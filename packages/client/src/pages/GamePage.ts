@@ -89,6 +89,9 @@ let moveToY = 0;
 let moveStartTime = 0;
 const moveStepDuration = 280;
 let isWaitingForChoice = false;
+let serverPath: number[] = [];
+let serverPathIndex = 0;
+let isServerAnimating = false;
 
 // Camera follow
 let cameraTargetX = 0;
@@ -709,16 +712,18 @@ export function createGamePage(controller: GameController): HTMLElement {
     });
 
     socket.on('server.playerMoved', (payload) => {
-      // 更新玩家位置并重新渲染
       const player = otherPlayers.find(p => p.id === payload.playerId);
       if (player) {
         player.position.cellId = payload.cellId;
         updateRendererPlayers();
       }
-      // 更新当前玩家的位置
       if (currentPlayer && payload.playerId === currentPlayer.id) {
-        currentPlayerPosition = payload.cellId;
-        (window as any).currentPlayerPosition = currentPlayerPosition;
+        if (payload.path && payload.path.length > 1 && !isServerAnimating) {
+          startServerPathAnimation(payload.path);
+        } else {
+          currentPlayerPosition = payload.cellId;
+          (window as any).currentPlayerPosition = currentPlayerPosition;
+        }
       }
     });
 
@@ -1635,12 +1640,16 @@ function updateMovement(): void {
   cameraTargetY = playerDisplayY;
 
   if (progress >= 1) {
-    remainingSteps--;
-    if (remainingSteps > 0) {
-      startNextStep();
+    if (isServerAnimating) {
+      advanceServerPathStep();
     } else {
-      isMoving = false;
-      onPlayerArrived();
+      remainingSteps--;
+      if (remainingSteps > 0) {
+        startNextStep();
+      } else {
+        isMoving = false;
+        onPlayerArrived();
+      }
     }
   }
 }
@@ -1674,6 +1683,52 @@ function animateMoveTo(targetId: number): void {
   moveStartTime = performance.now();
   currentPlayerPosition = targetId;
 (window as any).currentPlayerPosition = currentPlayerPosition;
+}
+
+function startServerPathAnimation(path: number[]): void {
+  if (!mapIndex || path.length < 2) return;
+  serverPath = path;
+  serverPathIndex = 0;
+  isServerAnimating = true;
+  isMoving = true;
+  actionUsedThisTurn = false;
+  hideHoverCard();
+  updateActionPanel();
+  addAchievementProgress('first_move', 1);
+  addAchievementProgress('moves_50', 1);
+  addAchievementProgress('moves_200', 1);
+  if (currentPlayerPosition === 0 && !talentsLocked) {
+    talentsLocked = true;
+    updateTopBar();
+  }
+  advanceServerPathStep();
+}
+
+function advanceServerPathStep(): void {
+  if (!mapIndex || !isServerAnimating) return;
+  serverPathIndex++;
+  if (serverPathIndex >= serverPath.length) {
+    isServerAnimating = false;
+    isMoving = false;
+    onPlayerArrived();
+    return;
+  }
+  const targetId = serverPath[serverPathIndex];
+  const target = mapIndex.getById(targetId);
+  if (!target) {
+    isServerAnimating = false;
+    isMoving = false;
+    onPlayerArrived();
+    return;
+  }
+  previousCellId = currentPlayerPosition;
+  moveFromX = playerDisplayX;
+  moveFromY = playerDisplayY;
+  moveToX = target.x;
+  moveToY = target.y;
+  moveStartTime = performance.now();
+  currentPlayerPosition = targetId;
+  (window as any).currentPlayerPosition = currentPlayerPosition;
 }
 
 function onIntersectionChoice(targetId: number): void {
@@ -1880,7 +1935,6 @@ function handleRollDice(): void {
         rollCooldownEnd = Date.now() + rollCooldown;
         addChatMessage(`🎲 掷出了 ${diceValue} 点！`, 'system');
         startRollCooldownTimer();
-        setTimeout(() => startMovement(diceValue), diceAnimDuration + 150);
       } else {
         addChatMessage(`❌ 掷骰失败：${result.error || '未知错误'}`, 'error');
         canRoll = true;
