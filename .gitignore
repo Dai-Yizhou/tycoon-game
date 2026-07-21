@@ -95,3 +95,7 @@ tmp/
 
 # release folder
 release/
+
+# AI bot screenshots
+ai-bot/screenshots/
+ai_bot_try/output/
