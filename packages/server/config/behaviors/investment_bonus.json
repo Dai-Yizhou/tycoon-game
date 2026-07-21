@@ -1,0 +1,47 @@
+{
+  "id": "investment_bonus",
+  "name": "投资项目奖励",
+  "description": "购买投资项目时，有概率获得额外收益",
+  "events": [
+    {
+      "msg": "💼 投资项目获得分红！金钱 +80",
+      "money": 80,
+      "credit": 0,
+      "env": 0,
+      "target": "player",
+      "weight": 5,
+      "good": true,
+      "creditModifier": 0.4
+    },
+    {
+      "msg": "📊 投资项目被推荐为优秀项目！信用值 +8",
+      "money": 0,
+      "credit": 8,
+      "env": 0,
+      "target": "player",
+      "weight": 4,
+      "good": true,
+      "creditModifier": 0.6
+    },
+    {
+      "msg": "🌱 投资绿色项目获得认证！环保值 +15",
+      "money": 0,
+      "credit": 0,
+      "env": 15,
+      "target": "player",
+      "weight": 4,
+      "good": true,
+      "creditModifier": 0.3
+    },
+    {
+      "msg": "🎯 投资项目获得政府补贴！金钱 +60，信用值 +5",
+      "money": 60,
+      "credit": 5,
+      "env": 0,
+      "target": "player",
+      "weight": 4,
+      "good": true,
+      "creditModifier": 0.5
+    }
+  ]
+}

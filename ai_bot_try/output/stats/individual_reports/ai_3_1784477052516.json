@@ -1,0 +1,61 @@
+{
+  "genomeId": "0.9386270487500152,0.46554198212998915,0.5445766863112554,0.7086042379249532,0.4558453320608754,0.77714498471989,0.7994564229145442,0.25483652672007817,0.07300721081039,0.4680299701478399,0.15231968718401967,0.9037125634927443,0.9044002962215997,0.9415996121311595,0.8918160407498256,0.6950991421852464,0.9259069936413129,0.16479094335326727,0.1648611494245641,0.44415310314020134,0.12570644350823246,0.06914915108175197,0.11443473436269934,0.07992755403374016,0.5055774657577043,0.5854007640519001,0.9065227725236686,0.25941501726737953,0.07318336720771758,0.8452397199993366",
+  "gene": {
+    "buyThreshold": 0.9386270487500152,
+    "buyUrgency": 0.46554198212998915,
+    "upgradeThreshold": 0.5445766863112554,
+    "upgradeUrgency": 0.7086042379249532,
+    "propertyDiversifyRatio": 0.4558453320608754,
+    "targetMonopolySize": 0.77714498471989,
+    "investmentThreshold": 0.7994564229145442,
+    "investmentUrgency": 0.25483652672007817,
+    "investmentHoldTime": 0.07300721081039,
+    "riskAdjustmentFactor": 0.4680299701478399,
+    "loanThreshold": 0.15231968718401967,
+    "loanAmountRatio": 0.9037125634927443,
+    "repayThreshold": 0.9044002962215997,
+    "interestTolerance": 0.9415996121311595,
+    "reserveRatio": 0.8918160407498256,
+    "emergencyReserveRatio": 0.6950991421852464,
+    "pathPreference": 0.9259069936413129,
+    "shortTermGainWeight": 0.16479094335326727,
+    "longTermGainWeight": 0.1648611494245641,
+    "safetyFactor": 0.44415310314020134,
+    "talentPriority": 0.12570644350823246,
+    "talentUnlockOrder": 0.06914915108175197,
+    "talentSynergyWeight": 0.11443473436269934,
+    "teamPreference": 0.07992755403374016,
+    "teamTrustThreshold": 0.5055774657577043,
+    "tradeWillingness": 0.5854007640519001,
+    "riskTolerance": 0.9065227725236686,
+    "monopolyStrategy": 0.25941501726737953,
+    "lossAversion": 0.07318336720771758,
+    "gainSeeking": 0.8452397199993366
+  },
+  "totalGenerations": 1,
+  "currentTier": 3,
+  "currentRank": 2,
+  "currentFitness": 0.6267233771705606,
+  "avgWinRate": 0,
+  "maxWinRate": 0,
+  "fitnessImprovement": 0,
+  "tierChanges": [
+    {
+      "generation": 68,
+      "tier": 3,
+      "change": "initial"
+    }
+  ],
+  "fullHistory": [
+    {
+      "generation": 68,
+      "tier": 3,
+      "rank": 2,
+      "fitness": 0.6267233771705606,
+      "winRate": 0,
+      "comebackScore": 0.06794444444444445,
+      "matchCount": 1,
+      "winCount": 0
+    }
+  ]
+}

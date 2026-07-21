@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>大富翁.io - 管理工具</title>
+  </head>
+  <body>
+    <div id="app">
+      <!-- 登录页面 -->
+      <div id="login-page" class="page">
+        <header class="admin-header">
+          <h1>大富翁.io - 管理工具</h1>
+          <p class="subtitle">管理员登录</p>
+        </header>
+        <main>
+          <section class="card login-card">
+            <h2>管理员登录</h2>
+            <form id="login-form">
+              <div class="form-group">
+                <label for="admin-token">管理令牌</label>
+                <input type="password" id="admin-token" name="token" placeholder="输入 ADMIN_TOKEN" required />
+              </div>
+              <div class="form-group">
+                <label for="server-url">服务器地址</label>
+                <input type="text" id="server-url" name="serverUrl" value="http://localhost:3000" required />
+              </div>
+              <button type="submit" id="btn-login">登录</button>
+              <p id="login-error" class="error-msg" style="display: none;"></p>
+            </form>
+          </section>
+        </main>
+      </div>
+
+      <!-- 管理面板（登录后显示） -->
+      <div id="admin-panel" class="page" style="display: none;">
+        <header class="admin-header">
+          <h1>大富翁.io - 管理工具</h1>
+          <p class="subtitle">时代切换 / 地图管理 / 玩家管理</p>
+          <button id="btn-logout" class="logout-btn">退出登录</button>
+        </header>
+        <main>
+          <!-- 玩家管理 -->
+          <section class="card">
+            <h2>玩家管理</h2>
+            <div class="toolbar">
+              <button id="btn-refresh-players" type="button">刷新玩家列表</button>
+            </div>
+            <div id="players-container">
+              <table class="players-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>用户名</th>
+                    <th>状态</th>
+                    <th>位置</th>
+                    <th>金钱</th>
+                    <th>队伍</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="players-list">
+                  <tr><td colspan="7" class="placeholder">暂无在线玩家</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- 时代管理 -->
+          <section class="card">
+            <h2>时代管理</h2>
+            <p>当前时代：<span id="current-era">-</span></p>
+            <p>当前地图：<span id="current-map">-</span></p>
+            <div class="actions">
+              <button id="btn-settle" type="button">触发时代结算</button>
+              <button id="btn-switch-era" type="button" disabled>切换到下一时代</button>
+            </div>
+          </section>
+
+          <!-- 地图列表 -->
+          <section class="card">
+            <h2>地图列表</h2>
+            <ul id="map-list">
+              <li class="placeholder">暂无地图（占位）</li>
+            </ul>
+          </section>
+        </main>
+        <footer class="admin-footer">
+          <small>管理工具 - 玩家管理 / 时代管理</small>
+        </footer>
+      </div>
+
+      <!-- 修改数值对话框 -->
+      <div id="edit-value-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+          <h3>修改玩家数值</h3>
+          <p id="modal-player-name">玩家：</p>
+          <form id="edit-value-form">
+            <div class="form-group">
+              <label for="edit-field">数值类型</label>
+              <select id="edit-field" name="fieldId">
+                <option value="money">金钱</option>
+                <option value="credit">信用值</option>
+                <option value="env">环保值</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="edit-new-value">新数值</label>
+              <input type="number" id="edit-new-value" name="value" required />
+            </div>
+            <div class="modal-actions">
+              <button type="submit">确认修改</button>
+              <button type="button" id="btn-cancel-edit">取消</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

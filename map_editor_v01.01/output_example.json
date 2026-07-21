@@ -1,0 +1,49 @@
+[
+  {
+    "id": 0,
+    "x": 356,
+    "y": 109,
+    "destinations": [],
+    "name": "",
+    "type": "",
+    "price": 0,
+    "rent": [
+      0,
+      10
+    ],
+    "description": [
+      "hi"
+    ],
+    "extra": [
+      ""
+    ],
+    "behavior": "",
+    "icon": "",
+    "level": 0,
+    "upgradeCost": [],
+    "owners": [],
+    "isMortgaged": 0,
+    "mortgagePrice": 0
+  },
+  {
+    "id": 1,
+    "x": 521,
+    "y": 284,
+    "destinations": [],
+    "name": "",
+    "type": "",
+    "price": 0,
+    "rent": [],
+    "description": [],
+    "extra": [
+      "34436"
+    ],
+    "behavior": "",
+    "icon": "",
+    "level": 0,
+    "upgradeCost": [],
+    "owners": [],
+    "isMortgaged": 0,
+    "mortgagePrice": 0
+  }
+]

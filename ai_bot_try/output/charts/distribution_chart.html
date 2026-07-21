@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>层级分布变化</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { margin: 0; padding: 20px; background: #fff; }
+    canvas { max-width: 100%; }
+  </style>
+</head>
+<body>
+  <h1 style="text-align: center; font-family: Arial, sans-serif; color: #333;">层级分布变化</h1>
+  <div style="width: 1200px; margin: 0 auto;">
+    <canvas id="chart"></canvas>
+  </div>
+  <script>
+    const labels = [100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119];
+    const t1Data = [50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50];
+    const t2Data = [50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50];
+    const t3Data = [50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50];
+    
+    new Chart(document.getElementById('chart'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          
+      { label: 'Tier 1', data: [], backgroundColor: '#ef4444' },
+      { label: 'Tier 2', data: [], backgroundColor: '#f59e0b' },
+      { label: 'Tier 3', data: [], backgroundColor: '#22c55e' }
+    
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { position: 'top', labels: { font: { size: 14 } } },
+          title: { display: true, text: '层级分布变化', font: { size: 18 } }
+        },
+        scales: {
+          y: { beginAtZero: true },
+          x: { title: { display: true, text: '世代' } }
+        }
+      }
+    });
+    
+    document.querySelectorAll('canvas')[0].parentElement.style.height = '600px';
+  </script>
+</body>
+</html>

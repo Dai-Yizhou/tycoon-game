@@ -1,0 +1,571 @@
+{
+  "genomeId": "0.5986148556103115,0.5211418774242695,0.8877637382014042,0.8875063085549186,0.02063143497796449,0.7283342313310791,0.5750664677686312,0.6935587640884316,0.18365348024488526,0.7090769868084634,0.5781992245862176,0.47176651343656917,0.9592846749923588,0.12214190609467712,0.8557051652316268,0.5533472643647298,0.7680402482969174,0.3214984068108546,0.11296648263104792,0.46647527525087196,0.0652158833990647,0.6986247100907318,0.3065266516354911,0.11412797942209307,0.06600549987785509,0.3205662219596027,0.18004541699026466,0.5478812382900425,0.5088837296077631,0.5609721548901057",
+  "gene": {
+    "buyThreshold": 0.5986148556103115,
+    "buyUrgency": 0.5211418774242695,
+    "upgradeThreshold": 0.8877637382014042,
+    "upgradeUrgency": 0.8875063085549186,
+    "propertyDiversifyRatio": 0.02063143497796449,
+    "targetMonopolySize": 0.7283342313310791,
+    "investmentThreshold": 0.5750664677686312,
+    "investmentUrgency": 0.6935587640884316,
+    "investmentHoldTime": 0.18365348024488526,
+    "riskAdjustmentFactor": 0.7090769868084634,
+    "loanThreshold": 0.5781992245862176,
+    "loanAmountRatio": 0.47176651343656917,
+    "repayThreshold": 0.9592846749923588,
+    "interestTolerance": 0.12214190609467712,
+    "reserveRatio": 0.8557051652316268,
+    "emergencyReserveRatio": 0.5533472643647298,
+    "pathPreference": 0.7680402482969174,
+    "shortTermGainWeight": 0.3214984068108546,
+    "longTermGainWeight": 0.11296648263104792,
+    "safetyFactor": 0.46647527525087196,
+    "talentPriority": 0.0652158833990647,
+    "talentUnlockOrder": 0.6986247100907318,
+    "talentSynergyWeight": 0.3065266516354911,
+    "teamPreference": 0.11412797942209307,
+    "teamTrustThreshold": 0.06600549987785509,
+    "tradeWillingness": 0.3205662219596027,
+    "riskTolerance": 0.18004541699026466,
+    "monopolyStrategy": 0.5478812382900425,
+    "lossAversion": 0.5088837296077631,
+    "gainSeeking": 0.5609721548901057
+  },
+  "totalGenerations": 35,
+  "currentTier": 2,
+  "currentRank": 1,
+  "currentFitness": 0.6433155573123456,
+  "avgWinRate": 0.9909523809523813,
+  "maxWinRate": 1,
+  "fitnessImprovement": -0.01401271470080101,
+  "tierChanges": [
+    {
+      "generation": 67,
+      "tier": 2,
+      "change": "initial"
+    },
+    {
+      "generation": 68,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 69,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 70,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 71,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 72,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 73,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 74,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 75,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 76,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 77,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 78,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 79,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 80,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 81,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 82,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 83,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 84,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 85,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 86,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 87,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 88,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 89,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 90,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 91,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 92,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 93,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 94,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 95,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 96,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 97,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 98,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 99,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 100,
+      "tier": 2,
+      "change": "stable"
+    },
+    {
+      "generation": 101,
+      "tier": 2,
+      "change": "stable"
+    }
+  ],
+  "fullHistory": [
+    {
+      "generation": 67,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6573282720131466,
+      "winRate": 1,
+      "comebackScore": 0.07418888888888889,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 68,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6550224177641344,
+      "winRate": 1,
+      "comebackScore": 0.06467222222222224,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 69,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6666532104999446,
+      "winRate": 1,
+      "comebackScore": 0.07005555555555557,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 70,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.656487972220708,
+      "winRate": 1,
+      "comebackScore": 0.053733333333333334,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 71,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6565611144611186,
+      "winRate": 1,
+      "comebackScore": 0.06448333333333334,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 72,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6599938467376033,
+      "winRate": 1,
+      "comebackScore": 0.07031111111111112,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 73,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.657251940125786,
+      "winRate": 1,
+      "comebackScore": 0.07943888888888889,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 74,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.653439086029985,
+      "winRate": 1,
+      "comebackScore": 0.08120000000000001,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 75,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6692355034785841,
+      "winRate": 1,
+      "comebackScore": 0.0698388888888889,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 76,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6667675178142692,
+      "winRate": 1,
+      "comebackScore": 0.049238888888888895,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 77,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6611622680349981,
+      "winRate": 1,
+      "comebackScore": 0.07108333333333332,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 78,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6344537699332335,
+      "winRate": 0.9666666666666667,
+      "comebackScore": 0.09893888888888887,
+      "matchCount": 60,
+      "winCount": 58
+    },
+    {
+      "generation": 79,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6501861218116078,
+      "winRate": 1,
+      "comebackScore": 0.08494444444444445,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 80,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6516505997272214,
+      "winRate": 1,
+      "comebackScore": 0.06762777777777779,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 81,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.659102438111832,
+      "winRate": 1,
+      "comebackScore": 0.06543333333333334,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 82,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6556999901723947,
+      "winRate": 1,
+      "comebackScore": 0.06293888888888889,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 83,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6501067354865648,
+      "winRate": 1,
+      "comebackScore": 0.07614444444444445,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 84,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6656910835304313,
+      "winRate": 1,
+      "comebackScore": 0.06960555555555555,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 85,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6601789128865466,
+      "winRate": 1,
+      "comebackScore": 0.06971666666666669,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 86,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6494030226178843,
+      "winRate": 0.9833333333333333,
+      "comebackScore": 0.08494999999999998,
+      "matchCount": 60,
+      "winCount": 59
+    },
+    {
+      "generation": 87,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.66497419789222,
+      "winRate": 1,
+      "comebackScore": 0.07051666666666666,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 88,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.662129444984553,
+      "winRate": 1,
+      "comebackScore": 0.06798888888888889,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 89,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6581180580416873,
+      "winRate": 1,
+      "comebackScore": 0.09247222222222223,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 90,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6674201879640579,
+      "winRate": 1,
+      "comebackScore": 0.06472777777777779,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 91,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6709250131026284,
+      "winRate": 1,
+      "comebackScore": 0.06920000000000003,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 92,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6572969666524805,
+      "winRate": 0.9833333333333333,
+      "comebackScore": 0.09957777777777778,
+      "matchCount": 60,
+      "winCount": 59
+    },
+    {
+      "generation": 93,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6633194044716909,
+      "winRate": 1,
+      "comebackScore": 0.05584444444444444,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 94,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6649911753971426,
+      "winRate": 1,
+      "comebackScore": 0.06282222222222221,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 95,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6674336281290354,
+      "winRate": 1,
+      "comebackScore": 0.06189999999999999,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 96,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6679578684169959,
+      "winRate": 1,
+      "comebackScore": 0.0613,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 97,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6468477580411266,
+      "winRate": 0.85,
+      "comebackScore": 0.09684999999999999,
+      "matchCount": 60,
+      "winCount": 51
+    },
+    {
+      "generation": 98,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6597265024956616,
+      "winRate": 1,
+      "comebackScore": 0.07051666666666667,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 99,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6438481097535059,
+      "winRate": 0.95,
+      "comebackScore": 0.07762222222222222,
+      "matchCount": 60,
+      "winCount": 57
+    },
+    {
+      "generation": 100,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6574003413390032,
+      "winRate": 1,
+      "comebackScore": 0.07872222222222224,
+      "matchCount": 60,
+      "winCount": 60
+    },
+    {
+      "generation": 101,
+      "tier": 2,
+      "rank": 1,
+      "fitness": 0.6433155573123456,
+      "winRate": 0.95,
+      "comebackScore": 0.09425000000000001,
+      "matchCount": 60,
+      "winCount": 57
+    }
+  ]
+}

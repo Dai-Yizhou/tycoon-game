@@ -1,0 +1,728 @@
+/**
+ * Socket.IO 管理器
+ *
+ * 职责：
+ * 1. 接收并管理客户端连接
+ * 2. 分层广播（全局 / 棋盘 / 区域 / 队伍 / 单玩家）
+ * 3. 鉴权与限流中间件
+ * 4. 与 GameWorld 集成：连接时绑定玩家，断开时解绑
+ *
+ * 房间命名约定：
+ * - `map:<mapId>`          : 同一棋盘的房间
+ * - `region:<mapId>:<regionId>` : 棋盘内某区域
+ * - `team:<teamId>`        : 队伍房间
+ * - `player:<playerId>`    : 单玩家私聊
+ * - `all`                  : 全局（默认）
+ *
+ * 性能要点：
+ * - Socket.IO 4.x 单实例支持 5000+ 并发；广播按房间切片避免无差别风暴
+ * - 中间件鉴权 + 限流在握手阶段执行，失败即拒绝连接
+ */
+
+import type { Server as SocketIOServer, Socket } from 'socket.io';
+import {
+  type ClientToServerEvents,
+  type ServerToClientEvents,
+  type SocketData,
+  type Player,
+  type ValueField,
+  type Team,
+  PlayerStatus,
+} from '@game/shared';
+import { logger } from '../utils/logger.js';
+import type { GameWorld } from '../world/GameWorld.js';
+import type { DayNightCycle } from '../world/DayNightCycle.js';
+import type { PlayerStore } from '../storage/PlayerStore.js';
+
+/**
+ * Socket.IO 类型化 Server
+ */
+export type TypedServer = SocketIOServer<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  Record<string, never>,
+  SocketData
+>;
+
+/**
+ * Socket.IO 类型化 Socket
+ */
+export type TypedSocket = Socket<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  Record<string, never>,
+  SocketData
+>;
+
+/**
+ * 限流配置
+ */
+export interface RateLimitConfig {
+  /** 时间窗口（毫秒） */
+  windowMs: number;
+  /** 时间窗口内允许的最大事件数 */
+  maxEvents: number;
+}
+
+/**
+ * Socket 管理器配置
+ */
+export interface SocketManagerOptions {
+  /** 关联的 GameWorld（必填） */
+  world: GameWorld;
+  /** 限流配置（默认 100 事件/10s） */
+  rateLimit?: RateLimitConfig;
+  /** 鉴权处理器；返回 null 表示通过，非 null 为 playerId */
+  authenticate?: (socket: TypedSocket, handshake: unknown) => string | null | Promise<string | null>;
+  /** 是否自动绑定 GameWorld 事件到广播（默认 true） */
+  autoWireWorldEvents?: boolean;
+  /** 昼夜循环实例（用于登录时同步时间给客户端） */
+  dayNightCycle?: DayNightCycle;
+  /** 玩家存储（用于账号持久化；不传则不持久化） */
+  playerStore?: PlayerStore;
+}
+
+/**
+ * Socket 管理器
+ */
+export class SocketManager {
+  private readonly io: TypedServer;
+  private readonly world: GameWorld;
+  private readonly rateLimit: RateLimitConfig;
+  private readonly authenticate?: SocketManagerOptions['authenticate'];
+  private readonly autoWireWorldEvents: boolean;
+  private dayNightCycle?: DayNightCycle;
+  private playerStore?: PlayerStore;
+
+  /** socketId -> 已发事件计数（按时间窗口重置） */
+  private readonly rateBuckets: Map<string, { count: number; windowStart: number }> = new Map();
+  /** 玩家 ID -> socketId 集合（一个玩家可能多个连接） */
+  private readonly playerSockets: Map<string, Set<string>> = new Map();
+
+  constructor(io: TypedServer, options: SocketManagerOptions) {
+    this.io = io;
+    this.world = options.world;
+    this.rateLimit = options.rateLimit ?? { windowMs: 10_000, maxEvents: 100 };
+    this.authenticate = options.authenticate;
+    this.autoWireWorldEvents = options.autoWireWorldEvents ?? true;
+    this.dayNightCycle = options.dayNightCycle;
+    this.playerStore = options.playerStore;
+
+    this.io.use((socket, next) => this.middleware(socket as TypedSocket, next));
+    this.io.on('connection', (socket) => this.onConnection(socket as TypedSocket));
+
+    if (this.autoWireWorldEvents) {
+      this.wireWorldEvents();
+    }
+  }
+
+  /**
+   * 获取底层 Socket.IO Server
+   */
+  getIO(): TypedServer {
+    return this.io;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 房间命名辅助
+  // ---------------------------------------------------------------------------
+
+  static mapRoom(mapId: string): string {
+    return `map:${mapId}`;
+  }
+
+  static regionRoom(mapId: string, regionId: string): string {
+    return `region:${mapId}:${regionId}`;
+  }
+
+  static teamRoom(teamId: string): string {
+    return `team:${teamId}`;
+  }
+
+  static playerRoom(playerId: string): string {
+    return `player:${playerId}`;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 广播分层
+  // ---------------------------------------------------------------------------
+
+  /**
+   * 全局广播
+   */
+  broadcast<K extends keyof ServerToClientEvents>(
+    event: K,
+    ...args: Parameters<ServerToClientEvents[K]>
+  ): void {
+    this.io.emit(event, ...(args as Parameters<ServerToClientEvents[K]>));
+  }
+
+  /**
+   * 棋盘内广播
+   */
+  broadcastToMap<K extends keyof ServerToClientEvents>(
+    mapId: string,
+    event: K,
+    ...args: Parameters<ServerToClientEvents[K]>
+  ): void {
+    this.io.to(SocketManager.mapRoom(mapId)).emit(event, ...(args as Parameters<ServerToClientEvents[K]>));
+  }
+
+  /**
+   * 区域内广播
+   */
+  broadcastToRegion<K extends keyof ServerToClientEvents>(
+    mapId: string,
+    regionId: string,
+    event: K,
+    ...args: Parameters<ServerToClientEvents[K]>
+  ): void {
+    this.io
+      .to(SocketManager.regionRoom(mapId, regionId))
+      .emit(event, ...(args as Parameters<ServerToClientEvents[K]>));
+  }
+
+  /**
+   * 队伍内广播
+   */
+  broadcastToTeam<K extends keyof ServerToClientEvents>(
+    teamId: string,
+    event: K,
+    ...args: Parameters<ServerToClientEvents[K]>
+  ): void {
+    this.io.to(SocketManager.teamRoom(teamId)).emit(event, ...(args as Parameters<ServerToClientEvents[K]>));
+  }
+
+  /**
+   * 单玩家推送
+   *
+   * - 一个玩家可能多端在线，全部推送
+   * - 未找到玩家时静默
+   */
+  emitToPlayer<K extends keyof ServerToClientEvents>(
+    playerId: string,
+    event: K,
+    ...args: Parameters<ServerToClientEvents[K]>
+  ): void {
+    const sockets = this.playerSockets.get(playerId);
+    if (!sockets || sockets.size === 0) return;
+    for (const sid of sockets) {
+      const target = this.io.sockets.sockets.get(sid);
+      if (target) {
+        target.emit(event, ...(args as Parameters<ServerToClientEvents[K]>));
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 中间件
+  // ---------------------------------------------------------------------------
+
+  private async middleware(
+    socket: TypedSocket,
+    next: (err?: Error) => void,
+  ): Promise<void> {
+    try {
+      // 1. 鉴权
+      if (this.authenticate) {
+        const playerId = await this.authenticate(socket, socket.handshake);
+        if (typeof playerId === 'string' && playerId.length > 0) {
+          socket.data.playerId = playerId;
+          socket.data.authenticated = true;
+        } else {
+          socket.data.authenticated = false;
+        }
+      } else {
+        socket.data.authenticated = true;
+      }
+
+      // 2. 限流（仅在握手阶段粗粒度限制；详细速率在 onConnection 内做）
+      const ip = socket.handshake.address;
+      socket.data.remoteAddress = ip;
+
+      next();
+    } catch (err) {
+      next(err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 连接生命周期
+  // ---------------------------------------------------------------------------
+
+  private onConnection(socket: TypedSocket): void {
+    logger.info(`socket connected: ${socket.id}`, { remote: socket.data.remoteAddress });
+
+    // 绑定玩家（如已鉴权）
+    const playerId = socket.data.playerId;
+    if (playerId) {
+      this.trackPlayerSocket(playerId, socket.id);
+      const player = this.world.getPlayer(playerId);
+      if (player) {
+        this.world.getPlayerManager().connectPlayer(playerId, socket.id);
+      } else {
+        logger.warn(`socket authenticated with unknown player: ${playerId}`);
+      }
+    }
+
+    // 限流：每连接维护一个桶
+    this.rateBuckets.set(socket.id, { count: 0, windowStart: Date.now() });
+
+    // 任意事件触发限流计数（使用 socket.onAny）
+    socket.onAny(() => {
+      this.consumeRate(socket);
+    });
+
+    // 业务事件：客户端不需传 socketId，使用连接级 socket
+    this.registerCoreHandlers(socket);
+
+    socket.on('disconnect', (reason) => this.onDisconnect(socket, reason));
+  }
+
+  private onDisconnect(socket: TypedSocket, reason: string): void {
+    logger.info(`socket disconnected: ${socket.id} (${reason})`);
+    const playerId = socket.data.playerId;
+    if (playerId) {
+      // 保存玩家状态到 PlayerStore（非游客模式且有存储时）
+      // 在冻结之前保存，确保存储中的状态是真实游戏状态而非 frozen
+      if (!socket.data.guest && this.playerStore) {
+        const player = this.world.getPlayer(playerId);
+        if (player) {
+          this.playerStore.savePlayer(player).catch((err) => {
+            logger.error(`failed to save player ${playerId} on disconnect`, err);
+          });
+        }
+      }
+
+      const set = this.playerSockets.get(playerId);
+      if (set) {
+        set.delete(socket.id);
+        if (set.size === 0) {
+          this.playerSockets.delete(playerId);
+          // 全部连接断开时冻结玩家
+          this.world.getPlayerManager().disconnectPlayer(playerId);
+        }
+      }
+    }
+    this.rateBuckets.delete(socket.id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 限流
+  // ---------------------------------------------------------------------------
+
+  private consumeRate(socket: TypedSocket): void {
+    const bucket = this.rateBuckets.get(socket.id);
+    if (!bucket) return;
+    const now = Date.now();
+    if (now - bucket.windowStart >= this.rateLimit.windowMs) {
+      bucket.windowStart = now;
+      bucket.count = 0;
+    }
+    bucket.count += 1;
+    if (bucket.count > this.rateLimit.maxEvents) {
+      // 触发限流：发送错误事件
+      socket.emit('server.error', { code: 'RATE_LIMIT', message: 'Too many events' });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 玩家 socket 跟踪
+  // ---------------------------------------------------------------------------
+
+  private trackPlayerSocket(playerId: string, socketId: string): void {
+    let set = this.playerSockets.get(playerId);
+    if (!set) {
+      set = new Set();
+      this.playerSockets.set(playerId, set);
+    }
+    set.add(socketId);
+  }
+
+  private getPlayerSocket(playerId: string): string | undefined {
+    const set = this.playerSockets.get(playerId);
+    if (!set || set.size === 0) return undefined;
+    return set.values().next().value;
+  }
+
+  /**
+   * 主动断开某玩家的全部连接（用于踢人/封禁）
+   */
+  disconnectPlayer(playerId: string, reason: string = 'server_kick'): void {
+    const set = this.playerSockets.get(playerId);
+    if (!set) return;
+    for (const sid of set) {
+      const sock = this.io.sockets.sockets.get(sid);
+      if (sock) {
+        sock.emit('server.error', { code: 'KICKED', message: reason });
+        sock.disconnect(true);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 核心事件处理器（心跳 + 鉴权 + 房间加入）
+  // ---------------------------------------------------------------------------
+
+  /**
+   * 注入昼夜循环实例（供登录时同步时间给客户端）
+   */
+  setDayNightCycle(dayNightCycle: DayNightCycle): void {
+    this.dayNightCycle = dayNightCycle;
+  }
+
+  /**
+   * 注入玩家存储实例（供登录恢复账号与断开时保存状态）
+   */
+  setPlayerStore(playerStore: PlayerStore): void {
+    this.playerStore = playerStore;
+  }
+
+  private registerCoreHandlers(socket: TypedSocket): void {
+    // 心跳
+    socket.on('client.ping', (payload, ack) => {
+      const response = {
+        timestamp: payload?.timestamp ?? Date.now(),
+        serverTime: Date.now(),
+      };
+      if (typeof ack === 'function') {
+        ack(response);
+      } else {
+        socket.emit('server.pong', response);
+      }
+    });
+
+    // 登录/加入游戏
+    socket.on('client.login', async (payload, ack) => {
+      try {
+        const username = payload?.username?.trim();
+        if (!username || username.length < 2) {
+          ack?.({ ok: false, error: '用户名至少需要2个字符' });
+          return;
+        }
+
+        const isGuest = payload?.guest === true;
+        const now = Date.now();
+
+        let player: Player;
+        let isNewPlayer = false;
+
+        if (isGuest) {
+          // 游客模式：创建临时玩家，不持久化
+          const playerId = `guest_${now}_${Math.random().toString(36).slice(2, 8)}`;
+          player = SocketManager.createDefaultPlayer(playerId, username, now);
+          socket.data.guest = true;
+        } else if (this.playerStore) {
+          // 非游客模式：尝试从存储中按用户名加载已有玩家
+          const existing = this.playerStore.loadPlayerByUsername
+            ? await this.playerStore.loadPlayerByUsername(username)
+            : null;
+          if (existing) {
+            // 恢复已有玩家状态
+            player = existing;
+            // 离线冻结的玩家重连时恢复为正常状态
+            if (player.status === PlayerStatus.Frozen) {
+              player.status = PlayerStatus.Normal;
+            }
+            player.lastActiveAt = now;
+          } else {
+            // 新玩家
+            const playerId = `p_${now}_${Math.random().toString(36).slice(2, 8)}`;
+            player = SocketManager.createDefaultPlayer(playerId, username, now);
+            isNewPlayer = true;
+          }
+        } else {
+          // 无 PlayerStore：创建新玩家（保持原有行为）
+          const playerId = `p_${now}_${Math.random().toString(36).slice(2, 8)}`;
+          player = SocketManager.createDefaultPlayer(playerId, username, now);
+        }
+
+        // 检查玩家是否已在游戏世界中（可能是冻结状态的重连）
+        const existingInWorld = this.world.getPlayer(player.id);
+        if (existingInWorld) {
+          // 玩家已在世界中（重连），更新数据并解冻
+          this.world.updatePlayer(player);
+          this.world.getPlayerManager().connectPlayer(player.id, socket.id);
+        } else {
+          // 添加到游戏世界
+          const added = this.world.addPlayer(player, socket.id);
+          if (!added) {
+            ack?.({ ok: false, error: '玩家已存在' });
+            return;
+          }
+        }
+
+        // 绑定 playerId 到 socket
+        socket.data.playerId = player.id;
+        this.trackPlayerSocket(player.id, socket.id);
+
+        // 保存到 PlayerStore（非游客模式且有存储时）
+        if (!isGuest && this.playerStore) {
+          try {
+            await this.playerStore.savePlayer(player);
+          } catch (err) {
+            logger.error(`failed to save player ${player.id}`, err);
+          }
+        }
+
+        // 获取昼夜周期信息
+        const cycleStartTime = this.dayNightCycle?.getCycleStartTime() ?? now;
+        const cycleMinutes = this.dayNightCycle?.getConfig().cycleMinutes ?? 15;
+
+        logger.info(
+          `player logged in: ${username} (${player.id})` +
+            `${isGuest ? ' [guest]' : ''}${isNewPlayer ? ' [new]' : ''}`,
+        );
+
+        // 获取已有玩家列表（排除当前玩家）
+        const existingPlayers = this.world.getAllPlayers().filter(p => p.id !== player.id);
+
+        ack?.({
+          ok: true,
+          data: {
+            player,
+            serverTime: now,
+            cycleStartTime,
+            cycleMinutes,
+            existingPlayers,
+          },
+        });
+
+        // 广播玩家加入
+        this.io.emit('server.playerJoined', player);
+      } catch (err) {
+        logger.error('login error', err);
+        ack?.({ ok: false, error: '登录失败' });
+      }
+    });
+
+    // 组队邀请
+    socket.on('client.inviteToTeam', (payload, ack) => {
+      try {
+        const targetPlayerId = payload?.targetPlayerId;
+        if (!targetPlayerId) {
+          ack?.({ ok: false, error: '目标玩家ID不能为空' });
+          return;
+        }
+
+        const playerId = socket.data.playerId;
+        if (!playerId) {
+          ack?.({ ok: false, error: '未登录' });
+          return;
+        }
+        const inviterPlayer = this.world.getPlayer(playerId);
+        const targetPlayer = this.world.getPlayer(targetPlayerId);
+
+        if (!inviterPlayer) {
+          ack?.({ ok: false, error: '邀请者不存在' });
+          return;
+        }
+
+        if (!targetPlayer) {
+          ack?.({ ok: false, error: '目标玩家不存在' });
+          return;
+        }
+
+        if (inviterPlayer.id === targetPlayerId) {
+          ack?.({ ok: false, error: '不能邀请自己' });
+          return;
+        }
+
+        // 邀请者若无队伍，则先创建
+        let teamId = inviterPlayer.teamId;
+        if (!teamId) {
+          teamId = `team_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          const newTeam: Team = {
+            id: teamId,
+            name: `${inviterPlayer.username}的队伍`,
+            memberIds: [inviterPlayer.id],
+            sharedValues: {},
+            createdAt: Date.now(),
+            disbanded: false,
+            leaderId: inviterPlayer.id,
+          };
+          this.world.createTeam(newTeam);
+          inviterPlayer.teamId = teamId;
+          this.world.updatePlayer(inviterPlayer);
+          logger.info(`team created: ${teamId}, leader: ${inviterPlayer.username}`);
+        }
+
+        // 获取目标玩家的 socket
+        const targetSocketId = this.getPlayerSocket(targetPlayerId);
+        if (!targetSocketId) {
+          ack?.({ ok: false, error: '目标玩家不在线' });
+          return;
+        }
+
+        // 发送邀请通知给目标玩家（包含真实 teamId）
+        this.io.to(targetSocketId).emit('server.teamInviteReceived', {
+          inviterId: inviterPlayer.id,
+          inviterName: inviterPlayer.username,
+          inviteId: `invite_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          teamId,
+        });
+
+        logger.info(`team invite sent: ${inviterPlayer.username} -> ${targetPlayer.username}`);
+        const team = this.world.getTeam(teamId);
+        ack?.({ ok: true, data: { team: team!, message: '邀请已发送' } });
+      } catch (err) {
+        logger.error('team invite error', err);
+        ack?.({ ok: false, error: '邀请失败' });
+      }
+    });
+
+    // 加入队伍
+    socket.on('client.joinTeam', (payload, ack) => {
+      try {
+        const teamId = payload?.teamId;
+        if (!teamId) {
+          ack?.({ ok: false, error: '队伍ID不能为空' });
+          return;
+        }
+
+        const playerId = socket.data.playerId;
+        if (!playerId) {
+          ack?.({ ok: false, error: '未登录' });
+          return;
+        }
+        const player = this.world.getPlayer(playerId);
+        if (!player) {
+          ack?.({ ok: false, error: '玩家不存在' });
+          return;
+        }
+
+        if (player.teamId) {
+          ack?.({ ok: false, error: '你已在队伍中' });
+          return;
+        }
+
+        const team = this.world.getTeam(teamId);
+        if (!team || team.disbanded) {
+          ack?.({ ok: false, error: '队伍不存在或已解散' });
+          return;
+        }
+
+        const success = this.world.addTeamMember(teamId, player.id);
+        if (success) {
+          logger.info(`player joined team: ${player.username} -> team ${teamId}`);
+          
+          const inviter = this.world.getPlayer(team.memberIds[0]);
+          if (inviter) {
+            const inviterSocketId = this.getPlayerSocket(inviter.id);
+            if (inviterSocketId) {
+              this.io.to(inviterSocketId).emit('server.teamMemberJoined', {
+                playerId: player.id,
+                playerName: player.username,
+              });
+            }
+          }
+
+          ack?.({ ok: true, data: { team } });
+        } else {
+          ack?.({ ok: false, error: '加入队伍失败' });
+        }
+      } catch (err) {
+        logger.error('join team error', err);
+        ack?.({ ok: false, error: '加入队伍失败' });
+      }
+    });
+
+    // 离开队伍
+    socket.on('client.leaveTeam', (_payload, ack) => {
+      try {
+        const playerId = socket.data.playerId;
+        if (!playerId) {
+          ack?.({ ok: false, error: '未登录' });
+          return;
+        }
+        const player = this.world.getPlayer(playerId);
+        if (!player) {
+          ack?.({ ok: false, error: '玩家不存在' });
+          return;
+        }
+
+        if (!player.teamId) {
+          ack?.({ ok: false, error: '你不在队伍中' });
+          return;
+        }
+
+        const team = this.world.getTeam(player.teamId);
+        const teamName = team?.name || player.teamId;
+
+        const success = this.world.removeTeamMember(player.teamId, player.id);
+        if (success) {
+          logger.info(`player left team: ${player.username} -> team ${player.teamId}`);
+          ack?.({ ok: true, data: { teamName } });
+        } else {
+          ack?.({ ok: false, error: '离开队伍失败' });
+        }
+      } catch (err) {
+        logger.error('leave team error', err);
+        ack?.({ ok: false, error: '离开队伍失败' });
+      }
+    });
+  }
+
+  /**
+   * 创建默认玩家对象
+   *
+   * 包含初始数值字段（金钱 2000、信用值 50），位置在起点。
+   */
+  private static createDefaultPlayer(playerId: string, username: string, now: number): Player {
+    const values: Record<string, ValueField> = {
+      money: { id: 'money', name: '财产', current: 2000, min: 0 },
+      credit: { id: 'credit', name: '信用值', current: 50, min: 0, max: 100 },
+    };
+
+    return {
+      id: playerId,
+      username,
+      teamId: null,
+      position: { cellId: 0 },
+      values,
+      items: [],
+      status: PlayerStatus.Normal,
+      createdAt: now,
+      lastActiveAt: now,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // GameWorld 事件自动转发
+  // ---------------------------------------------------------------------------
+
+  private wireWorldEvents(): void {
+    this.world.on('playerAdded', ({ player }: { player: import('@game/shared').Player }) => {
+      this.broadcast('server.playerJoined', player);
+    });
+
+    this.world.on('playerRemoved', ({ playerId }: { playerId: string }) => {
+      this.broadcast('server.playerLeft', { playerId });
+    });
+
+    this.world.on('playerUpdated', ({ player }: { player: import('@game/shared').Player }) => {
+      this.broadcast('server.playerMoved', { playerId: player.id, cellId: player.position.cellId });
+    });
+
+    this.world.on('eraChanged', ({ previousEraId, newEra }: { previousEraId: string | null; newEra: import('@game/shared').EraInfo }) => {
+      this.broadcast('server.eraChanged', {
+        previousEraId,
+        newEraId: newEra.id,
+        newMapId: newEra.mapId,
+      });
+    });
+  }
+
+  /**
+   * 关闭管理器
+   *
+   * 关闭所有连接并清理资源。
+   */
+  async close(): Promise<void> {
+    this.rateBuckets.clear();
+    this.playerSockets.clear();
+    await new Promise<void>((resolve) => {
+      this.io.close(() => resolve());
+    });
+  }
+}

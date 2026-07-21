@@ -1,0 +1,67 @@
+{
+  "id": "monument_special",
+  "name": "纪念碑特殊效果",
+  "description": "修缮纪念碑时，有概率触发特殊效果",
+  "events": [
+    {
+      "msg": "🏛️ 修缮纪念碑发现古董！金钱 +100",
+      "money": 100,
+      "credit": 0,
+      "env": 0,
+      "target": "player",
+      "weight": 4,
+      "good": true,
+      "creditModifier": 0.3
+    },
+    {
+      "msg": "📜 修缮纪念碑被媒体报道！信用值 +15",
+      "money": 0,
+      "credit": 15,
+      "env": 0,
+      "target": "player",
+      "weight": 3,
+      "good": true,
+      "creditModifier": 0.7
+    },
+    {
+      "msg": "🌿 修缮纪念碑获得环保认证！环保值 +20",
+      "money": 0,
+      "credit": 0,
+      "env": 20,
+      "target": "player",
+      "weight": 4,
+      "good": true,
+      "creditModifier": 0.4
+    },
+    {
+      "msg": "🏆 修缮纪念碑获得表彰！金钱 +80，信用值 +10",
+      "money": 80,
+      "credit": 10,
+      "env": 0,
+      "target": "player",
+      "weight": 3,
+      "good": true,
+      "creditModifier": 0.6
+    },
+    {
+      "msg": "🌸 修缮纪念碑美化环境！区域所有玩家环保值 +5",
+      "money": 0,
+      "credit": 0,
+      "env": 5,
+      "target": "region",
+      "weight": 3,
+      "good": true,
+      "creditModifier": 0.3
+    },
+    {
+      "msg": "🎁 修缮纪念碑获得赞助商奖励！金钱 +150",
+      "money": 150,
+      "credit": 0,
+      "env": 0,
+      "target": "player",
+      "weight": 3,
+      "good": true,
+      "creditModifier": 0.2
+    }
+  ]
+}

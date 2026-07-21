@@ -1,0 +1,47 @@
+{
+  "id": "start_bonus",
+  "name": "起点额外奖励",
+  "description": "经过起点时，有概率获得额外奖励",
+  "events": [
+    {
+      "msg": "🎉 经过起点，获得额外奖励！金钱 +100",
+      "money": 100,
+      "credit": 0,
+      "env": 0,
+      "target": "player",
+      "weight": 5,
+      "good": true,
+      "creditModifier": 0.2
+    },
+    {
+      "msg": "🎰 经过起点，运气爆棚！金钱 +200，信用值 +10",
+      "money": 200,
+      "credit": 10,
+      "env": 0,
+      "target": "player",
+      "weight": 3,
+      "good": true,
+      "creditModifier": 0.5
+    },
+    {
+      "msg": "💰 经过起点，发现遗失的钱包！金钱 +150",
+      "money": 150,
+      "credit": 0,
+      "env": 0,
+      "target": "player",
+      "weight": 4,
+      "good": true,
+      "creditModifier": 0.3
+    },
+    {
+      "msg": "🌟 经过起点，好运连连！金钱 +50，环保值 +5",
+      "money": 50,
+      "credit": 0,
+      "env": 5,
+      "target": "player",
+      "weight": 4,
+      "good": true,
+      "creditModifier": 0.2
+    }
+  ]
+}

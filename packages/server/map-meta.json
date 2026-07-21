@@ -1,0 +1,112 @@
+{
+  "id": "example-map",
+  "name": "示例地图 - 测试",
+  "version": "1.0.0",
+  "templateName": "default",
+  "startCellId": 0,
+  "dayNightCycleMinutes": 15,
+  "timezones": [
+    {
+      "id": "tz-central",
+      "name": "中央时区",
+      "offsetMinutes": 0,
+      "cellIds": [0, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+    },
+    {
+      "id": "tz-central-north",
+      "name": "中央时区·北部",
+      "offsetMinutes": 0,
+      "parentId": "tz-central",
+      "cellIds": [16, 17, 18, 19]
+    },
+    {
+      "id": "tz-central-south",
+      "name": "中央时区·南部",
+      "offsetMinutes": 0,
+      "parentId": "tz-central",
+      "cellIds": [20, 21, 22, 23, 24]
+    },
+    {
+      "id": "tz-east",
+      "name": "东部时区",
+      "offsetMinutes": 60,
+      "cellIds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    },
+    {
+      "id": "tz-east-coastal",
+      "name": "东部时区·沿海",
+      "offsetMinutes": 60,
+      "parentId": "tz-east",
+      "cellIds": [1, 2, 3, 4, 5]
+    },
+    {
+      "id": "tz-east-inland",
+      "name": "东部时区·内陆",
+      "offsetMinutes": 60,
+      "parentId": "tz-east",
+      "cellIds": [6, 7, 8, 9, 10]
+    },
+    {
+      "id": "tz-west",
+      "name": "西部时区",
+      "offsetMinutes": -60,
+      "cellIds": [25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+    },
+    {
+      "id": "tz-west-mountain",
+      "name": "西部时区·山区",
+      "offsetMinutes": -90,
+      "parentId": "tz-west",
+      "cellIds": [25, 26, 27]
+    },
+    {
+      "id": "tz-west-plain",
+      "name": "西部时区·平原",
+      "offsetMinutes": -60,
+      "parentId": "tz-west",
+      "cellIds": [28, 29, 30, 31, 32, 33, 34]
+    },
+    {
+      "id": "tz-south",
+      "name": "南部时区",
+      "offsetMinutes": 30,
+      "cellIds": [11, 12, 13, 14, 15, 35, 36, 37, 38, 39]
+    }
+  ],
+  "regions": [
+    {
+      "id": "region-central",
+      "name": "中央区域",
+      "cellIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      "prosperity": 80,
+      "environmentValue": 50,
+      "color": "#4CAF50"
+    },
+    {
+      "id": "region-outer",
+      "name": "外围区域",
+      "cellIds": [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39],
+      "prosperity": 60,
+      "environmentValue": 40,
+      "color": "#2196F3"
+    }
+  ],
+  "valueFieldDefinitions": [
+    { "id": "money", "name": "财产", "current": 2000, "min": 0, "scope": "player" },
+    { "id": "credit", "name": "信用值", "current": 0, "min": 0, "scope": "player" },
+    { "id": "environmental", "name": "环保值", "current": 50, "min": 0, "max": 100, "scope": "region" }
+  ],
+  "config": {
+    "era": "古典时代",
+    "startBonus": 2000,
+    "passBonus": 200,
+    "taxRate": {
+      "property": 0.01,
+      "money": 0.02,
+      "investment": 0.015
+    },
+    "diceCooldownSeconds": 5,
+    "jailCooldownSeconds": 10,
+    "jailDurationTurns": 3
+  }
+}
