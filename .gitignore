@@ -36,6 +36,7 @@ lerna-debug.log*
 .env.development
 .env.production
 .env.test
+.obsidian/
 
 # Cache
 .cache/
@@ -63,12 +64,6 @@ prisma/migrations/dev/
 
 # OS
 Thumbs.db
-
-# AI training outputs
-ai-bot-try/output/
-
-# Trae spec files
-.trae/
 
 # Large AI/model files
 ollama/
