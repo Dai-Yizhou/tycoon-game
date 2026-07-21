@@ -31,6 +31,8 @@ declare global {
     showTeamManagement: () => void;
     removeTeamMember: (memberId: string) => void;
     leaveTeam: () => void;
+    acceptTeamInvite: () => void;
+    rejectTeamInvite: () => void;
     nextTutorialStep: () => void;
     prevTutorialStep: () => void;
     endTutorial: () => void;
@@ -1530,6 +1532,7 @@ function updateRendererPlayers(): void {
     status: op.status,
     values: { money: { id: 'money', name: '财产', current: op.primaryValue, min: 0 } },
     teamId: null,
+    items: [],
     createdAt: Date.now(),
     lastActiveAt: Date.now(),
   }))];
