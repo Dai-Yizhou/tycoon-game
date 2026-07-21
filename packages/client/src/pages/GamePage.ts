@@ -727,6 +727,14 @@ export function createGamePage(controller: GameController): HTMLElement {
       }
     });
 
+    socket.on('server.askPath', (payload) => {
+      if (!currentPlayer) return;
+      isWaitingForChoice = true;
+      const optionIds = payload.options.map(opt => opt.cellId);
+      showIntersectionChoice(optionIds);
+      addChatMessage(`🔀 请选择移动方向：${payload.options.map(o => o.label).join(' / ')}`, 'system');
+    });
+
     socket.on('server.valueChanged', (payload) => {
       // 更新玩家财产（如果fieldId === 'money')
       if (payload.fieldId === 'money') {
@@ -1629,7 +1637,7 @@ function updateDiceAnimation(): void {
 
 // ===== Movement =====
 function updateMovement(): void {
-  if (!isMoving || isWaitingForChoice) return;
+  if (!isMoving) return;
   const elapsed = performance.now() - moveStartTime;
   const progress = Math.min(elapsed / moveStepDuration, 1);
   const t = easeInOutQuad(progress);
@@ -1734,7 +1742,16 @@ function advanceServerPathStep(): void {
 function onIntersectionChoice(targetId: number): void {
   isWaitingForChoice = false;
   hideIntersectionChoice();
-  animateMoveTo(targetId);
+  if (gameSocket) {
+    gameSocket.emit('client.choosePath', {
+      fromCellId: currentPlayerPosition,
+      toCellId: targetId,
+    }, (result) => {
+      if (!result.ok) {
+        addChatMessage(`❌ 路径选择失败：${result.error || '未知错误'}`, 'error');
+      }
+    });
+  }
 }
 
 function showIntersectionChoice(options: number[]): void {
@@ -1910,7 +1927,7 @@ function drawOtherPlayers(): void {
 
 // ===== Game Logic =====
 function handleRollDice(): void {
-  if (!canRoll || isMoving || diceAnimating || isBankrupt) return;
+  if (!canRoll || isMoving || diceAnimating || isBankrupt || isWaitingForChoice) return;
   if (isInJail) {
     const now = Date.now();
     if (now < jailEndTime) {
@@ -1940,14 +1957,6 @@ function handleRollDice(): void {
         canRoll = true;
       }
     });
-  } else {
-    diceValue = Math.floor(Math.random() * 6) + 1;
-    diceAnimating = true;
-    diceAnimStart = performance.now();
-    rollCooldownEnd = now + rollCooldown;
-    addChatMessage(`🎲 掷出了 ${diceValue} 点！`, 'system');
-    startRollCooldownTimer();
-    setTimeout(() => startMovement(diceValue), diceAnimDuration + 150);
   }
 }
 
@@ -1976,61 +1985,6 @@ function startRollCooldownTimer(): void {
   };
   update();
   rollCooldownTimer = setInterval(update, 100);
-}
-
-function startMovement(steps: number): void {
-  if (!mapIndex) return;
-  // Lock talents once the player departs from the start cell
-  if (currentPlayerPosition === 0 && !talentsLocked) {
-    talentsLocked = true;
-    updateTopBar();
-  }
-  remainingSteps = steps;
-  isMoving = true;
-  actionUsedThisTurn = false;
-  hideHoverCard();
-  updateActionPanel();
-  addAchievementProgress('first_move', 1);
-  addAchievementProgress('moves_50', 1);
-  addAchievementProgress('moves_200', 1);
-
-  showPathPrediction(steps);
-  startNextStep();
-}
-
-let predictedPath: number[] = [];
-
-function showPathPrediction(steps: number): void {
-  if (!mapIndex) return;
-  predictedPath = [];
-  let pos = currentPlayerPosition;
-  let prev = previousCellId;
-
-  for (let i = 0; i < steps; i++) {
-    const cell = mapIndex.getById(pos);
-    if (!cell) break;
-    predictedPath.push(pos);
-
-    let available = cell.destinations.filter(d => d !== prev);
-    if (available.length === 0) available = [...cell.destinations];
-    if (available.length === 0) break;
-
-    if (available.length === 1) {
-      prev = pos;
-      pos = available[0];
-    } else {
-      addChatMessage(`💡 提示：移动 ${i + 1} 步后会遇到岔路口（${available.length}个方向）`, 'system');
-      predictedPath.push(pos);
-      break;
-    }
-  }
-
-  if (predictedPath.length > 0) {
-    const finalCell = mapIndex.getById(predictedPath[predictedPath.length - 1]);
-    if (finalCell) {
-      addChatMessage(`📍 预计到达：${cName(finalCell)}${predictedPath.length < steps ? '（途中有岔路）' : ''}`, 'system');
-    }
-  }
 }
 
 function onPlayerArrived(): void {

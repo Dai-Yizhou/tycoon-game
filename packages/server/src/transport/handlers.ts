@@ -97,8 +97,18 @@ export class HandlerRegistry {
   constructor(io: TypedServer, world: GameWorld) {
     this.io = io;
     this.world = world;
-    // 初始化掷骰和移动处理器
-    this.diceHandler = new DiceHandler(io, world, this);
+
+    const mapMeta = world.getMapMeta();
+    const diceConfig = mapMeta?.config ?? {};
+
+    const cooldownConfig = {
+      normal: ((diceConfig.diceCooldownSeconds as number) ?? 5) * 1000,
+      jail: ((diceConfig.jailCooldownSeconds as number) ?? 10) * 1000,
+      diceMin: (diceConfig.diceMin as number) ?? 1,
+      diceMax: (diceConfig.diceMax as number) ?? 6,
+    };
+
+    this.diceHandler = new DiceHandler(io, world, this, cooldownConfig);
     this.movementHandler = new MovementHandler(io, world);
     // 初始化地产处理器
     this.propertyHandler = new PropertyHandler(io, world);

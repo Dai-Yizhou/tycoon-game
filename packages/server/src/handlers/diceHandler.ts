@@ -29,6 +29,8 @@ export interface CooldownConfig {
   normal: number;
   /** 监狱状态冷却时间（毫秒），默认 10000 */
   jail: number;
+  diceMin: number;
+  diceMax: number;
 }
 
 /**
@@ -37,6 +39,8 @@ export interface CooldownConfig {
 export const DEFAULT_COOLDOWN_CONFIG: CooldownConfig = {
   normal: 5000,
   jail: 10000,
+  diceMin: 1,
+  diceMax: 6,
 };
 
 /**
@@ -77,6 +81,8 @@ export class DiceHandler {
     this.cooldownConfig = {
       normal: cooldownConfig?.normal ?? DEFAULT_COOLDOWN_CONFIG.normal,
       jail: cooldownConfig?.jail ?? DEFAULT_COOLDOWN_CONFIG.jail,
+      diceMin: cooldownConfig?.diceMin ?? DEFAULT_COOLDOWN_CONFIG.diceMin,
+      diceMax: cooldownConfig?.diceMax ?? DEFAULT_COOLDOWN_CONFIG.diceMax,
     };
   }
 
@@ -183,16 +189,19 @@ export class DiceHandler {
    * 注意：predicted 仅用于测试，生产环境应忽略或严格校验
    */
   private generateDice(predicted?: number): number {
-    // 校验 predicted 值（用于测试）
+    const mapMeta = this.world.getMapMeta();
+    const config = mapMeta?.config ?? {};
+    const diceMin = (config.diceMin as number) ?? this.cooldownConfig.diceMin;
+    const diceMax = (config.diceMax as number) ?? this.cooldownConfig.diceMax;
+
     if (typeof predicted === 'number' && Number.isFinite(predicted)) {
-      const clamped = Math.floor(Math.max(1, Math.min(6, predicted)));
-      if (clamped >= 1 && clamped <= 6) {
+      const clamped = Math.floor(Math.max(diceMin, Math.min(diceMax, predicted)));
+      if (clamped >= diceMin && clamped <= diceMax) {
         return clamped;
       }
     }
 
-    // 正常随机生成（1-6，均匀分布）
-    return Math.floor(Math.random() * 6) + 1;
+    return Math.floor(Math.random() * (diceMax - diceMin + 1)) + diceMin;
   }
 
   /**
