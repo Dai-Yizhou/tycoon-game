@@ -1,0 +1,688 @@
+/**
+ * 前后端 Socket.IO 事件类型定义
+ *
+ * 采用 Socket.IO 推荐的 typed events 模式：
+ * - `ClientToServerEvents` : 客户端 → 服务端
+ * - `ServerToClientEvents` : 服务端 → 客户端
+ * - `SocketData`           : 每个连接的状态（如 playerId、teamId）
+ *
+ * 业务事件以「domain.action」形式命名（如 `client.rollDice`），便于扩展。
+ *
+ * 用法（服务端）：
+ * ```ts
+ * import { Server } from 'socket.io';
+ * import type { ClientToServerEvents, ServerToClientEvents, SocketData } from '@game/shared';
+ *
+ * const io = new Server<ClientToServerEvents, ServerToClientEvents, {}, SocketData>();
+ * io.on('connection', (socket) => {
+ *   socket.on('client.rollDice', (payload, ack) => {
+ *     // ...
+ *     socket.emit('server.playerMoved', { playerId: socket.data.playerId, ... });
+ *     ack({ ok: true });
+ *   });
+ * });
+ * ```
+ *
+ * 用法（客户端）：
+ * ```ts
+ * import { io, Socket } from 'socket.io-client';
+ * import type { ClientToServerEvents, ServerToClientEvents } from '@game/shared';
+ *
+ * const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io();
+ * socket.emit('client.rollDice', { steps: 6 });
+ * socket.on('server.playerMoved', (payload) => { /* ... *\/ });
+ * ```
+ */
+
+import type { Cell } from './cell.js';
+import type { ChatChannel, ChatMessage } from './chat.js';
+import type { Item } from './item.js';
+import type { Player } from './player.js';
+import type { Team } from './team.js';
+import type { ValueField } from './player.js';
+import type { PlayerTalent } from './talent.js';
+
+// ---------------------------------------------------------------------------
+// 共用负载（Payloads）
+// ---------------------------------------------------------------------------
+
+/** 玩家标识 */
+export interface PlayerIdPayload {
+  playerId: string;
+}
+
+/** 格子标识 */
+export interface CellIdPayload {
+  cellId: number;
+}
+
+/** 通用结果回执 */
+export interface AckResult<T = unknown> {
+  ok: boolean;
+  error?: string;
+  data?: T;
+}
+
+/** 数值变化广播 */
+export interface ValueChangedPayload {
+  playerId: string;
+  /** 受影响的字段 ID */
+  fieldId: string;
+  /** 变化后的当前值 */
+  current: number;
+  /** 变化量 */
+  delta: number;
+}
+
+/** 位置变更 */
+export interface PositionChangedPayload extends PlayerIdPayload {
+  cellId: number;
+  /** 路径经过的格子（动画用），按顺序 */
+  path?: number[];
+}
+
+// ---------------------------------------------------------------------------
+// 客户端 → 服务端（ClientToServerEvents）
+// ---------------------------------------------------------------------------
+
+export interface ClientToServerEvents {
+  /** 登录/加入游戏 */
+  'client.login': (
+    payload: { username: string; guest?: boolean },
+    ack?: (result: AckResult<{ player: import('../types/player').Player; serverTime: number; cycleStartTime: number; cycleMinutes: number; existingPlayers: import('../types/player').Player[] }>) => void,
+  ) => void;
+
+  /** 掷骰子 */
+  'client.rollDice': (
+    payload: { /** 客户端预测的骰子值，可选；不传则服务端随机 */ predicted?: number },
+    ack?: (result: AckResult<{ dice: number; steps: number }>) => void,
+  ) => void;
+
+  /**
+   * 选择移动路径上的多岔路
+   *
+   * 当玩家走过的格子有多个 destinations 时，服务端推送 `server.askPath` 询问选择。
+   */
+  'client.choosePath': (
+    payload: { fromCellId: number; toCellId: number },
+    ack?: (result: AckResult<{ cellId: number }>) => void,
+  ) => void;
+
+  /** 移动（用于调试 / 自由模式） */
+  'client.move': (
+    payload: { toCellId: number },
+    ack?: (result: AckResult<PositionChangedPayload>) => void,
+  ) => void;
+
+  /** 购买地产/项目 */
+  'client.buyProperty': (
+    payload: { cellId: number },
+    ack?: (result: AckResult<{ cell: Cell }>) => void,
+  ) => void;
+
+  /** 升级地产 */
+  'client.upgradeProperty': (
+    payload: { cellId: number },
+    ack?: (result: AckResult<{ cell: Cell; cost: number }>) => void,
+  ) => void;
+
+  /** 抵押地产 */
+  'client.mortgageProperty': (
+    payload: { cellId: number },
+    ack?: (result: AckResult<{ cell: Cell; gained: number }>) => void,
+  ) => void;
+
+  /** 赎回地产 */
+  'client.redeemProperty': (
+    payload: { cellId: number },
+    ack?: (result: AckResult<{ cell: Cell; cost: number }>) => void,
+  ) => void;
+
+  /** 使用道具 */
+  'client.useItem': (
+    payload: { itemId: string; targetCellId?: number; targetPlayerId?: string },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 银行：贷款 */
+  'client.bankLoan': (
+    payload: { amount: number },
+    ack?: (result: AckResult<{ amount: number; creditDelta: number }>) => void,
+  ) => void;
+
+  /** 银行：还款 */
+  'client.bankRepay': (
+    payload: { amount: number },
+    ack?: (result: AckResult<{ amount: number }>) => void,
+  ) => void;
+
+  /** 组队邀请 */
+  'client.inviteToTeam': (
+    payload: { targetPlayerId: string },
+    ack?: (result: AckResult<{ team: Team; message?: string }>) => void,
+  ) => void;
+
+  /** 响应组队邀请 */
+  'client.respondToTeamInvite': (
+    payload: { inviterId: string; accept: boolean },
+    ack?: (result: AckResult<{ team: Team | null }>) => void,
+  ) => void;
+
+
+  /** 加入队伍 */
+  'client.joinTeam': (
+    payload: { teamId: string },
+    ack?: (result: AckResult<{ team: Team }>) => void,
+  ) => void;
+  /** 离开队伍 */
+  'client.leaveTeam': (payload: Record<string, never>, ack?: (result: AckResult) => void) => void;
+
+  /** 聊天 */
+  'client.chat': (
+    payload: { channel: ChatChannel; content: string; metadata?: Record<string, unknown> },
+    ack?: (result: AckResult<{ message: ChatMessage }>) => void,
+  ) => void;
+
+  /** 学习天赋 */
+  'client.learnTalent': (
+    payload: { talentId: string },
+    ack?: (result: AckResult<{ talentId: string; pointsRemaining: number }>) => void,
+  ) => void;
+
+  /** 取消学习天赋 */
+  'client.unlearnTalent': (
+    payload: { talentId: string },
+    ack?: (result: AckResult<{ talentId: string; refundedPoints: number; pointsRemaining: number }>) => void,
+  ) => void;
+
+  /** 切换天赋启用状态 */
+  'client.toggleTalent': (
+    payload: { talentId: string; enabled: boolean },
+    ack?: (result: AckResult<{ talentId: string; enabled: boolean }>) => void,
+  ) => void;
+
+  /** 获取天赋信息 */
+  'client.getTalentInfo': (
+    payload: {},
+    ack?: (result: AckResult<{
+      availableTalents: { id: string; name: string; description: string; type: string; talentPointsCost: number; effects: unknown[] }[];
+      learnedTalents: PlayerTalent[];
+      talentPoints: number;
+    }>) => void,
+  ) => void;
+
+  /** 客户端 → 服务端心跳 */
+  'client.ping': (
+    payload: { timestamp: number },
+    ack?: (result: { timestamp: number; serverTime: number }) => void,
+  ) => void;
+
+  /** 使用交通枢纽传送 */
+  'client.useTransport': (
+    payload: { hubCellId: number; targetCellId: number },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 获取交通枢纽目的地列表 */
+  'client.getTransportDestinations': (
+    payload: { hubCellId: number },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 购买投资项目 */
+  'client.buyInvestment': (
+    payload: { cellId: number },
+    ack?: (result: AckResult<{ cell: Cell }>) => void,
+  ) => void;
+
+  /** 触发投资项目事件 */
+  'client.triggerInvestmentEvent': (
+    payload: { investmentId: number; eventId: string },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 获取玩家道具列表 */
+  'client.getItems': (
+    payload: Record<string, never>,
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 请求道具掉落 */
+  'client.requestItemDrop': (
+    payload: { itemType?: string },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 修缮纪念碑 */
+  'client.repairMonument': (
+    payload: { monumentId: number },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 获取纪念碑状态 */
+  'client.getMonumentStatus': (
+    payload: { monumentId: number },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 手动触发时代结算（管理员调试用） */
+  'client.triggerSettlement': (
+    payload: { /** 是否在结算后切换到新时代（需提供 newMapId/newEraName） */ switchEra?: boolean; newMapId?: string; newEraName?: string },
+    ack?: (result: AckResult<{ settled: boolean; eraId: string }>) => void,
+  ) => void;
+
+  /** 调试：快速重置玩家数据（仅调试模式可用） */
+  'client.debugReset': (
+    payload: Record<string, never>,
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 调试：注入测试数据（仅调试模式可用） */
+  'client.debugInject': (
+    payload: { money?: number; credit?: number; items?: string[] },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 调试：查询事件概率分布（仅调试模式可用） */
+  'client.debugEventProbabilities': (
+    payload: { behaviorId: string },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 管理员登录 */
+  'client.adminLogin': (
+    payload: { token: string },
+    ack?: (result: AckResult<{ sessionTimeout: number }>) => void,
+  ) => void;
+
+  /** 管理员修改玩家数值 */
+  'client.adminSetPlayerValue': (
+    payload: { playerId: string; fieldId: string; value: number },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 管理员冻结玩家 */
+  'client.adminFreezePlayer': (
+    payload: { playerId: string },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 管理员解冻玩家 */
+  'client.adminUnfreezePlayer': (
+    payload: { playerId: string },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 管理员踢出玩家 */
+  'client.adminKickPlayer': (
+    payload: { playerId: string; reason?: string },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 管理员获取所有在线玩家 */
+  'client.adminGetPlayers': (
+    payload: Record<string, never>,
+    ack?: (result: AckResult<{
+      players: Array<{
+        id: string;
+        username: string;
+        status: string;
+        position: { cellId: number };
+        values: Record<string, { id: string; name: string; current: number }>;
+        teamId: string | null;
+        lastActiveAt: number;
+      }>;
+      count: number;
+    }>) => void,
+  ) => void;
+}
+
+// ---------------------------------------------------------------------------
+// 服务端 → 客户端（ServerToClientEvents）
+// ---------------------------------------------------------------------------
+
+export interface ServerToClientEvents {
+  /** 完整游戏状态（玩家登录/重连时下发） */
+  'server.gameState': (payload: {
+    player: Player;
+    team: Team | null;
+    /** 当前玩家视野内可见的格子（可选） */
+    visibleCells?: Cell[];
+    /** 服务端时间 */
+    serverTime: number;
+  }) => void;
+
+  /** 玩家加入 */
+  'server.playerJoined': (payload: Player) => void;
+
+  /** 玩家离开 */
+  'server.playerLeft': (payload: PlayerIdPayload) => void;
+
+  /** 玩家移动 */
+  'server.playerMoved': (payload: PositionChangedPayload) => void;
+
+  /** 服务端询问路径选择 */
+  'server.askPath': (payload: {
+    fromCellId: number;
+    options: { cellId: number; label?: string }[];
+  }) => void;
+
+  /** 玩家数值变化（财产/信用值等） */
+  'server.valueChanged': (payload: ValueChangedPayload) => void;
+
+  /** 玩家状态变更（在监狱/破产等） */
+  'server.playerStatusChanged': (payload: {
+    playerId: string;
+    status: Player['status'];
+    expiresAt?: number;
+  }) => void;
+
+  /** 地产被购买 */
+  'server.propertyBought': (payload: { cell: Cell; playerId: string }) => void;
+
+  /** 地产被升级 */
+  'server.propertyUpgraded': (payload: {
+    cell: Cell;
+    playerId: string;
+    newLevel: number;
+    cost: number;
+  }) => void;
+
+  /** 地产被抵押/赎回 */
+  'server.propertyMortgaged': (payload: {
+    cell?: Cell;
+    cellId?: number;
+    playerId: string;
+    mortgaged?: boolean;
+    mortgagePrice?: number;
+    auctionId?: string;
+  }) => void;
+
+  /** 玩家进入监狱 */
+  'server.playerJailed': (payload: { playerId: string; cellId: number; durationMs: number }) => void;
+
+  /** 玩家出狱 */
+  'server.playerReleased': (payload: { playerId: string }) => void;
+
+  /** 玩家破产 */
+  'server.playerBankrupt': (payload: {
+    playerId: string;
+    bankruptcyId?: string;
+    bankruptcyTime?: number;
+    revivalDeadline?: number;
+    reason?: string;
+    netWorthAtBankruptcy?: number;
+  }) => void;
+
+  /** 玩家清算完成（超过复活期限） */
+  'server.playerLiquidated': (payload: {
+    playerId: string;
+    bankruptcyId: string;
+    liquidationTime: number;
+  }) => void;
+
+  /** 玩家复活 */
+  'server.playerRevived': (payload: {
+    playerId?: string;
+    cost?: number;
+    bankruptcyId?: string;
+    revivalTime?: number;
+    startingMoney?: number;
+    startingCredit?: number;
+    targetPlayerId?: string;
+    targetPlayerName?: string;
+    revivedBy?: string;
+    revivedByName?: string;
+  }) => void;
+
+  /** 道具获取 */
+  'server.itemAcquired': (payload: {
+    playerId: string;
+    item?: Item;
+    itemType?: string;
+    itemName?: string;
+    quantity?: number;
+  }) => void;
+
+  /** 道具使用 */
+  'server.itemUsed': (payload: {
+    playerId?: string;
+    item?: Item;
+    success?: boolean;
+    itemType?: string;
+    itemName?: string;
+    effects?: unknown[];
+    sealState?: unknown;
+    revivedPlayerId?: string;
+  }) => void;
+
+  /** 通用通知（弹窗） */
+  'server.notification': (payload: {
+    id: string;
+    type: 'info' | 'success' | 'warning' | 'error';
+    title: string;
+    content: string;
+    actions?: { label: string; action: string; payload?: unknown }[];
+    /** 持续时间（毫秒），0 表示需用户手动关闭 */
+    durationMs?: number;
+  }) => void;
+
+  /** 聊天消息（频道内） */
+  'server.chat': (payload: { message: ChatMessage }) => void;
+
+  /** 队伍变更广播 */
+  'server.teamUpdated': (payload: { team: Team }) => void;
+
+  /** 收到组队邀请 */
+  'server.teamInviteReceived': (payload: {
+    inviterId: string;
+    inviterName: string;
+    inviteId: string;
+    teamId: string;
+  }) => void;
+
+
+  /** 队伍成员加入通知 */
+  'server.teamMemberJoined': (payload: {
+    playerId: string;
+    playerName: string;
+  }) => void;
+  /** 昼夜切换 */
+  'server.dayNightChanged': (payload: {
+    isDay: boolean;
+    /** 全局时间（Unix 毫秒） */
+    globalTime: number;
+    /** 周期内进度（0-1） */
+    progress: number;
+    /** 周期起始时间（Unix 毫秒），客户端据此同步 */
+    cycleStartTime: number;
+    /** 周期时长（分钟） */
+    cycleMinutes: number;
+  }) => void;
+
+  /** 昼夜进度更新（每秒广播） */
+  'server.dayNightProgress': (payload: {
+    /** 当前阶段（'day' 或 'night'） */
+    phase: 'day' | 'night';
+    /** 周期内进度（0-1） */
+    progress: number;
+    /** 全局时间（Unix 毫秒） */
+    globalTime: number;
+    /** 周期起始时间（Unix 毫秒），客户端据此同步 */
+    cycleStartTime: number;
+    /** 周期时长（分钟） */
+    cycleMinutes: number;
+  }) => void;
+
+  /** 繁荣度变化 */
+  'server.prosperityChanged': (payload: {
+    /** 区域 ID */
+    regionId?: string;
+    /** 纪念碑 ID */
+    monumentId?: number;
+    /** 当前繁荣度 */
+    prosperity: number;
+    /** 变化量 */
+    delta: number;
+    /** 变化原因 */
+    reason?: string;
+    /** 变化时间 */
+    timestamp?: number;
+  }) => void;
+
+  /** 时代切换预告 */
+  'server.eraEndingSoon': (payload: { eraId: string; endsAt: number }) => void;
+
+  /** 时代切换完成 */
+  'server.eraChanged': (payload: {
+    previousEraId: string | null;
+    newEraId: string;
+    newMapId: string;
+  }) => void;
+
+  /** 骰子结果广播（其他玩家可见） */
+  'server.diceRolled': (payload: { playerId: string; dice: number; steps: number }) => void;
+
+  /** 全局初始数值字段定义（用于客户端 UI 渲染） */
+  'server.valueFieldDefinitions': (payload: { definitions: ValueField[] }) => void;
+
+  /** 天赋学习成功 */
+  'server.talentLearned': (payload: {
+    playerId: string;
+    talentId: string;
+    talent: PlayerTalent;
+  }) => void;
+
+  /** 天赋取消学习 */
+  'server.talentUnlearned': (payload: {
+    playerId: string;
+    talentId: string;
+    refundedPoints: number;
+  }) => void;
+
+  /** 天赋启用/禁用 */
+  'server.talentToggled': (payload: {
+    playerId: string;
+    talentId: string;
+    enabled: boolean;
+  }) => void;
+
+  /** 错误 */
+  'server.error': (payload: { code: string; message: string }) => void;
+
+  /** 服务端心跳回包 */
+  'server.pong': (payload: { timestamp: number; serverTime: number }) => void;
+
+  /** 交通枢纽目的地变更 */
+  'server.transportDestinationsChanged': (payload: {
+    hubId: number;
+    destinations: Array<{ cellId: number; name?: string }>;
+  }) => void;
+
+  /** 格子查封恢复 */
+  'server.cellUnsealed': (payload: {
+    cellId: number;
+    sealId: string;
+    unsealedAt: number;
+  }) => void;
+
+  /** 格子被查封 */
+  'server.cellSealed': (payload: {
+    cellId: number;
+    playerId: string;
+    playerName: string;
+    duration: number;
+    endTime: number;
+  }) => void;
+
+  /** 投资项目被购买 */
+  'server.investmentBought': (payload: { cell: Cell; playerId: string }) => void;
+
+  /** 投资项目事件被触发 */
+  'server.investmentEventTriggered': (payload: {
+    investmentId: number;
+    amount: number;
+    type: 'profit' | 'loss';
+    affectedPlayers: Array<{ playerId: string; share: number; amount: number }>;
+  }) => void;
+
+  /** 竞拍开始 */
+  'server.auctionStarted': (payload: {
+    auctionId: string;
+    cellId: number;
+    mortgagePrice: number;
+    startTime: number;
+    endTime: number;
+    originalOwnerId: string;
+  }) => void;
+
+  /** 竞拍出价 */
+  'server.bidPlaced': (payload: {
+    auctionId: string;
+    playerId: string;
+    amount: number;
+    currentHighestBid: number;
+    endTime: number;
+  }) => void;
+
+  /** 竞拍结束 */
+  'server.auctionEnded': (payload: {
+    auctionId: string;
+    cellId: number;
+    winnerId: string | null;
+    winningBid: number | null;
+    originalOwnerId: string;
+  }) => void;
+
+  /** 抵押赎回 */
+  'server.mortgageRedeemed': (payload: {
+    cellId: number;
+    playerId: string;
+    mortgagePrice: number;
+  }) => void;
+
+  /** 计税周期完成 */
+  'server.taxCycleComplete': (payload: {
+    timestamp: number;
+    playerCount: number;
+  }) => void;
+
+  /** 税收收取 */
+  'server.taxCollected': (payload: {
+    playerId: string;
+    wealthTax: number;
+    propertyTax: number;
+    investmentTax: number;
+    totalTax: number;
+    timestamp?: number;
+  }) => void;
+
+  /** 时区变化 */
+  'server.timezoneChanged': (payload: {
+    playerId: string;
+    fromTimezoneId: string;
+    toTimezoneId: string;
+    fromOffsetMinutes: number;
+    toOffsetMinutes: number;
+    fromTimezoneName?: string;
+    toTimezoneName?: string;
+  }) => void;
+}
+
+// ---------------------------------------------------------------------------
+// 连接级状态（SocketData）
+// ---------------------------------------------------------------------------
+
+/**
+ * 每个 socket 连接关联的状态
+ */
+export interface SocketData {
+  playerId?: string;
+  teamId?: string | null;
+  /** 是否已鉴权 */
+  authenticated?: boolean;
+  /** 连接的远端 IP（调试用） */
+  remoteAddress?: string;
+  /** 是否为游客模式（游客不持久化） */
+  guest?: boolean;
+}

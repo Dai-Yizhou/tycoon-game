@@ -1,0 +1,232 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "close": "Close",
+    "submit": "Submit",
+    "save": "Save",
+    "reset": "Reset",
+    "start": "Start",
+    "back": "Back",
+    "next": "Next",
+    "prev": "Previous",
+    "skip": "Skip",
+    "success": "Success",
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Info",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "game": {
+    "title": "Monopoly.io",
+    "subtitle": "Classic board game, new multiplayer experience",
+    "startButton": "Start Game",
+    "loginButton": "Login",
+    "guestButton": "Guest Mode",
+    "registerButton": "Register"
+  },
+  "login": {
+    "title": "Login",
+    "username": "Username",
+    "password": "Password",
+    "usernamePlaceholder": "Enter username",
+    "passwordPlaceholder": "Enter password",
+    "loginSuccess": "Login successful",
+    "loginFailed": "Login failed",
+    "usernameRequired": "Username required",
+    "passwordRequired": "Password required",
+    "invalidCredentials": "Invalid username or password"
+  },
+  "register": {
+    "title": "Register",
+    "username": "Username",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "usernamePlaceholder": "Username (3-20 letters, numbers, underscores)",
+    "passwordPlaceholder": "Password (at least 6 characters)",
+    "confirmPasswordPlaceholder": "Confirm password",
+    "registerSuccess": "Registration successful",
+    "registerFailed": "Registration failed",
+    "usernameExists": "Username already exists",
+    "usernameInvalid": "Invalid username format",
+    "passwordTooShort": "Password too short",
+    "passwordMismatch": "Passwords do not match"
+  },
+  "hud": {
+    "money": "Money",
+    "credit": "Credit",
+    "alternateField": "Alternate Value",
+    "players": "Players",
+    "online": "Online",
+    "offline": "Offline",
+    "inJail": "In Jail",
+    "bankrupt": "Bankrupt",
+    "frozen": "Frozen",
+    "team": "Team",
+    "noTeam": "No Team"
+  },
+  "dice": {
+    "roll": "Roll Dice",
+    "rolling": "Rolling...",
+    "cooldown": "Cooldown",
+    "cooldownSeconds": "seconds",
+    "result": "Dice Result",
+    "moveSteps": "Move {{count}} steps"
+  },
+  "cell": {
+    "start": "Start",
+    "property": "Property",
+    "event": "Event",
+    "investment": "Investment",
+    "transport": "Transport Hub",
+    "monument": "Monument",
+    "jail": "Jail",
+    "empty": "Empty"
+  },
+  "property": {
+    "buyTitle": "Buy Property",
+    "upgradeTitle": "Upgrade Property",
+    "price": "Price",
+    "rent": "Rent",
+    "level": "Level",
+    "upgradeCost": "Upgrade Cost",
+    "owner": "Owner",
+    "coOwners": "Co-owners",
+    "buyConfirm": "Confirm Purchase",
+    "upgradeConfirm": "Confirm Upgrade",
+    "buySuccess": "Purchase successful",
+    "upgradeSuccess": "Upgrade successful",
+    "insufficientMoney": "Insufficient funds",
+    "rentPaid": "Paid rent {{amount}}",
+    "rentReceived": "Received rent {{amount}}"
+  },
+  "event": {
+    "triggered": "Event Triggered",
+    "effect": "Effect",
+    "good": "Good",
+    "bad": "Bad",
+    "neutral": "Neutral"
+  },
+  "item": {
+    "bag": "Item Bag",
+    "use": "Use",
+    "sealOrder": "Seal Order",
+    "reviveOrder": "Revive Order",
+    "sealTarget": "Seal Target",
+    "reviveTarget": "Revive Target",
+    "useSuccess": "Item used successfully",
+    "useFailed": "Item use failed",
+    "quantityLimit": "Item quantity limit reached"
+  },
+  "talent": {
+    "panel": "Talent Panel",
+    "learn": "Learn",
+    "unlearn": "Unlearn",
+    "toggle": "Enable/Disable",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "points": "Talent Points",
+    "cost": "Cost",
+    "reward": "Reward",
+    "prerequisite": "Prerequisite",
+    "conflict": "Conflict",
+    "vision": "Vision",
+    "creditEnable": "Credit System",
+    "bankEnable": "Bank System",
+    "alternateEnable": "Alternate Value",
+    "itemsEnable": "Item System",
+    "teamEnable": "Team System"
+  },
+  "achievement": {
+    "panel": "Achievement Panel",
+    "unlocked": "Unlocked",
+    "locked": "Locked",
+    "hidden": "Hidden Achievement",
+    "progress": "Progress",
+    "reward": "Reward",
+    "claim": "Claim Reward",
+    "claimed": "Claimed",
+    "category": {
+      "wealth": "Wealth",
+      "credit": "Credit",
+      "property": "Property",
+      "social": "Social",
+      "special": "Special",
+      "survival": "Survival",
+      "investment": "Investment",
+      "monument": "Monument"
+    },
+    "rarity": {
+      "common": "Common",
+      "rare": "Rare",
+      "epic": "Epic",
+      "legendary": "Legendary"
+    }
+  },
+  "transport": {
+    "title": "Transport Hub",
+    "selectDestination": "Select Destination",
+    "cost": "Cost",
+    "teleport": "Teleport",
+    "teleportSuccess": "Teleport successful",
+    "teleportFailed": "Teleport failed"
+  },
+  "monument": {
+    "title": "Monument",
+    "repair": "Repair",
+    "repairCost": "Repair Cost",
+    "creditIncrease": "Credit Increase",
+    "prosperityIncrease": "Prosperity Increase",
+    "currentProsperity": "Current Prosperity",
+    "repairSuccess": "Repair successful",
+    "repairFailed": "Repair failed",
+    "records": "Monument Records"
+  },
+  "jail": {
+    "title": "Jail",
+    "inJail": "You are in jail",
+    "releaseTime": "Release Time",
+    "cooldownExtended": "Cooldown extended",
+    "creditPenalty": "Credit penalty",
+    "noRent": "Cannot collect rent in jail"
+  },
+  "bank": {
+    "title": "Bank",
+    "loan": "Loan",
+    "repay": "Repay",
+    "loanAmount": "Loan Amount",
+    "interestRate": "Interest Rate",
+    "currentLoan": "Current Loan",
+    "loanSuccess": "Loan successful",
+    "repaySuccess": "Repayment successful",
+    "insufficientCredit": "Insufficient credit"
+  },
+  "bankruptcy": {
+    "title": "Bankruptcy",
+    "bankrupt": "You are bankrupt",
+    "reviveTime": "Revive Time",
+    "propertiesClear": "Properties cleared",
+    "reviveOrderNeeded": "Revive Order needed"
+  },
+  "tutorial": {
+    "welcome": "Welcome to Monopoly.io!",
+    "step1": "Click Roll Dice to start moving",
+    "step2": "Purchase property on property cells",
+    "step3": "Pay rent when passing others' properties",
+    "step4": "Choose talents at Start",
+    "step5": "Complete! Start your adventure",
+    "skip": "Skip Tutorial",
+    "restart": "Restart Tutorial",
+    "complete": "Tutorial Complete"
+  },
+  "error": {
+    "network": "Network connection failed",
+    "server": "Server error",
+    "notFound": "Resource not found",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Forbidden",
+    "invalidData": "Invalid data format"
+  }
+}

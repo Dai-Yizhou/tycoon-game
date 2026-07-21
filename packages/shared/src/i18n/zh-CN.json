@@ -1,0 +1,232 @@
+{
+  "common": {
+    "loading": "加载中...",
+    "confirm": "确认",
+    "cancel": "取消",
+    "close": "关闭",
+    "submit": "提交",
+    "save": "保存",
+    "reset": "重置",
+    "start": "开始",
+    "back": "返回",
+    "next": "下一步",
+    "prev": "上一步",
+    "skip": "跳过",
+    "success": "成功",
+    "error": "错误",
+    "warning": "警告",
+    "info": "提示",
+    "yes": "是",
+    "no": "否"
+  },
+  "game": {
+    "title": "大富翁.io",
+    "subtitle": "经典棋盘游戏，全新多人体验",
+    "startButton": "开始游戏",
+    "loginButton": "登录",
+    "guestButton": "游客模式",
+    "registerButton": "注册账号"
+  },
+  "login": {
+    "title": "登录",
+    "username": "用户名",
+    "password": "密码",
+    "usernamePlaceholder": "请输入用户名",
+    "passwordPlaceholder": "请输入密码",
+    "loginSuccess": "登录成功",
+    "loginFailed": "登录失败",
+    "usernameRequired": "请输入用户名",
+    "passwordRequired": "请输入密码",
+    "invalidCredentials": "用户名或密码错误"
+  },
+  "register": {
+    "title": "注册账号",
+    "username": "用户名",
+    "password": "密码",
+    "confirmPassword": "确认密码",
+    "usernamePlaceholder": "请输入用户名（3-20位字母数字下划线）",
+    "passwordPlaceholder": "请输入密码（至少6位）",
+    "confirmPasswordPlaceholder": "请再次输入密码",
+    "registerSuccess": "注册成功",
+    "registerFailed": "注册失败",
+    "usernameExists": "用户名已存在",
+    "usernameInvalid": "用户名格式不正确",
+    "passwordTooShort": "密码长度不足",
+    "passwordMismatch": "两次密码不一致"
+  },
+  "hud": {
+    "money": "财产",
+    "credit": "信用值",
+    "alternateField": "备选数值",
+    "players": "玩家列表",
+    "online": "在线",
+    "offline": "离线",
+    "inJail": "在监狱",
+    "bankrupt": "破产",
+    "frozen": "冻结",
+    "team": "队伍",
+    "noTeam": "未组队"
+  },
+  "dice": {
+    "roll": "掷骰",
+    "rolling": "掷骰中...",
+    "cooldown": "冷却",
+    "cooldownSeconds": "秒",
+    "result": "骰子结果",
+    "moveSteps": "移动 {{count}} 步"
+  },
+  "cell": {
+    "start": "起点",
+    "property": "地产",
+    "event": "事件格",
+    "investment": "投资项目",
+    "transport": "交通枢纽",
+    "monument": "纪念碑",
+    "jail": "监狱",
+    "empty": "空白格"
+  },
+  "property": {
+    "buyTitle": "购买地产",
+    "upgradeTitle": "升级地产",
+    "price": "价格",
+    "rent": "租金",
+    "level": "等级",
+    "upgradeCost": "升级费用",
+    "owner": "所有者",
+    "coOwners": "合租者",
+    "buyConfirm": "确认购买",
+    "upgradeConfirm": "确认升级",
+    "buySuccess": "购买成功",
+    "upgradeSuccess": "升级成功",
+    "insufficientMoney": "财产不足",
+    "rentPaid": "支付租金 {{amount}}",
+    "rentReceived": "收到租金 {{amount}}"
+  },
+  "event": {
+    "triggered": "触发事件",
+    "effect": "效果",
+    "good": "好事",
+    "bad": "坏事",
+    "neutral": "中性事件"
+  },
+  "item": {
+    "bag": "道具背包",
+    "use": "使用",
+    "sealOrder": "查封令",
+    "reviveOrder": "复活令",
+    "sealTarget": "查封目标",
+    "reviveTarget": "复活目标",
+    "useSuccess": "道具使用成功",
+    "useFailed": "道具使用失败",
+    "quantityLimit": "道具数量已达上限"
+  },
+  "talent": {
+    "panel": "天赋面板",
+    "learn": "学习",
+    "unlearn": "取消",
+    "toggle": "启用/禁用",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "points": "天赋值",
+    "cost": "消耗",
+    "reward": "奖励",
+    "prerequisite": "前置",
+    "conflict": "互斥",
+    "vision": "视野",
+    "creditEnable": "信用值系统",
+    "bankEnable": "银行系统",
+    "alternateEnable": "备选数值",
+    "itemsEnable": "道具系统",
+    "teamEnable": "组队系统"
+  },
+  "achievement": {
+    "panel": "成就面板",
+    "unlocked": "已解锁",
+    "locked": "未解锁",
+    "hidden": "隐藏成就",
+    "progress": "进度",
+    "reward": "奖励",
+    "claim": "领取奖励",
+    "claimed": "已领取",
+    "category": {
+      "wealth": "财富类",
+      "credit": "信用类",
+      "property": "地产类",
+      "social": "社交类",
+      "special": "特殊目标类",
+      "survival": "生存类",
+      "investment": "投资类",
+      "monument": "纪念碑类"
+    },
+    "rarity": {
+      "common": "普通",
+      "rare": "稀有",
+      "epic": "史诗",
+      "legendary": "传说"
+    }
+  },
+  "transport": {
+    "title": "交通枢纽",
+    "selectDestination": "选择目的地",
+    "cost": "费用",
+    "teleport": "传送",
+    "teleportSuccess": "传送成功",
+    "teleportFailed": "传送失败"
+  },
+  "monument": {
+    "title": "纪念碑",
+    "repair": "修缮",
+    "repairCost": "修缮费用",
+    "creditIncrease": "信用值增加",
+    "prosperityIncrease": "繁荣度增加",
+    "currentProsperity": "当前繁荣度",
+    "repairSuccess": "修缮成功",
+    "repairFailed": "修缮失败",
+    "records": "纪念碑铭记"
+  },
+  "jail": {
+    "title": "监狱",
+    "inJail": "你被关进监狱",
+    "releaseTime": "出狱时间",
+    "cooldownExtended": "掷骰冷却延长",
+    "creditPenalty": "信用值惩罚",
+    "noRent": "监狱中无法收取租金"
+  },
+  "bank": {
+    "title": "银行",
+    "loan": "贷款",
+    "repay": "还款",
+    "loanAmount": "贷款金额",
+    "interestRate": "利率",
+    "currentLoan": "当前贷款",
+    "loanSuccess": "贷款成功",
+    "repaySuccess": "还款成功",
+    "insufficientCredit": "信用值不足"
+  },
+  "bankruptcy": {
+    "title": "破产",
+    "bankrupt": "你已破产",
+    "reviveTime": "复活时间",
+    "propertiesClear": "地产已清除",
+    "reviveOrderNeeded": "需要复活令"
+  },
+  "tutorial": {
+    "welcome": "欢迎来到大富翁.io！",
+    "step1": "点击掷骰按钮开始移动",
+    "step2": "走到地产格可以购买地产",
+    "step3": "路过他人地产需要支付租金",
+    "step4": "在起点可以选择天赋",
+    "step5": "完成！开始你的冒险吧",
+    "skip": "跳过引导",
+    "restart": "重新查看引导",
+    "complete": "引导完成"
+  },
+  "error": {
+    "network": "网络连接失败",
+    "server": "服务器错误",
+    "notFound": "资源不存在",
+    "unauthorized": "未授权",
+    "forbidden": "禁止访问",
+    "invalidData": "数据格式错误"
+  }
+}

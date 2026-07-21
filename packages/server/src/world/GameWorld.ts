@@ -1,0 +1,430 @@
+/**
+ * 游戏世界（GameWorld）
+ *
+ * 服务端核心状态容器，统一管理：
+ * - 当前时代（Era）
+ * - 玩家（通过 PlayerManager）
+ * - 队伍（Team）
+ * - 地图（MapData、MapMeta、MapIndex）
+ *
+ * 通过事件系统向上层（SocketManager、管理工具）通知状态变化：
+ * - `playerAdded`   : 玩家加入
+ * - `playerRemoved` : 玩家离开
+ * - `playerUpdated` : 玩家数据更新（位置/状态/数值等）
+ * - `eraChanged`    : 时代切换
+ * - `teamChanged`   : 队伍变更
+ * - `mapLoaded`     : 地图加载完成
+ *
+ * 设计原则：
+ * - 组合而非继承：GameWorld HAS-A PlayerManager
+ * - 事件先于副作用：所有状态变更先 emit 事件再写存储
+ * - 接受依赖注入：PlayerManager 可外部传入，便于测试
+ */
+
+import { EventEmitter } from 'node:events';
+import { buildPlayerValues, type EraInfo, type MapData, type MapMeta, type Player, type Team } from '@game/shared';
+import { MapIndex, type ValidationResult, validateMapData, validateMapMeta } from '@game/shared';
+import { PlayerEvents, PlayerManager, type PlayerEventName, type PlayerEventListener } from './PlayerManager.js';
+
+/**
+ * 游戏世界事件类型
+ */
+export const WorldEvents = {
+  PlayerAdded: 'playerAdded',
+  PlayerRemoved: 'playerRemoved',
+  PlayerUpdated: 'playerUpdated',
+  EraChanged: 'eraChanged',
+  TeamChanged: 'teamChanged',
+  MapLoaded: 'mapLoaded',
+} as const;
+
+/** 游戏世界事件名字符串字面量联合 */
+export type WorldEventName = (typeof WorldEvents)[keyof typeof WorldEvents];
+
+/**
+ * 事件载荷类型
+ */
+export interface PlayerAddedPayload {
+  player: Player;
+}
+
+export interface PlayerRemovedPayload {
+  playerId: string;
+  player: Player;
+}
+
+export interface PlayerUpdatedPayload {
+  player: Player;
+}
+
+export interface EraChangedPayload {
+  previousEraId: string | null;
+  newEra: EraInfo;
+}
+
+export interface TeamChangedPayload {
+  team: Team;
+  /** 变更类型 */
+  changeType: 'created' | 'updated' | 'disbanded' | 'memberAdded' | 'memberRemoved';
+}
+
+export interface MapLoadedPayload {
+  mapId: string;
+  mapMeta: MapMeta;
+  cellCount: number;
+  validation: ValidationResult;
+}
+
+/**
+ * 事件监听器
+ */
+export type WorldEventListener<T> = (payload: T) => void;
+
+/**
+ * 加载地图的选项
+ */
+export interface LoadMapOptions {
+  /** 是否跳过校验（默认 false） */
+  skipValidation?: boolean;
+}
+
+/**
+ * 游戏世界配置
+ */
+export interface GameWorldOptions {
+  /** 自定义 PlayerManager（测试时注入） */
+  playerManager?: PlayerManager;
+}
+
+/**
+ * 游戏世界
+ */
+export class GameWorld {
+  private readonly emitter: EventEmitter;
+  private readonly playerManager: PlayerManager;
+  private readonly teams: Map<string, Team>;
+
+  private mapData: MapData | null = null;
+  private mapMeta: MapMeta | null = null;
+  private mapIndex: MapIndex | null = null;
+  private currentEra: EraInfo | null = null;
+  private lastValidation: ValidationResult | null = null;
+
+  constructor(options: GameWorldOptions = {}) {
+    this.emitter = new EventEmitter();
+    this.playerManager = options.playerManager ?? new PlayerManager();
+    this.teams = new Map();
+
+    // 透传 PlayerManager 的事件为 WorldEvent
+    this.playerManager.on(PlayerEvents.Added, ({ player }: { player: Player }) => {
+      this.emit(WorldEvents.PlayerAdded, { player });
+    });
+    this.playerManager.on(PlayerEvents.Removed, ({ playerId }: { playerId: string }) => {
+      this.emit(WorldEvents.PlayerRemoved, { playerId, player: { id: playerId } as Player });
+    });
+    this.playerManager.on(PlayerEvents.Updated, ({ player }: { player: Player }) => {
+      this.emit(WorldEvents.PlayerUpdated, { player });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 玩家操作（委托给 PlayerManager，并发出 WorldEvent）
+  // ---------------------------------------------------------------------------
+
+  /**
+   * 添加玩家
+   */
+  addPlayer(player: Player, socketId?: string): boolean {
+    const ok = this.playerManager.addPlayer(player, socketId);
+    if (ok) {
+      this.emit(WorldEvents.PlayerAdded, { player });
+    }
+    return ok;
+  }
+
+  /**
+   * 移除玩家
+   */
+  removePlayer(playerId: string): boolean {
+    const player = this.playerManager.getPlayer(playerId);
+    if (!player) return false;
+    const removed = this.playerManager.removePlayer(playerId);
+    if (removed) {
+      this.emit(WorldEvents.PlayerRemoved, { playerId, player });
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * 更新玩家
+   */
+  updatePlayer(player: Player): boolean {
+    return this.playerManager.updatePlayer(player);
+  }
+
+  /**
+   * 获取玩家
+   */
+  getPlayer(playerId: string): Player | undefined {
+    return this.playerManager.getPlayer(playerId);
+  }
+
+  /**
+   * 获取全部玩家
+   */
+  getAllPlayers(): Player[] {
+    return this.playerManager.getAllPlayers();
+  }
+
+  /**
+   * 获取玩家数
+   */
+  getPlayerCount(): number {
+    return this.playerManager.getPlayerCount();
+  }
+
+  /**
+   * 生成新玩家 ID
+   */
+  generatePlayerId(): string {
+    return this.playerManager.generatePlayerId();
+  }
+
+  /**
+   * 获取底层 PlayerManager（高级用法，谨慎使用）
+   */
+  getPlayerManager(): PlayerManager {
+    return this.playerManager;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 地图
+  // ---------------------------------------------------------------------------
+
+  /**
+   * 加载地图（同时加载 mapData 与 mapMeta）
+   *
+   * - 内部建立 MapIndex 以加速查询
+   * - 校验通过后触发 `mapLoaded` 事件
+   * - 若 mapMeta.valueFieldDefinitions 非空，可自动初始化玩家的 values
+   *
+   * @returns 校验结果（含 errors / warnings）
+   */
+  loadMap(mapData: MapData, mapMeta: MapMeta, options: LoadMapOptions = {}): ValidationResult {
+    let result: ValidationResult = { valid: true, errors: [], warnings: [] };
+    if (!options.skipValidation) {
+      const dataCheck = validateMapData(mapData);
+      const metaCheck = validateMapMeta(mapMeta, mapData);
+      result = {
+        valid: dataCheck.valid && metaCheck.valid,
+        errors: [...dataCheck.errors, ...metaCheck.errors],
+        warnings: [...dataCheck.warnings, ...metaCheck.warnings],
+      };
+    }
+
+    this.mapData = mapData;
+    this.mapMeta = mapMeta;
+    this.mapIndex = new MapIndex(mapData);
+    this.lastValidation = result;
+
+    this.emit(WorldEvents.MapLoaded, {
+      mapId: mapMeta.id,
+      mapMeta,
+      cellCount: mapData.length,
+      validation: result,
+    });
+    return result;
+  }
+
+  /**
+   * 获取地图数据
+   */
+  getMapData(): MapData | null {
+    return this.mapData;
+  }
+
+  /**
+   * 获取地图元数据
+   */
+  getMapMeta(): MapMeta | null {
+    return this.mapMeta;
+  }
+
+  /**
+   * 获取地图索引
+   */
+  getMapIndex(): MapIndex | null {
+    return this.mapIndex;
+  }
+
+  /**
+   * 获取最近一次地图校验结果
+   */
+  getLastValidation(): ValidationResult | null {
+    return this.lastValidation;
+  }
+
+  /**
+   * 根据地图元数据构造玩家初始 values
+   *
+   * 若当前未加载地图元数据，返回空对象。
+   */
+  buildInitialPlayerValues(): Record<string, ReturnType<typeof buildPlayerValues>[string]> {
+    if (!this.mapMeta) return {};
+    return buildPlayerValues(this.mapMeta);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 时代
+  // ---------------------------------------------------------------------------
+
+  /**
+   * 设置当前时代
+   *
+   * 时代切换会触发 `eraChanged` 事件；客户端可据此切换地图/UI。
+   */
+  setEra(era: EraInfo): void {
+    const previousEraId = this.currentEra?.id ?? null;
+    this.currentEra = era;
+    this.emit(WorldEvents.EraChanged, { previousEraId, newEra: era });
+  }
+
+  /**
+   * 获取当前时代
+   */
+  getCurrentEra(): EraInfo | null {
+    return this.currentEra;
+  }
+
+  /**
+   * 通过 ID 查找时代
+   */
+  findEraById(eraId: string): EraInfo | null {
+    if (this.currentEra?.id === eraId) return this.currentEra;
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 队伍
+  // ---------------------------------------------------------------------------
+
+  /**
+   * 创建队伍
+   *
+   * - 重复 ID 返回 false
+   * - 触发 `teamChanged` 事件（changeType='created'）
+   */
+  createTeam(team: Team): boolean {
+    if (this.teams.has(team.id)) return false;
+    this.teams.set(team.id, team);
+    this.emit(WorldEvents.TeamChanged, { team, changeType: 'created' });
+    return true;
+  }
+
+  /**
+   * 解散队伍
+   */
+  disbandTeam(teamId: string): boolean {
+    const team = this.teams.get(teamId);
+    if (!team) return false;
+    team.disbanded = true;
+    team.disbandedAt = Date.now();
+    // 移除所有成员关联
+    for (const playerId of team.memberIds) {
+      const player = this.playerManager.getPlayer(playerId);
+      if (player && player.teamId === teamId) {
+        player.teamId = null;
+        this.playerManager.updatePlayer(player);
+      }
+    }
+    this.emit(WorldEvents.TeamChanged, { team, changeType: 'disbanded' });
+    return true;
+  }
+
+  /**
+   * 添加队员
+   */
+  addTeamMember(teamId: string, playerId: string): boolean {
+    const team = this.teams.get(teamId);
+    if (!team || team.disbanded) return false;
+    if (team.memberIds.includes(playerId)) return true;
+    team.memberIds.push(playerId);
+    const player = this.playerManager.getPlayer(playerId);
+    if (player) {
+      player.teamId = teamId;
+      this.playerManager.updatePlayer(player);
+    }
+    this.emit(WorldEvents.TeamChanged, { team, changeType: 'memberAdded' });
+    return true;
+  }
+
+  /**
+   * 移除队员
+   */
+  removeTeamMember(teamId: string, playerId: string): boolean {
+    const team = this.teams.get(teamId);
+    if (!team) return false;
+    const idx = team.memberIds.indexOf(playerId);
+    if (idx === -1) return false;
+    team.memberIds.splice(idx, 1);
+    const player = this.playerManager.getPlayer(playerId);
+    if (player && player.teamId === teamId) {
+      player.teamId = null;
+      this.playerManager.updatePlayer(player);
+    }
+    this.emit(WorldEvents.TeamChanged, { team, changeType: 'memberRemoved' });
+    return true;
+  }
+
+  /**
+   * 获取队伍
+   */
+  getTeam(teamId: string): Team | undefined {
+    return this.teams.get(teamId);
+  }
+
+  /**
+   * 获取全部队伍
+   */
+  getAllTeams(): Team[] {
+    return Array.from(this.teams.values());
+  }
+
+  // ---------------------------------------------------------------------------
+  // 事件订阅
+  // ---------------------------------------------------------------------------
+
+  /**
+   * 订阅事件
+   */
+  on<T = unknown>(event: WorldEventName, listener: WorldEventListener<T>): void {
+    this.emitter.on(event, listener);
+  }
+
+  /**
+   * 取消订阅
+   */
+  off<T = unknown>(event: WorldEventName, listener: WorldEventListener<T>): void {
+    this.emitter.off(event, listener);
+  }
+
+  /**
+   * 监听 PlayerManager 的底层事件
+   */
+  onPlayerEvent<T = unknown>(event: PlayerEventName, listener: PlayerEventListener<T>): void {
+    this.playerManager.on<T>(event, listener);
+  }
+
+  /**
+   * 触发事件
+   */
+  private emit<T>(event: WorldEventName, payload: T): void {
+    this.emitter.emit(event, payload);
+  }
+}
+
+/**
+ * 重导出 PlayerEvents 供外部使用
+ */
+export { PlayerEvents } from './PlayerManager.js';

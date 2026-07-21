@@ -1,0 +1,47 @@
+{
+  "id": "jail_special",
+  "name": "监狱特殊事件",
+  "description": "进入监狱时，有概率触发特殊事件",
+  "events": [
+    {
+      "msg": "👮 监狱遇到好心律师，获得法律援助！信用值 +5",
+      "money": 0,
+      "credit": 5,
+      "env": 0,
+      "target": "player",
+      "weight": 4,
+      "good": true,
+      "creditModifier": 0.3
+    },
+    {
+      "msg": "📚 监狱内参加教育改造，领悟新知！环保值 +10",
+      "money": 0,
+      "credit": 0,
+      "env": 10,
+      "target": "player",
+      "weight": 4,
+      "good": true,
+      "creditModifier": 0.2
+    },
+    {
+      "msg": "🙏 监狱内表现良好获得减刑机会！金钱 +20，信用值 +3",
+      "money": 20,
+      "credit": 3,
+      "env": 0,
+      "target": "player",
+      "weight": 5,
+      "good": true,
+      "creditModifier": 0.5
+    },
+    {
+      "msg": "💪 监狱经历让你更加坚强！信用值 +10",
+      "money": 0,
+      "credit": 10,
+      "env": 0,
+      "target": "player",
+      "weight": 3,
+      "good": true,
+      "creditModifier": 0.6
+    }
+  ]
+}
