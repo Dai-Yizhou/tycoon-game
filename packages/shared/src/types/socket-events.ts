@@ -38,7 +38,7 @@ import type { Cell } from './cell.js';
 import type { ChatChannel, ChatMessage } from './chat.js';
 import type { Item } from './item.js';
 import type { Player } from './player.js';
-import type { Team } from './team.js';
+import type { Team, TeamInvite, TeamMemberView } from './team.js';
 import type { ValueField } from './player.js';
 import type { PlayerTalent } from './talent.js';
 
@@ -156,26 +156,35 @@ export interface ClientToServerEvents {
     ack?: (result: AckResult<{ amount: number }>) => void,
   ) => void;
 
-  /** 组队邀请 */
+  /** 组队邀请（服务端权威：客户端仅发送请求，邀请由服务端校验并创建） */
   'client.inviteToTeam': (
     payload: { targetPlayerId: string },
-    ack?: (result: AckResult<{ team: Team; message?: string }>) => void,
+    ack?: (result: AckResult<{ invite: TeamInvite }>) => void,
   ) => void;
 
-  /** 响应组队邀请 */
+  /** 响应组队邀请（接受/拒绝，由服务端校验并执行加入逻辑） */
   'client.respondToTeamInvite': (
-    payload: { inviterId: string; accept: boolean },
+    payload: { inviteId: string; accept: boolean },
     ack?: (result: AckResult<{ team: Team | null }>) => void,
   ) => void;
 
-
-  /** 加入队伍 */
-  'client.joinTeam': (
-    payload: { teamId: string },
-    ack?: (result: AckResult<{ team: Team }>) => void,
+  /** 离开队伍（由服务端校验并执行，结果通过 team 事件广播） */
+  'client.leaveTeam': (
+    payload: Record<string, never>,
+    ack?: (result: AckResult<{ teamDisbanded: boolean }>) => void,
   ) => void;
-  /** 离开队伍 */
-  'client.leaveTeam': (payload: Record<string, never>, ack?: (result: AckResult) => void) => void;
+
+  /** 踢出队伍成员（仅队长，由服务端校验权限并执行） */
+  'client.kickTeamMember': (
+    payload: { targetPlayerId: string },
+    ack?: (result: AckResult) => void,
+  ) => void;
+
+  /** 查询当前队伍状态（服务端返回完整队伍与成员显示数据） */
+  'client.getTeamState': (
+    payload: Record<string, never>,
+    ack?: (result: AckResult<{ team: Team | null; members: TeamMemberView[]; color: string | null }>) => void,
+  ) => void;
 
   /** 聊天 */
   'client.chat': (
@@ -470,8 +479,12 @@ export interface ServerToClientEvents {
   /** 聊天消息（频道内） */
   'server.chat': (payload: { message: ChatMessage }) => void;
 
-  /** 队伍变更广播 */
-  'server.teamUpdated': (payload: { team: Team }) => void;
+  /**
+   * 队伍状态更新广播（服务端权威）
+   *
+   * members 携带每个成员的实时显示数据，客户端据此完整重建本地队伍视图。
+   */
+  'server.teamUpdated': (payload: { team: Team; members: TeamMemberView[] }) => void;
 
   /** 收到组队邀请 */
   'server.teamInviteReceived': (payload: {
@@ -479,14 +492,33 @@ export interface ServerToClientEvents {
     inviterName: string;
     inviteId: string;
     teamId: string;
+    expiresAt: number;
   }) => void;
 
-
-  /** 队伍成员加入通知 */
+  /** 队伍成员加入通知（仅提示，队伍状态以 teamUpdated 为准） */
   'server.teamMemberJoined': (payload: {
+    teamId: string;
     playerId: string;
     playerName: string;
   }) => void;
+
+  /** 队伍成员离开通知（仅提示，队伍状态以 teamUpdated 为准） */
+  'server.teamMemberLeft': (payload: {
+    teamId: string;
+    playerId: string;
+    isLeaderTransferred: boolean;
+    newLeaderId?: string;
+  }) => void;
+
+  /** 队伍成员被踢通知（仅提示，队伍状态以 teamUpdated 为准） */
+  'server.teamMemberKicked': (payload: {
+    teamId: string;
+    playerId: string;
+    kickedBy: string;
+  }) => void;
+
+  /** 队伍解散通知 */
+  'server.teamDisbanded': (payload: { teamId: string }) => void;
   /** 昼夜切换 */
   'server.dayNightChanged': (payload: {
     isDay: boolean;

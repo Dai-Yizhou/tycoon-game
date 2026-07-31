@@ -696,14 +696,8 @@ export function createGamePage(controller: GameController): HTMLElement {
         addChatMessage(`👤 ${player.username} 离开了游戏`, 'system');
         updateRendererPlayers();
       }
-      // 从队伍成员中移除（如果存在）
-      const member = teamMembers.find(m => m.id === payload.playerId);
-      if (member) {
-        teamMembers = teamMembers.filter(m => m.id !== payload.playerId);
-        addChatMessage(`👤 队伍成员 ${member.username} 已下线`, 'system');
-        updateTeamPanel();
-      }
-      // 从打开的邀请面板中移除对应条目
+      // 队伍成员状态由 server.teamUpdated / server.teamDisbanded 事件权威维护，此处不本地修改 teamMembers
+      // 仅清理邀请面板中对应条目
       const inviteItem = document.querySelector(`[data-player-id="${payload.playerId}"]`);
       if (inviteItem) {
         const item = inviteItem.closest('.management-item');
@@ -775,20 +769,22 @@ export function createGamePage(controller: GameController): HTMLElement {
       document.body.appendChild(modal);
 
       window.rejectTeamInvite = function(): void {
-        modal.remove();
-        addChatMessage(`你拒绝了 ${payload.inviterName} 的组队邀请`, 'system');
+        socket.emit('client.respondToTeamInvite', { inviteId: payload.inviteId, accept: false }, (result) => {
+          modal.remove();
+          if (result.ok) {
+            addChatMessage(`你拒绝了 ${payload.inviterName} 的组队邀请`, 'system');
+          } else {
+            addChatMessage(`❌ 拒绝邀请失败: ${result.error || '未知错误'}`, 'system');
+          }
+        });
       };
 
       window.acceptTeamInvite = function(): void {
-        socket.emit('client.joinTeam', { teamId: payload.teamId }, (result) => {
+        socket.emit('client.respondToTeamInvite', { inviteId: payload.inviteId, accept: true }, (result) => {
           if (result.ok) {
             modal.remove();
             addChatMessage(`✅ 已加入 ${payload.inviterName} 的队伍！`, 'system');
-            // 更新本地队伍面板
-            if (currentPlayer) {
-              currentPlayer.teamId = payload.teamId;
-            }
-            updateTeamPanel();
+            // 队伍状态由 server.teamMemberJoined / server.teamUpdated 事件推送，本地不修改
           } else {
             addChatMessage(`❌ 加入队伍失败: ${result.error || '未知错误'}`, 'system');
           }
@@ -796,20 +792,51 @@ export function createGamePage(controller: GameController): HTMLElement {
       };
     });
 
+    // 监听成员加入队伍（仅显示提示，队伍状态以 server.teamUpdated 为准）
     socket.on('server.teamMemberJoined', (payload) => {
-      const existingMember = teamMembers.find(m => m.id === payload.playerId);
-      if (!existingMember) {
-        teamMembers.push({
-          id: payload.playerId,
-          username: payload.playerName,
-          money: 2000,
-          credit: 50,
-          env: 0,
-          status: 'normal',
-        });
-        addChatMessage(`🤝 ${payload.playerName} 加入了队伍！`, 'system');
+      addChatMessage(`🤝 ${payload.playerName} 加入了队伍！`, 'system');
+      // teamMembers 由 server.teamUpdated 事件权威更新
+    });
+
+    // 监听成员离开队伍（仅显示提示，队伍状态以 server.teamUpdated 为准）
+    socket.on('server.teamMemberLeft', (payload) => {
+      addChatMessage(`👤 成员 ${payload.playerId} 离开了队伍`, 'system');
+      if (payload.isLeaderTransferred && payload.newLeaderId) {
+        addChatMessage(`👑 队长已变更`, 'system');
+      }
+      // teamMembers 由 server.teamUpdated 事件权威更新
+    });
+
+    // 监听成员被踢出（仅显示提示，队伍状态以 server.teamUpdated 为准）
+    socket.on('server.teamMemberKicked', (payload) => {
+      if (payload.playerId === currentPlayer?.id) {
+        addChatMessage(`❌ 你已被移出队伍`, 'system');
+      } else {
+        addChatMessage(`🚫 成员 ${payload.playerId} 被移出队伍`, 'system');
+      }
+      // teamMembers 由 server.teamUpdated / server.teamDisbanded 事件权威更新
+    });
+
+    // 监听队伍状态更新（服务端权威：完整重建本地队伍视图）
+    socket.on('server.teamUpdated', (payload) => {
+      if (payload.team && currentPlayer) {
+        currentPlayer.teamId = payload.team.id;
+        // 用服务端推送的成员显示数据完整重建 teamMembers
+        if (payload.members) {
+          applyTeamMembers(payload.members);
+        }
         updateTeamPanel();
       }
+    });
+
+    // 监听队伍解散（服务端权威）
+    socket.on('server.teamDisbanded', (_payload) => {
+      teamMembers = [];
+      if (currentPlayer) {
+        currentPlayer.teamId = null;
+      }
+      addChatMessage(`💥 队伍已解散`, 'system');
+      updateTeamPanel();
     });
 
     // 监听服务端繁荣度变化
@@ -3122,35 +3149,57 @@ function refreshChatMessages(): void {
 }
 
 // ===== Team System =====
+/**
+ * 初始化队伍系统
+ *
+ * 服务端权威：本地不预设任何队伍成员，连接后向服务端查询真实队伍状态。
+ * teamMembers 数组只能由 server.teamUpdated / server.teamDisbanded 事件维护。
+ */
 function initTeam(): void {
-  teamMembers = [{
-    id: 'player-1',
-    username: currentPlayer?.username || '玩家',
-    money: currentMoney,
-    credit: currentCredit,
-    env: currentEnv,
-    status: isBankrupt ? 'bankrupt' : (isInJail ? 'jail' : 'normal'),
-  }];
+  teamMembers = [];
+  // 向服务端查询当前队伍状态（若已组队则服务端返回完整成员显示数据）
+  if (gameSocket) {
+    gameSocket.emit('client.getTeamState', {}, (result) => {
+      if (result.ok && result.data) {
+        applyTeamMembers(result.data.members);
+        if (result.data.team && currentPlayer) {
+          currentPlayer.teamId = result.data.team.id;
+        }
+        updateTeamPanel();
+      }
+    });
+  }
 }
 
-function updateTeamMembers(): void {
-  const self = teamMembers.find(m => m.id === 'player-1');
-  if (self) {
-    self.money = currentMoney;
-    self.credit = currentCredit;
-    self.env = currentEnv;
-    self.status = isBankrupt ? 'bankrupt' : (isInJail ? 'jail' : 'normal');
-  }
+/**
+ * 应用服务端推送的队伍成员视图，完整重建本地 teamMembers
+ *
+ * 这是唯一允许修改 teamMembers 的入口，确保本地状态始终来自服务端权威数据。
+ */
+function applyTeamMembers(members: Array<{ id: string; username: string; money: number; credit: number; env: number; status: string; isLeader: boolean }>): void {
+  teamMembers = members.map(m => ({
+    id: m.id,
+    username: m.username,
+    money: m.money,
+    credit: m.credit,
+    env: m.env,
+    status: (m.status as TeamMember['status']) ?? 'normal',
+  }));
 }
 
 function leaveTeam(): void {
-  if (teamMembers.length <= 1) {
-    addChatMessage('❌ 无法离开：你是唯一的队员', 'system');
+  if (!gameSocket) {
+    addChatMessage('❌ 无法离开队伍：未连接服务器', 'system');
     return;
   }
-  teamMembers = teamMembers.filter(m => m.id !== 'player-1');
-  addChatMessage('👤 已离开队伍', 'system');
-  updateTeamPanel();
+  gameSocket.emit('client.leaveTeam', {}, (result) => {
+    if (result.ok) {
+      addChatMessage('👤 已离开队伍', 'system');
+      // 本地状态由 server.teamMemberLeft / server.teamDisbanded 事件更新
+    } else {
+      addChatMessage(`❌ 离开队伍失败: ${result.error || '未知错误'}`, 'system');
+    }
+  });
 }
 
 window.showTeamInvite = function(): void {
@@ -3210,21 +3259,7 @@ window.showTeamInvite = function(): void {
           }
         });
       } else {
-        const existingMember = teamMembers.find(m => m.id === playerId);
-        if (!existingMember) {
-          teamMembers.push({
-            id: playerId,
-            username: playerName,
-            money: 2000,
-            credit: 50,
-            env: 0,
-            status: 'normal',
-          });
-          addChatMessage(`🤝 ${playerName} 加入了队伍（本地模拟）`, 'system');
-          updateTeamPanel();
-        } else {
-          addChatMessage(`❌ ${playerName} 已经在队伍中了`, 'system');
-        }
+        addChatMessage('❌ 未连接服务器，无法发送邀请', 'system');
       }
 
       modal.remove();
@@ -3245,7 +3280,7 @@ window.showTeamManagement = function(): void {
       <div class="modal-header">👥 队伍管理</div>
       <div class="modal-body">
         <div class="team-management-list">
-          ${teamMembers.filter(m => m.id !== 'player-1').map(m => `
+          ${teamMembers.filter(m => !currentPlayer || m.id !== currentPlayer.id).map(m => `
             <div class="management-item">
               <span>${m.username}</span>
               <button class="modal-btn btn-secondary" onclick="window.removeTeamMember('${m.id}')">移除</button>
@@ -3260,12 +3295,19 @@ window.showTeamManagement = function(): void {
   
   window.removeTeamMember = (memberId: string) => {
     const member = teamMembers.find(m => m.id === memberId);
-    if (member) {
-      teamMembers = teamMembers.filter(m => m.id !== memberId);
-      addChatMessage(`👤 ${member.username} 已被移出队伍`, 'system');
-      modal.remove();
-      updateTeamPanel();
+    if (!member) return;
+    if (!gameSocket) {
+      addChatMessage('❌ 未连接服务器，无法移除成员', 'system');
+      return;
     }
+    gameSocket.emit('client.kickTeamMember', { targetPlayerId: memberId }, (result) => {
+      if (result.ok) {
+        // 本地状态由 server.teamMemberKicked 事件更新
+        modal.remove();
+      } else {
+        addChatMessage(`❌ 移除成员失败: ${result.error || '未知错误'}`, 'system');
+      }
+    });
   };
   
   window.leaveTeam = () => {
@@ -3450,13 +3492,12 @@ function updateTopBar(): void {
 
 function updateTeamPanel(): void {
   if (!teamPanelContentEl) return;
-  updateTeamMembers();
-
+  // teamMembers 由服务端事件权威维护，此处仅渲染，不本地修改
   const memberHtml = teamMembers.map(m => {
     const statusColor = m.status === 'bankrupt' ? '#ef4444' : (m.status === 'jail' ? '#f59e0b' : '#10b981');
     const statusBg = m.status === 'bankrupt' ? 'rgba(239,68,68,0.12)' : (m.status === 'jail' ? 'rgba(245,158,11,0.12)' : 'rgba(16,185,129,0.12)');
     const statusText = m.status === 'bankrupt' ? '破产' : (m.status === 'jail' ? '监狱' : '正常');
-    const isSelf = m.id === 'player-1';
+    const isSelf = currentPlayer != null && m.id === currentPlayer.id;
     return `
       <div class="team-member ${isSelf ? 'tm-self' : ''}">
         <div class="tm-header">

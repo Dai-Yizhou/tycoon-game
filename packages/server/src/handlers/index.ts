@@ -14,3 +14,4 @@ export { TalentHandler, registerTalentHandler } from './talentHandler.js';
 export { ItemHandler, createItemHandler, type UseItemPayload } from './itemHandler.js';
 export { DebugHandler, createDebugHandler, type DebugInjectPayload } from './debugHandler.js';
 export { AdminHandler, createAdminHandler, type AdminHandlerConfig } from './adminHandler.js';
+export { TeamHandler } from './teamHandler.js';

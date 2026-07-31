@@ -38,7 +38,6 @@ src/
 │   ├── SealOrderModal.ts #   查封令弹窗
 │   ├── ReviveOrderModal.ts # 复活令弹窗
 │   ├── TalentPanel.ts    #   天赋面板
-│   ├── TeamPanel.ts      #   组队面板
 │   ├── ChatPanel.ts      #   聊天面板
 │   ├── NotificationCenter.ts # 通知中心
 │   ├── ItemBag.ts        #   道具背包

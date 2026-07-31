@@ -26,7 +26,6 @@ import {
   type SocketData,
   type Player,
   type ValueField,
-  type Team,
   PlayerStatus,
 } from '@game/shared';
 import { logger } from '../utils/logger.js';
@@ -339,12 +338,6 @@ export class SocketManager {
     set.add(socketId);
   }
 
-  private getPlayerSocket(playerId: string): string | undefined {
-    const set = this.playerSockets.get(playerId);
-    if (!set || set.size === 0) return undefined;
-    return set.values().next().value;
-  }
-
   /**
    * 主动断开某玩家的全部连接（用于踢人/封禁）
    */
@@ -496,171 +489,10 @@ export class SocketManager {
       }
     });
 
-    // 组队邀请
-    socket.on('client.inviteToTeam', (payload, ack) => {
-      try {
-        const targetPlayerId = payload?.targetPlayerId;
-        if (!targetPlayerId) {
-          ack?.({ ok: false, error: '目标玩家ID不能为空' });
-          return;
-        }
-
-        const playerId = socket.data.playerId;
-        if (!playerId) {
-          ack?.({ ok: false, error: '未登录' });
-          return;
-        }
-        const inviterPlayer = this.world.getPlayer(playerId);
-        const targetPlayer = this.world.getPlayer(targetPlayerId);
-
-        if (!inviterPlayer) {
-          ack?.({ ok: false, error: '邀请者不存在' });
-          return;
-        }
-
-        if (!targetPlayer) {
-          ack?.({ ok: false, error: '目标玩家不存在' });
-          return;
-        }
-
-        if (inviterPlayer.id === targetPlayerId) {
-          ack?.({ ok: false, error: '不能邀请自己' });
-          return;
-        }
-
-        // 邀请者若无队伍，则先创建
-        let teamId = inviterPlayer.teamId;
-        if (!teamId) {
-          teamId = `team_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-          const newTeam: Team = {
-            id: teamId,
-            name: `${inviterPlayer.username}的队伍`,
-            memberIds: [inviterPlayer.id],
-            sharedValues: {},
-            createdAt: Date.now(),
-            disbanded: false,
-            leaderId: inviterPlayer.id,
-          };
-          this.world.createTeam(newTeam);
-          inviterPlayer.teamId = teamId;
-          this.world.updatePlayer(inviterPlayer);
-          logger.info(`team created: ${teamId}, leader: ${inviterPlayer.username}`);
-        }
-
-        // 获取目标玩家的 socket
-        const targetSocketId = this.getPlayerSocket(targetPlayerId);
-        if (!targetSocketId) {
-          ack?.({ ok: false, error: '目标玩家不在线' });
-          return;
-        }
-
-        // 发送邀请通知给目标玩家（包含真实 teamId）
-        this.io.to(targetSocketId).emit('server.teamInviteReceived', {
-          inviterId: inviterPlayer.id,
-          inviterName: inviterPlayer.username,
-          inviteId: `invite_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          teamId,
-        });
-
-        logger.info(`team invite sent: ${inviterPlayer.username} -> ${targetPlayer.username}`);
-        const team = this.world.getTeam(teamId);
-        ack?.({ ok: true, data: { team: team!, message: '邀请已发送' } });
-      } catch (err) {
-        logger.error('team invite error', err);
-        ack?.({ ok: false, error: '邀请失败' });
-      }
-    });
-
-    // 加入队伍
-    socket.on('client.joinTeam', (payload, ack) => {
-      try {
-        const teamId = payload?.teamId;
-        if (!teamId) {
-          ack?.({ ok: false, error: '队伍ID不能为空' });
-          return;
-        }
-
-        const playerId = socket.data.playerId;
-        if (!playerId) {
-          ack?.({ ok: false, error: '未登录' });
-          return;
-        }
-        const player = this.world.getPlayer(playerId);
-        if (!player) {
-          ack?.({ ok: false, error: '玩家不存在' });
-          return;
-        }
-
-        if (player.teamId) {
-          ack?.({ ok: false, error: '你已在队伍中' });
-          return;
-        }
-
-        const team = this.world.getTeam(teamId);
-        if (!team || team.disbanded) {
-          ack?.({ ok: false, error: '队伍不存在或已解散' });
-          return;
-        }
-
-        const success = this.world.addTeamMember(teamId, player.id);
-        if (success) {
-          logger.info(`player joined team: ${player.username} -> team ${teamId}`);
-          
-          const inviter = this.world.getPlayer(team.memberIds[0]);
-          if (inviter) {
-            const inviterSocketId = this.getPlayerSocket(inviter.id);
-            if (inviterSocketId) {
-              this.io.to(inviterSocketId).emit('server.teamMemberJoined', {
-                playerId: player.id,
-                playerName: player.username,
-              });
-            }
-          }
-
-          ack?.({ ok: true, data: { team } });
-        } else {
-          ack?.({ ok: false, error: '加入队伍失败' });
-        }
-      } catch (err) {
-        logger.error('join team error', err);
-        ack?.({ ok: false, error: '加入队伍失败' });
-      }
-    });
-
-    // 离开队伍
-    socket.on('client.leaveTeam', (_payload, ack) => {
-      try {
-        const playerId = socket.data.playerId;
-        if (!playerId) {
-          ack?.({ ok: false, error: '未登录' });
-          return;
-        }
-        const player = this.world.getPlayer(playerId);
-        if (!player) {
-          ack?.({ ok: false, error: '玩家不存在' });
-          return;
-        }
-
-        if (!player.teamId) {
-          ack?.({ ok: false, error: '你不在队伍中' });
-          return;
-        }
-
-        const team = this.world.getTeam(player.teamId);
-        const teamName = team?.name || player.teamId;
-
-        const success = this.world.removeTeamMember(player.teamId, player.id);
-        if (success) {
-          logger.info(`player left team: ${player.username} -> team ${player.teamId}`);
-          ack?.({ ok: true, data: { teamName } });
-        } else {
-          ack?.({ ok: false, error: '离开队伍失败' });
-        }
-      } catch (err) {
-        logger.error('leave team error', err);
-        ack?.({ ok: false, error: '离开队伍失败' });
-      }
-    });
+    // 注：组队相关事件（inviteToTeam / respondToTeamInvite / leaveTeam /
+    // kickTeamMember / getTeamState）由 TeamHandler 统一处理（服务端权威），
+    // 注册见 HandlerRegistry.registerForSocket。此处不再保留旧实现，避免
+    // 双重注册导致的状态不一致。
   }
 
   /**

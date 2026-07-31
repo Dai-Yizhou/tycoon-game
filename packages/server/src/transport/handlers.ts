@@ -22,7 +22,8 @@ import { randomUUID } from 'node:crypto';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from './SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
-import { DiceHandler, MovementHandler, PropertyHandler, StartHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, ItemHandler, DebugHandler, AdminHandler } from '../handlers/index.js';
+import { DiceHandler, MovementHandler, PropertyHandler, StartHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, ItemHandler, DebugHandler, AdminHandler, TeamHandler } from '../handlers/index.js';
+import { TeamManager, DEFAULT_TEAM_CONFIG } from '../team/index.js';
 import { EventHandler } from '../events/index.js';
 import { ItemRegistry, ItemEffectsHandler, BUILTIN_ITEM_TEMPLATES } from '../items/index.js';
 import type { ProsperityManager } from '../world/ProsperityManager.js';
@@ -92,6 +93,8 @@ export class HandlerRegistry {
   private itemHandler: ItemHandler;
   private readonly debugHandler: DebugHandler;
   private readonly adminHandler: AdminHandler;
+  private readonly teamManager: TeamManager;
+  private readonly teamHandler: TeamHandler;
   private timeZoneManager: TimeZoneManager | null = null;
 
   constructor(io: TypedServer, world: GameWorld) {
@@ -133,6 +136,9 @@ export class HandlerRegistry {
     this.debugHandler = new DebugHandler(io, world);
     // 初始化管理员处理器
     this.adminHandler = new AdminHandler(io, world);
+    // 初始化组队系统（TeamManager 为纯数据层，TeamHandler 负责协议与 I/O）
+    this.teamManager = new TeamManager(DEFAULT_TEAM_CONFIG);
+    this.teamHandler = new TeamHandler(io, world, this.teamManager);
   }
 
   /**
@@ -179,6 +185,8 @@ export class HandlerRegistry {
     }
     // 注册管理员处理器
     this.adminHandler.register(socket);
+    // 注册组队处理器
+    this.teamHandler.register(socket);
     this.handleChat(socket);
   }
 
@@ -311,6 +319,13 @@ export class HandlerRegistry {
    */
   getAdminHandler(): AdminHandler {
     return this.adminHandler;
+  }
+
+  /**
+   * 获取 TeamManager（用于外部调用，如离线清理、数值同步）
+   */
+  getTeamManager(): TeamManager {
+    return this.teamManager;
   }
 
   /**

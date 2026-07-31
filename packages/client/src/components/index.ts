@@ -15,6 +15,5 @@ export { TalentPanel, createTalentPanel, type TalentPanelConfig } from './Talent
 export { ItemBag, createItemBag, type ItemBagConfig } from './ItemBag';
 export { SealOrderModal, createSealOrderModal, type SealOrderModalConfig } from './SealOrderModal';
 export { ReviveOrderModal, createReviveOrderModal, type ReviveOrderModalConfig } from './ReviveOrderModal';
-export { TeamPanel, createTeamPanel, type TeamPanelConfig } from './TeamPanel';
 export { ChatPanel, createChatPanel, type ChatPanelConfig } from './ChatPanel';
 export { NotificationCenter, createNotificationCenter, type NotificationCenterConfig } from './NotificationCenter';

@@ -43,8 +43,9 @@ describe('TeamManager', () => {
     });
 
     test('邀请已组队玩家失败', () => {
-      manager.sendInvite('player1', '玩家1', 'player2');
-      const invite2 = manager.sendInvite('player3', '玩家3', 'player2');
+      const invite = manager.sendInvite('player1', '玩家1', 'player2');
+      manager.respondInvite(invite!.id, 'player2', true); // player2 接受邀请，加入 player1 的队伍
+      const invite2 = manager.sendInvite('player3', '玩家3', 'player2'); // player3 邀请已组队的 player2
       expect(invite2).toBeNull();
     });
 
@@ -238,11 +239,14 @@ describe('TeamManager', () => {
     });
 
     test('清理离线队伍', () => {
+      // 创建双人队伍：player1 + player2
       manager.createTeam('player1', '玩家1');
-      manager.createTeam('player2', '玩家2');
+      const invite = manager.sendInvite('player1', '玩家1', 'player2');
+      manager.respondInvite(invite!.id, 'player2', true);
 
+      // 仅 player1 离线，player2 仍在线，队伍不应解散
       const disbanded = manager.cleanupOfflineTeams(['player1']);
-      expect(disbanded.length).toBe(0); // player1 所在队伍还有其他成员
+      expect(disbanded.length).toBe(0); // player2 仍在线，保留队伍
     });
   });
 });
