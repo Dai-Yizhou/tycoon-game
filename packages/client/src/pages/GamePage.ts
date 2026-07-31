@@ -730,11 +730,89 @@ export function createGamePage(controller: GameController): HTMLElement {
     });
 
     socket.on('server.valueChanged', (payload) => {
-      // 更新玩家财产（如果fieldId === 'money')
+      // 服务端权威：所有数值变更以服务端推送为准
+      const isCurrentPlayer = currentPlayer && payload.playerId === currentPlayer.id;
       if (payload.fieldId === 'money') {
-        const player = otherPlayers.find(p => p.id === payload.playerId);
-        if (player) {
-          player.primaryValue = payload.current;
+        // 更新其他玩家显示数值
+        const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
+        if (otherPlayer) {
+          otherPlayer.primaryValue = payload.current;
+        }
+        // 更新当前玩家：服务端权威同步
+        if (isCurrentPlayer) {
+          currentPlayer!.values.money.current = payload.current;
+          currentMoney = payload.current;
+          if (payload.delta > 0) {
+            addEarnedMoney(payload.delta);
+          }
+        }
+        if (otherPlayer || isCurrentPlayer) {
+          updateRendererPlayers();
+        }
+        // 服务端数值同步后检查破产
+        if (isCurrentPlayer) {
+          checkBankruptcy();
+        }
+      } else if (payload.fieldId === 'credit') {
+        if (isCurrentPlayer) {
+          currentPlayer!.values.credit.current = payload.current;
+          currentCredit = payload.current;
+        }
+      } else if (payload.fieldId === 'environment' || payload.fieldId === 'env') {
+        if (isCurrentPlayer) {
+          const env = currentPlayer!.values.environment || currentPlayer!.values.env;
+          if (env) env.current = payload.current;
+          currentEnv = payload.current;
+        }
+      }
+      // 数值变更后刷新顶部面板
+      if (isCurrentPlayer) {
+        updateTopBar();
+      }
+    });
+
+    socket.on('server.playerJailed', (payload) => {
+      // 服务端权威：监狱状态由服务端驱动
+      const isCurrentPlayer = currentPlayer && payload.playerId === currentPlayer.id;
+      if (isCurrentPlayer) {
+        isInJail = true;
+        jailEndTime = Date.now() + payload.durationMs;
+        currentPlayer!.status = 'jail';
+        // 禁用掷骰按钮
+        if (rollBtn) {
+          rollBtn.disabled = true;
+          rollBtn.classList.add('disabled', 'cooldown');
+        }
+        addChatMessage('🔒 进监狱了！无法掷骰直到出狱', 'system');
+      } else {
+        const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
+        if (otherPlayer) {
+          otherPlayer.status = 'jail';
+          updateRendererPlayers();
+        }
+      }
+    });
+
+    socket.on('server.playerReleased', (payload) => {
+      // 服务端权威：出狱状态由服务端驱动
+      const isCurrentPlayer = currentPlayer && payload.playerId === currentPlayer.id;
+      if (isCurrentPlayer) {
+        isInJail = false;
+        jailEndTime = 0;
+        currentPlayer!.status = 'normal';
+        // 冷却结束后恢复掷骰能力
+        canRoll = true;
+        if (rollBtn && !rollCooldownTimer) {
+          rollBtn.disabled = false;
+          rollBtn.classList.remove('disabled', 'cooldown');
+          rollBtn.textContent = '掷骰子';
+          rollBtn.style.background = '';
+        }
+        addChatMessage('🔓 已出狱，恢复掷骰', 'system');
+      } else {
+        const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
+        if (otherPlayer) {
+          otherPlayer.status = 'normal';
           updateRendererPlayers();
         }
       }
@@ -2028,19 +2106,16 @@ function onPlayerArrived(): void {
 
   switch (type) {
     case 'start':
-      currentMoney += 200;
-      addEarnedMoney(200);
-      addChatMessage('🚩 经过起点，获得 200 元！', 'system');
+      // 服务端权威：数值由 server.valueChanged 同步（startHandler.handlePassStart）
+      addChatMessage('🚩 经过起点！', 'system');
       checkTalentSelection();
       break;
     case 'property':
       if (ownedProperties.has(cell.id)) {
         addChatMessage(`🏠 你已拥有 ${name}`, 'system');
       } else if (cOwners(cell).length > 0) {
-        const rent = cRent(cell)[propertyLevels.get(cell.id) || 0] || 0;
-        currentMoney = Math.max(0, currentMoney - rent);
-        addChatMessage(`💸 支付过路费 ${rent} 元`, 'system');
-        checkBankruptcy();
+        // 服务端权威：租金支付、数值变更由 propertyHandler 执行并通过 server.valueChanged 推送
+        addChatMessage(`💸 路过 ${name}，请缴纳过路费`, 'system');
       } else {
         addChatMessage(`📍 ${name} 无人所有，可购买`, 'system');
       }
@@ -2050,13 +2125,8 @@ function onPlayerArrived(): void {
       break;
     case 'investment':
       if (ownedInvestments.has(cell.id)) {
-        let returnAmount = cInvestmentReturn(cell);
-        if (isTalentActive('investment_boost')) {
-          returnAmount = Math.floor(returnAmount * 1.2);
-        }
-        currentMoney += returnAmount;
-        addEarnedMoney(returnAmount);
-        addChatMessage(`💎 投资收益：${returnAmount} 元${isTalentActive('investment_boost') ? '（投资加成+20%）' : ''}`, 'system');
+        // 服务端权威：投资收益由 investmentHandler.handleCellVisit() 计算并通过 server.valueChanged 推送
+        addChatMessage(`💎 ${name} 投资收益结算中…`, 'system');
       } else {
         addChatMessage(`💎 投资项目：${name}，可购买或合租`, 'system');
       }
@@ -2065,10 +2135,8 @@ function onPlayerArrived(): void {
       addChatMessage(`🚇 交通枢纽：${name}，可付费传送`, 'system');
       break;
     case 'jail':
-      isInJail = true;
-      jailEndTime = Date.now() + 15000;
-      currentCredit = Math.max(0, currentCredit - 10);
-      addChatMessage('🔒 进监狱了！15秒内无法掷骰，信用值-10', 'system');
+      // 服务端权威：isInJail/jailEndTime/信用惩罚由 jailHandler 通过 server.playerJailed + server.valueChanged 推送
+      addChatMessage('🔒 踩中监狱格子', 'system');
       break;
     case 'monument':
       addChatMessage('🗿 时代纪念碑：可修缮增加信用值', 'system');

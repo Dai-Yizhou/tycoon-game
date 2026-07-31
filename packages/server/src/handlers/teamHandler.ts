@@ -454,7 +454,7 @@ export class TeamHandler {
    * 客户端据此完整重建本地队伍视图，无需任何本地推测。
    */
   private notifyTeamUpdated(team: Team): void {
-    // 收集队员数据，同步共享数值
+    // 收集队员数据
     const players: Player[] = [];
     for (const memberId of team.memberIds) {
       const player = this.world.getPlayer(memberId);
@@ -463,10 +463,34 @@ export class TeamHandler {
       }
     }
 
-    // 更新队伍共享数值（服务端权威计算）
+    // 步骤1：计算队伍共享数值（服务端权威）
     this.teamManager.updateTeamSharedValues(team.id, players);
 
-    // 获取最新队伍状态
+    // 步骤2：同步共享数值回每个队员 player.values（组队附带效果 - 服务端权威）
+    const syncedPlayers = this.teamManager.syncTeamValuesToMembers(team.id, players);
+    for (const synced of syncedPlayers) {
+      const original = this.world.getPlayer(synced.id);
+      if (original) {
+        // 检测数值差异，发送 valueChanged 广播（客户端权威同步）
+        for (const fieldId of Object.keys(synced.values)) {
+          const oldVal = original.values[fieldId]?.current;
+          const newVal = synced.values[fieldId]?.current;
+          if (oldVal !== undefined && newVal !== undefined && oldVal !== newVal) {
+            const payload: Parameters<ServerToClientEvents['server.valueChanged']>[0] = {
+              playerId: synced.id,
+              fieldId,
+              current: newVal,
+              delta: newVal - oldVal,
+            };
+            this.io.emit('server.valueChanged', payload);
+          }
+        }
+      }
+      // 保存更新后的玩家状态（含共享值同步后的 teamId 和 values）
+      this.world.updatePlayer(synced);
+    }
+
+    // 步骤3：推送最新队伍状态（含 members）给全体队员
     const updatedTeam = this.teamManager.getTeam(team.id);
     if (updatedTeam) {
       const members = this.buildMemberViews(updatedTeam);
