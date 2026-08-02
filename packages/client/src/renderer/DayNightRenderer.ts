@@ -13,6 +13,8 @@
  * - 支持 Canvas 2D 渲染
  */
 
+import { t } from '../game/i18n.js';
+
 /**
  * 昼夜渲染配置
  */
@@ -85,7 +87,7 @@ export class DayNightRenderer {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      throw new Error('无法获取 Canvas 2D 上下文');
+      throw new Error(t('common.canvasContextError'));
     }
     this.ctx = ctx;
     this.config = config;

@@ -95,3 +95,9 @@ tmp/
 
 # release folder
 release/
+
+# IDE / agent workspace
+.trae/
+
+# External rules repo (cloned reference)
+agent-rules/

@@ -6,6 +6,7 @@
  */
 
 import type { MapData, Player } from '@game/shared';
+import { t } from '../game/i18n.js';
 import { MapIndex } from '@game/shared';
 import { Camera } from './Camera';
 import { CellRenderer } from './CellRenderer';
@@ -104,7 +105,7 @@ export class BoardRenderer {
    */
   render(): void {
     if (!this.mapIndex) {
-      this.drawPlaceholder('棋盘加载中...');
+      this.drawPlaceholder(t('board.loading'));
       return;
     }
 

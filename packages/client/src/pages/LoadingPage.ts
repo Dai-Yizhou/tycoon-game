@@ -9,6 +9,7 @@
 
 import type { GameController } from '../game/GameController.js';
 import { createSocket, waitForConnection } from '../hooks/useSocket.js';
+import { t } from '../game/i18n.js';
 
 /**
  * 创建加载界面
@@ -22,7 +23,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
   // 加载提示
   const title = document.createElement('h2');
   title.className = 'loading-title';
-  title.textContent = '正在连接服务器...';
+  title.textContent = t('loading.connecting');
   page.appendChild(title);
 
   // 进度条容器
@@ -56,7 +57,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
 
   const retryButton = document.createElement('button');
   retryButton.className = 'retry-button';
-  retryButton.textContent = '重新连接';
+  retryButton.textContent = t('loading.retry');
   retryButton.style.display = 'none';
   errorContainer.appendChild(retryButton);
 
@@ -78,7 +79,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
       },
       onError: (error) => {
         controller.setError(error);
-        errorText.textContent = `连接失败: ${error}`;
+        errorText.textContent = t('loading.connectFailed', { error });
         errorContainer.style.display = 'block';
         retryButton.style.display = 'inline-block';
         spinner.style.display = 'none';
@@ -96,7 +97,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
 
       // 发送登录请求
       const playerName = controller.getContext().playerName;
-      socket.emit('client.login', { username: playerName, guest: playerName.startsWith('游客_') }, (result) => {
+      socket.emit('client.login', { username: playerName, guest: playerName.startsWith(t('loading.guestPrefix')) }, (result) => {
         if (result.ok && result.data) {
           progressBar.style.width = '100%';
           progressText.textContent = '100%';
@@ -107,18 +108,18 @@ export function createLoadingPage(controller: GameController): HTMLElement {
             controller.nextState();
           }, 500);
         } else {
-          const errorMsg = result.error || '登录失败';
+          const errorMsg = result.error || t('loading.loginFailed');
           controller.setError(errorMsg);
-          errorText.textContent = `登录失败: ${errorMsg}`;
+          errorText.textContent = t('loading.loginFailedWithMsg', { msg: errorMsg });
           errorContainer.style.display = 'block';
           retryButton.style.display = 'inline-block';
           spinner.style.display = 'none';
         }
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : '未知错误';
+      const message = err instanceof Error ? err.message : t('common.unknownError');
       controller.setError(message);
-      errorText.textContent = `连接失败: ${message}`;
+      errorText.textContent = t('loading.connectFailed', { error: message });
       errorContainer.style.display = 'block';
       retryButton.style.display = 'inline-block';
       spinner.style.display = 'none';

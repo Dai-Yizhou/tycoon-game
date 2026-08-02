@@ -5,8 +5,10 @@
  * - 用户名输入框
  * - 游客模式按钮
  * - 输入验证
+ * - i18n 支持
  */
 
+import { t } from '@game/shared';
 import type { GameController } from '../game/GameController.js';
 
 /**
@@ -21,7 +23,7 @@ export function createLoginPage(controller: GameController): HTMLElement {
   // 标题
   const title = document.createElement('h2');
   title.className = 'login-title';
-  title.textContent = '输入你的名字';
+  title.textContent = t('game.loginButton');
   page.appendChild(title);
 
   // 输入容器
@@ -32,10 +34,10 @@ export function createLoginPage(controller: GameController): HTMLElement {
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'username-input';
-  input.placeholder = '请输入用户名';
+  input.placeholder = t('login.usernamePlaceholder');
   input.maxLength = 20;
   input.minLength = 2;
-  input.setAttribute('aria-label', '用户名');
+  input.setAttribute('aria-label', t('login.username'));
   inputContainer.appendChild(input);
 
   // 错误提示
@@ -53,13 +55,13 @@ export function createLoginPage(controller: GameController): HTMLElement {
   // 确认按钮
   const confirmButton = document.createElement('button');
   confirmButton.className = 'confirm-button';
-  confirmButton.textContent = '确认';
+  confirmButton.textContent = t('common.confirm');
   confirmButton.disabled = true;
 
   // 游客模式按钮
   const guestButton = document.createElement('button');
   guestButton.className = 'guest-button';
-  guestButton.textContent = '游客模式';
+  guestButton.textContent = t('game.guestButton');
 
   buttonContainer.appendChild(confirmButton);
   buttonContainer.appendChild(guestButton);
@@ -69,20 +71,20 @@ export function createLoginPage(controller: GameController): HTMLElement {
   const validateInput = (): boolean => {
     const value = input.value.trim();
     if (value.length < 2) {
-      errorText.textContent = '用户名至少需要2个字符';
+      errorText.textContent = t('login.usernameTooShort');
       errorText.style.display = 'block';
       confirmButton.disabled = true;
       return false;
     }
     if (value.length > 20) {
-      errorText.textContent = '用户名不能超过20个字符';
+      errorText.textContent = t('login.usernameTooLong');
       errorText.style.display = 'block';
       confirmButton.disabled = true;
       return false;
     }
     // 检查特殊字符
     if (!/^[\u4e00-\u9fa5a-zA-Z0-9_]+$/.test(value)) {
-      errorText.textContent = '用户名只能包含中文、字母、数字和下划线';
+      errorText.textContent = t('login.usernameInvalidChars');
       errorText.style.display = 'block';
       confirmButton.disabled = true;
       return false;
@@ -104,7 +106,7 @@ export function createLoginPage(controller: GameController): HTMLElement {
 
   // 游客模式点击
   guestButton.addEventListener('click', () => {
-    const guestName = `游客_${Date.now().toString().slice(-6)}`;
+    const guestName = `${t('chat.anonymous')}_${Date.now().toString().slice(-6)}`;
     controller.setPlayerName(guestName);
     controller.nextState();
   });

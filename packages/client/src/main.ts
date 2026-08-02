@@ -7,7 +7,7 @@
  * 3. 渲染对应页面
  */
 
-import { isFeatureEnabled, listEnabledFeatures } from '@game/shared';
+import { isFeatureEnabled, listEnabledFeatures, setLocale } from '@game/shared';
 import { GameController } from './game/index.js';
 import {
   createStartPage,
@@ -61,6 +61,12 @@ let currentRenderedState: string | null = null;
 
 function bootstrap(): void {
   disableZoom();
+
+  // 从 localStorage 读取语言设置
+  const savedLocale = localStorage.getItem('gameLocale');
+  if (savedLocale) {
+    setLocale(savedLocale as any);
+  }
 
   const app = document.getElementById('app');
   if (!app) {
