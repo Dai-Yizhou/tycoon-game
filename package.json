@@ -8,6 +8,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
+    "dev": "node scripts/dev-services.mjs",
     "build:shared": "cd packages/shared && npm run build",
     "build:server": "cd packages/server && npm run build",
     "build:client": "cd packages/client && npm run build",
