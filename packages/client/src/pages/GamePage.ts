@@ -120,7 +120,7 @@ import {
 
 import { registerSocketHandlers, unregisterSocketHandlers } from '../game/systems/SocketEventHandler.js';
 import { DesignAdapter } from '../design/DesignAdapter.js';
-import northeastTokens from '../../../shared/design-tokens/themes/northeast.json';
+import { getThemeTokens } from '../design/ThemeConfig.js';
 
 let notificationCenter: NotificationCenter | null = null;
 let gameViewModel: GameViewModel | null = null;
@@ -138,7 +138,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   const context = controller.getContext();
   const page = document.createElement('div');
   page.className = 'page game-page';
-  applyGamePageThemeTokens(page);
+  applyGamePageThemeTokens(page, { tokens: getThemeTokens((globalThis as { __GAME_THEME__?: string }).__GAME_THEME__) });
   gameViewModel = new GameViewModel();
   const effects = new NoOpEffectHooks();
 
@@ -281,7 +281,7 @@ export interface GamePageThemeConfig {
 }
 
 export function applyGamePageThemeTokens(page: HTMLElement, config: GamePageThemeConfig = {}): void {
-  const adapter = new DesignAdapter(config.tokens ?? (northeastTokens as Record<string, unknown>));
+  const adapter = new DesignAdapter(config.tokens ?? getThemeTokens());
   const snapshot = adapter.createSnapshot('day');
   for (const [name, value] of Object.entries(snapshot.dom)) {
     page.style.setProperty(name, value);

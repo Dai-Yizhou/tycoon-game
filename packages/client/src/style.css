@@ -1019,23 +1019,42 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   .game-page .items-panel { bottom: 142px; }
 }
 
-/* Game HUD shell: stable, independent DOM layer */
-.game-hud-shell { position:absolute; inset:0; z-index:20; pointer-events:none; color:var(--gp-fg,#f3eadf); font-size:13px; }
-.game-hud-shell section, .game-hud-shell button, .game-hud-shell input, .game-hud-shell select { pointer-events:auto; }
-.game-hud-shell section { background:rgba(30,32,36,.94); border:1px solid var(--gp-border,#4a2c2a); box-shadow:0 8px 24px rgba(0,0,0,.18); border-radius:8px; }
-.hud-top-bar { position:absolute; inset:0 0 auto; min-height:52px; display:flex; align-items:center; gap:16px; padding:0 18px; border-radius:0!important; border-width:0 0 1px!important; }
-.hud-brand { color:var(--gp-accent,#d8753d); font-weight:700; letter-spacing:.08em; }
-.hud-top-bar strong { margin-right:8px; }
-.hud-team-panel { position:absolute; top:70px; right:18px; width:210px; padding:12px; }
-.hud-team-panel header, .hud-chat-panel header, .hud-items-panel header { font-weight:700; margin-bottom:10px; }
-.hud-row { display:flex; gap:8px; margin-top:12px; }
-.hud-row button, .hud-action-panel button, .hud-chat-compose button { border:1px solid var(--gp-accent,#d8753d); border-radius:5px; background:transparent; color:inherit; padding:7px 10px; cursor:pointer; }
-.hud-chat-panel { position:absolute; left:18px; bottom:18px; width:320px; overflow:hidden; }
-.hud-chat-messages { height:130px; overflow:auto; padding:10px; color:#d8d0c8; }
-.hud-chat-compose { display:flex; gap:6px; padding:8px; border-top:1px solid var(--gp-border,#4a2c2a); }
-.hud-chat-compose input, .hud-chat-compose select { min-width:0; flex:1; border:1px solid #66534a; border-radius:4px; background:#25272b; color:inherit; padding:7px; }
-.hud-items-panel { position:absolute; left:18px; top:100px; width:170px; padding:12px; }
-.hud-action-panel { position:absolute; right:18px; bottom:18px; display:flex; gap:8px; padding:12px; }
-.hud-action-panel button:first-child { background:var(--gp-accent,#d8753d); color:#fff; }
-.hud-hover-card { position:absolute; right:270px; bottom:110px; min-width:170px; padding:12px; opacity:.85; }
-@media (max-width:720px) { .hud-top-bar { gap:8px; padding:0 10px; font-size:11px; } .hud-team-panel { right:10px; top:62px; width:180px; } .hud-items-panel { left:10px; top:80px; width:140px; } .hud-chat-panel { left:10px; bottom:10px; width:min(320px,calc(100vw - 20px)); } .hud-action-panel { right:10px; bottom:10px; } .hud-hover-card { display:none; } }
+/* Game HUD shell: reference layout, token-driven */
+.game-hud-shell { position:absolute; inset:0; z-index:120; pointer-events:none; color:var(--gp-fg,var(--tycoon-foreground,#1a1a1a)); font-size:11px; }
+.game-hud-shell .gp-layout { position:absolute; inset:0; display:grid; grid-template-columns:minmax(0,72fr) minmax(190px,18fr); grid-template-rows:62px minmax(0,1fr) 0; pointer-events:none; }
+.game-hud-shell .gp-layout > * { pointer-events:auto; }
+.game-hud-shell .gp-topbar { grid-column:1 / -1; grid-row:1; position:relative; height:auto; display:flex; align-items:center; gap:14px; padding:0 14px; background:var(--gp-bar-bg,#1e2024); color:var(--gp-fg,#e6dcc3); border:0; border-bottom:1px solid var(--gp-border,#4a2c2a); border-radius:0; }
+.game-hud-shell .gp-topbar-player-badge { display:flex; align-items:center; gap:8px; min-width:190px; }
+.game-hud-shell .gp-topbar-avatar { width:24px; height:24px; display:grid; place-items:center; border:2px solid currentColor; border-radius:50%; background:var(--player-blue,#2c5f8d); font-weight:800; }
+.game-hud-shell .gp-topbar-player-info { display:flex; flex-direction:column; }
+.game-hud-shell .gp-topbar-player-info small { color:var(--gp-muted,#9aa0a6); font-size:9px; }
+.game-hud-shell .gp-topbar-value-pills { display:flex; gap:6px; }
+.game-hud-shell .gp-topbar-pill { min-width:58px; padding:3px 7px; border:1px solid var(--gp-border,#4a2c2a); background:var(--gp-card,#34373d); }
+.game-hud-shell .gp-topbar-pill small { display:block; color:var(--gp-muted,#9aa0a6); font-size:8px; }
+.game-hud-shell .gp-topbar-pill b { font-family:var(--font-mono,monospace); font-size:12px; }
+.game-hud-shell .gp-topbar-spacer { flex:1; }
+.game-hud-shell .gp-topbar-cycle { display:flex; align-items:center; gap:6px; font-family:var(--font-mono,monospace); }
+.game-hud-shell .gp-topbar-cycle-dot { width:9px; height:9px; border:1px solid currentColor; border-radius:50%; background:#e8b83a; }
+.game-hud-shell .gp-rail { grid-column:2; grid-row:2; align-self:start; margin:8px 8px 0 0; display:flex; flex-direction:column; gap:6px; }
+.game-hud-shell .gp-menu, .game-hud-shell .gp-team, .game-hud-shell .gp-items, .game-hud-shell .gp-chat, .game-hud-shell .gp-action, .game-hud-shell .gp-hover { border:1px solid var(--gp-border,#4a2c2a); background:var(--gp-card,#34373d); box-shadow:0 4px 14px rgba(0,0,0,.14); border-radius:3px; }
+.game-hud-shell .gp-menu { display:grid; grid-template-columns:repeat(3,1fr); overflow:hidden; }
+.game-hud-shell .gp-menu button { min-height:42px; border:0; border-right:1px solid var(--gp-border,#4a2c2a); background:transparent; color:inherit; font-size:10px; cursor:pointer; }
+.game-hud-shell .gp-menu button:last-child { border-right:0; }
+.game-hud-shell .gp-menu button:hover { background:rgba(255,255,255,.1); }
+.game-hud-shell .gp-team { padding:8px; }
+.game-hud-shell .gp-team header, .game-hud-shell .gp-items header, .game-hud-shell .gp-chat header { padding-bottom:6px; margin-bottom:6px; border-bottom:1px solid var(--gp-border,#4a2c2a); font-weight:800; }
+.game-hud-shell .gp-team-actions { display:flex; gap:5px; margin-top:8px; }
+.game-hud-shell .gp-team-actions button { flex:1; border:1px solid var(--gp-border,#4a2c2a); background:transparent; color:inherit; font-size:9px; padding:4px; cursor:pointer; }
+.game-hud-shell .gp-items { grid-column:1; grid-row:2; align-self:start; width:128px; margin:8px 0 0 8px; padding:8px; }
+.game-hud-shell .gp-chat { grid-column:1; grid-row:2; align-self:end; width:198px; margin:0 0 8px 8px; overflow:hidden; }
+.game-hud-shell .gp-chat header { padding:6px 8px; margin:0; }
+.game-hud-shell .gp-chat header span { display:block; margin-top:3px; color:var(--gp-muted,#9aa0a6); font-size:8px; font-weight:400; }
+.game-hud-shell .gp-chat-messages { height:78px; padding:6px 8px; overflow:auto; color:var(--gp-fg,#e6dcc3); }
+.game-hud-shell .gp-chat-compose { display:flex; gap:4px; padding:5px; border-top:1px solid var(--gp-border,#4a2c2a); }
+.game-hud-shell .gp-chat-compose input, .game-hud-shell .gp-chat-compose select { min-width:0; flex:1; border:1px solid var(--gp-border,#4a2c2a); background:rgba(0,0,0,.16); color:inherit; padding:4px; font-size:9px; }
+.game-hud-shell .gp-chat-compose button { border:1px solid var(--gp-accent,#d95a2b); background:var(--gp-accent,#d95a2b); color:white; padding:4px 7px; font-size:9px; cursor:pointer; }
+.game-hud-shell .gp-action { grid-column:1; grid-row:2; align-self:end; justify-self:end; display:flex; gap:6px; margin:0 8px 8px 0; padding:8px; }
+.game-hud-shell .gp-action button { border:1px solid var(--gp-accent,#d95a2b); background:var(--gp-accent,#d95a2b); color:white; padding:8px 12px; font-size:10px; font-weight:800; cursor:pointer; }
+.game-hud-shell .gp-action button[data-action=bank] { border-color:var(--gp-border,#4a2c2a); background:transparent; }
+.game-hud-shell .gp-hover { grid-column:1; grid-row:2; align-self:center; justify-self:center; min-width:170px; padding:10px; color:var(--gp-fg,#e6dcc3); opacity:.88; }
+@media (max-width:720px) { .game-hud-shell .gp-topbar-player-badge { min-width:120px; } .game-hud-shell .gp-topbar-value-pills { display:none; } .game-hud-shell .gp-rail { width:176px; } .game-hud-shell .gp-chat { width:min(198px,48vw); } .game-hud-shell .gp-hover { display:none; } }
