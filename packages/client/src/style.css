@@ -933,3 +933,88 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   .action-panel { bottom: 6px; right: 6px; }
   .action-buttons { min-width: 120px; }
 }
+
+
+/* ===== Final HUD composition: reference layout ===== */
+.game-page {
+  --ui-bg: var(--tycoon-background, #ece7dc);
+  --ui-ink: var(--tycoon-foreground, #1a1a1a);
+  --ui-card: var(--tycoon-card, #fbf8f1);
+  --ui-border: var(--tycoon-border, #1a1a1a);
+  --ui-muted: var(--tycoon-muted, #8a847a);
+  --ui-accent: var(--tycoon-line-key, #d95a2b);
+  --ui-shadow: 0 5px 18px rgba(26, 26, 26, .16);
+  background: var(--ui-bg);
+}
+.game-page .board-container { background: var(--ui-bg); }
+.game-page .new-ui-layer { position: absolute; inset: 0; z-index: 110; pointer-events: none; }
+.game-page .new-ui-layer > * { pointer-events: auto; }
+
+/* Full-width top HUD */
+.game-page .gp-topbar {
+  position: absolute; top: 0; left: 0; right: 0; height: 62px;
+  display: flex; align-items: center; gap: 14px; padding: 8px 14px;
+  background: rgba(26, 26, 26, .94); color: #fbf8f1;
+  border: 0; border-bottom: 2px solid var(--ui-border);
+  box-shadow: 0 2px 0 rgba(255,255,255,.12);
+}
+.game-page .gp-topbar-player-badge { display: flex; align-items: center; gap: 8px; min-width: 190px; }
+.game-page .gp-topbar-avatar { width: 30px; height: 30px; display: grid; place-items: center; border: 2px solid #fbf8f1; border-radius: 50%; background: var(--player-blue, #2c5f8d); font-weight: 800; }
+.game-page .gp-topbar-player-info { display: flex; flex-direction: column; min-width: 0; }
+.game-page .gp-topbar-player-name { font-size: 12px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.game-page .gp-topbar-team-tag { color: #c8c0b4; font-size: 10px; }
+.game-page .gp-topbar-value-pills { display: flex; gap: 6px; }
+.game-page .gp-topbar-pill { min-width: 68px; padding: 4px 8px; border: 1px solid rgba(251,248,241,.5); border-radius: 3px; background: rgba(251,248,241,.08); }
+.game-page .gp-topbar-pill-label { display: block; color: #c8c0b4; font-size: 9px; }
+.game-page .gp-topbar-pill-value { display: block; color: #fbf8f1; font-family: var(--font-mono, monospace); font-size: 13px; font-weight: 800; }
+.game-page .gp-topbar-spacer { flex: 1; }
+.game-page .gp-topbar-cycle { display: flex; align-items: center; gap: 6px; color: #fbf8f1; font-family: var(--font-mono, monospace); font-size: 11px; }
+.game-page .gp-topbar-cycle-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #fbf8f1; }
+.game-page .gp-topbar-cycle-dot--day { background: #e8b83a; }
+.game-page .gp-topbar-cycle-dot--night { background: #2c5f8d; }
+.game-page .gp-topbar-notice { position: relative; width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(251,248,241,.5); border-radius: 4px; background: transparent; color: #fbf8f1; }
+.game-page .gp-topbar-notice-badge { position: absolute; top: -5px; right: -5px; min-width: 16px; padding: 1px 4px; border-radius: 10px; background: var(--ui-accent); color: #fff; font-size: 9px; }
+.game-page .gp-topbar-notice-badge--hidden { display: none; }
+
+/* Existing panels: aligned to reference zones */
+.game-page .team-panel { top: 7px; right: 8px; width: 150px; z-index: 130; border: 1px solid #b9c1cc; border-radius: 7px; background: rgba(248,250,252,.96); box-shadow: var(--ui-shadow); }
+.game-page .team-panel-title { padding: 6px 9px; color: #3d5b7b; background: #eef2f7; border-bottom: 1px solid #ccd4df; }
+.game-page .team-panel-content { min-height: 22px; color: #4b5563; }
+.game-page .team-panel-actions { background: #eef2f7; border-top: 1px solid #ccd4df; }
+.game-page .team-action-btn { color: #40536a; border-color: #c7d1dd; background: #f8fafc; }
+.game-page .page-cards { top: 7px; right: 165px; z-index: 130; gap: 4px; }
+.game-page .page-card-btn { min-width: 42px; padding: 5px 7px; color: #40536a; background: rgba(248,250,252,.96); border: 1px solid #b9c1cc; box-shadow: var(--ui-shadow); }
+.game-page .page-card-btn:hover:not(:disabled) { color: #243b53; border-color: #607d9b; background: #fff; }
+.game-page .pc-icon { font-size: 15px; }
+.game-page .pc-label { font-size: 9px; }
+
+.game-page .chat-box { left: 8px; bottom: 8px; width: 198px; max-height: 126px; border: 1px solid #b9c1cc; border-radius: 7px; background: rgba(248,250,252,.96); box-shadow: var(--ui-shadow); }
+.game-page .chat-header { padding: 4px 7px; background: #eef2f7; border-bottom: 1px solid #ccd4df; }
+.game-page .chat-channels { gap: 5px; }
+.game-page .chat-channel-checkbox { font-size: 9px; }
+.game-page .chat-messages { padding: 4px 7px; }
+.game-page .chat-message { color: #3f4b59; font-size: 10px; }
+.game-page .chat-input-container { padding: 4px !important; background: #eef2f7 !important; border-top: 1px solid #ccd4df !important; }
+.game-page .chat-input { color: #34495e !important; background: #fff !important; border-color: #b9c1cc !important; }
+.game-page .chat-send-btn { background: #3d79c7 !important; border-radius: 3px !important; }
+.game-page .items-panel { left: 8px; bottom: 143px; width: 128px; border: 1px solid #b9c1cc; border-radius: 7px; background: rgba(248,250,252,.96); box-shadow: var(--ui-shadow); }
+.game-page .items-header { padding: 5px 8px; color: #40536a; background: #eef2f7; border-bottom-color: #ccd4df; }
+.game-page .no-items { padding: 10px 6px; color: #718096; font-size: 10px; }
+
+/* Bottom-right action dock */
+.game-page .new-action-bar { right: 12px; bottom: 12px; min-width: 172px; padding: 10px; gap: 7px; border: 1px solid #111; border-radius: 6px; background: rgba(26,26,26,.95); color: #fbf8f1; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+.game-page .new-action-bar__status { color: #b8b0a4; font-size: 10px; }
+.game-page .new-action-bar__actions { align-items: center; }
+.game-page .new-action-bar__dice { display: inline-grid; place-items: center; min-width: 32px; height: 32px; border: 1px solid #756d62; border-radius: 4px; color: #f5e6a8; font-size: 11px; }
+.game-page .new-action-bar__button { min-height: 32px; padding: 6px 12px; border: 1px solid var(--ui-accent); border-radius: 3px; background: var(--ui-accent); color: #fff; font-size: 11px; font-weight: 800; cursor: pointer; }
+.game-page .new-action-bar__button--secondary { border-color: #756d62; background: transparent; color: #fbf8f1; }
+
+@media (max-width: 720px) {
+  .game-page .gp-topbar { height: 54px; padding: 6px 8px; gap: 6px; }
+  .game-page .gp-topbar-player-badge { min-width: 110px; }
+  .game-page .gp-topbar-value-pills { display: none; }
+  .game-page .team-panel { top: 60px; right: 6px; }
+  .game-page .page-cards { top: 60px; right: 164px; }
+  .game-page .chat-box { width: min(198px, 48vw); }
+  .game-page .items-panel { bottom: 142px; }
+}
