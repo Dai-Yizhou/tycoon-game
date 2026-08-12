@@ -59,6 +59,29 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 }
 .game-page { padding: 0; display: block; }
 
+/* 东北走廊主题：深工业 HUD 表面，色彩由 DesignAdapter 注入 */
+.game-page {
+  --gp-bar-bg: #1e2024;
+  --gp-sidebar-bg: #252830;
+  --gp-card: #34373d;
+  --gp-muted: #9aa0a6;
+  --gp-cell-bg: #2c2f35;
+  --gp-cell-border: var(--tycoon-border, #4a2c2a);
+  --gp-link: #555b63;
+  background: var(--gp-map-bg, #e4d9c8);
+}
+
+.game-page .player-info-bar,
+.game-page .team-panel,
+.game-page .page-cards,
+.game-page .detail-panel,
+.game-page .action-panel,
+.game-page .items-panel,
+.game-page .chat-box,
+.game-page .hover-card {
+  color: var(--gp-fg, #2c2e33);
+}
+
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }

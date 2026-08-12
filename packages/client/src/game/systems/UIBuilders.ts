@@ -6,11 +6,12 @@
 
 import { t } from '@game/shared';
 import {
-  chatChannelDefs, activeChatChannels,
+  chatChannelDefs, activeChatChannels, selectedChatChannel,
   setChatBoxEl,
   setTopBarProsperityEl, setTopBarProsperityFillEl, setTopBarRegionFieldsEl,
   setTopBarTimeEl, setTeamPanelContentEl,
   setChatChannelContainer,
+  setSelectedChatChannel,
 } from '../../state/GameStore.js';
 
 export function buildTopBar(page: HTMLElement): void {
@@ -112,6 +113,17 @@ export function buildChatBox(page: HTMLElement): void {
   inputContainer.className = 'chat-input-container';
   inputContainer.style.cssText = 'display: flex; gap: 6px; padding: 6px; border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);';
 
+  const sendChannel = document.createElement('select');
+  sendChannel.className = 'chat-send-channel';
+  for (const ch of chatChannelDefs.filter(ch => ch.id !== 'system')) {
+    const option = document.createElement('option');
+    option.value = ch.id;
+    option.textContent = t(ch.label);
+    option.selected = ch.id === selectedChatChannel;
+    sendChannel.appendChild(option);
+  }
+  sendChannel.addEventListener('change', () => setSelectedChatChannel(sendChannel.value));
+
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'chat-input';
@@ -129,12 +141,10 @@ export function buildChatBox(page: HTMLElement): void {
   const sendMessage = () => {
     const msg = input.value.trim();
     if (!msg) return;
-    const channel = Array.from(activeChatChannels)[0] || 'system';
+    const channel = selectedChatChannel;
     if (gameSocket) {
       gameSocket.emit('client.chat', { channel, content: msg }, (result) => {
-        if (result.ok) {
-          addChatMessage(t('chat.you') + msg, channel);
-        } else {
+        if (!result.ok) {
           addChatMessage(t('chat.sendFailed', { error: result.error || t('common.unknown') }), 'system');
         }
       });
@@ -149,6 +159,7 @@ export function buildChatBox(page: HTMLElement): void {
     if (e.key === 'Enter') sendMessage();
   });
 
+  inputContainer.appendChild(sendChannel);
   inputContainer.appendChild(input);
   inputContainer.appendChild(sendBtn);
 

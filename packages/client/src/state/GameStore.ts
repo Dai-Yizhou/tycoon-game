@@ -175,9 +175,10 @@ export let lastPlayerTimezone = '';
 
 // 聊天
 export let activeChatChannels: Set<string> = new Set(['system']);
+export let selectedChatChannel = 'global';
 export const chatChannelDefs: ChatChannelDef[] = [
   { id: 'system', label: 'chat.channel.system', icon: '🔔', color: '#f59e0b' },
-  { id: 'world', label: 'chat.channel.world', icon: '🌍', color: '#3b82f6' },
+  { id: 'global', label: 'chat.channel.global', icon: '🌍', color: '#3b82f6' },
   { id: 'team', label: 'chat.channel.team', icon: '👥', color: '#10b981' },
   { id: 'region', label: 'chat.channel.region', icon: '📍', color: '#8b5cf6' },
 ];
@@ -262,6 +263,7 @@ export function setBehaviorConfigs(val: Map<string, BehaviorConfig>): void { beh
 export function setTutorialStep(val: number): void { tutorialStep = val; }
 export function setTutorialActive(val: boolean): void { tutorialActive = val; }
 export function setActiveChatChannels(val: Set<string>): void { activeChatChannels = val; }
+export function setSelectedChatChannel(val: string): void { selectedChatChannel = val; }
 export function setTeamMembers(val: TeamMember[]): void { teamMembers = val; }
 export function setRollBtn(val: HTMLButtonElement | null): void { rollBtn = val; }
 export function setDiceDisplayEl(val: HTMLElement | null): void { diceDisplayEl = val; }

@@ -1,24 +1,20 @@
 /**
  * 模态系统
  *
- * 管理所有弹窗相关的函数，包括交通枢纽传送、银行、道具使用等弹窗。
- * 从 GameLogic.ts 拆分而来。
+ * 服务端权威：所有弹窗操作只发送请求，不直接修改本地业务状态。
+ * 数值变更、状态变更由服务端事件（server.valueChanged / server.playerStatusChanged 等）驱动。
  */
 
 import type { Cell } from '@game/shared';
 import {
   mapIndex, currentMoney, currentCredit,
-  loanAmount, loanInterestRate, ownedProperties, items, teamMembers,
-  gameSocket, rollBtn,
+  loanAmount, loanInterestRate, ownedProperties, teamMembers,
+  gameSocket,
   cName, cType, cIcon,
-  setCurrentMoney, setCurrentPlayerPosition, setPlayerDisplayPos,
-  setCameraTarget, setActionUsedThisTurn, setCurrentCredit,
-  setLoanAmount, setIsBankrupt, setCanRoll,
 } from '../../state/GameStore.js';
 import { isTalentActive, getMaxLoanAmount } from './GameLogic.js';
 import { addChatMessage } from './ChatSystem.js';
-import { addAchievementProgress } from './AchievementSystem.js';
-import { updateTopBar, updateTeamPanel, updateActionPanel, updateItemsPanel } from './UIUpdates.js';
+import { updateTopBar, updateActionPanel } from './UIUpdates.js';
 import { t } from '../i18n.js';
 
 export function showTransportModal(fromCell: Cell, cost: number, destinations: Cell[]): void {
@@ -61,19 +57,16 @@ export function showTransportModal(fromCell: Cell, cost: number, destinations: C
       const target = mapIndex?.getById(targetId);
       if (!target) return;
 
-      setCurrentMoney(currentMoney - cost);
-      setCurrentPlayerPosition(target.id);
-      setPlayerDisplayPos(target.x, target.y);
-      setCameraTarget(target.x, target.y);
-      setActionUsedThisTurn(true);
-      addAchievementProgress('transport_5', 1);
-
-      addChatMessage(t('transport.teleportSuccess', { name: cName(target), discount: isTalentActive('transport_discount') ? t('transport.discount') : '' }), 'system');
-      updateTopBar();
-      updateTeamPanel();
-      updateActionPanel();
-
       modal.remove();
+
+      // 服务端权威：发送请求，由服务端处理移动、扣费和状态变更
+      if (gameSocket) {
+        gameSocket.emit('client.useTransport', { hubCellId: fromCell.id, targetCellId: target.id }, (result) => {
+          if (!result.ok) {
+            addChatMessage(result.error || t('common.unknownError'), 'error');
+          }
+        });
+      }
     });
   });
 }
@@ -138,13 +131,19 @@ export function showBankModal(): void {
     const amount = parseInt(loanInput.value) || 0;
     if (amount <= 0) { addChatMessage(t('bank.invalidAmount'), 'system'); return; }
     if (amount > maxLoan) { addChatMessage(t('bank.exceedsMaxLoan', { max: maxLoan }), 'system'); return; }
-    setCurrentMoney(currentMoney + amount);
-    setLoanAmount(loanAmount + amount);
-    setCurrentCredit(Math.max(0, currentCredit - 5));
-    addChatMessage(t('bank.loanSuccess', { amount }), 'system');
-    modal.remove();
-    updateTopBar();
-    updateActionPanel();
+    // 服务端权威：发送贷款请求，由服务端处理数值变更
+    if (gameSocket) {
+      gameSocket.emit('client.bankLoan', { amount }, (result) => {
+        if (result.ok) {
+          addChatMessage(t('bank.loanSuccess', { amount }), 'system');
+          modal.remove();
+          updateTopBar();
+          updateActionPanel();
+        } else {
+          addChatMessage(result.error || t('common.unknownError'), 'error');
+        }
+      });
+    }
   });
 
   modal.querySelector('#btn-repay')!.addEventListener('click', () => {
@@ -154,13 +153,19 @@ export function showBankModal(): void {
     const interest = Math.floor(amount * loanInterestRate);
     const totalRepay = amount + interest;
     if (currentMoney < totalRepay) { addChatMessage(t('bank.insufficientFunds', { cost: totalRepay, interest }), 'system'); return; }
-    setCurrentMoney(currentMoney - totalRepay);
-    setLoanAmount(loanAmount - amount);
-    setCurrentCredit(Math.min(100, currentCredit + 2));
-    addChatMessage(t('bank.repaySuccess', { amount, interest }), 'system');
-    modal.remove();
-    updateTopBar();
-    updateActionPanel();
+    // 服务端权威：发送还款请求，由服务端处理数值变更
+    if (gameSocket) {
+      gameSocket.emit('client.bankRepay', { amount }, (result) => {
+        if (result.ok) {
+          addChatMessage(t('bank.repaySuccess', { amount, interest }), 'system');
+          modal.remove();
+          updateTopBar();
+          updateActionPanel();
+        } else {
+          addChatMessage(result.error || t('common.unknownError'), 'error');
+        }
+      });
+    }
   });
 
   modal.querySelector('#btn-bank-close')!.addEventListener('click', () => modal.remove());
@@ -230,7 +235,7 @@ export function showSealItemModal(itemIndex: number): void {
       return;
     }
 
-    // 使用道具
+    // 服务端权威：使用道具，只发送请求，不修改本地状态
     useSealItem(itemIndex, cellId, modal);
   });
 
@@ -242,31 +247,27 @@ export function showSealItemModal(itemIndex: number): void {
 
 /**
  * 使用查封令道具
+ * 服务端权威：只发送请求，等待服务端事件驱动状态更新
  */
-export function useSealItem(itemIndex: number, cellId: number, modal: HTMLElement): void {
-  // 本地模拟使用（暂无服务端连接）
-  addChatMessage(t('item.useSealSuccess', { name: cellId }), 'system');
-  setCurrentCredit(Math.max(0, currentCredit - 5));
-
-  // 更新道具数量
-  items[itemIndex].count--;
-  if (items[itemIndex].count <= 0) items.splice(itemIndex, 1);
-
-  modal.remove();
-  updateItemsPanel();
-  updateTopBar();
-
-  // 如果有 socket 连接，发送到服务端
-  if (gameSocket) {
-    gameSocket.emit('client.useItem', {
-      itemId: 'seal',
-      targetCellId: cellId,
-    }, (result: { ok: boolean; error?: string }) => {
-      if (!result.ok) {
-        addChatMessage(t('item.useSealFailed', { error: result.error ?? t('common.unknown') }), 'system');
-      }
-    });
+export function useSealItem(_itemIndex: number, cellId: number, modal: HTMLElement): void {
+  if (!gameSocket) {
+    addChatMessage(t('common.unknownError'), 'system');
+    modal.remove();
+    return;
   }
+
+  gameSocket.emit('client.useItem', {
+    itemId: 'seal',
+    targetCellId: cellId,
+  }, (result: { ok: boolean; error?: string }) => {
+    if (result.ok) {
+      addChatMessage(t('item.useSealSuccess', { name: cellId }), 'system');
+      modal.remove();
+      // 道具数量和服务端数值由 server.itemUsed / server.valueChanged 事件驱动更新
+    } else {
+      addChatMessage(t('item.useSealFailed', { error: result.error ?? t('common.unknown') }), 'system');
+    }
+  });
 }
 
 /**
@@ -340,7 +341,7 @@ export function showReviveItemModal(itemIndex: number): void {
       return;
     }
 
-    // 使用道具
+    // 服务端权威：使用道具，只发送请求，不修改本地状态
     useReviveItem(itemIndex, selectedPlayerId, modal);
   });
 
@@ -352,63 +353,25 @@ export function showReviveItemModal(itemIndex: number): void {
 
 /**
  * 使用复活令道具
+ * 服务端权威：只发送请求，等待服务端事件驱动状态更新
  */
-export function useReviveItem(itemIndex: number, playerId: string, modal: HTMLElement): void {
-  // 本地模拟使用（复活自己或队友）
-  const targetPlayer = teamMembers.find(m => m.id === playerId);
-  if (!targetPlayer) {
-    addChatMessage(t('bankruptcy.playerNotFound'), 'system');
+export function useReviveItem(_itemIndex: number, playerId: string, modal: HTMLElement): void {
+  if (!gameSocket) {
+    addChatMessage(t('common.unknownError'), 'system');
     modal.remove();
     return;
   }
 
-  addChatMessage(t('item.useReviveSuccess', { name: targetPlayer.username }), 'system');
-  setCurrentCredit(Math.min(100, currentCredit + 10));
-
-  // 复活目标玩家
-  targetPlayer.status = 'normal';
-  targetPlayer.money = 2000; // 启动资金
-  targetPlayer.credit = 50;
-
-  // 如果复活的是自己
-  if (playerId === 'player-1') {
-    setIsBankrupt(false);
-    setCanRoll(true);
-    setCurrentMoney(2000);
-    setCurrentCredit(Math.min(100, currentCredit + 10));
-    setCurrentPlayerPosition(0);
-
-    const startCell = mapIndex?.getById(0);
-    if (startCell) {
-      setPlayerDisplayPos(startCell.x, startCell.y);
-      setCameraTarget(startCell.x, startCell.y);
+  gameSocket.emit('client.useItem', {
+    itemId: 'revive',
+    targetPlayerId: playerId,
+  }, (result: { ok: boolean; error?: string }) => {
+    if (result.ok) {
+      addChatMessage(t('item.useReviveSuccess', { name: playerId }), 'system');
+      modal.remove();
+      // 玩家状态、数值、道具数量由 server.itemUsed / server.playerRevived / server.valueChanged 事件驱动更新
+    } else {
+      addChatMessage(t('item.useReviveFailed', { error: result.error ?? t('common.unknown') }), 'system');
     }
-
-    if (rollBtn) {
-      rollBtn.disabled = false;
-      rollBtn.classList.remove('disabled');
-      rollBtn.textContent = t('dice.roll');
-    }
-  }
-
-  // 更新道具数量
-  items[itemIndex].count--;
-  if (items[itemIndex].count <= 0) items.splice(itemIndex, 1);
-
-  modal.remove();
-  updateItemsPanel();
-  updateTopBar();
-  updateTeamPanel();
-
-  // 如果有 socket 连接，发送到服务端
-  if (gameSocket) {
-    gameSocket.emit('client.useItem', {
-      itemId: 'revive',
-      targetPlayerId: playerId,
-    }, (result: { ok: boolean; error?: string }) => {
-      if (!result.ok) {
-        addChatMessage(t('item.useReviveFailed', { error: result.error ?? t('common.unknown') }), 'system');
-      }
-    });
-  }
+  });
 }

@@ -37,8 +37,10 @@ import { startServerPathAnimation, showIntersectionChoice } from './MovementSyst
 import { addEarnedMoney } from './AchievementSystem.js';
 import { updateTopBar, updateTeamPanel, updateRendererPlayers, updateBoardTheme, updateTopBarTime } from './UIUpdates.js';
 import { getPlayerTimezone, getLocalDayNight } from './MapLoader.js';
-import { checkBankruptcy } from './GameLogic.js';
 import { applyTeamMembers } from './TeamSystem.js';
+import { checkBankruptcy } from './GameLogic.js';
+
+const registeredSockets = new WeakSet<TypedClientSocket>();
 
 const SOCKET_EVENTS = [
   'server.dayNightProgress',
@@ -67,6 +69,8 @@ const SOCKET_EVENTS = [
  * 注册所有 socket 事件处理器
  */
 export function registerSocketHandlers(socket: TypedClientSocket): void {
+  if (registeredSockets.has(socket)) return;
+  registeredSockets.add(socket);
   // 每秒进度更新：同步 cycleStartTime 和计算时钟偏移
   socket.on('server.dayNightProgress', (payload: { cycleStartTime: number; cycleMinutes: number; globalTime: number }) => {
     setDayNightStartTime(payload.cycleStartTime);
@@ -375,7 +379,9 @@ export function registerSocketHandlers(socket: TypedClientSocket): void {
  * 注销所有 socket 事件处理器
  */
 export function unregisterSocketHandlers(socket: TypedClientSocket): void {
+  if (!registeredSockets.has(socket)) return;
   for (const event of SOCKET_EVENTS) {
     socket.off(event);
   }
+  registeredSockets.delete(socket);
 }

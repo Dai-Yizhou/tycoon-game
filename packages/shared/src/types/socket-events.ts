@@ -274,6 +274,11 @@ export interface ClientToServerEvents {
     ack?: (result: AckResult) => void,
   ) => void;
 
+  /** 破产重开（破产玩家选择重新开始游戏） */
+  'client.bankruptRestart': (
+    payload: Record<string, never>,
+    ack?: (result: AckResult) => void,
+  ) => void;
   /** 手动触发时代结算（管理员调试用） */
   'client.triggerSettlement': (
     payload: { /** 是否在结算后切换到新时代（需提供 newMapId/newEraName） */ switchEra?: boolean; newMapId?: string; newEraName?: string },
