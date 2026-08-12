@@ -138,7 +138,9 @@ export function createGamePage(controller: GameController): HTMLElement {
   const context = controller.getContext();
   const page = document.createElement('div');
   page.className = 'page game-page';
-  applyGamePageThemeTokens(page, { tokens: getThemeTokens((globalThis as { __GAME_THEME__?: string }).__GAME_THEME__) });
+  // 当前地图文件尚无主题配置，暂用 northeast；未来由地图配置覆盖。
+  const designSnapshot = new DesignAdapter(getThemeTokens((globalThis as { __GAME_THEME__?: string }).__GAME_THEME__ ?? 'northeast')).createSnapshot('day');
+  applyGamePageThemeSnapshot(page, designSnapshot);
   gameViewModel = new GameViewModel();
   const effects = new NoOpEffectHooks();
 
@@ -154,7 +156,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   setCanvasEl(canvas);
   page.appendChild(boardContainer);
 
-  setRenderer(new BoardRenderer(canvas));
+  setRenderer(new BoardRenderer(canvas, { theme: designSnapshot }));
   renderer!.drawPlaceholder(t('common.loadingMap'));
 
   // Build isolated HUD layer. Business actions stay in GamePage.
@@ -281,15 +283,18 @@ export interface GamePageThemeConfig {
 }
 
 export function applyGamePageThemeTokens(page: HTMLElement, config: GamePageThemeConfig = {}): void {
-  const adapter = new DesignAdapter(config.tokens ?? getThemeTokens());
-  const snapshot = adapter.createSnapshot('day');
+  const snapshot = new DesignAdapter(config.tokens ?? getThemeTokens()).createSnapshot('day');
+  applyGamePageThemeSnapshot(page, snapshot);
+}
+
+function applyGamePageThemeSnapshot(page: HTMLElement, snapshot: ReturnType<DesignAdapter['createSnapshot']>): void {
   for (const [name, value] of Object.entries(snapshot.dom)) {
     page.style.setProperty(name, value);
   }
   page.style.setProperty('--gp-map-bg', snapshot.canvas.board.background);
-  page.style.setProperty('--gp-accent', adapter.getColor('color.palette.accent'));
-  page.style.setProperty('--gp-border', adapter.getColor('color.palette.border'));
-  page.style.setProperty('--gp-fg', adapter.getColor('color.palette.ink'));
+  page.style.setProperty('--gp-accent', snapshot.dom['--tycoon-line-key']);
+  page.style.setProperty('--gp-border', snapshot.dom['--tycoon-line-map']);
+  page.style.setProperty('--gp-fg', snapshot.dom['--tycoon-piece-outline']);
 }
 
 // ===== UI Builders =====

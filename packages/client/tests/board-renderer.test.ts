@@ -1,4 +1,5 @@
 import { BoardRenderer } from '../src/board/board-renderer';
+import type { ThemeSnapshot } from '../src/design/DesignAdapter';
 
 /**
  * Mock Canvas 2D context for jsdom
@@ -25,6 +26,8 @@ function createMockContext(): CanvasRenderingContext2D {
     arc: noop,
     fill: noop,
     stroke: noop,
+    setLineDash: noop,
+    setTransform: noop,
     save: noop,
     restore: noop,
     translate: noop,
@@ -59,7 +62,7 @@ describe('BoardRenderer', () => {
     const viewport = renderer.getViewport();
     expect(viewport.width).toBe(800);
     expect(viewport.height).toBe(600);
-    expect(viewport.zoom).toBe(1);
+    expect(viewport.zoom).toBe(0.8);
   });
 
   it('throws on invalid context', () => {
@@ -75,5 +78,23 @@ describe('BoardRenderer', () => {
   it('drawPlaceholder does not throw', () => {
     const renderer = new BoardRenderer(canvas);
     expect(() => renderer.drawPlaceholder('test')).not.toThrow();
+  });
+
+  it('renders board, cell, and connection colors from the theme snapshot', () => {
+    const context = createMockContext();
+    getContextSpy.mockImplementation(() => context);
+    const theme: ThemeSnapshot = {
+      canvas: { board: { background: '#101820' }, cell: { property: { fill: '#aa0001' }, event: { fill: '#aa0002' }, transport: { fill: '#aa0003' } } },
+      dom: { '--tycoon-line-map': '#556677' }, piece: { outlineWidth: 3 }, line: { currentWidth: 3 },
+    };
+    const renderer = new BoardRenderer(canvas, { theme });
+    renderer.loadMap([
+      { id: 0, x: 100, y: 100, destinations: [1], extra: { type: 'property' } },
+      { id: 1, x: 200, y: 100, destinations: [2], extra: { type: 'event' } },
+      { id: 2, x: 300, y: 100, destinations: [], extra: { type: 'transport' } },
+    ]);
+    renderer.render();
+    expect(context.fillRect).toHaveBeenCalledWith(0, 0, canvas.width, canvas.height);
+    expect(context.fillStyle).toBe('#aa0003');
   });
 });

@@ -14,6 +14,7 @@ import { ConnectionRenderer } from './ConnectionRenderer';
 import { PlayerRenderer, PlayerPieceStyle } from './PlayerRenderer';
 import { isPointInCircle } from '../utils/geometry';
 import { DEFAULT_CELL_CONFIG } from '../utils/geometry';
+import type { ThemeSnapshot } from '../design/DesignAdapter';
 
 /**
  * 棋盘渲染配置
@@ -23,6 +24,8 @@ export interface BoardRendererConfig {
   cellRadius?: number;
   /** 玩家棋子样式 */
   playerStyle?: PlayerPieceStyle;
+  /** 单次生成的主题快照，避免渲染过程中读取令牌树。 */
+  theme?: ThemeSnapshot;
 }
 
 /**
@@ -35,6 +38,7 @@ export class BoardRenderer {
   private cellRenderer: CellRenderer;
   private connectionRenderer: ConnectionRenderer;
   private playerRenderer: PlayerRenderer;
+  private theme?: ThemeSnapshot;
   private mapIndex: MapIndex | null = null;
   private players: Player[] = [];
   private lastFrameTime: number = 0;
@@ -48,6 +52,7 @@ export class BoardRenderer {
 
     this.canvas = canvas;
     this.ctx = ctx;
+    this.theme = config?.theme;
 
     const dpr = window.devicePixelRatio || 1;
     const cssWidth = canvas.width / dpr || canvas.width;
@@ -57,8 +62,9 @@ export class BoardRenderer {
     // 初始化子渲染器
     this.cellRenderer = new CellRenderer(this.ctx, {
       radius: config?.cellRadius ?? DEFAULT_CELL_CONFIG.radius,
+      theme: config?.theme,
     });
-    this.connectionRenderer = new ConnectionRenderer(this.ctx);
+    this.connectionRenderer = new ConnectionRenderer(this.ctx, { theme: config?.theme });
     this.playerRenderer = new PlayerRenderer(this.ctx, {
       style: config?.playerStyle ?? PlayerPieceStyle.Pawn,
     });
@@ -137,7 +143,7 @@ export class BoardRenderer {
    * 清空画布
    */
   clear(): void {
-    this.ctx.fillStyle = '#eef2f6';
+    this.ctx.fillStyle = this.theme?.canvas.board.background ?? '#eef2f6';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
@@ -194,6 +200,12 @@ export class BoardRenderer {
     }
 
     return null;
+  }
+
+  /** 兼容旧调用方，返回当前视口快照。 */
+  getViewport(): { width: number; height: number; zoom: number } {
+    const state = this.camera.getState();
+    return { width: state.viewportWidth, height: state.viewportHeight, zoom: state.zoom };
   }
 
   /**

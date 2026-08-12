@@ -8,6 +8,7 @@
 import type { MapData } from '@game/shared';
 import { DEFAULT_CONNECTION_CONFIG } from '../utils/geometry';
 import type { CameraState } from './Camera';
+import type { ThemeSnapshot } from '../design/DesignAdapter';
 
 /**
  * 连线渲染配置
@@ -25,12 +26,12 @@ export class ConnectionRenderer {
   private ctx: CanvasRenderingContext2D;
   private config: ConnectionRenderConfig;
 
-  constructor(ctx: CanvasRenderingContext2D, config?: Partial<ConnectionRenderConfig>) {
+  constructor(ctx: CanvasRenderingContext2D, config?: Partial<ConnectionRenderConfig> & { theme?: ThemeSnapshot }) {
     this.ctx = ctx;
     this.config = {
       lineWidth: config?.lineWidth ?? DEFAULT_CONNECTION_CONFIG.lineWidth,
       dashInterval: config?.dashInterval ?? DEFAULT_CONNECTION_CONFIG.dashInterval,
-      color: config?.color ?? DEFAULT_CONNECTION_CONFIG.color,
+      color: config?.theme?.dom['--tycoon-line-map'] ?? config?.color ?? DEFAULT_CONNECTION_CONFIG.color,
     };
   }
 

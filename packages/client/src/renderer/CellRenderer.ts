@@ -12,6 +12,7 @@ import { getExtra, normalizeCellType } from '@game/shared';
 import { getColorScheme } from '../utils/colorScheme';
 import { DEFAULT_CELL_CONFIG } from '../utils/geometry';
 import type { CameraState } from './Camera';
+import type { ThemeSnapshot } from '../design/DesignAdapter';
 
 const TIMEZONE_BRIGHTNESS: Record<string, number> = {
   'UTC-8': 0.55,
@@ -60,6 +61,7 @@ export interface CellRenderConfig {
   radius: number;
   borderWidth: number;
   fontSize: number;
+  theme?: ThemeSnapshot;
 }
 
 /**
@@ -77,6 +79,7 @@ export class CellRenderer {
       radius: config?.radius ?? DEFAULT_CELL_CONFIG.radius,
       borderWidth: config?.borderWidth ?? DEFAULT_CELL_CONFIG.borderWidth,
       fontSize: config?.fontSize ?? DEFAULT_CELL_CONFIG.fontSize,
+      theme: config?.theme,
     };
   }
 
@@ -89,11 +92,14 @@ export class CellRenderer {
 
     const cellType = normalizeCellType(cell);
     const colorScheme = getColorScheme(cellType);
+    const themeFill = cellType === 'property' ? this.config.theme?.canvas.cell.property.fill
+      : cellType === 'event' ? this.config.theme?.canvas.cell.event.fill
+      : cellType === 'transport' ? this.config.theme?.canvas.cell.transport.fill : undefined;
 
     const timezone = getExtra<string>(cell, 'timezone', '');
     const brightness = timezone ? TIMEZONE_BRIGHTNESS[timezone] ?? 1.0 : 1.0;
-    const fillColor = adjustBrightness(colorScheme.fill, brightness);
-    const strokeColor = adjustBrightness(colorScheme.stroke, brightness);
+    const fillColor = adjustBrightness(themeFill ?? colorScheme.fill, brightness);
+    const strokeColor = adjustBrightness(this.config.theme?.dom['--tycoon-cell-border'] ?? colorScheme.stroke, brightness);
 
     this.ctx.save();
     this.ctx.globalAlpha = opacity;
