@@ -114,3 +114,76 @@ pnpm -r exec tsc --noEmit
 本仓库已同步至 `~/tycoon-game/shared-repo/`，包含完整 Git 历史和多分支。
 多个会话通过此共享仓库在不同分支上协作编辑。
 推送/拉取操作通过远程 `origin`（GitHub）进行同步。
+
+---
+
+## 七、2026-08-05 更新
+
+- 已从远程 `dev-Dai` 恢复以下代码与文档：`docs/`、`config_editors/`、`map_editor_v01.01/`、`ai-bot/`、`ai_bot_try/`。
+- 恢复时排除了 `.obsidian`、截图、`output`、`individual_reports`、`test-dist`、编译产物、训练产物和模型文件。
+- 已确认 `packages/server/map.json` 存在。
+- 工具链版本：Node `v24.18.0`，pnpm `v11.18.0`。
+- 已在隔离目录 `/tmp/tycoon-work` 安装依赖并完成四包构建，构建成功。
+- admin 测试通过。
+- 其他测试当前失败原因：shared 存在 i18n Jest 映射和性能阈值问题；server 存在 JWT `exp`/`expiresIn`、昼夜、MongoDB 和 vi 相关问题；client 存在 Jest/Vitest、Canvas、mock 和模块解析问题。
+- 桌面仓库受权限限制，无法创建 `node_modules` 和 `.git/index.lock`。
+- 后端技术栈更正为 Express + Socket.IO。
+- 共享仓库路径：`~/Desktop/tycoon-game/shared-repo`。
+
+---
+
+## 八、2026-08-07 更新
+
+### 1. 服务端权威全面收敛
+
+- **移动最终落点事务唯一化**：中间格不触发业务逻辑，只有最终停留格触发一次结算。
+  - 关键文件：`packages/server/src/handlers/movementHandler.ts`、`transport/handlers.ts`
+- **监狱所有者不可收租**：租金计算时过滤处于监狱状态的所有者。
+  - 关键文件：`packages/server/src/handlers/propertyHandler.ts`
+- **道具出狱校验**：完善玩家状态、道具持有、道具类型的校验。
+  - 关键文件：`packages/server/src/handlers/jailHandler.ts`
+- **组队状态收敛**：`TeamManager` 与 `GameWorld Player.teamId` 同步，退出/踢人/解散时通知所有成员。
+  - 关键文件：`packages/server/src/handlers/teamHandler.ts`
+- **客户端业务请求收敛**：`GameLogic.ts` 中所有操作只发送 `client.*` 请求，不修改本地业务状态。
+  - 关键文件：`packages/client/src/game/systems/GameLogic.ts`
+- **ModalSystem 弹窗收敛**：交通枢纽、银行、道具弹窗改为只发送请求，等待服务端事件驱动状态更新。
+  - 关键文件：`packages/client/src/game/systems/ModalSystem.ts`
+- **Socket 事件集中管理**：使用 `WeakSet` 防止重复注册，`unregisterSocketHandlers` 正确清理。
+  - 关键文件：`packages/client/src/game/systems/SocketEventHandler.ts`
+- **`client.move` 拒绝非授权调用**：普通移动请求返回错误，必须由服务端移动流程发起。
+  - 关键文件：`packages/server/src/handlers/movementHandler.ts`
+
+### 2. 新增测试
+
+| 测试文件 | 验证内容 |
+|----------|----------|
+| `packages/server/tests/transport/authoritativeMovement.test.ts` | 移动权威：中间格不触发、最终格唯一触发 |
+| `packages/server/tests/handlers/rentAuthority.test.ts` | 租金权威：被监禁所有者不收租 |
+| `packages/server/tests/handlers/jailItemRelease.test.ts` | 道具出狱：各种校验场景 |
+| `packages/client/tests/socket-handler-lifecycle.test.ts` | Socket 监听生命周期：重复注册和清理 |
+| `packages/client/tests/server-authority-rendering.test.ts` | 客户端渲染权威：GameLogic 和 ModalSystem 无本地状态修改 |
+| `packages/client/tests/client-authoritative-actions.test.ts` | 客户端操作权威：所有操作只发送请求 |
+
+### 3. 新增文档
+
+- `docs/UI_REBUILD_HANDOFF.md` — UI 重构交接文档，明确需要显示的信息、数据流和组件拆分建议。
+
+### 4. 破产重开服务端处理器
+
+- **`client.bankruptRestart` 服务端处理器**：`HandlerRegistry.handleBankruptRestart` 调用 `Bankruptcy.revivePlayer()` 处理破产重开请求。
+  - 关键文件：`packages/server/src/transport/handlers.ts`
+  - 注入点：`packages/server/src/app.ts` → `handlerRegistry.setBankruptcy(bankruptcy)`
+- **Socket 事件类型补充**：`shared/src/types/socket-events.ts` 新增 `client.bankruptRestart` 事件定义。
+- **客户端 `checkBankruptcy` 导出**：`GameLogic.ts` 新增 `checkBankruptcy()` 函数，`SocketEventHandler.ts` 恢复导入。
+- **TypeScript 编译错误修复**：清理 `GameLogic.ts`、`ModalSystem.ts`、`SocketEventHandler.ts` 中的未使用变量和导入。
+
+### 5. 文档更新
+
+- `docs/ARCHITECTURE.md` 新增「破产重开流程」章节。
+- `docs/API.md` 新增 `client.bankruptRestart` 事件文档。
+
+### 6. 客户端测试注意事项
+
+- 客户端测试使用 `jest` + `ts-jest` + `jsdom` 环境
+- `server-authority-rendering.test.ts` 和 `client-authoritative-actions.test.ts` 通过文件内容静态分析验证服务端权威
+- 运行：`pnpm --filter @game/client test`

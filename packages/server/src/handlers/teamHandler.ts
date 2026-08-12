@@ -70,6 +70,12 @@ export class TeamHandler {
     this.io = io;
     this.world = world;
     this.teamManager = teamManager;
+    this.teamManager.onTeamDisbanded((teamId, memberIds) => {
+      this.clearWorldTeamIds(memberIds, teamId);
+      for (const memberId of memberIds) {
+        this.emitToPlayer(memberId, 'server.teamDisbanded', { teamId });
+      }
+    });
   }
 
   /**
@@ -255,7 +261,7 @@ export class TeamHandler {
     }
 
     const teamId = team.id;
-    const remainingMembers = team.memberIds.slice();
+    const originalMembers = team.memberIds.slice();
 
     // 调用 TeamManager 离开队伍（服务端权威）
     const result = this.teamManager.leaveTeam(playerId);
@@ -270,11 +276,9 @@ export class TeamHandler {
     logger.info(`玩家 ${playerId} 离开队伍 ${teamId}（解散: ${isDisbanded}）`);
 
     if (isDisbanded) {
-      // 队伍解散：通知所有原成员
-      for (const memberId of remainingMembers) {
-        this.emitToPlayer(memberId, 'server.teamDisbanded', { teamId });
-      }
+      this.clearWorldTeamIds(originalMembers, teamId);
     } else if (result.team) {
+      this.clearWorldTeamIds([playerId], teamId);
       // 队伍仍存在：通知全队有成员离开
       this.broadcastToTeam(result.team, 'server.teamMemberLeft', {
         teamId: result.team.id,
@@ -338,6 +342,7 @@ export class TeamHandler {
     }
 
     const teamId = team.id;
+    const originalMembers = team.memberIds.slice();
 
     // 调用 TeamManager 踢出成员（复用 leaveTeam 逻辑）
     const result = this.teamManager.leaveTeam(payload.targetPlayerId);
@@ -357,6 +362,8 @@ export class TeamHandler {
     });
 
     if (result.team) {
+      this.clearWorldTeamIds([payload.targetPlayerId], teamId);
+      this.emitToPlayer(payload.targetPlayerId, 'server.teamDisbanded', { teamId });
       // 通知全队有成员被踢
       this.broadcastToTeam(result.team, 'server.teamMemberKicked', {
         teamId: result.team.id,
@@ -365,8 +372,7 @@ export class TeamHandler {
       });
       this.notifyTeamUpdated(result.team);
     } else {
-      // 队伍解散
-      this.emitToPlayer(playerId, 'server.teamDisbanded', { teamId });
+      this.clearWorldTeamIds(originalMembers, teamId);
     }
 
     ack?.({ ok: true });
@@ -498,6 +504,15 @@ export class TeamHandler {
         team: updatedTeam,
         members,
       });
+    }
+  }
+
+  private clearWorldTeamIds(playerIds: string[], teamId: string): void {
+    for (const playerId of playerIds) {
+      const player = this.world.getPlayer(playerId);
+      if (player?.teamId === teamId) {
+        this.world.updatePlayer({ ...player, teamId: null });
+      }
     }
   }
 

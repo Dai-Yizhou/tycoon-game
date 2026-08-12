@@ -9,7 +9,7 @@
  * - TR-9.5: 合租持股比例计算正确
  */
 
-import { describe, it, expect, beforeEach, vi } from '@jest/globals';
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { PropertyHandler, type PropertyOwnership } from '../../src/handlers/propertyHandler.js';
 import { GameWorld } from '../../src/world/GameWorld.js';
 import type { TypedServer, TypedSocket } from '../../src/transport/SocketManager.js';
@@ -20,15 +20,15 @@ import { PlayerStatus } from '@game/shared';
 function createMockSocket(playerId?: string): TypedSocket {
   return {
     data: { playerId },
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedSocket;
 }
 
 function createMockIO(): TypedServer {
   return {
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedServer;
 }
 
@@ -81,6 +81,11 @@ function createTestMapMeta(): MapMeta {
     id: 'test-map',
     name: 'Test Map',
     version: '1.0.0',
+    templateName: 'default',
+    timezones: [],
+    regions: [],
+    dayNightCycleMinutes: 15,
+    startCellId: 0,
     valueFieldDefinitions: [
       { id: 'money', name: '财产', current: 1000, min: 0 },
     ],
@@ -252,6 +257,50 @@ describe('PropertyHandler', () => {
       expect(owner.values['money'].current).toBe(510); // 500 + 10
     });
 
+    it('所有者被关押时不创建租金事务', () => {
+      const payer = createTestPlayer('payer', 1000);
+      const owner = createTestPlayer('owner', 500);
+      owner.status = PlayerStatus.Jail;
+      world.addPlayer(payer);
+      world.addPlayer(owner);
+
+      const cell = world.getMapIndex()!.getById(1)!;
+      cell.extra.ownerships = [{ playerId: 'owner', share: 1.0, purchasePrice: 100 }];
+      cell.extra.owners = ['owner'];
+      cell.extra.level = 0;
+
+      const result = handler.handleRentPayment('payer', 1, mockSocket);
+
+      expect(result).toBeNull();
+      expect(payer.values['money'].current).toBe(1000);
+      expect(owner.values['money'].current).toBe(500);
+    });
+
+    it('合租时排除被关押的所有者', () => {
+      const payer = createTestPlayer('payer', 1000);
+      const jailedOwner = createTestPlayer('jailed-owner', 500);
+      const activeOwner = createTestPlayer('active-owner', 500);
+      jailedOwner.status = PlayerStatus.Jail;
+      world.addPlayer(payer);
+      world.addPlayer(jailedOwner);
+      world.addPlayer(activeOwner);
+
+      const cell = world.getMapIndex()!.getById(1)!;
+      cell.extra.ownerships = [
+        { playerId: 'jailed-owner', share: 0.6, purchasePrice: 60 },
+        { playerId: 'active-owner', share: 0.4, purchasePrice: 40 },
+      ];
+      cell.extra.owners = ['jailed-owner', 'active-owner'];
+      cell.extra.level = 0;
+
+      const result = handler.handleRentPayment('payer', 1, mockSocket);
+
+      expect(result).toEqual({ rent: 10, payerId: 'payer', ownerId: 'active-owner' });
+      expect(payer.values['money'].current).toBe(990);
+      expect(jailedOwner.values['money'].current).toBe(500);
+      expect(activeOwner.values['money'].current).toBe(504);
+    });
+
     it('自己的地产不收租', () => {
       const player = createTestPlayer('player', 1000);
       world.addPlayer(player);
@@ -354,7 +403,7 @@ describe('PropertyHandler', () => {
   describe('Socket事件处理', () => {
     it('未登录玩家购买地产失败', () => {
       const socket = createMockSocket(); // 无 playerId
-      const ack = vi.fn();
+      const ack = jest.fn();
 
       handler.register(socket);
 
@@ -377,7 +426,7 @@ describe('PropertyHandler', () => {
       world.addPlayer(player);
 
       const socket = createMockSocket('player1');
-      const ack = vi.fn();
+      const ack = jest.fn();
 
       handler.register(socket);
 

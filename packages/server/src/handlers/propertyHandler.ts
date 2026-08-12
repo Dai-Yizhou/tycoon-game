@@ -16,7 +16,7 @@
  */
 
 import type { AckResult, Cell, Player } from '@game/shared';
-import { getExtra, normalizeCellType, CellTypes } from '@game/shared';
+import { getExtra, normalizeCellType, CellTypes, PlayerStatus } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -411,6 +411,17 @@ export class PropertyHandler {
         return null;
       }
 
+      const ownerIds = ownerships.length > 0
+        ? ownerships.map(ownership => ownership.playerId)
+        : owners;
+      const receivableOwnerIds = ownerIds.filter(ownerId => {
+        const owner = this.world.getPlayer(ownerId);
+        return owner && owner.status !== PlayerStatus.Jail;
+      });
+      if (receivableOwnerIds.length === 0) {
+        return null;
+      }
+
       // 6. 获取租金
       const level = getExtra<number>(cell, 'level', 0) ?? 0;
       const rentArray = getExtra<number[]>(cell, 'rent', []) ?? [];
@@ -439,7 +450,7 @@ export class PropertyHandler {
       });
 
       // 找出主要所有者用于返回
-      const mainOwner = owners[0] ?? ownerships[0]?.playerId ?? '';
+      const mainOwner = receivableOwnerIds[0];
 
       logger.debug(`玩家 ${payerId} 向格子 ${cellId} 的所有者支付租金 ${actualRent}`);
 
@@ -569,7 +580,7 @@ export class PropertyHandler {
       const owners = getExtra<string[]>(cell, 'owners', []) ?? [];
       if (owners.length > 0) {
         const owner = this.world.getPlayer(owners[0]);
-        if (owner) {
+        if (owner && owner.status !== PlayerStatus.Jail) {
           const currentMoney = this.getPlayerMoney(owner);
           const newMoney = currentMoney + totalRent;
           this.setPlayerMoney(owner, newMoney);
@@ -588,7 +599,7 @@ export class PropertyHandler {
     // 按持股比例分配
     for (const ownership of ownerships) {
       const owner = this.world.getPlayer(ownership.playerId);
-      if (owner) {
+      if (owner && owner.status !== PlayerStatus.Jail) {
         const shareRent = Math.floor(totalRent * ownership.share);
         const currentMoney = this.getPlayerMoney(owner);
         const newMoney = currentMoney + shareRent;

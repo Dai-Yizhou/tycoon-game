@@ -15,7 +15,7 @@
  */
 
 import type { ValueChangedPayload } from '@game/shared';
-import { CellTypes, PlayerStatus, getExtra } from '@game/shared';
+import { CellTypes, ItemTypes, PlayerStatus, getExtra } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -98,12 +98,7 @@ export class JailHandler {
   /**
    * 注册监狱相关事件处理器
    */
-  register(_socket: TypedSocket): void {
-    // 占位：使用道具出狱事件
-    // socket.on('client.useJailItem', (payload, ack) => {
-    //   this.handleUseJailItem(socket, payload, ack);
-    // });
-  }
+  register(_socket: TypedSocket): void {}
 
   /**
    * 处理踩中监狱格子
@@ -313,10 +308,27 @@ export class JailHandler {
    * @returns 是否成功出狱
    */
   useItemToRelease(playerId: string, itemId: string): boolean {
-    // 占位：未来实现道具出狱逻辑
-    // Task 11 将实现道具系统
-    logger.debug(`占位：玩家 ${playerId} 使用道具 ${itemId} 出狱`);
-    return this.releasePlayer(playerId);
+    const player = this.world.getPlayer(playerId);
+    if (!player || player.status !== PlayerStatus.Jail || !player.items) {
+      return false;
+    }
+
+    const item = player.items.find(candidate => candidate.id === itemId);
+    if (!item || item.type !== ItemTypes.Revive || item.quantity < 1) {
+      return false;
+    }
+
+    if (!this.releasePlayer(playerId)) {
+      return false;
+    }
+
+    if (item.quantity > 1) {
+      item.quantity -= 1;
+    } else {
+      player.items = player.items.filter(candidate => candidate.id !== itemId);
+    }
+    this.world.updatePlayer(player);
+    return true;
   }
 
   /**

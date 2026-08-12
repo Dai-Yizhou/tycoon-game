@@ -13,12 +13,11 @@
  * - 广播移动动画给所有玩家
  */
 
-import type { AckResult, PositionChangedPayload, Cell, Player } from '@game/shared';
-import { getExtra, normalizeCellType, CellTypes } from '@game/shared';
+import type { AckResult, PositionChangedPayload, Cell } from '@game/shared';
+import { getExtra } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
-import type { HandlerRegistry } from '../transport/handlers.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
 import type { TimeZoneManager } from '../world/TimeZoneManager.js';
 
@@ -49,14 +48,18 @@ interface PlayerMovementState {
 export class MovementHandler {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
-  private readonly registry: HandlerRegistry | null;
   private timeZoneManager: TimeZoneManager | null = null;
+  private readonly settleLanding: ((playerId: string, cellId: number, socket: TypedSocket) => void) | null;
   private playerMovementStates: Map<string, PlayerMovementState> = new Map();
 
-  constructor(io: TypedServer, world: GameWorld, registry?: HandlerRegistry) {
+  constructor(
+    io: TypedServer,
+    world: GameWorld,
+    settleLanding?: (playerId: string, cellId: number, socket: TypedSocket) => void,
+  ) {
     this.io = io;
     this.world = world;
-    this.registry = registry ?? null;
+    this.settleLanding = settleLanding ?? null;
   }
 
   setTimeZoneManager(timeZoneManager: TimeZoneManager): void {
@@ -176,7 +179,6 @@ export class MovementHandler {
     logger.debug(`玩家 ${playerId} 移动：从 ${startCellId} 到 ${current.id}，路径 ${path.join(' → ')}，步数 ${stepsTaken}`);
 
     this.checkTimezoneChange(playerId, current.id, socket);
-    this.triggerCellEvent(player, current.id, socket);
 
     if (encounteredChoice && stepsTaken < steps) {
       const remainingSteps = steps - stepsTaken;
@@ -199,6 +201,7 @@ export class MovementHandler {
       logger.debug(`玩家 ${playerId} 遇到岔路，暂停移动，剩余步数 ${remainingSteps}`);
     } else {
       this.playerMovementStates.delete(playerId);
+      this.settleLanding?.(playerId, current.id, socket);
     }
 
     return { playerId, finalCellId: current.id, path, stepsTaken };
@@ -218,51 +221,11 @@ export class MovementHandler {
 
   private handleDirectMove(
     socket: TypedSocket,
-    payload: { toCellId: number },
+    _payload: { toCellId: number },
     ack?: (result: AckResult<PositionChangedPayload>) => void,
   ): void {
-    try {
-      const playerId = socket.data.playerId;
-      if (!playerId) {
-        emitError(socket, ErrorCodes.NotAuthenticated, '请先登录');
-        ack?.({ ok: false, error: 'not_authenticated' });
-        return;
-      }
-      const player = this.world.getPlayer(playerId);
-      if (!player) {
-        emitError(socket, ErrorCodes.PlayerNotFound, '玩家不存在');
-        ack?.({ ok: false, error: 'player_not_found' });
-        return;
-      }
-      const mapIndex = this.world.getMapIndex();
-      if (!mapIndex) {
-        emitError(socket, ErrorCodes.InternalError, '地图未加载');
-        ack?.({ ok: false, error: 'map_not_loaded' });
-        return;
-      }
-      const targetCell = mapIndex.getById(payload.toCellId);
-      if (!targetCell) {
-        emitError(socket, ErrorCodes.InvalidPayload, `目标格子 ${payload.toCellId} 不存在`);
-        ack?.({ ok: false, error: 'invalid_cell' });
-        return;
-      }
-      player.position.cellId = payload.toCellId;
-      player.lastActiveAt = Date.now();
-      this.world.updatePlayer(player);
-      const movedPayload: PositionChangedPayload = {
-        playerId,
-        cellId: payload.toCellId,
-        path: [player.position.cellId, payload.toCellId],
-      };
-      this.io.emit('server.playerMoved', movedPayload);
-      this.checkTimezoneChange(playerId, payload.toCellId, socket);
-      ack?.({ ok: true, data: movedPayload });
-      logger.debug(`玩家 ${playerId} 直接移动到 ${payload.toCellId}`);
-    } catch (err) {
-      logger.error('直接移动处理错误', err);
-      emitError(socket, ErrorCodes.InternalError, err instanceof Error ? err.message : String(err));
-      ack?.({ ok: false, error: 'internal_error' });
-    }
+    emitError(socket, ErrorCodes.InvalidOperation, '普通移动请求必须由服务端移动流程发起');
+    ack?.({ ok: false, error: 'movement_not_authorized' });
   }
 
   private handleChoosePath(
@@ -317,91 +280,10 @@ export class MovementHandler {
     }
   }
 
-  private triggerCellEvent(player: Player, cellId: number, socket: TypedSocket): void {
-    const mapIndex = this.world.getMapIndex();
-    if (!mapIndex) return;
-    const cell = mapIndex.getById(cellId);
-    if (!cell) return;
-    const cellType = normalizeCellType(cell);
-    switch (cellType) {
-      case CellTypes.Property:
-        this.handlePropertyCell(player, cell, socket);
-        break;
-      case CellTypes.Start:
-        logger.debug(`玩家 ${player.id} 到达起点`);
-        break;
-      case CellTypes.Jail:
-        logger.debug(`玩家 ${player.id} 到达监狱`);
-        break;
-      case CellTypes.Event:
-        logger.debug(`玩家 ${player.id} 到达事件格`);
-        break;
-      case CellTypes.Transport:
-        logger.debug(`玩家 ${player.id} 到达交通枢纽`);
-        break;
-      case CellTypes.Monument:
-        logger.debug(`玩家 ${player.id} 到达纪念碑`);
-        break;
-      case CellTypes.Investment:
-        logger.debug(`玩家 ${player.id} 到达投资项目格`);
-        break;
-      default:
-        break;
-    }
-  }
 
-  private handlePropertyCell(player: Player, cell: Cell, socket: TypedSocket): void {
-    const owners = getExtra<string[]>(cell, 'owners', []) ?? [];
-    const ownerships = getExtra<{ playerId: string; share: number }[]>(cell, 'ownerships', []) ?? [];
-    const isOwner = owners.includes(player.id) || ownerships.some(o => o.playerId === player.id);
-    const hasOwner = owners.length > 0 || ownerships.length > 0;
-
-    if (!hasOwner) {
-      const price = getExtra<number>(cell, 'price', 0) ?? 0;
-      socket.emit('server.notification', {
-        id: `property_buy_${cell.id}`,
-        type: 'info',
-        title: '购买地产',
-        content: `你可以购买 ${getExtra<string>(cell, 'name', '该地产') ?? '该地产'}，价格为 ${price}`,
-        actions: [
-          { label: '购买', action: 'buyProperty', payload: { cellId: cell.id } },
-          { label: '取消', action: 'dismiss' },
-        ],
-        durationMs: 0,
-      });
-      logger.debug(`玩家 ${player.id} 到达无主地产 ${cell.id}`);
-    } else if (isOwner) {
-      const level = getExtra<number>(cell, 'level', 0) ?? 0;
-      const upgradeCosts = getExtra<number[]>(cell, 'upgradeCost', []) ?? [];
-      const maxLevel = upgradeCosts.length;
-      if (level < maxLevel) {
-        const upgradeCost = upgradeCosts[level];
-        socket.emit('server.notification', {
-          id: `property_upgrade_${cell.id}`,
-          type: 'info',
-          title: '升级地产',
-          content: `你的地产 ${getExtra<string>(cell, 'name', '该地产') ?? '该地产'} 可以升级到 ${level + 1} 级，费用为 ${upgradeCost}`,
-          actions: [
-            { label: '升级', action: 'upgradeProperty', payload: { cellId: cell.id } },
-            { label: '取消', action: 'dismiss' },
-          ],
-          durationMs: 0,
-        });
-        logger.debug(`玩家 ${player.id} 到达自有地产 ${cell.id}，等级 ${level}`);
-      } else {
-        logger.debug(`玩家 ${player.id} 到达自有地产 ${cell.id}，已满级`);
-      }
-    } else {
-      if (this.registry) {
-        this.registry.handleRentPayment(player.id, cell.id, socket);
-      } else {
-        logger.warn(`无法处理租金支付：registry 未初始化`);
-      }
-    }
-  }
 }
 
-export function registerMovementHandler(io: TypedServer, world: GameWorld, registry?: HandlerRegistry): MovementHandler {
-  const handler = new MovementHandler(io, world, registry);
+export function registerMovementHandler(io: TypedServer, world: GameWorld): MovementHandler {
+  const handler = new MovementHandler(io, world);
   return handler;
 }

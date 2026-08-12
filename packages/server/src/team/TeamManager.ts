@@ -87,6 +87,7 @@ export class TeamManager {
   private readonly playerTeamBindings: Map<string, string> = new Map();
   private readonly teamColors: Map<string, string> = new Map();
   private readonly config: TeamConfig;
+  private readonly teamDisbandedListeners: Array<(teamId: string, memberIds: string[]) => void> = [];
 
   constructor(config: TeamConfig = DEFAULT_TEAM_CONFIG) {
     this.config = config;
@@ -154,6 +155,10 @@ export class TeamManager {
    */
   getAllTeams(): Team[] {
     return Array.from(this.teams.values()).filter(t => !t.disbanded);
+  }
+
+  onTeamDisbanded(listener: (teamId: string, memberIds: string[]) => void): void {
+    this.teamDisbandedListeners.push(listener);
   }
 
   // ---------------------------------------------------------------------------
@@ -372,6 +377,8 @@ export class TeamManager {
       return null;
     }
 
+    const originalMemberIds = team.memberIds.slice();
+
     // 移除玩家
     const memberIndex = team.memberIds.indexOf(playerId);
     if (memberIndex === -1) {
@@ -396,6 +403,9 @@ export class TeamManager {
       team.disbandedAt = Date.now();
       if (remainingMembers.length === 1) {
         this.playerTeamBindings.delete(remainingMembers[0]);
+      }
+      for (const listener of this.teamDisbandedListeners) {
+        listener(team.id, originalMemberIds);
       }
       logger.info(`队伍 ${team.id} 已解散`);
       return { team: null, remainingMembers };
@@ -598,13 +608,17 @@ export class TeamManager {
       return false;
     }
 
-    // 移除所有队员绑定
+    const originalMemberIds = team.memberIds.slice();
     for (const memberId of team.memberIds) {
       this.playerTeamBindings.delete(memberId);
     }
 
     team.disbanded = true;
     team.disbandedAt = Date.now();
+
+    for (const listener of this.teamDisbandedListeners) {
+      listener(teamId, originalMemberIds);
+    }
 
     logger.info(`队伍 ${teamId} 已解散`);
     return true;

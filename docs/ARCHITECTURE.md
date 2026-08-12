@@ -460,3 +460,53 @@ npm run dev -- --count 1 --dashboard --llm --llm-type ollama --llm-model qwen2.5
 - 隐私：密码 bcrypt 哈希（10 轮 salt）；JWT 身份认证；敏感数据不写入日志。
 - 地图数据：服务端校验格式（防恶意大文件、结构炸弹）。
 - HTTP：Helmet 安全头 + CORS 白名单 + 1MB 请求体限制。
+
+## 服务端权威关键设计模式
+
+### 移动最终落点事务（settleLanding）
+
+```
+MovementHandler.continueMovement (路径计算 + 位置更新)
+  │
+  └──→ settleLanding (回调，由 HandlerRegistry 注入)
+         │
+         └──→ HandlerRegistry.handleCellEvent
+                │
+                ├──→ StartHandler (起点资金)
+                ├──→ JailHandler (入狱判定)
+                ├──→ EventHandler (事件格)
+                ├──→ PropertyHandler (地产租金/购买)
+                ├──→ InvestmentHandler (投资结算)
+                └──→ MonumentHandler (纪念碑修缮)
+```
+
+**关键规则**：
+- 中间经过的格子**不触发任何业务逻辑**，仅用于动画路径
+- 只有最终停留格触发一次 `settleLanding` 回调
+- `client.move` 的普通调用被拒绝，必须由服务端 `rollDice` 流程发起
+
+### 地产与租金权威
+
+- 租金计算时过滤 `PlayerStatus.Jail` 的所有者，被监禁所有者不参与租金分配
+- 若所有所有者均被监禁，该地产不收取租金
+- 合租（`ownerships`）场景同样过滤被监禁者
+
+### 组件状态同步
+
+- 组队状态以 `TeamManager` 为权威源，`Player.teamId` 同步更新
+- 退出队伍、被踢出、队伍解散时，所有受影响成员均收到状态清理事件
+
+### 客户端事件处理
+
+- 所有 `client.*` 请求仅发送到服务端，不修改本地业务状态
+- 服务端通过 `server.valueChanged`、`server.playerStatusChanged` 等事件驱动客户端状态更新
+- `SocketEventHandler` 集中管理所有事件监听，使用 `WeakSet` 防止重复注册，提供 `unregisterSocketHandlers` 清理
+- 客户端 `GameLogic.ts` 和 `ModalSystem.ts` 中的业务操作只发送请求，不调用 `setCurrentMoney`、`setCurrentPlayerPosition` 等本地状态修改函数
+
+### 破产重开流程
+
+- 客户端 `handleBankruptRestart()` 发送 `client.bankruptRestart` 请求
+- 服务端 `HandlerRegistry.handleBankruptRestart` 调用 `Bankruptcy.revivePlayer()` 处理
+- 重置玩家状态为 `Normal`，重置金钱和信用值，回到起点
+- 广播 `server.playerRevived` 事件通知所有客户端
+- 服务端权威：所有数值变更由服务端事件驱动，客户端不直接修改本地状态

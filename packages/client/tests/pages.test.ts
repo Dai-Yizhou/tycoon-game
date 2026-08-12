@@ -149,6 +149,18 @@ describe('Pages', () => {
   });
 
   describe('GamePage', () => {
+    test('TR-6.23: createGamePage 创建通知中心', () => {
+      controller.setPlayerName('测试玩家');
+      controller.setSocket({
+        on: jest.fn(),
+        off: jest.fn(),
+        emit: jest.fn(),
+      } as any);
+
+      const page = createGamePage(controller);
+
+      expect(page.querySelector('.notification-center')).toBeTruthy();
+    });
     test('TR-6.21: createGamePage 创建正确的 DOM 结构', () => {
       controller.setPlayerName('测试玩家');
       const page = createGamePage(controller);

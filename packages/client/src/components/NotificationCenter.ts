@@ -7,20 +7,27 @@
  * - 通知历史查看
  */
 
+type NotificationType = 'info' | 'success' | 'warning' | 'error';
+
 interface NotificationAction {
-  action: string;
   label: string;
+  action: string;
   payload?: unknown;
 }
 
 interface Notification {
   id: string;
-  type: string;
+  type: NotificationType;
   title: string;
   content: string;
+  actions?: NotificationAction[];
   durationMs: number;
   createdAt: number;
-  actions?: NotificationAction[];
+}
+
+interface NotificationSocket {
+  on(event: 'server.notification', handler: (payload: Notification) => void): void;
+  off(event: 'server.notification'): void;
 }
 
 /**
@@ -30,7 +37,7 @@ export interface NotificationCenterConfig {
   /** 容器元素 */
   container: HTMLElement;
   /** Socket 连接 */
-  socket: any;
+  socket: NotificationSocket;
   /** 当前玩家 ID */
   playerId: string;
   /** 通知动作回调 */
@@ -121,11 +128,10 @@ export class NotificationCenter {
       // 通知动作按钮
       if (target.classList.contains('notification-action-btn')) {
         const action = target.dataset.action;
-        const payload = (target as HTMLElement).dataset.payload;
-        const notificationId = (target.closest('.notification-toast') as HTMLElement | null)?.dataset.id;
+        const payload = target.dataset.payload;
 
-        if (action && notificationId) {
-          this.executeAction(notificationId, action, payload ? JSON.parse(payload) : undefined);
+        if (action) {
+          this.config.onAction?.(action, payload ? JSON.parse(payload) : undefined);
         }
       }
 
@@ -213,31 +219,6 @@ export class NotificationCenter {
   }
 
   /**
-   * 执行通知动作
-   */
-  private executeAction(notificationId: string, action: string, payload?: unknown): void {
-    this.config.socket.emit(
-      'client.executeNotificationAction',
-      { notificationId, action },
-      (result: any) => {
-        if (result.ok) {
-          // 关闭通知
-          const toast = this.toastsContainer?.querySelector(`[data-id="${notificationId}"]`);
-          if (toast) {
-            toast.remove();
-            this.updateBadge();
-          }
-
-          // 触发回调
-          this.config.onAction?.(action, payload || result.data);
-        } else {
-          this.showError(result.error || '操作失败');
-        }
-      }
-    );
-  }
-
-  /**
    * 切换历史显示
    */
   private toggleHistory(): void {
@@ -266,7 +247,7 @@ export class NotificationCenter {
     const historyList = this.element.querySelector('.history-list');
     if (!historyList) return;
 
-    historyList.innerHTML = this.state.notifications.map(notification => `
+    historyList.innerHTML = this.state.notifications.map((notification: Notification) => `
       <div class="history-item notification-${notification.type}">
         <div class="history-item-header">
           <span class="history-item-type">${this.getTypeIcon(notification.type)}</span>
@@ -349,20 +330,6 @@ export class NotificationCenter {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
-  }
-
-  /**
-   * 显示错误消息
-   */
-  private showError(message: string): void {
-    const errorElement = document.createElement('div');
-    errorElement.className = 'notification-error';
-    errorElement.textContent = message;
-    this.element.appendChild(errorElement);
-
-    setTimeout(() => {
-      errorElement.remove();
-    }, 3000);
   }
 
   /**

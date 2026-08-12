@@ -51,7 +51,7 @@ export class Camera {
     bounds: CameraBounds = DEFAULT_CAMERA_BOUNDS,
   ) {
     this.state = {
-      zoom: 1,
+      zoom: bounds.minZoom,
       offsetX: 0,
       offsetY: 0,
       viewportWidth,
@@ -182,7 +182,7 @@ export class Camera {
    * 重置相机状态
    */
   reset(): void {
-    this.state.zoom = 1;
+    this.state.zoom = this.bounds.minZoom;
     this.state.offsetX = 0;
     this.state.offsetY = 0;
     this.isDragging = false;

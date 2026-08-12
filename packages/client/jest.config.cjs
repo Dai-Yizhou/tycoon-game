@@ -10,6 +10,9 @@ module.exports = {
   testPathIgnorePatterns: ['/node_modules/', '/dist/'],
   clearMocks: true,
   restoreMocks: true,
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
   transform: {
     '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
   },

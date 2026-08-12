@@ -511,6 +511,7 @@
     "channel": {
       "system": "System",
       "world": "World",
+      "global": "Global",
       "team": "Team",
       "region": "Region"
     }

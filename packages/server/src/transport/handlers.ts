@@ -16,12 +16,13 @@
  * ```
  */
 
-import type { ChatMessage } from '@game/shared';
+import { ChatChannels, type ChatChannel, type ChatMessage } from '@game/shared';
 import { DebugFeatures, isFeatureEnabled } from '@game/shared';
-import { randomUUID } from 'node:crypto';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from './SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
+import { ChatManager } from '../chat/index.js';
+import { Bankruptcy } from '../economy/index.js';
 import { DiceHandler, MovementHandler, PropertyHandler, StartHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, ItemHandler, DebugHandler, AdminHandler, TeamHandler } from '../handlers/index.js';
 import { TeamManager, DEFAULT_TEAM_CONFIG } from '../team/index.js';
 import { EventHandler } from '../events/index.js';
@@ -95,6 +96,8 @@ export class HandlerRegistry {
   private readonly adminHandler: AdminHandler;
   private readonly teamManager: TeamManager;
   private readonly teamHandler: TeamHandler;
+  private readonly chatManager: ChatManager;
+  private bankruptcy: Bankruptcy | null = null;
   private timeZoneManager: TimeZoneManager | null = null;
 
   constructor(io: TypedServer, world: GameWorld) {
@@ -112,7 +115,9 @@ export class HandlerRegistry {
     };
 
     this.diceHandler = new DiceHandler(io, world, this, cooldownConfig);
-    this.movementHandler = new MovementHandler(io, world);
+    this.movementHandler = new MovementHandler(io, world, (playerId, cellId, socket) => {
+      this.handleCellEvent(playerId, cellId, socket);
+    });
     // 初始化地产处理器
     this.propertyHandler = new PropertyHandler(io, world);
     // 初始化起点和监狱处理器
@@ -139,6 +144,7 @@ export class HandlerRegistry {
     // 初始化组队系统（TeamManager 为纯数据层，TeamHandler 负责协议与 I/O）
     this.teamManager = new TeamManager(DEFAULT_TEAM_CONFIG);
     this.teamHandler = new TeamHandler(io, world, this.teamManager);
+    this.chatManager = new ChatManager();
   }
 
   /**
@@ -188,6 +194,7 @@ export class HandlerRegistry {
     // 注册组队处理器
     this.teamHandler.register(socket);
     this.handleChat(socket);
+    this.handleBankruptRestart(socket);
   }
 
   /**
@@ -335,8 +342,16 @@ export class HandlerRegistry {
    */
   setItemHandler(bank: any): void {
     this.itemEffectsHandler = new ItemEffectsHandler(this.io, this.world, this.itemRegistry, bank);
-    this.itemHandler = new ItemHandler(this.io, this.world, this.itemRegistry, this.itemEffectsHandler);
+    this.itemHandler = new ItemHandler(this.io, this.world, this.itemRegistry, this.itemEffectsHandler, this.jailHandler);
     logger.info('ItemHandler 已初始化');
+  }
+
+  /**
+   * 设置 Bankruptcy 实例（在 app.ts 中调用）
+   */
+  setBankruptcy(bankruptcy: Bankruptcy): void {
+    this.bankruptcy = bankruptcy;
+    logger.info('Bankruptcy 已注入 HandlerRegistry');
   }
 
   /**
@@ -349,8 +364,6 @@ export class HandlerRegistry {
       return;
     }
 
-    // Task 10: 移动后触发起点和监狱逻辑
-    this.handleCellEvent(playerId, result.finalCellId, socket);
   }
 
   /**
@@ -438,13 +451,6 @@ export class HandlerRegistry {
     });
   }
 
-  /**
-   * 聊天（占位实现）
-   *
-   * - system 频道：仅服务端可发，客户端发也回包为系统消息
-   * - team/global 频道：直接广播（占位）
-   * - region 频道：需要知道玩家所在区域（占位，下版本完整化）
-   */
   private handleChat(socket: TypedSocket): void {
     socket.on('client.chat', (payload, ack) => {
       safeHandle(socket, ErrorCodes.InternalError, () => {
@@ -453,7 +459,13 @@ export class HandlerRegistry {
           ack?.({ ok: false, error: 'invalid_payload' });
           return;
         }
-        const content = payload.content.slice(0, 500); // 简单限长
+        const content = payload.content.replace(/<[^>]*>/g, '');
+        const channel = payload.channel as ChatChannel;
+        if (channel !== ChatChannels.Global && channel !== ChatChannels.Team && channel !== ChatChannels.Region) {
+          emitError(socket, ErrorCodes.InvalidPayload, '不支持的聊天频道');
+          ack?.({ ok: false, error: 'invalid_channel' });
+          return;
+        }
         const playerId = socket.data.playerId;
         if (!playerId) {
           emitError(socket, ErrorCodes.NotAuthenticated, '请先登录');
@@ -467,21 +479,73 @@ export class HandlerRegistry {
           return;
         }
 
-        const message: ChatMessage = {
-          id: randomUUID(),
-          channel: payload.channel,
-          senderId: player.id,
-          senderName: player.username,
+        const metadata = channel === ChatChannels.Team
+          ? { ...payload.metadata, teamId: player.teamId }
+          : channel === ChatChannels.Region
+            ? { ...payload.metadata, regionId: this.getPlayerRegionId(player.position.cellId) }
+            : payload.metadata;
+        const message = this.chatManager.sendMessage(
+          channel,
+          player.id,
+          player.username,
           content,
-          timestamp: Date.now(),
-          metadata: payload.metadata,
-        };
+          metadata,
+        );
+        if (!message) {
+          ack?.({ ok: false, error: 'invalid_payload' });
+          return;
+        }
 
-        // 占位广播：直接全局广播；后续按频道分发
-        this.io.emit('server.chat', { message });
+        this.broadcastChat(channel, playerId, { message });
         ack?.({ ok: true, data: { message } });
       });
     });
+  }
+
+  private broadcastChat(channel: ChatChannel, senderId: string, payload: { message: ChatMessage }): void {
+    if (channel === ChatChannels.Global) {
+      this.io.emit('server.chat', payload);
+      return;
+    }
+    const sender = this.world.getPlayer(senderId);
+    if (!sender) return;
+    const regionId = this.getPlayerRegionId(sender.position.cellId);
+    for (const target of this.io.sockets.sockets.values()) {
+      const targetPlayerId = target.data.playerId;
+      const targetPlayer = targetPlayerId ? this.world.getPlayer(targetPlayerId) : undefined;
+      if (!targetPlayer) continue;
+      const matches = channel === ChatChannels.Team
+        ? Boolean(sender.teamId && targetPlayer.teamId === sender.teamId)
+        : Boolean(regionId && this.getPlayerRegionId(targetPlayer.position.cellId) === regionId);
+      if (matches) target.emit('server.chat', payload);
+    }
+  }
+
+
+  /**
+   * 破产重开处理器（由客户端 handleBankruptRestart 调用）
+   */
+  private handleBankruptRestart(socket: TypedSocket): void {
+    socket.on('client.bankruptRestart', (_payload, ack) => {
+      safeHandle(socket, ErrorCodes.InternalError, () => {
+        const playerId = socket.data.playerId;
+        if (!playerId) {
+          ack?.({ ok: false, error: 'not_authenticated' });
+          return;
+        }
+        if (!this.bankruptcy) {
+          ack?.({ ok: false, error: 'bankruptcy_system_not_available' });
+          return;
+        }
+        const result = this.bankruptcy.revivePlayer(playerId, socket);
+        ack?.({ ok: result.success, error: result.error });
+      });
+    });
+  }
+
+  private getPlayerRegionId(cellId: number): string | null {
+    const regions = this.world.getMapMeta()?.regions ?? [];
+    return regions.find(region => region.cellIds.includes(cellId))?.id ?? null;
   }
 }
 

@@ -511,6 +511,7 @@
     "channel": {
       "system": "系统",
       "world": "世界",
+      "global": "世界",
       "team": "队伍",
       "region": "区域"
     }

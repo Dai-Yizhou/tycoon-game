@@ -324,6 +324,14 @@ AckResult<{
   - `switchEra=true` 时需提供 `newMapId` 与 `newEraName`，结算后切换到新时代
 - **Ack**: `AckResult<{ settled: boolean; eraId: string }>`
 
+#### client.bankruptRestart
+
+破产重开：破产玩家选择重新开始游戏。服务端通过 `Bankruptcy.revivePlayer()` 重置状态。
+
+- **Payload**: `{}`
+- **Ack**: `AckResult`
+- **副作用**：发送 `server.playerRevived`，重置金钱、信用值、位置、状态。
+
 #### client.debugReset
 
 重置玩家数据为初始值（仅调试模式可用，受 `DebugFeatures.QuickReset` 控制）。

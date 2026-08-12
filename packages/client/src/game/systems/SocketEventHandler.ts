@@ -35,7 +35,7 @@ import type { OtherPlayerInfo } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
 import { startServerPathAnimation, showIntersectionChoice } from './MovementSystem.js';
 import { addEarnedMoney } from './AchievementSystem.js';
-import { updateTopBar, updateTeamPanel, updateRendererPlayers, updateBoardTheme, updateTopBarTime } from './UIUpdates.js';
+import { updateTopBar, updateTeamPanel, updateActionPanel, updateRendererPlayers, updateBoardTheme, updateTopBarTime } from './UIUpdates.js';
 import { getPlayerTimezone, getLocalDayNight } from './MapLoader.js';
 import { applyTeamMembers } from './TeamSystem.js';
 import { checkBankruptcy } from './GameLogic.js';
@@ -197,6 +197,9 @@ export function registerSocketHandlers(socket: TypedClientSocket): void {
       // 服务端数值同步后检查破产
       if (isCurrentPlayer) {
         checkBankruptcy();
+        // 金钱变化后刷新操作面板（按钮依赖金钱判断可用性）
+        updateActionPanel();
+        updateTopBar();
       }
     } else if (payload.fieldId === 'credit') {
       if (isCurrentPlayer) {
@@ -254,6 +257,7 @@ export function registerSocketHandlers(socket: TypedClientSocket): void {
         rollBtn.style.background = '';
       }
       addChatMessage(t('jail.released'), 'system');
+      updateActionPanel();
     } else {
       const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {

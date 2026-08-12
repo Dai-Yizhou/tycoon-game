@@ -13,12 +13,13 @@
  * - 道具使用需要验证玩家状态
  */
 
-import type { AckResult } from '@game/shared';
+import { PlayerStatus, type AckResult } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { ItemRegistry } from '../items/ItemRegistry.js';
 import type { ItemEffectsHandler, ItemUseResult } from '../items/ItemEffects.js';
+import type { JailHandler } from './jailHandler.js';
 import { emitError, ErrorCodes } from '../transport/handlers.js';
 
 /**
@@ -40,16 +41,19 @@ export class ItemHandler {
   private readonly world: GameWorld;
   private readonly registry: ItemRegistry;
   private readonly effectsHandler: ItemEffectsHandler;
+  private readonly jailHandler: JailHandler;
 
   constructor(
     _io: TypedServer,
     world: GameWorld,
     registry: ItemRegistry,
     effectsHandler: ItemEffectsHandler,
+    jailHandler: JailHandler,
   ) {
     this.world = world;
     this.registry = registry;
     this.effectsHandler = effectsHandler;
+    this.jailHandler = jailHandler;
   }
 
   /**
@@ -113,6 +117,17 @@ export class ItemHandler {
       if (!itemInstance) {
         emitError(socket, ErrorCodes.InvalidPayload, '道具不存在');
         ack?.({ ok: false, error: 'item_not_found' });
+        return;
+      }
+
+      if (player.status === PlayerStatus.Jail) {
+        const released = this.jailHandler.useItemToRelease(playerId, payload.itemId);
+        if (!released) {
+          emitError(socket, ErrorCodes.InvalidOperation, '监狱中只能使用允许的出狱道具');
+          ack?.({ ok: false, error: 'jail_release_item_not_allowed' });
+          return;
+        }
+        ack?.({ ok: true, data: { success: true, itemId: payload.itemId, itemType: itemInstance.type } });
         return;
       }
 
@@ -289,6 +304,7 @@ export function createItemHandler(
   world: GameWorld,
   registry: ItemRegistry,
   effectsHandler: ItemEffectsHandler,
+  jailHandler: JailHandler,
 ): ItemHandler {
-  return new ItemHandler(io, world, registry, effectsHandler);
+  return new ItemHandler(io, world, registry, effectsHandler, jailHandler);
 }

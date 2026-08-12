@@ -3,6 +3,7 @@
  */
 
 import { TeamManager, DEFAULT_TEAM_CONFIG } from '../../src/team/index.js';
+import { jest } from '@jest/globals';
 import type { Player } from '@game/shared';
 
 describe('TeamManager', () => {
@@ -247,6 +248,18 @@ describe('TeamManager', () => {
       // 仅 player1 离线，player2 仍在线，队伍不应解散
       const disbanded = manager.cleanupOfflineTeams(['player1']);
       expect(disbanded.length).toBe(0); // player2 仍在线，保留队伍
+    });
+
+    test('自动解散时通知原始成员', () => {
+      const team = manager.createTeam('player1', '玩家1');
+      const invite = manager.sendInvite('player1', '玩家1', 'player2');
+      manager.respondInvite(invite!.id, 'player2', true);
+      const onDisbanded = jest.fn();
+
+      manager.onTeamDisbanded(onDisbanded);
+      manager.cleanupOfflineTeams(['player1', 'player2']);
+
+      expect(onDisbanded).toHaveBeenCalledWith(team.id, ['player1', 'player2']);
     });
   });
 });

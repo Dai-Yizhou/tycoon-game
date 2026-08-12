@@ -23,6 +23,7 @@ import {
   hoverCardEl, itemsPanelEl, actionButtonsEl,
   cName, cType, cIcon, cPrice, cRent, cUpgradeCost, cDesc, cEffects,
   cTransportCost, cMonumentCost, cInvestmentReturn,
+  rollBtn,
   getCellEnvValue, getRegionEnvValue, getRegionByCellId,
   getCurrentRegionProsperity, getCanvasCoords,
   setTutorialStep, setTutorialActive, setAvailableTP,
@@ -408,6 +409,8 @@ export function updateActionPanel(): void {
   actionButtonsEl.innerHTML = '';
 
   if (isBankrupt) {
+    // 破产时隐藏掷骰按钮，只显示重开按钮
+    if (rollBtn) rollBtn.style.display = 'none';
     const btn = document.createElement('button');
     btn.className = 'action-btn action-restart';
     btn.textContent = t('bankruptcy.restart');
@@ -417,6 +420,19 @@ export function updateActionPanel(): void {
     });
     actionButtonsEl.appendChild(btn);
     return;
+  }
+
+  // 非破产时确保掷骰按钮可见
+  if (rollBtn) rollBtn.style.display = '';
+
+  // 移动中禁用掷骰按钮，清空操作按钮
+  if (rollBtn) {
+    if (isMoving) {
+      rollBtn.disabled = true;
+      rollBtn.classList.add('disabled');
+    } else {
+      rollBtn.classList.remove('disabled');
+    }
   }
 
   if (!mapIndex || isMoving) return;
@@ -715,10 +731,13 @@ export function updateCameraFollow(): void {
   const dx = targetOffsetX - state.offsetX;
   const dy = targetOffsetY - state.offsetY;
 
+  // 移动期间使用更快跟随速度，避免画面落后于玩家
+  const lerpFactor = isMoving ? 0.3 : 0.15;
+
   if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
     cam.panTo(
-      state.offsetX + dx * 0.15,
-      state.offsetY + dy * 0.15
+      state.offsetX + dx * lerpFactor,
+      state.offsetY + dy * lerpFactor
     );
   }
 }
