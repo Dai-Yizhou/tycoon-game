@@ -44,8 +44,9 @@ import type { MapData, Player } from '@game/shared';
 import { MapIndex, t } from '@game/shared';
 import { BoardRenderer } from '../board/board-renderer.js';
 import { createNotificationCenter, type NotificationCenter } from '../components/NotificationCenter.js';
-import { createTopBar, type TopBarComponent } from '../components/TopBarComponent.js';
+import type { TopBarComponent } from '../components/TopBarComponent.js';
 import { ActionBarComponent } from '../components/ActionBarComponent.js';
+import { GameHudShell } from '../components/GameHudShell.js';
 import { NoOpEffectHooks } from '../game/GameEffects.js';
 import { GameViewModel } from '../game/GameViewModel.js';
 
@@ -63,9 +64,9 @@ import {
   setActionUsedThisTurn, setAnimationFrameId, setAvailableTP,
   setBankBtnEl, setCameraTarget, setCanRoll, setCanvasEl, setChatChannelContainer,
   setCurrentCredit, setCurrentEnv, setCurrentMoney, setCurrentPlayer, setCurrentPlayerName,
-  setCurrentPlayerPosition, setDayNightCycle, setDayNightStartTime, setDetailPanelExpanded,
+  setCurrentPlayerPosition, setDayNightCycle, setDayNightStartTime,
   setDiceAnimating, setGameSocket, setIsBankrupt,
-  setIsInJail, setIsMoving, setIsWaitingForChoice, setItems, setItemsPanelEl, setLastLocalIsDay,
+  setIsInJail, setIsMoving, setIsWaitingForChoice, setItems, setLastLocalIsDay,
   setLastPlayerTimezone, setLoanAmount, setMapIndex, setMapRegions,
   setOtherPlayers, setPlayerDisplayPos,
   setProsperity, setProsperityTimer, setRenderer, setRollCooldownTimer,
@@ -78,12 +79,9 @@ import {
   // 额外状态变量
   valueFieldDefs, teamMembers,
   // 额外 setter
-  setDiceDisplayEl, setRollBtn, setActionButtonsEl, setHoverCardEl, setChatBoxEl,
+  setDiceDisplayEl, setRollBtn, setActionButtonsEl, setChatBoxEl,
 } from '../state/GameStore.js';
 
-import {
-  buildChatBox, buildTeamPanel,
-} from '../game/systems/UIBuilders.js';
 
 import {
   loadTalentConfig, loadAchievementConfig, loadPlayerProgress,
@@ -101,9 +99,7 @@ import {
   startTutorial,
 } from '../game/systems/TutorialSystem.js';
 
-import {
-  checkTalentSelection, showTalentsModal,
-} from '../game/systems/TalentSystem.js';
+import { checkTalentSelection } from '../game/systems/TalentSystem.js';
 
 import {
   addChatMessage,
@@ -113,13 +109,7 @@ import {
   startRenderLoop,
   updateTopBar, updateTeamPanel, updateActionPanel, updateItemsPanel,
   centerCameraOnCell, handleMouseMove, handleClick, handleMouseLeave, handleResize,
-  showSettingsModal,
-  updateDetailPanel,
 } from '../game/systems/UIUpdates.js';
-
-import {
-  showAchievementsModal,
-} from '../game/systems/AchievementSystem.js';
 
 import {
   handleRollDice,
@@ -136,6 +126,7 @@ let notificationCenter: NotificationCenter | null = null;
 let gameViewModel: GameViewModel | null = null;
 let topBarComponent: TopBarComponent | null = null;
 let actionBarComponent: ActionBarComponent | null = null;
+let gameHudShell: GameHudShell | null = null;
 let viewModelSyncTimer: ReturnType<typeof setInterval> | null = null;
 
 // ===== 入口函数 =====
@@ -166,21 +157,21 @@ export function createGamePage(controller: GameController): HTMLElement {
   setRenderer(new BoardRenderer(canvas));
   renderer!.drawPlaceholder(t('common.loadingMap'));
 
-  // Build UI
-  buildChatBox(page);
-  buildTeamPanel(page);
-  buildPageCards(page);
-  setTopBarTalentsEl(document.getElementById('pc-talent-badge'));
-  buildDetailPanel(page);
-  buildHoverCard(page);
-  buildBackButton(page, controller);
-  buildItemsPanel(page);
-  const newUiLayer = document.createElement('div');
-  newUiLayer.className = 'new-ui-layer';
-  topBarComponent = createTopBar(gameViewModel, effects);
-  actionBarComponent = new ActionBarComponent(gameViewModel, effects, { onRoll: handleRollDice });
-  newUiLayer.append(topBarComponent.getElement(), actionBarComponent.getElement());
-  page.appendChild(newUiLayer);
+  // Build isolated HUD layer. Business actions stay in GamePage.
+  const backButton = document.createElement('button');
+  backButton.className = 'back-button';
+  backButton.textContent = '返回';
+  backButton.addEventListener('click', () => controller.setState('start'));
+  page.appendChild(backButton);
+  gameHudShell = new GameHudShell(gameViewModel, effects, {
+    onRoll: handleRollDice,
+    onBank: () => { window.dispatchEvent(new CustomEvent('game:open-bank')); },
+    onChatSend: (message, channel) => {
+      if (gameSocket) gameSocket.emit('client.chat', { channel, content: message });
+      else addChatMessage(t('chat.you') + message, channel);
+    },
+  });
+  page.appendChild(gameHudShell.getElement());
   syncViewModel();
   viewModelSyncTimer = setInterval(syncViewModel, 100);
 
@@ -307,193 +298,6 @@ export function applyGamePageThemeTokens(page: HTMLElement, config: GamePageThem
  * 构建左侧玩家信息条（参考florr.io设计）
  * 紧凑、条状，不占太多屏幕空间
  */
-
-function buildPageCards(page: HTMLElement): void {
-  const container = document.createElement('div');
-  container.className = 'page-cards';
-
-  const cards = [
-    { icon: '⚙️', label: t('common.settingsLabel'), key: 'settings' },
-    { icon: '🎯', label: t('common.talentsLabel'), key: 'talents' },
-    { icon: '🏆', label: t('common.achievementsLabel'), key: 'achievements' },
-  ];
-
-  for (const card of cards) {
-    const btn = document.createElement('button');
-    btn.className = 'page-card-btn';
-    btn.title = card.label;
-    let badgeHtml = '';
-    if (card.key === 'talents') {
-      badgeHtml = `<span class="pc-badge" id="pc-talent-badge" title="${t('hud.availableTalentPoints')}">0</span>`;
-    }
-    btn.innerHTML = `<span class="pc-icon">${card.icon}</span><span class="pc-label">${card.label}</span>${badgeHtml}`;
-    btn.addEventListener('click', () => {
-      if (card.key === 'talents') showTalentsModal();
-      else if (card.key === 'achievements') showAchievementsModal();
-      else if (card.key === 'settings') showSettingsModal();
-      else addChatMessage(t('common.featureInProgress', { page: card.label }));
-    });
-    container.appendChild(btn);
-  }
-
-  page.appendChild(container);
-}
-
-/**
- * 右下角详细面板（参考florr.io设计）
- * 可展开/收起，包含多个标签页
- */
-let detailPanelEl: HTMLElement | null = null;
-let detailPanelExpanded = false;
-
-function buildDetailPanel(page: HTMLElement): void {
-  const panel = document.createElement('div');
-  panel.className = 'detail-panel';
-  panel.id = 'detail-panel';
-
-  // 展开/收起按钮
-  const toggleBtn = document.createElement('button');
-  toggleBtn.className = 'detail-toggle';
-  toggleBtn.id = 'detail-toggle';
-  toggleBtn.title = t('panel.details');
-  toggleBtn.innerHTML = '📊';
-  toggleBtn.addEventListener('click', toggleDetailPanel);
-  panel.appendChild(toggleBtn);
-
-  // 可展开内容
-  const content = document.createElement('div');
-  content.className = 'detail-content';
-  content.id = 'detail-content';
-  content.style.display = 'none';
-
-  // 标签页切换
-  const tabs = document.createElement('div');
-  tabs.className = 'detail-tabs';
-  tabs.innerHTML = `
-    <button class="detail-tab active" data-tab="region">${t('panel.region')}</button>
-    <button class="detail-tab" data-tab="team">${t('team.panel')}</button>
-    <button class="detail-tab" data-tab="other">${t('panel.other')}</button>
-  `;
-  content.appendChild(tabs);
-
-  // 区域标签页内容（动态数值字段区域 + 固定区域）
-  const regionTab = document.createElement('div');
-  regionTab.className = 'detail-tab-content active';
-  regionTab.id = 'tab-region';
-  regionTab.innerHTML = `
-    <div class="dp-section">
-      <div class="dp-label">${t('panel.currentLocation')}</div>
-      <div class="dp-value" id="dp-cellname">-</div>
-    </div>
-    <div id="dp-region-fields"></div>
-    <div class="dp-section">
-      <div class="dp-label">${t('panel.regionProsperity')}</div>
-      <div class="dp-bar"><div class="dp-bar-fill" id="dp-prosperity-bar" style="width: 100%"></div></div>
-      <div class="dp-value"><span id="dp-prosperity-val">100</span>%</div>
-    </div>
-    <div class="dp-section">
-      <div class="dp-label">${t('panel.dayNightStatus')}</div>
-      <div class="dp-value" id="dp-time">${t('dayNight.day')}</div>
-    </div>
-  `;
-  content.appendChild(regionTab);
-
-  // 队伍标签页内容
-  const teamTab = document.createElement('div');
-  teamTab.className = 'detail-tab-content';
-  teamTab.id = 'tab-team';
-  teamTab.innerHTML = `
-    <div class="dp-section" id="dp-team-members">
-      <div class="dp-label">${t('panel.teamMembers')}</div>
-      <div id="dp-team-list">${t('team.noTeamMembers')}</div>
-    </div>
-    <div class="dp-section" id="dp-team-values">
-      <div class="dp-label">${t('panel.teamTotalAssets')}</div>
-      <div id="dp-team-total">-</div>
-    </div>
-  `;
-  content.appendChild(teamTab);
-
-  // 其他标签页内容（成就、天赋简要）
-  const otherTab = document.createElement('div');
-  otherTab.className = 'detail-tab-content';
-  otherTab.id = 'tab-other';
-  otherTab.innerHTML = `
-    <div id="dp-player-fields"></div>
-    <div class="dp-section">
-      <div class="dp-label">${t('panel.talentPoints')}</div>
-      <div class="dp-value">${t('hud.pointsAvailable', { count: '<span id="dp-tp">0</span>' })}</div>
-    </div>
-    <div class="dp-section">
-      <div class="dp-label">${t('panel.achievementProgress')}</div>
-      <div class="dp-bar"><div class="dp-bar-fill" id="dp-ach-bar" style="width: 0%"></div></div>
-      <div class="dp-value"><span id="dp-ach-count">0</span> / <span id="dp-ach-total">0</span></div>
-    </div>
-  `;
-  content.appendChild(otherTab);
-
-  panel.appendChild(content);
-  page.appendChild(panel);
-  detailPanelEl = panel;
-
-  // 标签页切换事件
-  tabs.querySelectorAll('.detail-tab').forEach(tab => {
-    tab.addEventListener('click', (e) => {
-      const target = e.currentTarget as HTMLElement;
-      const tabId = target.dataset.tab;
-      if (!tabId) return;
-
-      // 切换标签激活状态
-      tabs.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
-      target.classList.add('active');
-
-      // 切换内容显示
-      content.querySelectorAll('.detail-tab-content').forEach(c => c.classList.remove('active'));
-      document.getElementById(`tab-${tabId}`)?.classList.add('active');
-    });
-  });
-}
-
-function toggleDetailPanel(): void {
-  if (!detailPanelEl) return;
-  const content = document.getElementById('detail-content');
-  if (!content) return;
-
-  setDetailPanelExpanded(!detailPanelExpanded);
-  content.style.display = detailPanelExpanded ? 'block' : 'none';
-
-  // 更新展开状态
-  if (detailPanelExpanded) {
-    updateDetailPanel();
-  }
-}
-
-function buildHoverCard(page: HTMLElement): void {
-  const card = document.createElement('div');
-  card.className = 'hover-card';
-  card.style.display = 'none';
-  page.appendChild(card);
-  setHoverCardEl(card);
-}
-
-function buildBackButton(page: HTMLElement, controller: GameController): void {
-  const btn = document.createElement('button');
-  btn.className = 'back-button';
-  btn.textContent = '← ' + t('common.back');
-  btn.title = t('common.backToStart');
-  btn.addEventListener('click', () => {
-    controller.setState('start');
-  });
-  page.appendChild(btn);
-}
-
-function buildItemsPanel(page: HTMLElement): void {
-  const panel = document.createElement('div');
-  panel.className = 'items-panel';
-  panel.innerHTML = `<div class="items-header" title="${t('item.bagListTitle')}">${t('item.bagShort')}</div><div class="items-content" id="items-content"></div>`;
-  page.appendChild(panel);
-  setItemsPanelEl(panel.querySelector('#items-content'));
-}
 
 // ===== Player Init =====
 
@@ -776,6 +580,8 @@ export function cleanupGamePage(page: HTMLElement): void {
     clearInterval(viewModelSyncTimer);
     viewModelSyncTimer = null;
   }
+  gameHudShell?.destroy();
+  gameHudShell = null;
   actionBarComponent?.destroy();
   topBarComponent?.destroy();
   actionBarComponent = null;
@@ -811,7 +617,6 @@ export function cleanupGamePage(page: HTMLElement): void {
   setDiceDisplayEl(null);
   setActionButtonsEl(null);
   setChatBoxEl(null);
-  setHoverCardEl(null);
   setTopBarTalentsEl(null);
   setTopBarProsperityEl(null);
   setTopBarProsperityFillEl(null);
@@ -820,7 +625,6 @@ export function cleanupGamePage(page: HTMLElement): void {
   setBankBtnEl(null);
   setTeamPanelContentEl(null);
   setChatChannelContainer(null);
-  setItemsPanelEl(null);
   setIsMoving(false);
   setCanRoll(true);
   setIsBankrupt(false);

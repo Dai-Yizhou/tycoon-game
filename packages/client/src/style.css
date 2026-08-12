@@ -1018,3 +1018,24 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   .game-page .chat-box { width: min(198px, 48vw); }
   .game-page .items-panel { bottom: 142px; }
 }
+
+/* Game HUD shell: stable, independent DOM layer */
+.game-hud-shell { position:absolute; inset:0; z-index:20; pointer-events:none; color:var(--gp-fg,#f3eadf); font-size:13px; }
+.game-hud-shell section, .game-hud-shell button, .game-hud-shell input, .game-hud-shell select { pointer-events:auto; }
+.game-hud-shell section { background:rgba(30,32,36,.94); border:1px solid var(--gp-border,#4a2c2a); box-shadow:0 8px 24px rgba(0,0,0,.18); border-radius:8px; }
+.hud-top-bar { position:absolute; inset:0 0 auto; min-height:52px; display:flex; align-items:center; gap:16px; padding:0 18px; border-radius:0!important; border-width:0 0 1px!important; }
+.hud-brand { color:var(--gp-accent,#d8753d); font-weight:700; letter-spacing:.08em; }
+.hud-top-bar strong { margin-right:8px; }
+.hud-team-panel { position:absolute; top:70px; right:18px; width:210px; padding:12px; }
+.hud-team-panel header, .hud-chat-panel header, .hud-items-panel header { font-weight:700; margin-bottom:10px; }
+.hud-row { display:flex; gap:8px; margin-top:12px; }
+.hud-row button, .hud-action-panel button, .hud-chat-compose button { border:1px solid var(--gp-accent,#d8753d); border-radius:5px; background:transparent; color:inherit; padding:7px 10px; cursor:pointer; }
+.hud-chat-panel { position:absolute; left:18px; bottom:18px; width:320px; overflow:hidden; }
+.hud-chat-messages { height:130px; overflow:auto; padding:10px; color:#d8d0c8; }
+.hud-chat-compose { display:flex; gap:6px; padding:8px; border-top:1px solid var(--gp-border,#4a2c2a); }
+.hud-chat-compose input, .hud-chat-compose select { min-width:0; flex:1; border:1px solid #66534a; border-radius:4px; background:#25272b; color:inherit; padding:7px; }
+.hud-items-panel { position:absolute; left:18px; top:100px; width:170px; padding:12px; }
+.hud-action-panel { position:absolute; right:18px; bottom:18px; display:flex; gap:8px; padding:12px; }
+.hud-action-panel button:first-child { background:var(--gp-accent,#d8753d); color:#fff; }
+.hud-hover-card { position:absolute; right:270px; bottom:110px; min-width:170px; padding:12px; opacity:.85; }
+@media (max-width:720px) { .hud-top-bar { gap:8px; padding:0 10px; font-size:11px; } .hud-team-panel { right:10px; top:62px; width:180px; } .hud-items-panel { left:10px; top:80px; width:140px; } .hud-chat-panel { left:10px; bottom:10px; width:min(320px,calc(100vw - 20px)); } .hud-action-panel { right:10px; bottom:10px; } .hud-hover-card { display:none; } }
