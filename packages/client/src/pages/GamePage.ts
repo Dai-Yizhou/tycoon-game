@@ -44,11 +44,16 @@ import type { MapData, Player } from '@game/shared';
 import { MapIndex, t } from '@game/shared';
 import { BoardRenderer } from '../board/board-renderer.js';
 import { createNotificationCenter, type NotificationCenter } from '../components/NotificationCenter.js';
+import { createTopBar, type TopBarComponent } from '../components/TopBarComponent.js';
+import { ActionBarComponent } from '../components/ActionBarComponent.js';
+import { NoOpEffectHooks } from '../game/GameEffects.js';
+import { GameViewModel } from '../game/GameViewModel.js';
 
 import {
   achievements,
   activeTalents, animationFrameId,
-  currentPlayer, currentPlayerPosition,
+  currentPlayer, currentPlayerPosition, currentPlayerName, currentMoney, currentCredit, currentEnv, isBankrupt, actionUsedThisTurn,
+  isMoving, canRoll, isWaitingForChoice, isServerAnimating, isInJail, jailEndTime, dayNightStartTime, DAY_NIGHT_CYCLE, serverTimeOffset,
   gameSocket, investmentShares,
   mapIndex,
   otherPlayers, ownedInvestments, ownedProperties,
@@ -77,7 +82,7 @@ import {
 } from '../state/GameStore.js';
 
 import {
-  buildTopBar, buildChatBox, buildTeamPanel,
+  buildChatBox, buildTeamPanel,
 } from '../game/systems/UIBuilders.js';
 
 import {
@@ -123,14 +128,15 @@ import {
 import {
 } from '../game/systems/MovementSystem.js';
 
-import {
-  showBankModal,
-} from '../game/systems/BankSystem.js';
 import { registerSocketHandlers, unregisterSocketHandlers } from '../game/systems/SocketEventHandler.js';
 import { DesignAdapter } from '../design/DesignAdapter.js';
 import northeastTokens from '../../../shared/design-tokens/themes/northeast.json';
 
 let notificationCenter: NotificationCenter | null = null;
+let gameViewModel: GameViewModel | null = null;
+let topBarComponent: TopBarComponent | null = null;
+let actionBarComponent: ActionBarComponent | null = null;
+let viewModelSyncTimer: ReturnType<typeof setInterval> | null = null;
 
 // ===== 入口函数 =====
 
@@ -141,7 +147,9 @@ export function createGamePage(controller: GameController): HTMLElement {
   const context = controller.getContext();
   const page = document.createElement('div');
   page.className = 'page game-page';
-  applyThemeTokens(page);
+  applyGamePageThemeTokens(page);
+  gameViewModel = new GameViewModel();
+  const effects = new NoOpEffectHooks();
 
   // Board
   const boardContainer = document.createElement('div');
@@ -159,16 +167,22 @@ export function createGamePage(controller: GameController): HTMLElement {
   renderer!.drawPlaceholder(t('common.loadingMap'));
 
   // Build UI
-  buildTopBar(page);
   buildChatBox(page);
   buildTeamPanel(page);
   buildPageCards(page);
   setTopBarTalentsEl(document.getElementById('pc-talent-badge'));
   buildDetailPanel(page);
-  buildActionPanel(page);
   buildHoverCard(page);
   buildBackButton(page, controller);
   buildItemsPanel(page);
+  const newUiLayer = document.createElement('div');
+  newUiLayer.className = 'new-ui-layer';
+  topBarComponent = createTopBar(gameViewModel, effects);
+  actionBarComponent = new ActionBarComponent(gameViewModel, effects, { onRoll: handleRollDice });
+  newUiLayer.append(topBarComponent.getElement(), actionBarComponent.getElement());
+  page.appendChild(newUiLayer);
+  syncViewModel();
+  viewModelSyncTimer = setInterval(syncViewModel, 100);
 
   // Init: load configs first, then player progress, then game
   const playerName = context.playerName || t('game.defaultPlayerName');
@@ -271,8 +285,12 @@ export function createGamePage(controller: GameController): HTMLElement {
 }
 
 /** 将主题令牌投影到页面根节点，组件只消费 CSS 变量，不读取主题 JSON。 */
-function applyThemeTokens(page: HTMLElement): void {
-  const adapter = new DesignAdapter(northeastTokens as Record<string, unknown>);
+export interface GamePageThemeConfig {
+  tokens?: Record<string, unknown>;
+}
+
+export function applyGamePageThemeTokens(page: HTMLElement, config: GamePageThemeConfig = {}): void {
+  const adapter = new DesignAdapter(config.tokens ?? (northeastTokens as Record<string, unknown>));
   const snapshot = adapter.createSnapshot('day');
   for (const [name, value] of Object.entries(snapshot.dom)) {
     page.style.setProperty(name, value);
@@ -448,48 +466,6 @@ function toggleDetailPanel(): void {
   if (detailPanelExpanded) {
     updateDetailPanel();
   }
-}
-
-function buildActionPanel(page: HTMLElement): void {
-  const panel = document.createElement('div');
-  panel.className = 'action-panel';
-
-  // Dice area
-  const diceArea = document.createElement('div');
-  diceArea.className = 'dice-area';
-  const diceDisplay = document.createElement('div');
-  diceDisplay.className = 'dice-display';
-  diceDisplay.textContent = '🎲';
-  diceDisplay.title = t('dice.points');
-  setDiceDisplayEl(diceDisplay);
-  diceArea.appendChild(diceDisplay);
-
-  const rollButton = document.createElement('button');
-  rollButton.className = 'roll-button';
-  rollButton.title = t('dice.rollMove');
-  rollButton.textContent = t('dice.roll');
-  rollButton.addEventListener('click', handleRollDice);
-  setRollBtn(rollButton);
-  diceArea.appendChild(rollButton);
-  panel.appendChild(diceArea);
-
-  // Action buttons container (dynamic)
-  const actionButtons = document.createElement('div');
-  actionButtons.className = 'action-buttons';
-  actionButtons.id = 'action-buttons';
-  panel.appendChild(actionButtons);
-  setActionButtonsEl(actionButtons);
-
-  // Bank/Loan button
-  const bankBtn = document.createElement('button');
-  bankBtn.className = 'action-btn action-bank';
-  bankBtn.title = t('bank.loanTitle');
-  bankBtn.textContent = t('bank.title');
-  bankBtn.addEventListener('click', showBankModal);
-  panel.appendChild(bankBtn);
-  setBankBtnEl(bankBtn);
-
-  page.appendChild(panel);
 }
 
 function buildHoverCard(page: HTMLElement): void {
@@ -783,9 +759,28 @@ window.showTeamManagement = function(): void {
   document.body.appendChild(modal);
 }
 
+
+function syncViewModel(): void {
+  if (!gameViewModel) return;
+  gameViewModel.setPlayer({ currentPlayer, currentPlayerPosition, currentMoney, currentCredit, currentEnv, isBankrupt, actionUsedThisTurn, ownedProperties, propertyLevels, ownedInvestments, investmentShares, currentPlayerName });
+  gameViewModel.setMovement({ isMoving, canRoll, isWaitingForChoice, isServerAnimating });
+  gameViewModel.setJail({ isInJail, jailEndTime });
+  gameViewModel.setTeam({ members: teamMembers.map((member) => ({ ...member, status: member.status as 'normal' | 'bankrupt' | 'jail' })) });
+  gameViewModel.setDayNight({ cycleStartTime: dayNightStartTime, cycleDuration: DAY_NIGHT_CYCLE, serverTimeOffset });
+}
+
 // ===== Tutorial System =====
 
 export function cleanupGamePage(page: HTMLElement): void {
+  if (viewModelSyncTimer) {
+    clearInterval(viewModelSyncTimer);
+    viewModelSyncTimer = null;
+  }
+  actionBarComponent?.destroy();
+  topBarComponent?.destroy();
+  actionBarComponent = null;
+  topBarComponent = null;
+  gameViewModel = null;
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
     setAnimationFrameId(null);

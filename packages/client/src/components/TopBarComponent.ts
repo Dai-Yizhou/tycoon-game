@@ -12,6 +12,14 @@ import type { GameViewModel } from '../game/GameViewModel.js';
 import type { GameEffectHooks } from '../game/GameEffects.js';
 
 /** 顶部栏配置 */
+function injectStyle(): void {
+  if (document.getElementById('new-top-bar-style')) return;
+  const style = document.createElement('style');
+  style.id = 'new-top-bar-style';
+  style.textContent = `.new-ui-layer{position:absolute;inset:0;pointer-events:none;z-index:20}.new-ui-layer button{pointer-events:auto}.gp-topbar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--gp-bar-bg,#1e2024);color:var(--gp-fg,#f3eadf);border-bottom:1px solid var(--gp-border,#4a2c2a)} .new-action-bar{position:absolute;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;padding:12px;background:var(--gp-bar-bg,#1e2024);color:var(--gp-fg,#f3eadf);border:1px solid var(--gp-border,#4a2c2a);border-radius:8px}.new-action-bar__actions{display:flex;gap:8px}.new-action-bar__button{padding:10px 18px;border:1px solid var(--gp-accent,#d8753d);background:var(--gp-accent,#d8753d);color:#fff;border-radius:5px;cursor:pointer}`;
+  document.head.appendChild(style);
+}
+
 export interface TopBarConfig {
   /** 通知铃铛点击回调 */
   onNoticeClick?: () => void;
