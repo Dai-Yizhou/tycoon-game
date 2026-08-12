@@ -1,0 +1,253 @@
+/**
+ * 游戏逻辑系统
+ *
+ * 服务端权威：客户端只发送请求，不直接修改本地业务状态。
+ * 所有数值变更、状态变更由服务端事件（server.valueChanged / server.playerStatusChanged 等）驱动。
+ */
+
+import { t } from '../i18n.js';
+import {
+  currentPlayerPosition, currentMoney, currentCredit,
+  isBankrupt, actionUsedThisTurn, ownedProperties,
+  ownedInvestments, canRoll, isMoving, diceAnimating,
+  isWaitingForChoice, isInJail, rollCooldownEnd, rollCooldown,
+  mapIndex, gameSocket, rollBtn, rollCooldownTimer,
+  activeTalents, availableTP, loanAmount,
+  cName, cType, cOwners,
+  cTransportCost,
+  setCanRoll,
+  setDiceValue, setDiceAnimating, setDiceAnimStart, setRollCooldownEnd,
+  setRollCooldownTimer, setPlayerDisplayPos,
+  setCameraTarget, setActiveTalents, setAvailableTP,
+} from '../../state/GameStore.js';
+import { addChatMessage } from './ChatSystem.js';
+import {
+  updateTopBar, updateTeamPanel, updateActionPanel, updateItemsPanel,
+  // centerCameraOnCell,
+} from './UIUpdates.js';
+
+// ===== 辅助函数 =====
+
+export function isTalentActive(id: string): boolean {
+  return activeTalents.has(id);
+}
+
+// ===== 掷骰 & 冷却 =====
+
+export function handleRollDice(): void {
+  if (!canRoll || isMoving || diceAnimating || isBankrupt || isWaitingForChoice) return;
+  if (isInJail) {
+    addChatMessage(t('jail.stillInJail'), 'system');
+    return;
+  }
+  const now = Date.now();
+  if (now < rollCooldownEnd) return;
+
+  setCanRoll(false);
+
+  if (gameSocket) {
+    gameSocket.emit('client.rollDice', {}, (result: { ok: boolean; data?: { dice: number }; error?: string }) => {
+      if (result.ok && result.data) {
+        setDiceValue(result.data.dice);
+        setDiceAnimating(true);
+        setDiceAnimStart(performance.now());
+        setRollCooldownEnd(Date.now() + rollCooldown);
+        addChatMessage(t('dice.rolled', { value: result.data.dice }), 'system');
+        startRollCooldownTimer();
+      } else {
+        addChatMessage(t('dice.rollFailed', { error: result.error || t('dice.unknownError') }), 'error');
+        setCanRoll(true);
+      }
+    });
+  }
+}
+
+export function startRollCooldownTimer(): void {
+  if (rollCooldownTimer) clearInterval(rollCooldownTimer);
+  const update = () => {
+    const remaining = rollCooldownEnd - Date.now();
+    if (remaining <= 0) {
+      if (rollCooldownTimer) { clearInterval(rollCooldownTimer); setRollCooldownTimer(null); }
+      setCanRoll(true);
+      if (rollBtn) {
+        rollBtn.disabled = false;
+        rollBtn.classList.remove('disabled', 'cooldown');
+        rollBtn.textContent = t('dice.roll');
+        rollBtn.style.background = '';
+      }
+      return;
+    }
+    if (rollBtn) {
+      const progress = 1 - (remaining / rollCooldown);
+      rollBtn.textContent = t('dice.cooldownBar');
+      rollBtn.classList.add('cooldown');
+      rollBtn.style.background = `linear-gradient(to right, var(--accent, #4f46e5) ${progress * 100}%, rgba(255,255,255,0.15) ${progress * 100}%)`;
+    }
+  };
+  update();
+  setRollCooldownTimer(setInterval(update, 100));
+}
+
+// ===== 玩家到达 =====
+
+export function onPlayerArrived(): void {
+  if (!mapIndex) return;
+  const cell = mapIndex.getById(currentPlayerPosition);
+  if (!cell) return;
+  setPlayerDisplayPos(cell.x, cell.y);
+  setCameraTarget(cell.x, cell.y);
+
+  const type = cType(cell);
+  const name = cName(cell);
+
+  switch (type) {
+    case 'start':
+      addChatMessage(t('player.passedStart'), 'system');
+      break;
+    case 'property':
+      if (ownedProperties.has(cell.id)) {
+        addChatMessage(t('property.alreadyOwned', { name }), 'system');
+      } else if (cOwners(cell).length > 0) {
+        addChatMessage(t('property.passingPayToll', { name }), 'system');
+      } else {
+        addChatMessage(t('property.availableForPurchase', { name }), 'system');
+      }
+      break;
+    case 'event':
+      addChatMessage(t('event.arrived'), 'system');
+      break;
+    case 'investment':
+      if (ownedInvestments.has(cell.id)) {
+        addChatMessage(t('investment.arrivedSettlement', { name }), 'system');
+      } else {
+        addChatMessage(t('investment.available', { name }), 'system');
+      }
+      break;
+    case 'transport':
+      addChatMessage(t('transport.arrived', { name }), 'system');
+      break;
+    case 'jail':
+      addChatMessage(t('jail.arrived'), 'system');
+      break;
+    case 'monument':
+      addChatMessage(t('monument.arrived', { name }), 'system');
+      break;
+    default:
+      addChatMessage(t('cell.arrived', { name }), 'system');
+  }
+
+  updateTopBar();
+  updateTeamPanel();
+  updateActionPanel();
+  updateItemsPanel();
+}
+
+// ===== 地产购买 & 升级 =====
+
+export function handleBuyProperty(): void {
+  if (!mapIndex || actionUsedThisTurn || !gameSocket) return;
+  const cell = mapIndex.getById(currentPlayerPosition);
+  if (!cell || cType(cell) !== 'property' || ownedProperties.has(cell.id)) return;
+  gameSocket.emit('client.buyProperty', { cellId: cell.id }, (result) => {
+    if (!result.ok) addChatMessage(result.error || t('common.unknownError'), 'error');
+  });
+}
+
+export function handleUpgradeProperty(): void {
+  if (!mapIndex || actionUsedThisTurn || !gameSocket) return;
+  const cell = mapIndex.getById(currentPlayerPosition);
+  if (!cell || cType(cell) !== 'property' || !ownedProperties.has(cell.id)) return;
+  gameSocket.emit('client.upgradeProperty', { cellId: cell.id }, (result) => {
+    if (!result.ok) addChatMessage(result.error || t('common.unknownError'), 'error');
+  });
+}
+
+// ===== 投资 & 合租 =====
+
+export function handleBuyInvestment(): void {
+  if (!mapIndex || actionUsedThisTurn || !gameSocket) return;
+  const cell = mapIndex.getById(currentPlayerPosition);
+  if (!cell || cType(cell) !== 'investment') return;
+  gameSocket.emit('client.buyInvestment', { cellId: cell.id }, (result) => {
+    if (!result.ok) addChatMessage(result.error || t('common.unknownError'), 'error');
+  });
+}
+
+export function handleCoInvest(): void {
+  handleBuyInvestment();
+}
+
+// ===== 交通枢纽 =====
+
+export function handleTransport(): void {
+  if (!mapIndex || actionUsedThisTurn || !gameSocket) return;
+  const cell = mapIndex.getById(currentPlayerPosition);
+  if (!cell || cType(cell) !== 'transport') return;
+  const cost = cTransportCost(cell);
+  if (currentMoney < cost) { addChatMessage(t('transport.insufficientMoney'), 'system'); return; }
+
+  gameSocket.emit('client.getTransportDestinations', { hubCellId: cell.id }, (result) => {
+    if (!result.ok) {
+      addChatMessage(result.error || t('common.unknownError'), 'error');
+    }
+  });
+}
+
+// ===== 纪念碑修缮 =====
+
+export function handleRestoreMonument(): void {
+  if (!mapIndex || actionUsedThisTurn || !gameSocket) return;
+  const cell = mapIndex.getById(currentPlayerPosition);
+  if (!cell || cType(cell) !== 'monument') return;
+  gameSocket.emit('client.repairMonument', { monumentId: cell.id }, (result) => {
+    if (!result.ok) addChatMessage(result.error || t('common.unknownError'), 'error');
+  });
+}
+
+// ===== 破产重开 =====
+
+export function handleBankruptRestart(): void {
+  if (!isBankrupt || !gameSocket) return;
+
+  const savedActiveTalents = new Set(activeTalents);
+  const savedAvailableTP = availableTP;
+
+  gameSocket.emit('client.bankruptRestart', {}, (result: { ok: boolean; error?: string }) => {
+    if (result.ok) {
+      setActiveTalents(savedActiveTalents);
+      setAvailableTP(savedAvailableTP);
+
+      if (rollBtn) {
+        rollBtn.disabled = false;
+        rollBtn.classList.remove('disabled');
+        rollBtn.textContent = t('dice.roll');
+      }
+
+      addChatMessage(t('bankruptcy.restarted'), 'system');
+    } else {
+      addChatMessage(t('bankruptcy.restartFailed', { error: result.error || t('common.unknown') }), 'error');
+    }
+  });
+}
+
+// ===== 银行系统 =====
+
+export function getMaxLoanAmount(): number {
+  if (!isTalentActive('bank')) return 0;
+  const baseLimit = currentCredit * 20;
+  return Math.max(0, baseLimit - loanAmount);
+}
+// ===== 破产检查 =====
+
+export function checkBankruptcy(): void {
+  if (isBankrupt) return;
+  if (currentMoney <= 0) {
+    addChatMessage(t('bankruptcy.declared'), 'system');
+    // 服务端权威：发送破产请求，由服务端处理
+    if (gameSocket) {
+      gameSocket.emit('client.bankruptRestart', {}, () => {
+        // 静默，服务端会通过 server.playerBankrupt 事件更新状态
+      });
+    }
+  }
+}

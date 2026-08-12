@@ -58,3 +58,48 @@ export function getTeamSharedValue(
 ): ValueField | undefined {
   return team.sharedValues?.[fieldId];
 }
+
+/**
+ * 组队邀请（前后端共享）
+ *
+ * 由服务端 TeamManager 创建，通过 `server.teamInviteReceived` 推送给被邀请玩家。
+ */
+export interface TeamInvite {
+  /** 邀请唯一 ID */
+  id: string;
+  /** 邀请者 ID */
+  inviterId: string;
+  /** 邀请者名称（用于显示） */
+  inviterName: string;
+  /** 目标玩家 ID */
+  targetId: string;
+  /** 邀请创建时间（Unix 毫秒） */
+  createdAt: number;
+  /** 邀请过期时间（Unix 毫秒） */
+  expiresAt: number;
+  /** 邀请状态 */
+  status: 'pending' | 'accepted' | 'rejected' | 'expired';
+}
+
+/**
+ * 队伍成员显示数据（服务端权威，供客户端队伍面板渲染）
+ *
+ * 由服务端 TeamHandler.buildMemberViews 构建，通过 `server.teamUpdated`
+ * 和 `server.teamState` 推送。客户端据此完整重建本地队伍视图，无需本地推测。
+ */
+export interface TeamMemberView {
+  /** 玩家 ID */
+  id: string;
+  /** 用户名 */
+  username: string;
+  /** 金钱 */
+  money: number;
+  /** 信用值 */
+  credit: number;
+  /** 环保值 */
+  env: number;
+  /** 玩家状态（normal / bankrupt / jail 等） */
+  status: string;
+  /** 是否为队长 */
+  isLeader: boolean;
+}

@@ -7,7 +7,21 @@
  * - 通知历史查看
  */
 
-import type { Notification, NotificationAction } from '@game/shared';
+interface NotificationAction {
+  action: string;
+  label: string;
+  payload?: unknown;
+}
+
+interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  content: string;
+  durationMs: number;
+  createdAt: number;
+  actions?: NotificationAction[];
+}
 
 /**
  * 通知中心配置
@@ -107,8 +121,8 @@ export class NotificationCenter {
       // 通知动作按钮
       if (target.classList.contains('notification-action-btn')) {
         const action = target.dataset.action;
-        const payload = target.dataset.payload;
-        const notificationId = target.closest('.notification-toast')?.dataset.id;
+        const payload = (target as HTMLElement).dataset.payload;
+        const notificationId = (target.closest('.notification-toast') as HTMLElement | null)?.dataset.id;
 
         if (action && notificationId) {
           this.executeAction(notificationId, action, payload ? JSON.parse(payload) : undefined);
@@ -164,7 +178,7 @@ export class NotificationCenter {
     if (notification.actions && notification.actions.length > 0) {
       actionsHtml = `
         <div class="notification-actions">
-          ${notification.actions.map(action => `
+          ${notification.actions.map((action: NotificationAction) => `
             <button class="notification-action-btn"
               data-action="${action.action}"
               data-payload='${JSON.stringify(action.payload || {})}'>
