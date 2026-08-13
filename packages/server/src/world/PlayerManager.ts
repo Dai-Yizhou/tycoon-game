@@ -40,6 +40,11 @@ export interface PlayerDisconnectEvent {
   socketId?: string;
 }
 
+export interface PlayerRemovedEvent {
+  playerId: string;
+  player: Player;
+}
+
 export interface PlayerFreezeEvent {
   playerId: string;
   /** 冻结原因 */
@@ -135,7 +140,7 @@ export class PlayerManager {
     this.frozen.delete(playerId);
     this.socketBindings.delete(playerId);
     this.players.delete(playerId);
-    this.emit(PlayerEvents.Removed, { playerId });
+    this.emit(PlayerEvents.Removed, { playerId, player });
     return player;
   }
 

@@ -236,6 +236,16 @@ describe('PlayerManager', () => {
       expect(frozen).toHaveBeenCalled();
     });
 
+    it('emits Removed with the removed player', () => {
+      const pm = new PlayerManager();
+      const handler = jest.fn();
+      const player = buildPlayer('p1');
+      pm.on(PlayerEvents.Removed, handler);
+      pm.addPlayer(player);
+      pm.removePlayer('p1');
+      expect(handler).toHaveBeenCalledWith({ playerId: 'p1', player });
+    });
+
     it('off removes listener', () => {
       const pm = new PlayerManager();
       const handler = jest.fn();

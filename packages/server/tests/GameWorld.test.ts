@@ -284,22 +284,25 @@ describe('GameWorld', () => {
   });
 
   describe('Events', () => {
-    it('emits playerAdded when addPlayer is called', () => {
+    it('emits playerAdded once when addPlayer is called', () => {
       const world = new GameWorld();
       const handler = jest.fn();
       world.on(WorldEvents.PlayerAdded, handler);
       const p = buildPlayer('p1');
       world.addPlayer(p);
+      expect(handler).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledWith({ player: p });
     });
 
-    it('emits playerRemoved when removePlayer is called', () => {
+    it('emits playerRemoved once with the removed player when removePlayer is called', () => {
       const world = new GameWorld();
       const handler = jest.fn();
       world.on(WorldEvents.PlayerRemoved, handler);
-      world.addPlayer(buildPlayer('p1'));
+      const p = buildPlayer('p1');
+      world.addPlayer(p);
       world.removePlayer('p1');
-      expect(handler).toHaveBeenCalled();
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith({ playerId: 'p1', player: p });
     });
 
     it('emits mapLoaded with validation result', () => {

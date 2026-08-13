@@ -24,7 +24,7 @@
 import { EventEmitter } from 'node:events';
 import { buildPlayerValues, type EraInfo, type MapData, type MapMeta, type Player, type Team } from '@game/shared';
 import { MapIndex, type ValidationResult, validateMapData, validateMapMeta } from '@game/shared';
-import { PlayerEvents, PlayerManager, type PlayerEventName, type PlayerEventListener } from './PlayerManager.js';
+import { PlayerEvents, PlayerManager, type PlayerEventName, type PlayerEventListener, type PlayerRemovedEvent } from './PlayerManager.js';
 
 /**
  * 游戏世界事件类型
@@ -119,8 +119,8 @@ export class GameWorld {
     this.playerManager.on(PlayerEvents.Added, ({ player }: { player: Player }) => {
       this.emit(WorldEvents.PlayerAdded, { player });
     });
-    this.playerManager.on(PlayerEvents.Removed, ({ playerId }: { playerId: string }) => {
-      this.emit(WorldEvents.PlayerRemoved, { playerId, player: { id: playerId } as Player });
+    this.playerManager.on(PlayerEvents.Removed, ({ playerId, player }: PlayerRemovedEvent) => {
+      this.emit(WorldEvents.PlayerRemoved, { playerId, player });
     });
     this.playerManager.on(PlayerEvents.Updated, ({ player }: { player: Player }) => {
       this.emit(WorldEvents.PlayerUpdated, { player });
@@ -135,25 +135,14 @@ export class GameWorld {
    * 添加玩家
    */
   addPlayer(player: Player, socketId?: string): boolean {
-    const ok = this.playerManager.addPlayer(player, socketId);
-    if (ok) {
-      this.emit(WorldEvents.PlayerAdded, { player });
-    }
-    return ok;
+    return this.playerManager.addPlayer(player, socketId);
   }
 
   /**
    * 移除玩家
    */
   removePlayer(playerId: string): boolean {
-    const player = this.playerManager.getPlayer(playerId);
-    if (!player) return false;
-    const removed = this.playerManager.removePlayer(playerId);
-    if (removed) {
-      this.emit(WorldEvents.PlayerRemoved, { playerId, player });
-      return true;
-    }
-    return false;
+    return this.playerManager.removePlayer(playerId) !== undefined;
   }
 
   /**
