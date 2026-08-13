@@ -139,17 +139,6 @@ export class HandlerRegistry {
   }
 
   /**
-   * 注册所有基础事件处理器
-   *
-   * 使用 `io.on('connection', ...)` 包裹，因此每个新连接都会执行。
-   */
-  registerAll(): void {
-    this.io.on('connection', (socket) => {
-      this.registerForSocket(socket as TypedSocket);
-    });
-  }
-
-  /**
    * 为单个 socket 注册事件处理器
    *
    * 暴露此方法便于在 SocketManager 之外使用（如测试中手动模拟连接）。
@@ -537,7 +526,6 @@ export class HandlerRegistry {
  */
 export function registerHandlers(io: TypedServer, world: GameWorld): HandlerRegistry {
   const registry = new HandlerRegistry(io, world);
-  registry.registerAll();
   return registry;
 }
 

@@ -108,7 +108,6 @@ export class SocketManager {
     this.playerStore = options.playerStore;
 
     this.io.use((socket, next) => this.middleware(socket as TypedSocket, next));
-    this.io.on('connection', (socket) => this.onConnection(socket as TypedSocket));
 
     if (this.autoWireWorldEvents) {
       this.wireWorldEvents();
@@ -120,6 +119,10 @@ export class SocketManager {
    */
   getIO(): TypedServer {
     return this.io;
+  }
+
+  registerConnectionHandlers(socket: TypedSocket): void {
+    this.onConnection(socket);
   }
 
   // ---------------------------------------------------------------------------

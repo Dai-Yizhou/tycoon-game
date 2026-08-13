@@ -52,8 +52,12 @@ async function createChatEnvironment(): Promise<{ http: HttpServer; clients: Cli
   world.addPlayer(buildPlayer('teammate', 0, 'team-1'));
   world.addPlayer(buildPlayer('same-region', 0));
   world.addPlayer(buildPlayer('other-region', 1));
-  new SocketManager(io, { world, autoWireWorldEvents: false, authenticate: socket => (socket.handshake.query.playerId as string) ?? null });
-  registerHandlers(io, world);
+  const socketManager = new SocketManager(io, { world, autoWireWorldEvents: false, authenticate: socket => (socket.handshake.query.playerId as string) ?? null });
+  const handlerRegistry = registerHandlers(io, world);
+  io.on('connection', socket => {
+    socketManager.registerConnectionHandlers(socket);
+    handlerRegistry.registerForSocket(socket);
+  });
   await new Promise<void>(resolve => http.listen(0, resolve));
   const port = (http.address() as AddressInfo).port;
   const clients: ClientSocket[] = [];

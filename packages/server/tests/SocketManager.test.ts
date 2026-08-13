@@ -76,11 +76,19 @@ function waitFor<T>(socket: ClientSocket, event: string, timeoutMs = 1000): Prom
 
 describe('SocketManager', () => {
   describe('connection lifecycle', () => {
+    it('does not register a connection listener in the constructor', async () => {
+      const env = await createTestEnv();
+      const world = new GameWorld();
+      new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      expect(env.io.listeners('connection')).toHaveLength(0);
+      await new Promise((r) => env.http.close(r));
+    });
     it('accepts new connections', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();
       // eslint-disable-next-line no-new
-      new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
       const sock = await connectClient(env.port);
       expect(sock.connected).toBe(true);
       sock.disconnect();
@@ -91,7 +99,7 @@ describe('SocketManager', () => {
       const env = await createTestEnv();
       const world = new GameWorld();
       world.addPlayer(buildPlayer('p1'));
-      new SocketManager(env.io, {
+      const socketManager = new SocketManager(env.io, {
         world,
         autoWireWorldEvents: false,
         authenticate: (socket) => {
@@ -100,6 +108,7 @@ describe('SocketManager', () => {
           return q['playerId'] ?? null;
         },
       });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
       const sock = await connectClient(env.port, { query: { playerId: 'p1' } });
       expect(sock.connected).toBe(true);
       sock.disconnect();
@@ -110,11 +119,12 @@ describe('SocketManager', () => {
       const env = await createTestEnv();
       const world = new GameWorld();
       world.addPlayer(buildPlayer('p1'));
-      new SocketManager(env.io, {
+      const socketManager = new SocketManager(env.io, {
         world,
         autoWireWorldEvents: false,
         authenticate: () => 'p1',
       });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
       const sock = await connectClient(env.port);
       // 等连接稳定
       await new Promise((r) => setTimeout(r, 50));
@@ -128,6 +138,7 @@ describe('SocketManager', () => {
       const env = await createTestEnv();
       const world = new GameWorld();
       const sm = new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      env.io.on('connection', (socket) => sm.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port);
       const c2 = await connectClient(env.port);
       // 等连接
@@ -147,6 +158,7 @@ describe('SocketManager', () => {
       const env = await createTestEnv();
       const world = new GameWorld();
       const sm = new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      env.io.on('connection', (socket) => sm.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port);
       const c2 = await connectClient(env.port);
       await new Promise((r) => setTimeout(r, 50));
@@ -171,6 +183,7 @@ describe('SocketManager', () => {
       const env = await createTestEnv();
       const world = new GameWorld();
       const sm = new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      env.io.on('connection', (socket) => sm.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port);
       const c2 = await connectClient(env.port);
       await new Promise((r) => setTimeout(r, 50));
@@ -203,6 +216,7 @@ describe('SocketManager', () => {
           return q['playerId'] === 'p1' ? 'p1' : null;
         },
       });
+      env.io.on('connection', (socket) => sm.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port, { query: { playerId: 'p1' } });
       const c2 = await connectClient(env.port);
       // 等连接并完成绑定
@@ -227,7 +241,8 @@ describe('SocketManager', () => {
       const env = await createTestEnv();
       const world = new GameWorld();
       // eslint-disable-next-line no-new
-      new SocketManager(env.io, { world, autoWireWorldEvents: true });
+      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: true });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port);
       const p1 = waitFor<{ id: string }>(c1, 'server.playerJoined');
       const p = buildPlayer('p1');
@@ -241,7 +256,8 @@ describe('SocketManager', () => {
       const env = await createTestEnv();
       const world = new GameWorld();
       // eslint-disable-next-line no-new
-      new SocketManager(env.io, { world, autoWireWorldEvents: true });
+      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: true });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port);
       const p1 = waitFor<{ newEraId: string }>(c1, 'server.eraChanged');
       world.setEra({
@@ -263,7 +279,8 @@ describe('SocketManager', () => {
     it('responds to client.ping with server.pong', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();
-      new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
       registerHandlers(env.io, world);
       const c1 = await connectClient(env.port);
       const pong = waitFor<{ serverTime: number }>(c1, 'server.pong');
@@ -279,6 +296,7 @@ describe('SocketManager', () => {
       const env = await createTestEnv();
       const world = new GameWorld();
       const sm = new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      env.io.on('connection', (socket) => sm.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port);
       await new Promise((r) => setTimeout(r, 50));
       expect(c1.connected).toBe(true);

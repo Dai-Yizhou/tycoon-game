@@ -312,7 +312,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   logger.info(`EraManager initialized (eraLengthDays=${config.eraLengthDays})`);
 
   // 注册手动触发时代结算事件（管理员调试用）
-  io.on('connection', (socket) => {
+  const registerSettlementHandler = (socket: Parameters<typeof handlerRegistry.registerForSocket>[0]): void => {
     socket.on('client.triggerSettlement', (payload, ack) => {
       try {
         const currentEra = eraManager.getCurrentEra();
@@ -352,6 +352,12 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
         ack?.({ ok: false, error: err instanceof Error ? err.message : String(err) });
       }
     });
+  };
+
+  io.on('connection', (socket) => {
+    socketManager?.registerConnectionHandlers(socket);
+    handlerRegistry.registerForSocket(socket);
+    registerSettlementHandler(socket);
   });
 
   // 初始化玩家存储（FR-22 账号持久化）
