@@ -86,28 +86,6 @@ export class UseMovement {
       finalPosition: null,
     };
 
-    this.setupSocketListeners();
-  }
-
-  /**
-   * 设置 Socket 监听器
-   */
-  private setupSocketListeners(): void {
-    if (!this.socket) return;
-
-    this.socket.on('server.playerMoved', (payload: PositionChangedPayload) => {
-      this.handlePlayerMoved(payload);
-    });
-
-    this.socket.on('server.askPath', (payload: { fromCellId: number; options: { cellId: number; label?: string }[] }) => {
-      if (this.onPathChoiceRequired && this.boardRenderer) {
-        const cells = payload.options.map(opt => {
-          const cell = this.boardRenderer!.getMapIndex()?.getById(opt.cellId);
-          return cell!;
-        }).filter(c => c !== undefined);
-        this.onPathChoiceRequired(payload.fromCellId, cells);
-      }
-    });
   }
 
   /**
@@ -266,7 +244,6 @@ export class UseMovement {
    */
   setSocket(socket: Socket | null): void {
     this.socket = socket;
-    this.setupSocketListeners();
   }
 
   /**
@@ -319,10 +296,6 @@ export class UseMovement {
     this.stopMovementAnimation();
     this.stateListeners.clear();
 
-    if (this.socket) {
-      this.socket.off('server.playerMoved');
-      this.socket.off('server.askPath');
-    }
   }
 }
 

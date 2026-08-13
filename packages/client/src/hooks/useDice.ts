@@ -69,20 +69,6 @@ export class UseDice {
       error: null,
     };
 
-    this.setupSocketListeners();
-  }
-
-  /**
-   * 设置 Socket 监听器
-   */
-  private setupSocketListeners(): void {
-    if (!this.socket) return;
-
-    this.socket.on('server.diceRolled', (payload: { playerId: string; dice: number; steps: number }) => {
-      if (this.onOtherPlayerRolled) {
-        this.onOtherPlayerRolled(payload.playerId, payload.dice, payload.steps);
-      }
-    });
   }
 
   /**
@@ -225,7 +211,6 @@ export class UseDice {
    */
   setSocket(socket: Socket | null): void {
     this.socket = socket;
-    this.setupSocketListeners();
   }
 
   /**
@@ -238,13 +223,14 @@ export class UseDice {
   /**
    * 销毁 Hook
    */
+  handleDiceRolled(payload: { playerId: string; dice: number; steps: number }): void {
+    this.onOtherPlayerRolled?.(payload.playerId, payload.dice, payload.steps);
+  }
+
   destroy(): void {
     this.stopCooldown();
     this.stateListeners.clear();
 
-    if (this.socket) {
-      this.socket.off('server.diceRolled');
-    }
   }
 }
 

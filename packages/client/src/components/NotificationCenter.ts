@@ -107,10 +107,6 @@ export class NotificationCenter {
    * 绑定事件
    */
   private bindEvents(): void {
-    this.config.socket.on('server.notification', (payload: Notification) => {
-      this.addNotification(payload);
-    });
-
     // 点击通知图标
     this.element.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
@@ -146,6 +142,10 @@ export class NotificationCenter {
     });
 
     this.toastsContainer = this.element.querySelector('.notification-toasts');
+  }
+
+  handleNotification(notification: Notification): void {
+    this.addNotification(notification);
   }
 
   /**
@@ -343,7 +343,6 @@ export class NotificationCenter {
    * 销毁通知中心
    */
   destroy(): void {
-    this.config.socket.off('server.notification');
     this.element.remove();
   }
 }

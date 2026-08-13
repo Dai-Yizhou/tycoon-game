@@ -48,7 +48,6 @@ export class ItemBag {
     this.maxItems = config.maxItems ?? 5;
 
     this.init();
-    this.setupSocketListeners();
   }
 
   /**
@@ -149,49 +148,6 @@ export class ItemBag {
           this.showItemDetail(itemId);
         }
       });
-    });
-  }
-
-  /**
-   * 设置 Socket 监听器
-   */
-  private setupSocketListeners(): void {
-    // 监听道具获得事件
-    this.socket.on('server.itemAcquired', (payload: { itemId: string; itemType: string; itemName: string; quantity: number }) => {
-      this.addItem({
-        id: payload.itemId,
-        type: payload.itemType,
-        name: payload.itemName,
-        quantity: payload.quantity,
-        acquiredAt: Date.now(),
-      });
-    });
-
-    // 监听道具使用结果
-    this.socket.on('server.itemUsed', (payload: { success: boolean; itemType: string; itemName: string }) => {
-      if (payload.success) {
-        this.showNotification(`成功使用 ${payload.itemName}`, 'success');
-      }
-    });
-
-    // 监听数值变化（用于更新道具使用效果）
-    this.socket.on('server.valueChanged', (payload: { fieldId: string; delta: number }) => {
-      // 可以在这里显示数值变化动画
-    });
-
-    // 监听格子查封事件
-    this.socket.on('server.cellSealed', (payload: { cellId: number; playerName: string; duration: number }) => {
-      this.showNotification(`玩家 ${payload.playerName} 查封了格子 ${payload.cellId}`, 'warning');
-    });
-
-    // 监听格子解封事件
-    this.socket.on('server.cellUnsealed', (payload: { cellId: number }) => {
-      this.showNotification(`格子 ${payload.cellId} 已解除查封`, 'info');
-    });
-
-    // 监听玩家复活事件
-    this.socket.on('server.playerRevived', (payload: { targetPlayerName: string; revivedByName: string }) => {
-      this.showNotification(`玩家 ${payload.targetPlayerName} 被 ${payload.revivedByName} 复活`, 'success');
     });
   }
 
@@ -350,16 +306,7 @@ export class ItemBag {
     return this.items;
   }
 
-  /**
-   * 清理资源
-   */
   destroy(): void {
-    this.socket.off('server.itemAcquired');
-    this.socket.off('server.itemUsed');
-    this.socket.off('server.valueChanged');
-    this.socket.off('server.cellSealed');
-    this.socket.off('server.cellUnsealed');
-    this.socket.off('server.playerRevived');
     this.container.innerHTML = '';
   }
 }

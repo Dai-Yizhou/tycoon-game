@@ -41,36 +41,36 @@ import { applyTeamMembers } from './TeamSystem.js';
 import { checkBankruptcy } from './GameLogic.js';
 
 const registeredSockets = new WeakSet<TypedClientSocket>();
+const eventObservers = new WeakMap<TypedClientSocket, (event: string) => void>();
+
+export interface SocketHandlerOptions {
+  onEvent?: (event: string) => void;
+  onNotification?: (payload: { id: string; type: 'info' | 'success' | 'warning' | 'error'; title: string; content: string; durationMs?: number; createdAt?: number }) => void;
+}
 
 const SOCKET_EVENTS = [
-  'server.dayNightProgress',
-  'server.dayNightChanged',
-  'server.timezoneChanged',
-  'server.pong',
-  'server.chat',
-  'server.playerJoined',
-  'server.playerLeft',
-  'server.playerMoved',
-  'server.askPath',
-  'server.valueChanged',
-  'server.playerJailed',
-  'server.playerReleased',
-  'server.playerStatusChanged',
-  'server.teamInviteReceived',
-  'server.teamMemberJoined',
-  'server.teamMemberLeft',
-  'server.teamMemberKicked',
-  'server.teamUpdated',
-  'server.teamDisbanded',
-  'server.prosperityChanged',
+  'server.dayNightProgress', 'server.dayNightChanged', 'server.timezoneChanged', 'server.pong',
+  'server.chat', 'server.playerJoined', 'server.playerLeft', 'server.playerMoved', 'server.askPath',
+  'server.valueChanged', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
+  'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft', 'server.teamMemberKicked',
+  'server.teamUpdated', 'server.teamDisbanded', 'server.prosperityChanged', 'server.gameState',
+  'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.itemAcquired',
+  'server.itemUsed', 'server.cellSealed', 'server.cellUnsealed', 'server.playerRevived',
 ] as const;
 
 /**
  * 注册所有 socket 事件处理器
  */
-export function registerSocketHandlers(socket: TypedClientSocket): void {
+export function registerSocketHandlers(socket: TypedClientSocket, options: SocketHandlerOptions = {}): void {
   if (registeredSockets.has(socket)) return;
   registeredSockets.add(socket);
+  if (options.onEvent && socket.onAny) {
+    const observer = (event: string) => {
+      queueMicrotask(() => options.onEvent?.(event));
+    };
+    eventObservers.set(socket, observer);
+    socket.onAny(observer);
+  }
   // 每秒进度更新：同步 cycleStartTime 和计算时钟偏移
   socket.on('server.dayNightProgress', (payload: { cycleStartTime: number; cycleMinutes: number; globalTime: number }) => {
     setDayNightStartTime(payload.cycleStartTime);
@@ -101,6 +101,10 @@ export function registerSocketHandlers(socket: TypedClientSocket): void {
   // 心跳校正时钟偏移
   socket.on('server.pong', (payload: { serverTime: number }) => {
     setServerTimeOffset(payload.serverTime - Date.now());
+  });
+
+  socket.on('server.notification', (payload: { id: string; type: 'info' | 'success' | 'warning' | 'error'; title: string; content: string; durationMs?: number }) => {
+    options.onNotification?.(payload);
   });
 
   // 监听聊天消息
@@ -387,5 +391,10 @@ export function unregisterSocketHandlers(socket: TypedClientSocket): void {
   for (const event of SOCKET_EVENTS) {
     socket.off(event);
   }
+  const observer = eventObservers.get(socket);
+  if (observer && socket.offAny) {
+    socket.offAny(observer);
+  }
+  eventObservers.delete(socket);
   registeredSockets.delete(socket);
 }

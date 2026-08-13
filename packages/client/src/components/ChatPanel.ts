@@ -98,11 +98,6 @@ export class ChatPanel {
    * 绑定事件
    */
   private bindEvents(): void {
-    // Socket 事件
-    this.config.socket.on('server.chat', (payload: { message: ChatMessage }) => {
-      this.addMessage(payload.message);
-    });
-
     // DOM 事件
     this.element.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
@@ -156,6 +151,10 @@ export class ChatPanel {
 
     // 渲染消息
     this.renderMessages();
+  }
+
+  handleChatMessage(payload: { message: ChatMessage }): void {
+    this.addMessage(payload.message);
   }
 
   /**
@@ -290,7 +289,6 @@ export class ChatPanel {
    * 销毁面板
    */
   destroy(): void {
-    this.config.socket.off('server.chat');
     this.element.remove();
   }
 }

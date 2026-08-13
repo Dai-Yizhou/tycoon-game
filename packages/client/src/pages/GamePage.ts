@@ -44,9 +44,8 @@ import type { MapData, Player } from '@game/shared';
 import { MapIndex, t } from '@game/shared';
 import { BoardRenderer } from '../board/board-renderer.js';
 import { createNotificationCenter, type NotificationCenter } from '../components/NotificationCenter.js';
-import type { TopBarComponent } from '../components/TopBarComponent.js';
-import { ActionBarComponent } from '../components/ActionBarComponent.js';
 import { GameHudShell } from '../components/GameHudShell.js';
+import { InteractiveMapSurface } from '../components/InteractiveMapSurface.js';
 import { NoOpEffectHooks } from '../game/GameEffects.js';
 import { GameViewModel } from '../game/GameViewModel.js';
 
@@ -124,10 +123,7 @@ import { getThemeTokens } from '../design/ThemeConfig.js';
 
 let notificationCenter: NotificationCenter | null = null;
 let gameViewModel: GameViewModel | null = null;
-let topBarComponent: TopBarComponent | null = null;
-let actionBarComponent: ActionBarComponent | null = null;
 let gameHudShell: GameHudShell | null = null;
-let viewModelSyncTimer: ReturnType<typeof setInterval> | null = null;
 
 // ===== 入口函数 =====
 
@@ -153,6 +149,8 @@ export function createGamePage(controller: GameController): HTMLElement {
   canvas.height = window.innerHeight;
   canvas.setAttribute('aria-label', t('game.boardAriaLabel'));
   boardContainer.appendChild(canvas);
+  const interactiveMap = new InteractiveMapSurface();
+  boardContainer.appendChild(interactiveMap.getElement());
   setCanvasEl(canvas);
   page.appendChild(boardContainer);
 
@@ -175,7 +173,6 @@ export function createGamePage(controller: GameController): HTMLElement {
   });
   page.appendChild(gameHudShell.getElement());
   syncViewModel();
-  viewModelSyncTimer = setInterval(syncViewModel, 100);
 
   // Init: load configs first, then player progress, then game
   const playerName = context.playerName || t('game.defaultPlayerName');
@@ -215,6 +212,7 @@ export function createGamePage(controller: GameController): HTMLElement {
       }
       setMapIndex(new MapIndex(mapData));
       renderer.loadMap(mapData);
+      interactiveMap.render(mapData, [currentPlayer!, ...otherPlayers.map(p => ({ ...p, values: { money: { current: p.primaryValue ?? 0 } } } as any))]);
       const startCell = mapIndex!.getById(0);
       if (startCell) {
         setPlayerDisplayPos(startCell.x, startCell.y);
@@ -264,10 +262,18 @@ export function createGamePage(controller: GameController): HTMLElement {
     });
     page.appendChild(notificationCenter.getElement());
 
-    registerSocketHandlers(socket);
+    registerSocketHandlers(socket, {
+      onEvent: () => syncViewModel(),
+      onNotification: (payload) => notificationCenter?.handleNotification({ ...payload, durationMs: payload.durationMs ?? 3000, createdAt: payload.createdAt ?? Date.now() }),
+    });
   }
 
   // Canvas events - no drag/zoom, only hover and click
+  interactiveMap.getElement().addEventListener('map:hover', (event) => {
+    const detail = (event as CustomEvent).detail;
+    if (detail?.cell && gameHudShell) { gameHudShell.showCellHover(detail.cell, detail.clientX, detail.clientY); }
+  });
+  interactiveMap.getElement().addEventListener('map:leave', () => gameHudShell?.hideCellHover());
   canvas.addEventListener('mousemove', handleMouseMove);
   canvas.addEventListener('click', handleClick);
   canvas.addEventListener('mouseleave', handleMouseLeave);
@@ -288,13 +294,10 @@ export function applyGamePageThemeTokens(page: HTMLElement, config: GamePageThem
 }
 
 function applyGamePageThemeSnapshot(page: HTMLElement, snapshot: ReturnType<DesignAdapter['createSnapshot']>): void {
+  // 所有 --gp-* 和 --tycoon-* 变量均由 DesignAdapter 从主题 JSON 注入到 dom 快照
   for (const [name, value] of Object.entries(snapshot.dom)) {
     page.style.setProperty(name, value);
   }
-  page.style.setProperty('--gp-map-bg', snapshot.canvas.board.background);
-  page.style.setProperty('--gp-accent', snapshot.dom['--tycoon-line-key']);
-  page.style.setProperty('--gp-border', snapshot.dom['--tycoon-line-map']);
-  page.style.setProperty('--gp-fg', snapshot.dom['--tycoon-piece-outline']);
 }
 
 // ===== UI Builders =====
@@ -581,16 +584,8 @@ function syncViewModel(): void {
 // ===== Tutorial System =====
 
 export function cleanupGamePage(page: HTMLElement): void {
-  if (viewModelSyncTimer) {
-    clearInterval(viewModelSyncTimer);
-    viewModelSyncTimer = null;
-  }
   gameHudShell?.destroy();
   gameHudShell = null;
-  actionBarComponent?.destroy();
-  topBarComponent?.destroy();
-  actionBarComponent = null;
-  topBarComponent = null;
   gameViewModel = null;
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);

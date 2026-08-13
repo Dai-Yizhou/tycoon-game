@@ -54,24 +54,16 @@ export class SealOrderModal {
     this.onClose = config.onClose;
     this.onSuccess = config.onSuccess;
 
-    this.setupSocketListeners();
   }
 
-  /**
-   * 设置 Socket 监听器
-   */
-  private setupSocketListeners(): void {
-    this.socket.on('server.itemUsed', (payload: { success: boolean; error?: string }) => {
-      if (payload.success) {
-        this.showSuccess();
-        if (this.onSuccess) {
-          this.onSuccess();
-        }
-        setTimeout(() => this.close(), 1500);
-      } else {
-        this.showError(payload.error ?? '查封令使用失败');
-      }
-    });
+  handleItemUsed(payload: { success: boolean; error?: string }): void {
+    if (payload.success) {
+      this.showSuccess();
+      this.onSuccess?.();
+      setTimeout(() => this.close(), 1500);
+    } else {
+      this.showError(payload.error ?? '道具使用失败');
+    }
   }
 
   /**
@@ -243,7 +235,6 @@ export class SealOrderModal {
    * 清理资源
    */
   destroy(): void {
-    this.socket.off('server.itemUsed');
     this.close();
   }
 }

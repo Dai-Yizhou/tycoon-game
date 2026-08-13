@@ -64,22 +64,6 @@ export function createSocket(options: SocketOptions = {}): TypedClientSocket {
     }
   });
 
-  // 游戏状态（登录成功后收到）
-  socket.on('server.gameState', (payload) => {
-    console.info('[socket] received game state:', payload);
-    if (options.onGameState) {
-      options.onGameState(payload);
-    }
-  });
-
-  // 错误事件
-  socket.on('server.error', (payload) => {
-    console.error('[socket] server error:', payload);
-    if (options.onError) {
-      options.onError(`${payload.code}: ${payload.message}`);
-    }
-  });
-
   return socket;
 }
 

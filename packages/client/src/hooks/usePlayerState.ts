@@ -81,7 +81,6 @@ export class PlayerStateManager {
    */
   bindSocket(socket: TypedClientSocket): void {
     this.socket = socket;
-    this.setupListeners();
   }
 
   /**
@@ -89,123 +88,8 @@ export class PlayerStateManager {
    */
   unbindSocket(): void {
     if (this.socket) {
-      this.removeListeners();
       this.socket = null;
     }
-  }
-
-  /**
-   * 设置 Socket 事件监听
-   */
-  private setupListeners(): void {
-    if (!this.socket) return;
-
-    // 游戏状态初始化
-    this.socket.on('server.gameState', (payload) => {
-      this.state.player = payload.player;
-      this.state.loaded = true;
-
-      // 记录初始数值
-      if (payload.player.values) {
-        for (const [key, field] of Object.entries(payload.player.values)) {
-          this.previousValues.set(key, field.current);
-        }
-      }
-
-      this.notifyStateListeners();
-    });
-
-    // 数值字段定义
-    this.socket.on('server.valueFieldDefinitions', (payload) => {
-      this.state.valueFieldDefinitions = payload.definitions;
-      this.notifyStateListeners();
-    });
-
-    // 数值变化
-    this.socket.on('server.valueChanged', (payload) => {
-      const oldValue = this.previousValues.get(payload.fieldId) ?? payload.current - payload.delta;
-
-      // 更新当前玩家数值
-      if (this.state.player && this.state.player.id === payload.playerId) {
-        if (this.state.player.values[payload.fieldId]) {
-          this.state.player.values[payload.fieldId].current = payload.current;
-        }
-        this.previousValues.set(payload.fieldId, payload.current);
-      }
-
-      // 更新其他玩家数值
-      if (this.otherPlayers.has(payload.playerId)) {
-        const otherPlayer = this.otherPlayers.get(payload.playerId)!;
-        // 默认假设 'money' 是主要显示字段
-        if (payload.fieldId === 'money') {
-          otherPlayer.primaryValue = payload.current;
-        }
-        this.notifyOtherPlayersListeners();
-      }
-
-      // 通知数值变化监听器（带动画效果）
-      this.notifyValueListeners({ ...payload, oldValue });
-      this.notifyStateListeners();
-    });
-
-    // 玩家移动
-    this.socket.on('server.playerMoved', (payload) => {
-      if (this.state.player && this.state.player.id === payload.playerId) {
-        this.state.player.position.cellId = payload.cellId;
-        this.notifyStateListeners();
-      }
-
-      if (this.otherPlayers.has(payload.playerId)) {
-        this.otherPlayers.get(payload.playerId)!.position.cellId = payload.cellId;
-        this.notifyOtherPlayersListeners();
-      }
-    });
-
-    // 玩家状态变化
-    this.socket.on('server.playerStatusChanged', (payload) => {
-      if (this.state.player && this.state.player.id === payload.playerId) {
-        this.state.player.status = payload.status;
-        this.notifyStateListeners();
-      }
-
-      if (this.otherPlayers.has(payload.playerId)) {
-        this.otherPlayers.get(payload.playerId)!.status = payload.status;
-        this.notifyOtherPlayersListeners();
-      }
-    });
-
-    // 玩家加入
-    this.socket.on('server.playerJoined', (payload) => {
-      this.addOtherPlayer({
-        id: payload.id,
-        username: payload.username,
-        position: payload.position,
-        status: payload.status,
-        primaryValue: payload.values?.money?.current,
-      });
-      this.notifyOtherPlayersListeners();
-    });
-
-    // 玩家离开
-    this.socket.on('server.playerLeft', (payload) => {
-      this.removeOtherPlayer(payload.playerId);
-      this.notifyOtherPlayersListeners();
-    });
-  }
-
-  /**
-   * 移除 Socket 事件监听
-   */
-  private removeListeners(): void {
-    if (!this.socket) return;
-
-    this.socket.off('server.gameState');
-    this.socket.off('server.valueFieldDefinitions');
-    this.socket.off('server.valueChanged');
-    this.socket.off('server.playerMoved');
-    this.socket.off('server.playerStatusChanged');
-    this.socket.off('server.playerJoined');
-    this.socket.off('server.playerLeft');
   }
 
   /**
