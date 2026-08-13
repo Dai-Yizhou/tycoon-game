@@ -65,9 +65,9 @@ src/
 ├── transport/            # 通信层
 │   ├── SocketManager.ts  #   Socket.IO 管理（鉴权/限流/5层广播/登录处理）
 │   └── handlers.ts       #   HandlerRegistry（集中注册事件处理器）
-├── team/                 # 组队（已实现，待接入 socket 路由）
-├── chat/                 # 聊天（已实现，handler 为占位）
-├── notifications/        # 通知（已实现，待接入）
+├── team/                 # 组队（已实现，由 TeamHandler 接入 Socket 路由）
+├── chat/                 # 聊天（已实现，由 HandlerRegistry 接入 Socket 路由）
+├── notifications/        # 通知（管理器已实现，业务处理器按需推送）
 ├── utils/
 │   └── logger.ts
 └── config/               # JSON 配置（非 src，位于包根）

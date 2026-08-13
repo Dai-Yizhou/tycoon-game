@@ -3,10 +3,10 @@
  *
  * 集中注册业务事件处理器：
  * - `client.ping`       : 心跳（已在 SocketManager 中处理，此处可重写）
- * - `client.rollDice`   : 掷骰子（Task 7 实现）
+ * - `client.rollDice`   : 掷骰子
  * - `client.move`       : 移动（调试用）
  * - `client.choosePath` : 路径选择（多岔路）
- * - `client.chat`       : 聊天（占位；Task 19 完整化）
+ * - `client.chat`       : 聊天
  *
  * 错误处理：所有处理器用统一 try/catch 包装，向客户端发送 `server.error` 事件。
  *
@@ -68,14 +68,8 @@ function safeHandle(socket: TypedSocket, code: ErrorCode, fn: () => void): void 
  * 处理器注册器
  *
  * 维护一个 io 引用以便支持后续任务（如房间管理、玩家加入游戏流程）。
- * Task 7 新增：DiceHandler 和 MovementHandler
- * Task 9 新增：PropertyHandler
- * Task 10 新增：StartHandler 和 JailHandler
- * Task 11 新增：EventHandler
- * Task 12 新增：InvestmentHandler
- * Task 13 新增：TransportHandler 和 MonumentHandler
- * Task 15 新增：ItemHandler
- * FR-21 新增：DebugHandler（仅调试模式注册）
+ * 当前注册骰子、移动、地产、起点、监狱、事件、投资、交通、纪念碑、道具、组队、管理员和聊天处理器。
+ * DebugHandler 仅在调试模式下注册。
  */
 export class HandlerRegistry {
   private readonly io: TypedServer;

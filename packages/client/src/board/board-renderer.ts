@@ -1,5 +1,5 @@
 /**
- * Canvas 棋盘渲染器（占位实现，完整实现在 src/renderer/BoardRenderer.ts）
+ * Canvas 棋盘渲染器兼容入口，重导出 src/renderer/BoardRenderer.ts 的完整实现。
  */
 
 // 重导出完整实现的 BoardRenderer
