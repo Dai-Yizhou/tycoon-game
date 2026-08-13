@@ -77,7 +77,6 @@ monopoly-io-game/
 │   │   └── config/               # JSON 配置（talents/achievements/behaviors）
 │   ├── client/   (@game/client)  # Vite + TypeScript + Canvas 前端
 │   │   └── public/config/        # 客户端 JSON 配置副本
-│   └── admin/    (@game/admin)   # 时代切换管理工具
 ├── ai-bot/                       # AI 玩家程序（独立项目，开发测试工具）
 ├── ai-bot-try/                   # AI 训练框架（遗传算法，支持训练与调用已训练玩家）
 ├── pnpm-workspace.yaml
@@ -112,8 +111,6 @@ pnpm dev:server
 # 终端 2：启动客户端（端口 5173）
 > ⚠️ 客户端已禁用浏览器页面缩放，确保游戏棋盘正确显示。pnpm dev:client
 
-# 终端 3：启动管理工具（端口 5174，可选）
-pnpm dev:admin
 ```
 
 打开浏览器访问 `http://localhost:5173` 即可进入游戏。
@@ -130,7 +127,6 @@ pnpm -r build
 - `packages/shared/dist/` - 共享库（CJS + ESM 双格式）
 - `packages/server/dist/` - Node.js 服务端
 - `packages/client/dist/` - 静态前端（可用任意静态服务器托管）
-- `packages/admin/dist/` - 静态管理工具
 
 ### 运行测试
 
@@ -228,7 +224,6 @@ withFeature('cheat-economy', () => {
 | `pnpm -r clean` | 清理所有包构建产物 |
 | `pnpm dev:server` | 服务端开发（热重载） |
 | `pnpm dev:client` | 客户端开发（Vite HMR） |
-| `pnpm dev:admin` | 管理工具开发 |
 
 ## 端口约定
 
@@ -236,10 +231,8 @@ withFeature('cheat-economy', () => {
 | --- | --- |
 | @game/server | 3000 |
 | @game/client (Vite dev) | 5173 |
-| @game/admin (Vite dev) | 5174 |
 | @game/client (Vite preview) | 4173 |
 | ai-bot 控制面板 | 4040 |
-| @game/admin (Vite preview) | 4174 |
 
 可通过环境变量覆盖：`PORT`、`HOST`、`VITE_API_TARGET`。
 

@@ -8,7 +8,6 @@ const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const services = [
   { name: 'server', directory: 'packages/server' },
   { name: 'client', directory: 'packages/client' },
-  { name: 'admin', directory: 'packages/admin' },
 ];
 const children = new Map();
 let shuttingDown = false;

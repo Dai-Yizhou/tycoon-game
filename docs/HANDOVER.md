@@ -19,7 +19,6 @@
 | --- | --- | --- |
 | 游戏服务端 | `packages/server/` | Koa + Socket.IO，游戏世界管理 |
 | 游戏客户端 | `packages/client/` | Vite + Canvas 2D 渲染 |
-| 管理后台 | `packages/admin/` | 时代/配置管理 |
 | AI Bot 系统 | `ai-bot/` | AI 玩家 + 浏览器 AI + 评价引擎 |
 | 配置编辑器 | `config_editors/` | 地图/天赋/行为可视化编辑 |
 | 地图编辑器 | `map_editor_v01.01/` | 地图绘制工具 |

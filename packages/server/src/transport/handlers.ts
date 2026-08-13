@@ -23,7 +23,7 @@ import type { TypedServer, TypedSocket } from './SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ChatManager } from '../chat/index.js';
 import { Bankruptcy } from '../economy/index.js';
-import { DiceHandler, MovementHandler, PropertyHandler, StartHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, ItemHandler, DebugHandler, AdminHandler, TeamHandler } from '../handlers/index.js';
+import { DiceHandler, MovementHandler, PropertyHandler, StartHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, ItemHandler, DebugHandler, TeamHandler } from '../handlers/index.js';
 import { TeamManager, DEFAULT_TEAM_CONFIG } from '../team/index.js';
 import { EventHandler } from '../events/index.js';
 import { ItemRegistry, ItemEffectsHandler, BUILTIN_ITEM_TEMPLATES } from '../items/index.js';
@@ -68,7 +68,7 @@ function safeHandle(socket: TypedSocket, code: ErrorCode, fn: () => void): void 
  * 处理器注册器
  *
  * 维护一个 io 引用以便支持后续任务（如房间管理、玩家加入游戏流程）。
- * 当前注册骰子、移动、地产、起点、监狱、事件、投资、交通、纪念碑、道具、组队、管理员和聊天处理器。
+ * 当前注册骰子、移动、地产、起点、监狱、事件、投资、交通、纪念碑、道具、组队和聊天处理器。
  * DebugHandler 仅在调试模式下注册。
  */
 export class HandlerRegistry {
@@ -87,7 +87,6 @@ export class HandlerRegistry {
   private itemEffectsHandler: ItemEffectsHandler;
   private itemHandler: ItemHandler;
   private readonly debugHandler: DebugHandler;
-  private readonly adminHandler: AdminHandler;
   private readonly teamManager: TeamManager;
   private readonly teamHandler: TeamHandler;
   private readonly chatManager: ChatManager;
@@ -133,8 +132,6 @@ export class HandlerRegistry {
     this.itemHandler = null as any; // 占位，将在 app.ts 中设置
     // 初始化调试处理器
     this.debugHandler = new DebugHandler(io, world);
-    // 初始化管理员处理器
-    this.adminHandler = new AdminHandler(io, world);
     // 初始化组队系统（TeamManager 为纯数据层，TeamHandler 负责协议与 I/O）
     this.teamManager = new TeamManager(DEFAULT_TEAM_CONFIG);
     this.teamHandler = new TeamHandler(io, world, this.teamManager);
@@ -183,8 +180,6 @@ export class HandlerRegistry {
     ) {
       this.debugHandler.register(socket);
     }
-    // 注册管理员处理器
-    this.adminHandler.register(socket);
     // 注册组队处理器
     this.teamHandler.register(socket);
     this.handleChat(socket);
@@ -315,12 +310,6 @@ export class HandlerRegistry {
     return this.debugHandler;
   }
 
-  /**
-   * 获取 AdminHandler（用于外部调用）
-   */
-  getAdminHandler(): AdminHandler {
-    return this.adminHandler;
-  }
 
   /**
    * 获取 TeamManager（用于外部调用，如离线清理、数值同步）

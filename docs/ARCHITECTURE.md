@@ -39,7 +39,6 @@ monopoly-io-game/                 # 项目根
 │   │   └── src/
 │   ├── client/   (@game/client)  # 客户端
 │   │   └── public/config/        # 客户端 JSON 配置副本
-│   └── admin/    (@game/admin)   # 管理工具
 ├── pnpm-workspace.yaml
 ├── package.json
 ├── tsconfig.base.json
@@ -79,12 +78,6 @@ monopoly-io-game/                 # 项目根
 - **构建**：Vite 5.x，dev server 5173，生产构建到 `dist/`。
 - **架构原则**：渲染层与数据层分离（MVVM）。
 - **页面流程**：Start → Login → Loading → Game（由 GameController 状态机管理）。
-
-### @game/admin
-
-- **职责**：管理工具，时代切换、地图管理。
-- **构建**：Vite 5.x，dev server 5174。
-- **复用关系**：与地图编辑器（`map_editor_v01.01`）同源，组件复用。
 
 ## 服务端核心架构
 

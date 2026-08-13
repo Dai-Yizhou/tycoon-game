@@ -12,10 +12,8 @@
     "build:shared": "cd packages/shared && npm run build",
     "build:server": "cd packages/server && npm run build",
     "build:client": "cd packages/client && npm run build",
-    "build:admin": "cd packages/admin && npm run build",
     "dev:server": "cd packages/server && npm run dev",
     "dev:client": "cd packages/client && npm run dev",
-    "dev:admin": "cd packages/admin && npm run dev",
     "lint": "cd packages/shared && npm run lint && cd ../../packages/server && npm run lint && cd ../../packages/client && npm run lint",
     "test": "cd packages/shared && npm test && cd ../../packages/server && npm test && cd ../../packages/client && npm test",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/coverage"

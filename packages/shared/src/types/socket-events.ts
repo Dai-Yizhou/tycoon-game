@@ -303,52 +303,11 @@ export interface ClientToServerEvents {
     ack?: (result: AckResult) => void,
   ) => void;
 
-  /** 管理员登录 */
-  'client.adminLogin': (
-    payload: { token: string },
-    ack?: (result: AckResult<{ sessionTimeout: number }>) => void,
-  ) => void;
 
-  /** 管理员修改玩家数值 */
-  'client.adminSetPlayerValue': (
-    payload: { playerId: string; fieldId: string; value: number },
-    ack?: (result: AckResult) => void,
-  ) => void;
 
-  /** 管理员冻结玩家 */
-  'client.adminFreezePlayer': (
-    payload: { playerId: string },
-    ack?: (result: AckResult) => void,
-  ) => void;
 
-  /** 管理员解冻玩家 */
-  'client.adminUnfreezePlayer': (
-    payload: { playerId: string },
-    ack?: (result: AckResult) => void,
-  ) => void;
 
-  /** 管理员踢出玩家 */
-  'client.adminKickPlayer': (
-    payload: { playerId: string; reason?: string },
-    ack?: (result: AckResult) => void,
-  ) => void;
 
-  /** 管理员获取所有在线玩家 */
-  'client.adminGetPlayers': (
-    payload: Record<string, never>,
-    ack?: (result: AckResult<{
-      players: Array<{
-        id: string;
-        username: string;
-        status: string;
-        position: { cellId: number };
-        values: Record<string, { id: string; name: string; current: number }>;
-        teamId: string | null;
-        lastActiveAt: number;
-      }>;
-      count: number;
-    }>) => void,
-  ) => void;
 }
 
 // ---------------------------------------------------------------------------

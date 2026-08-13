@@ -67,7 +67,6 @@ packages/
 ├── shared/   (@game/shared)  共享类型、调试开关、地图解析
 ├── server/   (@game/server)  Express + Socket.IO 服务端
 ├── client/   (@game/client)  Vite + Canvas 渲染客户端
-└── admin/    (@game/admin)   管理工具（时代切换、地图管理）
 ```
 
 ### @game/shared
