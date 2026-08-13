@@ -5,8 +5,7 @@
  */
 
 import {
-  currentMoney, currentCredit, loanAmount, loanInterestRate,
-  setCurrentMoney, setCurrentCredit, setLoanAmount,
+  currentMoney, currentCredit, loanAmount, loanInterestRate, gameSocket,
 } from '../../state/GameStore.js';
 import { isTalentActive } from './GameLogic.js';
 import { addChatMessage } from './ChatSystem.js';
@@ -79,12 +78,13 @@ export function showBankModal(): void {
     const amount = parseInt(loanInput.value) || 0;
     if (amount <= 0) { addChatMessage(t('bank.invalidAmount'), 'system'); return; }
     if (amount > maxLoan) { addChatMessage(t('bank.exceedsMaxLoan', { max: maxLoan }), 'system'); return; }
-    setCurrentMoney(currentMoney + amount);
-    setLoanAmount(loanAmount + amount);
-    setCurrentCredit(Math.max(0, currentCredit - 5));
-    addChatMessage(t('bank.loanSuccess', { amount }), 'system');
-    modal.remove();
-    requestHudRefresh();
+    if (!gameSocket) return;
+    gameSocket.emit('client.bankLoan', { amount }, (result) => {
+      if (!result.ok) { addChatMessage(result.error || t('common.unknownError'), 'error'); return; }
+      addChatMessage(t('bank.loanSuccess', { amount }), 'system');
+      modal.remove();
+      requestHudRefresh();
+    });
   });
 
   modal.querySelector('#btn-repay')!.addEventListener('click', () => {
@@ -94,12 +94,13 @@ export function showBankModal(): void {
     const interest = Math.floor(amount * loanInterestRate);
     const totalRepay = amount + interest;
     if (currentMoney < totalRepay) { addChatMessage(t('bank.insufficientFunds', { cost: totalRepay, interest }), 'system'); return; }
-    setCurrentMoney(currentMoney - totalRepay);
-    setLoanAmount(loanAmount - amount);
-    setCurrentCredit(Math.min(100, currentCredit + 2));
-    addChatMessage(t('bank.repaySuccess', { amount, interest }), 'system');
-    modal.remove();
-    requestHudRefresh();
+    if (!gameSocket) return;
+    gameSocket.emit('client.bankRepay', { amount }, (result) => {
+      if (!result.ok) { addChatMessage(result.error || t('common.unknownError'), 'error'); return; }
+      addChatMessage(t('bank.repaySuccess', { amount, interest }), 'system');
+      modal.remove();
+      requestHudRefresh();
+    });
   });
 
   modal.querySelector('#btn-bank-close')!.addEventListener('click', () => modal.remove());

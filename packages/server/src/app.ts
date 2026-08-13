@@ -250,6 +250,8 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   const handlerRegistry = registerHandlers(io, world);
 
   // 初始化道具系统（Task 15）
+  handlerRegistry.setBank(bank);
+  handlerRegistry.setBankruptcy(bankruptcy);
   handlerRegistry.setItemHandler(bank);
   const itemEffectsHandler = handlerRegistry.getItemEffectsHandler();
 
