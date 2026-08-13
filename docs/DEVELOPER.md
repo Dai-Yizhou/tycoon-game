@@ -1,5 +1,7 @@
 # 开发者文档
 
+> 开发边界：只维护 `packages/shared`、`packages/server`、`packages/client` 三包；没有 admin 包。客户端只有一个 Socket 连接和一个服务端事件入口，银行与其他关键数值由服务端权威计算。
+
 ## 快速上手
 
 ### 环境要求
@@ -90,6 +92,8 @@ packages/
 - Canvas 渲染：`src/renderer/BoardRenderer.ts`（主渲染器）
 - 子渲染器：`CellRenderer.ts`, `ConnectionRenderer.ts`, `PlayerRenderer.ts`
 - 加载配置：`/config/talents.json`, `/config/achievements.json`（从 `public/config/` serve）
+- 单一连接：`hooks/useSocket.ts` 创建，`GamePage` 持有，`SocketEventHandler` 集中监听并在销毁时注销
+- 新 HUD：`components/GameHudShell.ts` 消费 `GameViewModel`，展示玩家数值、昼夜、聊天、行动栏和道具
 
 ## 关键文件
 
@@ -106,6 +110,24 @@ packages/
 | `packages/server/map.json` | 棋盘格子数据（40格示例地图） |
 | `packages/server/map-meta.json` | 地图元数据（时区/区域/数值字段定义/自定义配置） |
 | `packages/server/config/behaviors/*.json` | 格子行为脚本（10个文件，每个含 events 数组） |
+
+## 单一 Socket 入口与新 HUD
+
+`LoadingPage` 创建 Socket 并完成登录，`GamePage` 复用该连接，不在页面或子系统创建第二条连接。所有服务端推送在 `SocketEventHandler` 注册，重复注册会被忽略；离开游戏页必须调用注销函数。`GameHudShell` 不直接依赖 Socket 或 Store，只消费 ViewModel，通过 `ClientHudBridge` 接收状态刷新。
+
+客户端操作必须遵循：按钮或系统发出 `client.*` → 服务端校验和执行业务 → `server.*`/ack 返回 → GameStore 与 ViewModel 更新 → HUD 刷新。不得在客户端请求成功前修改金钱、信用、位置或破产状态。
+
+## 配置直接编辑
+
+配置文件是运行时事实来源，不需要 admin 工具：
+
+| 内容 | 直接编辑路径 | 生效方式 |
+|---|---|---|
+| 地图 | `packages/server/map.json`、`packages/server/map-meta.json` | 重启服务端 |
+| 天赋/成就/行为 | `packages/server/config/` | 重启服务端 |
+| 客户端配置副本 | `packages/client/public/config/` | 重新启动或构建客户端 |
+
+修改服务端与客户端同名配置时保持内容同步，先验证 JSON，再运行三包 build。`src/config.ts` 只负责环境变量和路径解析；不要新增运行时管理页面来替代文件编辑。
 
 ## 数据流
 
@@ -377,6 +399,11 @@ Bug 日志标记为 `bug` 级别，在控制面板中以红色高亮显示。
 ## 编译检查
 
 ```bash
-pnpm exec tsc --noEmit --project packages/client/tsconfig.json
-pnpm exec tsc --noEmit --project packages/server/tsconfig.json
+pnpm build:shared
+pnpm build:server
+pnpm build:client
+pnpm --filter @game/shared test
+pnpm --filter @game/server test
+pnpm --filter @game/client test
+pnpm lint
 ```

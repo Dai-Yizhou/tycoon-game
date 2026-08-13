@@ -1,5 +1,22 @@
 # 项目架构
 
+## 当前基线
+
+项目运行时只由三个 workspace 包组成：`@game/shared` 提供共享契约，`@game/server` 持有游戏世界与经济权威，`@game/client` 负责连接、状态投影、Canvas 与新 HUD。仓库没有 admin 包；配置通过仓库内 JSON 文件直接编辑并按需重启或构建。
+
+```mermaid
+graph TD
+  Shared["@game/shared\n类型 / 地图解析 / i18n / debug"]
+  Server["@game/server\nExpress / Socket.IO / GameWorld / Economy"]
+  Client["@game/client\nVite / Canvas / GameStore / 新 HUD"]
+  Config["JSON 配置\nmap / map-meta / talents / achievements / behaviors"]
+  Server --> Shared
+  Client --> Shared
+  Config --> Server
+  Config --> Client
+  Client <-->|"单一 Socket.IO 连接\nclient.* 请求 / server.* 事件"| Server
+```
+
 ## 目标
 
 大富翁.io 是一款结合经典大富翁玩法与 io 游戏大世界概念的多人在线网页游戏。架构上需要支持：
@@ -15,7 +32,7 @@
 | --- | --- | --- | --- |
 | 语言 | TypeScript | ^5.4 | 全栈统一类型 |
 | 运行时 | Node.js | >=18 | 服务端运行时 |
-| 前端构建 | Vite | ^5.2 | 客户端/Admin 构建 |
+| 前端构建 | Vite | ^5.2 | 客户端构建 |
 | 后端运行 | tsx (dev) / tsc (build) | ^4.7 / ^5.4 | 开发与构建 |
 | 后端框架 | Express | ^4.19 | HTTP 服务 |
 | 实时通信 | Socket.IO | ^4.7 | WebSocket 实时双向 |
@@ -30,7 +47,7 @@
 ```
 monopoly-io-game/                 # 项目根
 ├── .trae/specs/                  # 规格文档（只读，不修改）
-├── map_editor_v01.01/            # 地图编辑器（只读，参考用）
+├── map_editor_v01.01/            # 地图工具（不在本任务范围内）
 ├── docs/                         # 项目文档
 ├── packages/
 │   ├── shared/   (@game/shared)  # 共享类型/地图解析/调试开关/i18n
@@ -71,6 +88,7 @@ monopoly-io-game/                 # 项目根
   - 单棋盘 ~1000 名玩家同时在线
   - 关键计算（随机数、经济、胜负）服务端权威
   - 横向扩展：未来可接 Redis 适配器支持多实例
+  - 银行、破产、租金、税收和位置变更均以服务端状态为准
 
 ### @game/client
 
@@ -161,6 +179,95 @@ index.ts (bootstrap)
 - **TeamManager**（`team/TeamManager.ts`）：队伍创建/合并/分离（**已实现，待接入 socket 路由**）。
 - **ChatManager**（`chat/ChatManager.ts`）：频道管理与消息分发（**已实现，handler 为占位**）。
 - **NotificationManager**（`notifications/NotificationManager.ts`）：通知创建/优先级/历史（**已实现，待接入**）。
+
+## 单一 Socket 与客户端事件入口
+
+客户端在 Loading 阶段由 `hooks/useSocket.ts:createSocket` 创建唯一 Socket.IO 连接，交给 `GameController`，进入 GamePage 后保存到 `GameStore.gameSocket`。服务端推送统一由 `game/systems/SocketEventHandler.ts` 注册；`WeakSet` 防止重复注册，`unregisterSocketHandlers` 在离开页面时清理。业务模块只通过这条连接发送 `client.*` 请求，不直接修改业务状态；状态变化由 `server.*` 事件回填 GameStore 并刷新 HUD。
+
+```mermaid
+sequenceDiagram
+  participant UI as GamePage / 新 HUD
+  participant Socket as 单一 Typed Socket
+  participant Events as SocketEventHandler
+  participant Server as HandlerRegistry
+  participant World as GameWorld + Economy
+  UI->>Socket: emit client.*
+  Socket->>Server: 路由并校验
+  Server->>World: 执行业务事务
+  World-->>Server: 权威状态
+  Server-->>Socket: server.* 广播 / ack
+  Socket->>Events: 集中监听
+  Events->>UI: 更新 GameStore / ViewModel / HUD
+```
+
+## 核心流程
+
+### 登录
+
+```mermaid
+sequenceDiagram
+  participant Client as LoadingPage
+  participant Socket as SocketManager
+  participant Store as PlayerStore
+  participant World as GameWorld
+  Client->>Socket: connect
+  Client->>Socket: client.login(username, guest)
+  Socket->>Store: load 或创建玩家
+  Socket->>World: add / 恢复玩家
+  Socket-->>Client: ack(player, cycle, existingPlayers)
+  Socket-->>Client: server.gameState / server.playerJoined
+```
+
+### 移动
+
+```mermaid
+flowchart LR
+  A[新 HUD 掷骰] --> B[client.rollDice]
+  B --> C[DiceHandler 服务端随机与冷却]
+  C --> D[MovementHandler 计算路径]
+  D --> E{是否需要选路}
+  E -- 是 --> F[server.askPath]
+  F --> G[client.choosePath]
+  E -- 否 --> H[最终落点]
+  G --> H
+  H --> I[settleLanding 一次结算]
+  I --> J[server.playerMoved / valueChanged / 业务事件]
+```
+
+中间经过的格子只用于动画；只有最终落点触发一次业务结算。普通 `client.move` 不能绕过服务端移动流程。
+
+### 配置
+
+```mermaid
+flowchart LR
+  A[直接编辑 JSON] --> B{配置类型}
+  B -->|地图| C[packages/server/map.json + map-meta.json]
+  B -->|玩法| D[server/config]
+  B -->|客户端展示副本| E[client/public/config]
+  C --> F[服务端启动加载]
+  D --> F
+  E --> G[Vite 静态加载]
+  F --> H[Socket / REST]
+  H --> I[客户端状态与新 HUD]
+```
+
+### 断线与重连
+
+```mermaid
+sequenceDiagram
+  participant Client
+  participant Socket as Socket.IO
+  participant Server as SocketManager
+  participant Store as PlayerStore
+  Client--xSocket: disconnect
+  Socket->>Server: disconnect
+  Server->>Store: 保存非游客玩家并冻结状态
+  Client->>Socket: 自动重连
+  Socket->>Server: 重新认证
+  Server->>Store: 读取并恢复玩家
+  Server-->>Client: server.gameState + 当前世界快照
+  Client->>Client: SocketEventHandler 恢复监听并刷新 HUD
+```
 
 ## 数据流
 

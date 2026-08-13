@@ -1,5 +1,7 @@
 # 大富翁.io
 
+> 当前架构基线：`packages/shared`、`packages/server`、`packages/client` 三包 monorepo；项目不包含 admin 包。服务端掌握游戏状态与银行账本，客户端通过单一 Socket 连接发送 `client.*` 请求并消费 `server.*` 状态事件。
+
 > 结合经典大富翁玩法与 io 游戏大世界概念的多人在线网页游戏。
 > 财产 / 信用值 / 备选数值三大数值体系并行，数据驱动棋盘，地图由编辑器定义。
 
@@ -45,7 +47,7 @@
 | --- | --- | --- |
 | 语言 | TypeScript 5.4 | 全栈统一类型 |
 | 运行时 | Node.js ≥ 18（推荐 20+） | 服务端运行时 |
-| 前端构建 | Vite 5 | 客户端 / Admin 构建 |
+| 前端构建 | Vite 5 | 客户端构建 |
 | 后端框架 | Express 4 | HTTP 服务 |
 | 实时通信 | Socket.IO 4 | WebSocket 双向通信 |
 | 数据库 | MongoDB 6（可选） | 玩家数据持久化 |
@@ -78,7 +80,7 @@ monopoly-io-game/
 │   ├── client/   (@game/client)  # Vite + TypeScript + Canvas 前端
 │   │   └── public/config/        # 客户端 JSON 配置副本
 ├── ai-bot/                       # AI 玩家程序（独立项目，开发测试工具）
-├── ai-bot-try/                   # AI 训练框架（遗传算法，支持训练与调用已训练玩家）
+├── ai_bot_try/                   # AI 训练框架（独立工具，不属于三包运行时）
 ├── pnpm-workspace.yaml
 ├── package.json                  # 根
 ├── tsconfig.base.json
@@ -149,7 +151,7 @@ npx prettier --write . # Prettier 格式化
 
 ## 配置系统
 
-项目采用 **JSON 配置 + TS 硬编码配置** 双轨制：
+运行时配置直接编辑仓库中的 JSON 文件，不通过 admin 页面或隐藏管理 API 生成：
 
 ### JSON 配置（数据驱动，可热替换）
 
@@ -159,7 +161,7 @@ npx prettier --write . # Prettier 格式化
 | `achievements.json` | 同上 | 成就定义（条件、奖励、分类） |
 | `behaviors/*.json` | 同上 `behaviors/` 子目录 | 格子行为脚本（事件触发逻辑） |
 
-服务端从 `packages/server/config/` 加载；客户端从 `packages/client/public/config/` 加载（Vite 静态服务）。
+服务端从 `packages/server/config/` 加载；客户端从 `packages/client/public/config/` 加载（Vite 静态服务）。直接编辑后重新启动服务端或重新构建客户端；需要同步的同名配置文件应同时更新。
 
 ### TS 硬编码配置
 
@@ -240,12 +242,12 @@ withFeature('cheat-economy', () => {
 
 | 文档 | 受众 | 内容 |
 |---|---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 开发者 | 架构概述、核心管理器、数据流、配置系统 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 开发者 | 三包架构、依赖图、权威边界与核心流程 |
 | [docs/API.md](docs/API.md) | 开发者 | Socket 事件列表、REST API、核心类型 |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 运维 | 环境变量、部署流程、MongoDB 配置、排查 |
 | [docs/CODING_STYLE.md](docs/CODING_STYLE.md) | 开发者 | 编码规范 |
-| [docs/DEVELOPER.md](docs/DEVELOPER.md) | 协作开发者 | 技术栈、包结构、数据流、调试 |
-| [docs/CONTENT_CREATOR.md](docs/CONTENT_CREATOR.md) | 内容创作者 | 地图编辑器、属性模板、天赋/成就配置 |
+| [docs/DEVELOPER.md](docs/DEVELOPER.md) | 协作开发者 | 三包开发、直接编辑配置、Socket 与验证 |
+| [docs/CONTENT_CREATOR.md](docs/CONTENT_CREATOR.md) | 内容创作者 | 地图数据与 JSON 配置直接编辑 |
 | [docs/PLAYER.md](docs/PLAYER.md) | 玩家 | 操作说明、界面介绍、天赋系统 |
 | [.trae/specs/monopoly-io-game/spec.md](.trae/specs/monopoly-io-game/spec.md) | 全部 | 产品需求规格 |
 | [map_editor_v01.01/instruction.txt](map_editor_v01.01/instruction.txt) | 内容创作者 | 地图编辑器说明 |

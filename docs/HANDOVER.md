@@ -1,5 +1,7 @@
 # 项目交接文档
 
+> 当前交接基线：主运行时为 `@game/shared`、`@game/server`、`@game/client`，无 admin 包。配置直接编辑 JSON；客户端使用单一 Socket 与 `SocketEventHandler`；银行及关键经济状态由服务端权威维护。
+
 > 更新时间：2026-07-12
 > 项目：大富翁.io（monopoly-io-game）
 > 存储位置：`/Volumes/T7_APFS/monopoly-io-game/`
@@ -17,11 +19,10 @@
 
 | 模块 | 路径 | 说明 |
 | --- | --- | --- |
-| 游戏服务端 | `packages/server/` | Koa + Socket.IO，游戏世界管理 |
+| 游戏服务端 | `packages/server/` | Express + Socket.IO，游戏世界与经济权威 |
 | 游戏客户端 | `packages/client/` | Vite + Canvas 2D 渲染 |
 | AI Bot 系统 | `ai-bot/` | AI 玩家 + 浏览器 AI + 评价引擎 |
-| 配置编辑器 | `config_editors/` | 地图/天赋/行为可视化编辑 |
-| 地图编辑器 | `map_editor_v01.01/` | 地图绘制工具 |
+| 配置文件 | `packages/server/config/`、`packages/client/public/config/` | 直接编辑 JSON，重启或构建生效 |
 | Ollama 本地 | `ollama/` | 本地 LLM 服务（含模型） |
 | llamafile | `llamafile/` | 单文件 LLM 备选方案 |
 
@@ -144,6 +145,7 @@ DYLD_LIBRARY_PATH="/Volumes/T7_APFS/monopoly-io-game/ollama/bin" \
 **预防措施**：
 - 客户端已实现自动重连
 - 重连后通过 `server.gameState` 事件同步全量状态
+- 重连后由 `SocketEventHandler` 恢复服务端事件监听并刷新新 HUD
 - 检查 `pingInterval` 和 `pingTimeout` 配置是否合理
 
 ### 3.3 玩家位置同步延迟
@@ -214,7 +216,7 @@ DYLD_LIBRARY_PATH="/Volumes/T7_APFS/monopoly-io-game/ollama/bin" \
 - 前置天赋依赖关系形成环
 
 **预防措施**：
-- 使用 `config_editors/talent_achievement_editor.html` 编辑配置
+- 直接编辑 `packages/server/config/talents.json` 与 `packages/server/config/achievements.json`，同步客户端 `public/config/` 副本
 - 修改后验证 JSON 格式正确性
 - 检查天赋树是否有循环依赖
 
@@ -318,7 +320,7 @@ node dist/main.js \
 - 所有源代码（`packages/`, `ai-bot/src/`）
 - 配置文件（`package.json`, `tsconfig.json`, `vite.config.ts` 等）
 - 文档（`docs/`）
-- 配置编辑器（`config_editors/`）
+- JSON 配置（`packages/server/config/`、`packages/client/public/config/`）
 - 地图编辑器（`map_editor_v01.01/`）
 - 游戏配置（`packages/server/config/`, `packages/client/public/config/`）
 - AI Bot 配置（`ai-bot/package.json`, `ai-bot/tsconfig.json`）

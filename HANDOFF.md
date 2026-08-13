@@ -1,5 +1,7 @@
 # 临时交接文档
 
+> Task 9 文档基线：运行时仅有 `packages/shared/server/client` 三包；无 admin；配置文件直接编辑；客户端单一 Socket 与单一事件入口；服务端银行权威。
+
 > 生成日期：2026-08-02
 > 工作仓库：`tycoon-game`（monorepo、pnpm workspace）
 > 远程地址：https://github.com/Dai-Yizhou/tycoon-game.git
@@ -56,12 +58,15 @@
 
 ### 技术栈
 - **Monorepo**：`packages/client/` + `packages/server/` + `packages/shared/`
-- **前端**：TypeScript + Canvas 2D 渲染（无框架）
-- **后端**：Koa + Socket.IO
+- **前端**：TypeScript + Vite + Canvas 2D 渲染（无框架）
+- **后端**：Express + Socket.IO
 - **构建**：TypeScript 编译 + pnpm workspace
 
 ### 关键架构决策
 - **服务端权威**：所有游戏事件处理在服务端完成，客户端仅发送请求并同步状态。
+- **银行权威**：`Bank` 负责贷款、利息、还款和信用变化；客户端只发 `client.bankLoan` / `client.bankRepay`。
+- **单一 Socket 入口**：`createSocket` 创建连接，`SocketEventHandler` 集中消费服务端事件，`GameHudShell` 只消费 ViewModel。
+- **直接编辑配置**：编辑 `packages/server/config/` 与 `packages/client/public/config/` 中的 JSON，重启或构建后生效。
 - **状态管理**：通过 `GameStore.ts` 的 getter/setter 统一管理，禁止直接修改导入变量。
 - **国际化**：使用 `t()` 函数动态获取文本，语言包键按命名空间组织（`loading.*`、`chat.*`、`board.*` 等）。
 - **Canvas 渲染**：使用 `devicePixelRatio` 保持视觉尺寸，摄像机自动跟随玩家，禁止缩放/拖拽。
@@ -76,12 +81,11 @@
 ## 四、已知问题与风险
 
 ### 高优先级
-1. **MapLoader.ts / ConfigLoader.ts 数据硬编码**：地图格子名称/描述、天赋/成就定义仍为 TypeScript 硬编码中文，应改为独立 JSON 配置文件以便多语言支持。
-2. **`components/`、`hud/`、`tutorial/` 目录弃用**：这些目录已被 `tsconfig.json` exclude 且无引用，后续可安全删除。
-3. **`main` 分支落后**：`main` 分支停留在初始提交，未同步 `dev-Dai` 的最新重构。若需从 `main` 发布，需要先合并。
+1. **完整联机回归**：继续覆盖登录、移动、断线重连、银行和破产流程。
+2. **`main` 分支落后**：`main` 未同步 `dev-Dai` 的最新重构，发布前需按流程合并。
 
 ### 中优先级
-4. **pnpm-lock 变更大**：`pnpm-lock.yaml` 有大量变更（+785/-492），可能引入依赖版本不一致。
+3. **pnpm-lock 变更大**：`pnpm-lock.yaml` 有大量变更（+785/-492），可能引入依赖版本不一致。
 5. **国际化覆盖率**：`zh-CN.json` 和 `en-US.json` 的 key 结构需保持同步，当前 en-US 部分键缺少翻译。
 6. **游戏测试**：模块拆分后未进行完整的 E2E 游戏流程测试，可能存在回归。
 
@@ -103,8 +107,11 @@ pnpm --filter @game/server dev
 # 启动客户端
 pnpm --filter @game/client dev
 
-# 类型检查
-pnpm -r exec tsc --noEmit
+# 三包构建与测试
+pnpm build:shared && pnpm build:server && pnpm build:client
+pnpm --filter @game/shared test
+pnpm --filter @game/server test
+pnpm --filter @game/client test
 ```
 
 ---
@@ -119,7 +126,7 @@ pnpm -r exec tsc --noEmit
 
 ## 七、2026-08-05 更新
 
-- 已从远程 `dev-Dai` 恢复以下代码与文档：`docs/`、`config_editors/`、`map_editor_v01.01/`、`ai-bot/`、`ai_bot_try/`。
+- 已从远程 `dev-Dai` 恢复主项目文档与独立工具目录；这些工具不属于三包运行时。
 - 恢复时排除了 `.obsidian`、截图、`output`、`individual_reports`、`test-dist`、编译产物、训练产物和模型文件。
 - 已确认 `packages/server/map.json` 存在。
 - 工具链版本：Node `v24.18.0`，pnpm `v11.18.0`。

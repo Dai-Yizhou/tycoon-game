@@ -1,5 +1,7 @@
 # API 参考
 
+> 协议基线：客户端和服务端各自只通过一条 Socket.IO 连接通信。客户端请求统一使用 `client.*`，服务端状态统一使用 `server.*`；没有 admin socket 协议。客户端不得把 ack 当作本地状态写入的替代品，最终数值必须等待服务端事件。
+
 本文档描述游戏前后端之间的通信协议，包括 Socket.IO 事件和 REST API 端点。
 
 所有事件类型定义于 `packages/shared/src/types/socket-events.ts`，采用 Socket.IO 类型化事件模式（`ClientToServerEvents` / `ServerToClientEvents` / `SocketData`）。
@@ -99,7 +101,7 @@ AckResult<{
 
 #### client.move
 
-直接移动到指定格子（调试 / 自由模式用）。
+直接移动到指定格子（仅服务端授权的调试 / 自由模式用）。普通客户端调用会被拒绝，正常移动必须从 `client.rollDice` 或服务端移动流程开始。
 
 - **Payload**: `{ toCellId: number }`
 - **Ack**: `AckResult<PositionChangedPayload>`
@@ -308,6 +310,7 @@ AckResult<{
 
 - **Payload**: `{ amount: number }`
 - **Ack**: `AckResult<{ amount: number; creditDelta: number }>`
+- **权威规则**：服务端 `Bank.requestLoan` 校验信用值、贷款上限和当前负债，修改玩家财产与信用，并广播两个 `server.valueChanged`。
 
 #### client.bankRepay
 
@@ -315,10 +318,11 @@ AckResult<{
 
 - **Payload**: `{ amount: number }`
 - **Ack**: `AckResult<{ amount: number }>`
+- **权威规则**：服务端 `Bank.repayLoan` 计算应计利息、扣除财产、恢复信用并广播两个 `server.valueChanged`；客户端不自行计算或写入余额。
 
 #### client.triggerSettlement
 
-手动触发时代结算（管理员调试用）。
+手动触发时代结算（仅调试功能开启时可用，不代表存在 admin 包或 admin 协议）。
 
 - **Payload**: `{ switchEra?: boolean; newMapId?: string; newEraName?: string }`
   - `switchEra=true` 时需提供 `newMapId` 与 `newEraName`，结算后切换到新时代
@@ -891,6 +895,10 @@ Player
 ```
 
 ---
+
+### 客户端事件消费约定
+
+`packages/client/src/game/systems/SocketEventHandler.ts` 是唯一的服务端业务事件注册入口。`server.valueChanged`、`server.playerStatusChanged`、`server.playerMoved`、`server.gameState` 等事件先更新客户端状态，再由 HUD/ViewModel 渲染；页面销毁时注销全部监听器，重连后重新注册并等待完整状态快照。
 
 ## REST API
 
