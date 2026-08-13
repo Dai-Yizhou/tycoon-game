@@ -152,7 +152,7 @@ export class BoardRenderer {
    */
   drawPlaceholder(text: string): void {
     this.clear();
-    this.ctx.fillStyle = '#58a6ff';
+    this.ctx.fillStyle = this.theme?.dom['--tycoon-line-key'] ?? this.theme?.canvas.connection ?? '#58a6ff';
     this.ctx.font = '20px sans-serif';
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
@@ -213,6 +213,10 @@ export class BoardRenderer {
    */
   getCamera(): Camera {
     return this.camera;
+  }
+
+  getCanvas(): HTMLCanvasElement {
+    return this.canvas;
   }
 
   /**

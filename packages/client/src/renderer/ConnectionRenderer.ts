@@ -25,9 +25,11 @@ export interface ConnectionRenderConfig {
 export class ConnectionRenderer {
   private ctx: CanvasRenderingContext2D;
   private config: ConnectionRenderConfig;
+  private readonly theme?: ThemeSnapshot;
 
   constructor(ctx: CanvasRenderingContext2D, config?: Partial<ConnectionRenderConfig> & { theme?: ThemeSnapshot }) {
     this.ctx = ctx;
+    this.theme = config?.theme;
     this.config = {
       lineWidth: config?.lineWidth ?? DEFAULT_CONNECTION_CONFIG.lineWidth,
       dashInterval: config?.dashInterval ?? DEFAULT_CONNECTION_CONFIG.dashInterval,
@@ -47,7 +49,7 @@ export class ConnectionRenderer {
     this.ctx.globalAlpha = opacity;
 
     // 设置虚线样式
-    this.ctx.strokeStyle = this.config.color;
+    this.ctx.strokeStyle = this.theme?.canvas.connection ?? this.config.color;
     this.ctx.lineWidth = this.config.lineWidth * cameraState.zoom;
     this.ctx.setLineDash(this.config.dashInterval.map((d) => d * cameraState.zoom));
 

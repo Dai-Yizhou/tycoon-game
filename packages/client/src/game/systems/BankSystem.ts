@@ -10,7 +10,7 @@ import {
 } from '../../state/GameStore.js';
 import { isTalentActive } from './GameLogic.js';
 import { addChatMessage } from './ChatSystem.js';
-import { updateTopBar, updateActionPanel } from './UIUpdates.js';
+import { requestHudRefresh } from '../ClientHudBridge.js';
 import { t } from '../i18n.js';
 
 export function getMaxLoanAmount(): number {
@@ -84,8 +84,7 @@ export function showBankModal(): void {
     setCurrentCredit(Math.max(0, currentCredit - 5));
     addChatMessage(t('bank.loanSuccess', { amount }), 'system');
     modal.remove();
-    updateTopBar();
-    updateActionPanel();
+    requestHudRefresh();
   });
 
   modal.querySelector('#btn-repay')!.addEventListener('click', () => {
@@ -100,8 +99,7 @@ export function showBankModal(): void {
     setCurrentCredit(Math.min(100, currentCredit + 2));
     addChatMessage(t('bank.repaySuccess', { amount, interest }), 'system');
     modal.remove();
-    updateTopBar();
-    updateActionPanel();
+    requestHudRefresh();
   });
 
   modal.querySelector('#btn-bank-close')!.addEventListener('click', () => modal.remove());

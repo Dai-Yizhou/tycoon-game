@@ -8,7 +8,7 @@ import {
   setTeamMembers, type TeamMember,
 } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
-import { updateTeamPanel } from './UIUpdates.js';
+import { requestHudRefresh } from '../ClientHudBridge.js';
 import { t } from '../i18n.js';
 
 export function initTeamSystem(): void {
@@ -31,10 +31,10 @@ export function showTeamManagement(): void {
 
 export function updateTeamState(members: TeamMember[]): void {
   setTeamMembers(members);
-  updateTeamPanel();
+  requestHudRefresh();
 }
 
 export function applyTeamMembers(members: TeamMember[]): void {
   setTeamMembers(members);
-  updateTeamPanel();
+  requestHudRefresh();
 }

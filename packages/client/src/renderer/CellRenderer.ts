@@ -119,7 +119,7 @@ export class CellRenderer {
     // 绘制时区标签（在格子下方）
     if (timezone && scaledRadius > 25) {
       this.ctx.font = `${9 * cameraState.zoom}px sans-serif`;
-      this.ctx.fillStyle = brightness < 0.7 ? '#94a3b8' : '#6366f1';
+      this.ctx.fillStyle = this.config.theme?.canvas.muted ?? '#9AA0A6';
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'top';
       this.ctx.fillText(timezone, screenX, screenY + scaledRadius + 6 * cameraState.zoom);
@@ -148,7 +148,7 @@ export class CellRenderer {
         } else {
           // emoji/文字图标
           this.ctx.font = `${iconSize * 0.85}px sans-serif`;
-          this.ctx.fillStyle = colorScheme.icon;
+          this.ctx.fillStyle = this.config.theme?.canvas.cell.text ?? colorScheme.icon;
           this.ctx.textAlign = 'center';
           this.ctx.textBaseline = 'middle';
           this.ctx.fillText(
@@ -161,7 +161,7 @@ export class CellRenderer {
         // 名称显示在图标下方
         if (name) {
           this.ctx.font = `${this.config.fontSize * cameraState.zoom}px sans-serif`;
-          this.ctx.fillStyle = colorScheme.text;
+          this.ctx.fillStyle = this.config.theme?.canvas.cell.text ?? colorScheme.text;
           this.ctx.textAlign = 'center';
           this.ctx.textBaseline = 'middle';
           const displayName = name.length > 6 ? name.slice(0, 6) + '...' : name;
@@ -171,7 +171,7 @@ export class CellRenderer {
         // 无图标：仅显示名称（居中）
         if (name) {
           this.ctx.font = `${this.config.fontSize * cameraState.zoom}px sans-serif`;
-          this.ctx.fillStyle = colorScheme.text;
+          this.ctx.fillStyle = this.config.theme?.canvas.cell.text ?? colorScheme.text;
           this.ctx.textAlign = 'center';
           this.ctx.textBaseline = 'middle';
           const displayName = name.length > 6 ? name.slice(0, 6) + '...' : name;
@@ -198,30 +198,34 @@ export class CellRenderer {
   }
 
   private renderLevelBadge(x: number, y: number, level: number, zoom: number): void {
+    const accent = this.config.theme?.canvas.accent ?? '#D95A2B';
+    const ink = this.config.theme?.canvas.cell.text ?? '#1A1A1A';
     const badgeRadius = 8 * zoom;
     this.ctx.beginPath();
     this.ctx.arc(x, y, badgeRadius, 0, Math.PI * 2);
-    this.ctx.fillStyle = '#fbbf24';
+    this.ctx.fillStyle = accent;
     this.ctx.fill();
-    this.ctx.strokeStyle = '#d97706';
+    this.ctx.strokeStyle = ink;
     this.ctx.lineWidth = 1 * zoom;
     this.ctx.stroke();
     this.ctx.closePath();
 
     this.ctx.font = `${10 * zoom}px sans-serif`;
-    this.ctx.fillStyle = '#1f2937';
+    this.ctx.fillStyle = this.config.theme?.canvas.fg ?? '#FBF8F1';
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
     this.ctx.fillText(`${level}`, x, y);
   }
 
   private renderOwnerIndicator(x: number, y: number, zoom: number): void {
+    const accent = this.config.theme?.canvas.accent ?? '#D95A2B';
+    const ink = this.config.theme?.canvas.cell.text ?? '#1A1A1A';
     const indicatorRadius = 5 * zoom;
     this.ctx.beginPath();
     this.ctx.arc(x, y, indicatorRadius, 0, Math.PI * 2);
-    this.ctx.fillStyle = '#10b981';
+    this.ctx.fillStyle = accent;
     this.ctx.fill();
-    this.ctx.strokeStyle = '#059669';
+    this.ctx.strokeStyle = ink;
     this.ctx.lineWidth = 1 * zoom;
     this.ctx.stroke();
     this.ctx.closePath();

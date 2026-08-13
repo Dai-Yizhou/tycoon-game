@@ -10,7 +10,7 @@ import {
   setAvailableTP, setTotalMoneyEarned,
 } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
-import { updateTopBar } from './UIUpdates.js';
+import { requestHudRefresh } from '../ClientHudBridge.js';
 import { savePlayerProgress } from './ConfigLoader.js';
 import { t } from '../i18n.js';
 
@@ -88,7 +88,7 @@ export function updateAchievement(id: string, value: number): void {
     setAvailableTP(availableTP + ach.tpReward);
     savePlayerProgress();
     addChatMessage(t('achievement.completed', { name: ach.name, tp: ach.tpReward }), 'system');
-    updateTopBar();
+    requestHudRefresh();
   }
 }
 
@@ -101,7 +101,7 @@ export function addAchievementProgress(id: string, delta: number): void {
     setAvailableTP(availableTP + ach.tpReward);
     savePlayerProgress();
     addChatMessage(t('achievement.completed', { name: ach.name, tp: ach.tpReward }), 'system');
-    updateTopBar();
+    requestHudRefresh();
   }
 }
 

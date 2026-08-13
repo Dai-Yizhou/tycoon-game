@@ -18,7 +18,7 @@ import {
 } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
 import { addAchievementProgress } from './AchievementSystem.js';
-import { updateActionPanel, updateTopBar, hideHoverCard } from './UIUpdates.js';
+import { requestHudRefresh } from '../ClientHudBridge.js';
 import { onPlayerArrived } from './GameLogic.js';
 import { t } from '@game/shared';
 
@@ -82,14 +82,14 @@ export function startServerPathAnimation(path: number[]): void {
   setIsServerAnimating(true);
   setIsMoving(true);
   setRemainingSteps(0);
-  hideHoverCard();
-  updateActionPanel();
+  window.dispatchEvent(new CustomEvent('game:cell-leave'));
+  requestHudRefresh();
   addAchievementProgress('first_move', 1);
   addAchievementProgress('moves_50', 1);
   addAchievementProgress('moves_200', 1);
   if (currentPlayerPosition === 0 && !talentsLocked) {
     import('../../state/GameStore.js').then(m => m.setTalentsLocked(true));
-    updateTopBar();
+    requestHudRefresh();
   }
   advanceServerPathStep();
 }

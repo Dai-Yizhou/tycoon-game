@@ -21,10 +21,7 @@ import {
   setCameraTarget, setActiveTalents, setAvailableTP,
 } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
-import {
-  updateTopBar, updateTeamPanel, updateActionPanel, updateItemsPanel,
-  // centerCameraOnCell,
-} from './UIUpdates.js';
+import { requestHudRefresh } from '../ClientHudBridge.js';
 
 // ===== 辅助函数 =====
 
@@ -136,10 +133,7 @@ export function onPlayerArrived(): void {
       addChatMessage(t('cell.arrived', { name }), 'system');
   }
 
-  updateTopBar();
-  updateTeamPanel();
-  updateActionPanel();
-  updateItemsPanel();
+  requestHudRefresh();
 }
 
 // ===== 地产购买 & 升级 =====

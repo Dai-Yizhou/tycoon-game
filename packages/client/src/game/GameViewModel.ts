@@ -13,7 +13,7 @@
 
 import type { Player } from '@game/shared';
 import type { MapIndex } from '@game/shared';
-import type { BoardRenderer } from '../board/board-renderer.js';
+import type { BoardRenderer } from '../renderer/BoardRenderer.js';
 import type { TypedClientSocket } from '../hooks/useSocket.js';
 
 // ===== 状态切片类型定义 =====

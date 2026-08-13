@@ -12,7 +12,7 @@ import {
   setIsBankrupt, setCanRoll,
 } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
-import { updateTopBar, updateTeamPanel, updateItemsPanel } from './UIUpdates.js';
+import { requestHudRefresh } from '../ClientHudBridge.js';
 import { t } from '../i18n.js';
 
 const ITEM_DEFS: Record<string, { name: string; icon: string }> = {
@@ -29,7 +29,7 @@ export function addItem(itemId: string): void {
   } else {
     items.push({ id: itemId, ...def, count: 1 });
   }
-  updateItemsPanel();
+  requestHudRefresh();
 }
 
 // Window-level useItem handler
@@ -109,8 +109,8 @@ function useSealItem(itemIndex: number, cellId: number, modal: HTMLElement): voi
   items[itemIndex].count--;
   if (items[itemIndex].count <= 0) items.splice(itemIndex, 1);
   modal.remove();
-  updateItemsPanel();
-  updateTopBar();
+  requestHudRefresh();
+  requestHudRefresh();
   if (gameSocket) {
     gameSocket.emit('client.useItem', { itemId: 'seal', targetCellId: cellId }, (result: { ok: boolean; error?: string }) => {
       if (!result.ok) addChatMessage(t('item.useSealFailed', { error: result.error ?? t('common.unknown') }), 'system');
@@ -215,9 +215,9 @@ function useReviveItem(itemIndex: number, playerId: string, modal: HTMLElement):
   items[itemIndex].count--;
   if (items[itemIndex].count <= 0) items.splice(itemIndex, 1);
   modal.remove();
-  updateItemsPanel();
-  updateTopBar();
-  updateTeamPanel();
+  requestHudRefresh();
+  requestHudRefresh();
+  requestHudRefresh();
 
   if (gameSocket) {
     gameSocket.emit('client.useItem', { itemId: 'revive', targetPlayerId: playerId }, (result: { ok: boolean; error?: string }) => {

@@ -4,7 +4,11 @@ export type DayPhase = 'day' | 'dusk' | 'night';
 export interface ThemeSnapshot {
   canvas: {
     board: { background: string };
-    cell: Record<'property' | 'event' | 'transport', { fill: string }>;
+    cell: Record<'property' | 'event' | 'transport', { fill: string }> & { text: string };
+    connection: string;
+    accent: string;
+    muted: string;
+    fg: string;
   };
   dom: Record<string, string>;
   piece: { outlineWidth: number };
@@ -59,20 +63,46 @@ export class DesignAdapter {
     const event = color('color.cell.event.fill');
     const transport = color('color.cell.transport.fill');
     const board = color('color.surface.board');
+    const ink = color('color.piece.outline');
+    const connection = color('color.line.map');
+    const accent = color('color.palette.accent');
+    const muted = color('color.hud.muted');
 
     return {
-      canvas: { board: { background: board }, cell: { property: { fill: property }, event: { fill: event }, transport: { fill: transport } } },
+      canvas: {
+        board: { background: board },
+        cell: { property: { fill: property }, event: { fill: event }, transport: { fill: transport }, text: ink },
+        connection,
+        accent,
+        muted,
+        fg: color("color.hud.fg"),
+      },
       dom: {
         '--tycoon-board-background': board,
         '--tycoon-cell-property-fill': property,
         '--tycoon-cell-event-fill': event,
         '--tycoon-cell-transport-fill': transport,
+        '--tycoon-cell-border': color('color.hud.cellBorder'),
         '--tycoon-piece-head': color('color.piece.head'),
         '--tycoon-piece-body': color('color.piece.body'),
         '--tycoon-piece-outline': color('color.piece.outline'),
         '--tycoon-line-map': color('color.line.map'),
         '--tycoon-line-current': color('color.line.current'),
         '--tycoon-line-key': color('color.line.key'),
+        '--tycoon-accent': accent,
+        '--tycoon-muted': muted,
+        // HUD 覆盖层令牌：由主题 JSON 的 color.hud 区段注入，组件只消费 CSS 变量
+        '--gp-bar-bg': color('color.hud.barBg'),
+        '--gp-sidebar-bg': color('color.hud.sidebarBg'),
+        '--gp-map-bg': color('color.hud.mapBg'),
+        '--gp-card': color('color.hud.card'),
+        '--gp-fg': color('color.hud.fg'),
+        '--gp-border': color('color.hud.cellBorder'),
+        '--gp-muted': color('color.hud.muted'),
+        '--gp-accent': accent,
+        '--gp-cell-bg': color('color.hud.cellBg'),
+        '--gp-cell-border': color('color.hud.cellBorder'),
+        '--gp-link': color('color.hud.link'),
       },
       piece: { outlineWidth: number('dimension.piece.outline') },
       line: { currentWidth: number('dimension.line.current') },

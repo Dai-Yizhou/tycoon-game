@@ -7,7 +7,7 @@
 
 import type { Cell, Player, MapIndex } from '@game/shared';
 import { getExtra } from '@game/shared';
-import type { BoardRenderer } from '../board/board-renderer.js';
+import type { BoardRenderer } from '../renderer/BoardRenderer.js';
 import type { TypedClientSocket } from '../hooks/useSocket.js';
 
 // ===== 类型定义 =====

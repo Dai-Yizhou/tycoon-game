@@ -1,4 +1,4 @@
-import { BoardRenderer } from '../src/board/board-renderer';
+import { BoardRenderer } from '../src/renderer/BoardRenderer';
 import type { ThemeSnapshot } from '../src/design/DesignAdapter';
 
 /**

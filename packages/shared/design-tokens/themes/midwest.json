@@ -1,9 +1,267 @@
 {
   "$schema": "https://design-tokens.github.io/community-group/format/",
-  "theme": { "id": { "$value": "midwest", "$type": "string" } },
-  "color": { "palette": { "surface": { "$value": "#CBB089", "$type": "color" }, "ink": { "$value": "#2F4B7A", "$type": "color" }, "border": { "$value": "#6E6A64", "$type": "color" }, "accent": { "$value": "#9E6B40", "$type": "color" }, "property": { "$value": "#2F4B7A", "$type": "color" }, "event": { "$value": "#9E6B40", "$type": "color" }, "transport": { "$value": "#6E6A64", "$type": "color" } }, "surface": { "board": { "$value": "{color.palette.surface}", "$type": "color" } }, "cell": { "property": { "fill": { "$value": "{color.palette.property}", "$type": "color" } }, "event": { "fill": { "$value": "{color.palette.event}", "$type": "color" } }, "transport": { "fill": { "$value": "{color.palette.transport}", "$type": "color" } } }, "piece": { "head": { "$value": "#F3D68A", "$type": "color" }, "body": { "$value": "#2C5F8D", "$type": "color" }, "outline": { "$value": "#1A1A1A", "$type": "color" } }, "line": { "map": { "$value": "#B0B0B0", "$type": "color" }, "current": { "$value": "#1A1A1A", "$type": "color" }, "key": { "$value": "#D95A2B", "$type": "color" } } },
-  "dimension": { "piece": { "outline": { "$value": 3, "$type": "number" } }, "line": { "map": { "$value": 2, "$type": "number" }, "current": { "$value": 3, "$type": "number" }, "key": { "$value": 4, "$type": "number" }, "node": { "$value": 8, "$type": "number" } } },
-  "texture": { "piece": { "opacity": { "$value": 0.12, "$type": "number" } } },
-  "font": { "heading": { "$value": "Noto Serif SC, Songti SC, serif", "$type": "fontFamily" }, "body": { "$value": "Noto Sans SC, PingFang SC, sans-serif", "$type": "fontFamily" }, "number": { "$value": "IBM Plex Mono, Menlo, monospace", "$type": "fontFamily" } },
-  "modes": { "dusk": { "color": { "surface": { "board": { "$value": "#C89B64", "$type": "color" } }, "line": { "map": { "$value": "#9A8474", "$type": "color" }, "current": { "$value": "#3B2B25", "$type": "color" }, "key": { "$value": "#B56A3A", "$type": "color" } }, "piece": { "head": { "$value": "#C89B64", "$type": "color" }, "body": { "$value": "#294D70", "$type": "color" } } }, "texture": { "piece": { "opacity": { "$value": 0.16, "$type": "number" } } } }, "night": { "color": { "surface": { "board": { "$value": "#2F4B7A", "$type": "color" } }, "line": { "map": { "$value": "#53687A", "$type": "color" }, "current": { "$value": "#D7E3EA", "$type": "color" }, "key": { "$value": "#E8B83A", "$type": "color" } }, "piece": { "head": { "$value": "#5B6770", "$type": "color" }, "body": { "$value": "#18354E", "$type": "color" } } }, "texture": { "piece": { "opacity": { "$value": 0.1, "$type": "number" } } } } }
+  "theme": {
+    "id": {
+      "$value": "midwest",
+      "$type": "string"
+    }
+  },
+  "color": {
+    "palette": {
+      "surface": {
+        "$value": "#CBB089",
+        "$type": "color"
+      },
+      "ink": {
+        "$value": "#2F4B7A",
+        "$type": "color"
+      },
+      "border": {
+        "$value": "#6E6A64",
+        "$type": "color"
+      },
+      "accent": {
+        "$value": "#9E6B40",
+        "$type": "color"
+      },
+      "property": {
+        "$value": "#2F4B7A",
+        "$type": "color"
+      },
+      "event": {
+        "$value": "#9E6B40",
+        "$type": "color"
+      },
+      "transport": {
+        "$value": "#6E6A64",
+        "$type": "color"
+      }
+    },
+    "surface": {
+      "board": {
+        "$value": "{color.palette.surface}",
+        "$type": "color"
+      }
+    },
+    "cell": {
+      "property": {
+        "fill": {
+          "$value": "{color.palette.property}",
+          "$type": "color"
+        }
+      },
+      "event": {
+        "fill": {
+          "$value": "{color.palette.event}",
+          "$type": "color"
+        }
+      },
+      "transport": {
+        "fill": {
+          "$value": "{color.palette.transport}",
+          "$type": "color"
+        }
+      }
+    },
+    "piece": {
+      "head": {
+        "$value": "#F3D68A",
+        "$type": "color"
+      },
+      "body": {
+        "$value": "#2C5F8D",
+        "$type": "color"
+      },
+      "outline": {
+        "$value": "#1A1A1A",
+        "$type": "color"
+      }
+    },
+    "line": {
+      "map": {
+        "$value": "#B0B0B0",
+        "$type": "color"
+      },
+      "current": {
+        "$value": "#1A1A1A",
+        "$type": "color"
+      },
+      "key": {
+        "$value": "#D95A2B",
+        "$type": "color"
+      }
+    },
+    "hud": {
+      "barBg": {
+        "$value": "#2A241C",
+        "$type": "color"
+      },
+      "sidebarBg": {
+        "$value": "#3A3228",
+        "$type": "color"
+      },
+      "mapBg": {
+        "$value": "#CBB089",
+        "$type": "color"
+      },
+      "card": {
+        "$value": "#6E6A64",
+        "$type": "color"
+      },
+      "fg": {
+        "$value": "#D9C4A0",
+        "$type": "color"
+      },
+      "muted": {
+        "$value": "#5A5246",
+        "$type": "color"
+      },
+      "cellBg": {
+        "$value": "#D9C4A0",
+        "$type": "color"
+      },
+      "cellBorder": {
+        "$value": "{color.palette.border}",
+        "$type": "color"
+      },
+      "link": {
+        "$value": "#6E6A64",
+        "$type": "color"
+      }
+    }
+  },
+  "dimension": {
+    "piece": {
+      "outline": {
+        "$value": 3,
+        "$type": "number"
+      }
+    },
+    "line": {
+      "map": {
+        "$value": 2,
+        "$type": "number"
+      },
+      "current": {
+        "$value": 3,
+        "$type": "number"
+      },
+      "key": {
+        "$value": 4,
+        "$type": "number"
+      },
+      "node": {
+        "$value": 8,
+        "$type": "number"
+      }
+    }
+  },
+  "texture": {
+    "piece": {
+      "opacity": {
+        "$value": 0.12,
+        "$type": "number"
+      }
+    }
+  },
+  "font": {
+    "heading": {
+      "$value": "Noto Serif SC, Songti SC, serif",
+      "$type": "fontFamily"
+    },
+    "body": {
+      "$value": "Noto Sans SC, PingFang SC, sans-serif",
+      "$type": "fontFamily"
+    },
+    "number": {
+      "$value": "IBM Plex Mono, Menlo, monospace",
+      "$type": "fontFamily"
+    }
+  },
+  "modes": {
+    "dusk": {
+      "color": {
+        "surface": {
+          "board": {
+            "$value": "#C89B64",
+            "$type": "color"
+          }
+        },
+        "line": {
+          "map": {
+            "$value": "#9A8474",
+            "$type": "color"
+          },
+          "current": {
+            "$value": "#3B2B25",
+            "$type": "color"
+          },
+          "key": {
+            "$value": "#B56A3A",
+            "$type": "color"
+          }
+        },
+        "piece": {
+          "head": {
+            "$value": "#C89B64",
+            "$type": "color"
+          },
+          "body": {
+            "$value": "#294D70",
+            "$type": "color"
+          }
+        }
+      },
+      "texture": {
+        "piece": {
+          "opacity": {
+            "$value": 0.16,
+            "$type": "number"
+          }
+        }
+      }
+    },
+    "night": {
+      "color": {
+        "surface": {
+          "board": {
+            "$value": "#2F4B7A",
+            "$type": "color"
+          }
+        },
+        "line": {
+          "map": {
+            "$value": "#53687A",
+            "$type": "color"
+          },
+          "current": {
+            "$value": "#D7E3EA",
+            "$type": "color"
+          },
+          "key": {
+            "$value": "#E8B83A",
+            "$type": "color"
+          }
+        },
+        "piece": {
+          "head": {
+            "$value": "#5B6770",
+            "$type": "color"
+          },
+          "body": {
+            "$value": "#18354E",
+            "$type": "color"
+          }
+        }
+      },
+      "texture": {
+        "piece": {
+          "opacity": {
+            "$value": 0.1,
+            "$type": "number"
+          }
+        }
+      }
+    }
+  }
 }

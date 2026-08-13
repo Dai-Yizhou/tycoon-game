@@ -5,57 +5,206 @@ export interface GameHudShellConfig {
   onRoll?: () => void;
   onBank?: () => void;
   onChatSend?: (message: string, channel: string) => void;
+  onCellHover?: (cell: any, x: number, y: number) => void;
+  onCellLeave?: () => void;
 }
 
+/**
+ * 全屏地图 HUD 覆盖层。
+ *
+ * 布局参考 game-page-hud-compact-chat.html：
+ * - gp-topbar：顶部渐变透明状态栏（玩家信息 + 数值 + 昼夜）
+ * - cell-hover-card：当前格悬浮详情卡
+ * - hud-chat-dock：左下角可收起聊天/通知
+ * - gp-actionbar：底部渐变透明行动栏（掷骰 + 动作 + 道具）
+ * - event-toast：顶部居中事件提示（默认隐藏）
+ * - map-overlay：地图角落区域标签
+ *
+ * 低耦合：仅消费 GameViewModel 和回调，不直接访问 Store / Socket / Canvas。
+ * 主题令牌通过页面根节点 CSS 变量（--gp-*）注入，组件不读取主题 JSON。
+ */
 export class GameHudShell {
-  private readonly root: HTMLElement;
-  private readonly unsubscribers: Array<() => void> = [];
+  private readonly root = document.createElement("div");
   private readonly input: HTMLInputElement;
   private readonly channel: HTMLSelectElement;
+  private readonly unsubscribers: Array<() => void> = [];
   private destroyed = false;
 
-  constructor(private readonly vm: GameViewModel, private readonly effects: GameEffectHooks, private readonly config: GameHudShellConfig = {}) {
-    this.root = document.createElement("div");
+  constructor(
+    private readonly vm: GameViewModel,
+    private readonly effects: GameEffectHooks,
+    private readonly config: GameHudShellConfig = {},
+  ) {
     this.root.className = "game-hud-shell";
     this.root.dataset.ui = "game-hud-shell";
-    this.root.append(this.buildTopBar(), this.buildTeamPanel(), this.buildChatPanel(), this.buildItemsPanel(), this.buildActionPanel(), this.buildHoverCard());
-    this.input = this.root.querySelector('[data-ui="chat-input"]') as HTMLInputElement;
-    this.channel = this.root.querySelector('[data-ui="chat-channel"]') as HTMLSelectElement;
+    this.root.innerHTML = `
+      <div class="gp-layout" data-ui="hud-layout">
+        <header class="gp-topbar" data-ui="top-bar">
+          <div class="player-badge" data-ui="player-badge">
+            <div class="player-badge__avatar"></div>
+            <div>
+              <div class="player-badge__name" data-ui="player-name">玩家</div>
+              <div class="player-badge__team" data-ui="player-team">独行</div>
+            </div>
+          </div>
+          <div class="value-pills" data-ui="resource-strip">
+            <div class="value-pill"><span class="value-pill__label">金钱</span><span class="value-pill__num" data-ui="money">0</span></div>
+            <div class="value-pill value-pill--accent"><span class="value-pill__label">信用</span><span class="value-pill__num" data-ui="credit">0</span></div>
+            <div class="value-pill"><span class="value-pill__label">环保</span><span class="value-pill__num" data-ui="env">0</span></div>
+          </div>
+          <div class="topbar-spacer"></div>
+          <div class="cycle-indicator" data-ui="day-night">
+            <div class="cycle-dot" data-ui="cycle-dot"></div>
+            <span class="cycle-text" data-ui="day-time">--:--</span>
+          </div>
+        </header>
+
+        <div class="map-overlay map-overlay--zone" data-ui="zone-tag">--</div>
+        <div class="map-overlay map-overlay--prosperity" data-ui="prosperity-tag">--</div>
+
+        <div class="event-toast" data-ui="event-toast" style="display:none">
+          <span class="event-toast__title"></span>
+        </div>
+
+        <div class="cell-hover-card" data-ui="hover-card">
+          <div class="cell-hover-card__type">等待</div>
+          <div class="cell-hover-card__title">悬停格子查看信息</div>
+          <div class="cell-hover-card__rows"></div>
+        </div>
+
+        <div class="hud-chat-dock" data-ui="chat-panel">
+          <div class="hud-chat-dock__head">
+            <span>聊天 / 通知</span>
+            <span class="hud-chat-dock__tabs"><b data-ui="sys-count">系统 0</b> 队伍 区域</span>
+          </div>
+          <div class="hud-chat-msgs" data-ui="chat-messages"></div>
+          <div class="hud-chat-dock__input">
+            <select data-ui="chat-channel"><option value="team">队伍</option><option value="region">区域</option></select>
+            <input data-ui="chat-input" maxlength="200" placeholder="发送消息…" />
+            <button data-action="chat-send">发送</button>
+          </div>
+        </div>
+
+        <footer class="gp-actionbar" data-ui="action-dock">
+          <div class="dice-zone">
+            <button class="dice-btn" data-action="roll">掷骰</button>
+            <span class="dice-status" data-ui="dice-status">就绪</span>
+          </div>
+          <div class="action-cluster">
+            <button class="act-btn" data-action="bank">银行</button>
+          </div>
+          <div class="actionbar-spacer"></div>
+          <div class="item-tray" data-ui="items-panel"></div>
+        </footer>
+      </div>`;
+
+    this.input = this.root.querySelector("[data-ui=chat-input]") as HTMLInputElement;
+    this.channel = this.root.querySelector("[data-ui=chat-channel]") as HTMLSelectElement;
+
+    // Event wiring
     this.root.querySelector('[data-action="chat-send"]')?.addEventListener("click", () => this.sendChat());
-    this.input.addEventListener("keydown", (event) => { if (event.key === "Enter") this.sendChat(); });
-    this.unsubscribers.push(this.vm.subscribe("player", () => this.update()), this.vm.subscribe("movement", () => this.update()), this.vm.subscribe("team", () => this.update()), this.vm.subscribe("items", () => this.update()), this.vm.subscribe("chat", () => this.update()));
+    this.input.addEventListener("keydown", (e) => { if (e.key === "Enter") this.sendChat(); });
+    this.root.querySelector('[data-action="roll"]')?.addEventListener("click", () => this.config.onRoll?.());
+    this.root.querySelector('[data-action="bank"]')?.addEventListener("click", () => this.config.onBank?.());
+
+    // Subscriptions
+    this.unsubscribers.push(
+      this.vm.subscribe("player", () => this.update()),
+      this.vm.subscribe("movement", () => this.update()),
+      this.vm.subscribe("team", () => this.update()),
+      this.vm.subscribe("items", () => this.update()),
+      this.vm.subscribe("dayNight", () => this.update()),
+      this.vm.subscribe("chat", () => this.update()),
+    );
     this.update();
   }
 
   getElement(): HTMLElement { return this.root; }
+
+  showCellHover(cell: any, x: number, y: number): void {
+    const card = this.root.querySelector("[data-ui=hover-card]") as HTMLElement;
+    card.innerHTML = `<div class="cell-hover-card__type">${String(cell.type).toUpperCase()} · 当前格</div><div class="cell-hover-card__title">${this.escapeHtml(String(cell.name))}</div><div class="cell-hover-card__rows"><span>价格</span><b>${cell.price ? `$${cell.price}` : "—"}</b><span>等级</span><b>Lv.${cell.level ?? 0}</b><span>归属</span><b>${cell.owners?.length ? "已归属" : "无主"}</b></div>`;
+    card.style.display="block"; card.style.left=`${Math.min(x+18,window.innerWidth-240)}px`; card.style.top=`${Math.max(76,y-12)}px`;
+  }
+  hideCellHover(): void { (this.root.querySelector("[data-ui=hover-card]") as HTMLElement).style.display="none"; }
 
   update(): void {
     if (this.destroyed) return;
     const player = this.vm.getPlayer();
     const movement = this.vm.getMovement();
     const team = this.vm.getTeam();
-    const top = this.root.querySelector('[data-ui="top-bar"]');
-    if (top) top.querySelector('[data-ui="player-name"]')!.textContent = player.currentPlayerName || "玩家";
+    const items = this.vm.getItems();
+    const chat = this.vm.getChat();
+
+    // Player badge
+    const nameEl = this.root.querySelector("[data-ui=player-name]")!;
+    nameEl.textContent = player.currentPlayerName || "玩家";
+    const teamEl = this.root.querySelector("[data-ui=player-team]")!;
+    teamEl.textContent = team.members.length > 1 ? `队伍 ${team.members.length}人` : "独行";
+
+    // Value pills
     for (const [key, value] of [["money", player.currentMoney], ["credit", player.currentCredit], ["env", player.currentEnv]] as const) {
-      const el = this.root.querySelector(`[data-ui="${key}"]`); if (el) el.textContent = String(Math.round(value));
+      this.root.querySelector(`[data-ui=${key}]`)!.textContent = String(Math.round(value));
     }
-    const teamList = this.root.querySelector('[data-ui="team-list"]');
-    if (teamList) teamList.textContent = team.members.length ? team.members.map(member => member.username).join("、") : "暂无队员";
-    const roll = this.root.querySelector('[data-action="roll"]') as HTMLButtonElement | null;
-    if (roll) roll.disabled = !movement.canRoll || movement.isMoving || player.isBankrupt;
-    const items = this.root.querySelector('[data-ui="items-list"]');
-    if (items) items.textContent = this.vm.getItems().items.length ? this.vm.getItems().items.map(item => `${item.name} ×${item.count}`).join("、") : "暂无道具";
+
+    // Day/Night cycle
+    const day = this.vm.getLocalDayNight(this.vm.getPlayerTimezone());
+    const timeEl = this.root.querySelector("[data-ui=day-time]")!;
+    timeEl.textContent = `${day.isDay ? "昼" : "夜"} ${day.timeStr}`;
+    const dotEl = this.root.querySelector("[data-ui=cycle-dot]")!;
+    dotEl.className = `cycle-dot ${day.isDay ? "cycle-dot--day" : "cycle-dot--night"}`;
+
+    // Dice button
+    const rollBtn = this.root.querySelector('[data-action="roll"]') as HTMLButtonElement;
+    const canRoll = movement.canRoll && !movement.isMoving && !player.isBankrupt;
+    rollBtn.disabled = !canRoll;
+    const statusEl = this.root.querySelector("[data-ui=dice-status]")!;
+    statusEl.textContent = movement.isMoving ? "移动中" : canRoll ? "就绪" : "冷却中";
+
+    // Items tray
+    const trayEl = this.root.querySelector("[data-ui=items-panel]")!;
+    if (items.items.length > 0) {
+      trayEl.innerHTML = items.items.map(i =>
+        `<div class="item-slot item-slot--has" title="${i.name}">${i.name.slice(0, 2)}<span class="item-slot__count">${i.count}</span></div>`
+      ).join("");
+    } else {
+      trayEl.innerHTML = `<div class="item-slot" title="无道具">--</div>`;
+    }
+
+    // Chat messages (last 10)
+    const msgsEl = this.root.querySelector("[data-ui=chat-messages]")!;
+    const recent = chat.history.slice(-10);
+    if (recent.length > 0) {
+      msgsEl.innerHTML = recent.map(m => {
+        const chanLabel = m.channel === "system" ? "系统" : m.channel === "team" ? "队伍" : "区域";
+        return `<div class="hud-chat-msg"><b>${chanLabel}</b><span>${this.escapeHtml(m.text)}</span></div>`;
+      }).join("");
+    } else {
+      msgsEl.innerHTML = `<div class="hud-chat-msg"><span>暂无消息</span></div>`;
+    }
+
+    // System unread count
+    const sysCount = chat.history.filter(m => m.channel === "system").length;
+    this.root.querySelector("[data-ui=sys-count]")!.textContent = `系统 ${sysCount}`;
   }
 
-  destroy(): void { this.destroyed = true; this.unsubscribers.forEach(unsubscribe => unsubscribe()); this.effects.onNotifyDismiss("game-hud-shell"); this.root.remove(); }
+  destroy(): void {
+    this.destroyed = true;
+    this.unsubscribers.forEach(fn => fn());
+    this.effects.onNotifyDismiss("game-hud-shell");
+    this.root.remove();
+  }
 
-  private sendChat(): void { const message = this.input.value.trim(); if (!message) return; this.config.onChatSend?.(message, this.channel.value); this.input.value = ""; }
-  private section(ui: string, className: string): HTMLElement { const el = document.createElement("section"); el.dataset.ui = ui; el.className = className; return el; }
-  private button(action: string, label: string, onClick?: () => void): HTMLButtonElement { const btn = document.createElement("button"); btn.type = "button"; btn.dataset.action = action; btn.textContent = label; onClick && btn.addEventListener("click", onClick); return btn; }
-  private buildTopBar(): HTMLElement { const el = this.section("top-bar", "hud-top-bar"); el.innerHTML = '<span class="hud-brand">城市经营</span><strong data-ui="player-name">玩家</strong><span>金钱 <b data-ui="money">0</b></span><span>信用 <b data-ui="credit">0</b></span><span>环保 <b data-ui="env">0</b></span>'; return el; }
-  private buildTeamPanel(): HTMLElement { const el = this.section("team-panel", "hud-team-panel"); el.innerHTML = '<header>队伍</header><div data-ui="team-list">暂无队员</div><div class="hud-row"></div>'; const row = el.querySelector(".hud-row")!; row.append(this.button("team-invite", "邀请", () => window.showTeamInvite?.()), this.button("team-manage", "管理", () => window.showTeamManagement?.())); return el; }
-  private buildChatPanel(): HTMLElement { const el = this.section("chat-panel", "hud-chat-panel"); el.innerHTML = '<header>聊天</header><div data-ui="chat-messages" class="hud-chat-messages"></div><div class="hud-chat-compose"><select data-ui="chat-channel"><option value="team">队伍</option><option value="region">区域</option></select><input data-ui="chat-input" maxlength="200" placeholder="输入消息"><button data-action="chat-send" type="button">发送</button></div>'; return el; }
-  private buildItemsPanel(): HTMLElement { const el = this.section("items-panel", "hud-items-panel"); el.innerHTML = '<header>道具</header><div data-ui="items-list">暂无道具</div>'; return el; }
-  private buildActionPanel(): HTMLElement { const el = this.section("action-panel", "hud-action-panel"); el.append(this.button("roll", "掷骰移动", this.config.onRoll), this.button("bank", "银行", this.config.onBank)); return el; }
-  private buildHoverCard(): HTMLElement { const el = this.section("hover-card", "hud-hover-card"); el.textContent = "悬停格子查看信息"; return el; }
+  private sendChat(): void {
+    const message = this.input.value.trim();
+    if (!message) return;
+    this.config.onChatSend?.(message, this.channel.value);
+    this.input.value = "";
+  }
+
+  private escapeHtml(s: string): string {
+    const div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
 }

@@ -11,7 +11,7 @@ import {
 } from '../../state/GameStore.js';
 import { t } from '@game/shared';
 import { addChatMessage } from './ChatSystem.js';
-import { updateTopBar } from './UIUpdates.js';
+import { requestHudRefresh } from '../ClientHudBridge.js';
 import { savePlayerProgress } from './ConfigLoader.js';
 
 export function checkTalentSelection(): void {
@@ -108,7 +108,7 @@ export function showTalentsModal(force = false): void {
         savePlayerProgress();
         addChatMessage(t('talent.activateSuccess', { name: talent.name, cost: talent.cost }), 'system');
         modal.remove();
-        updateTopBar();
+        requestHudRefresh();
         showTalentsModal(force);
       });
     });

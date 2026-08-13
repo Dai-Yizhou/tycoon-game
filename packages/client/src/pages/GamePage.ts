@@ -42,7 +42,7 @@ declare global {
 import type { GameController } from '../game/GameController.js';
 import type { MapData, Player } from '@game/shared';
 import { MapIndex, t } from '@game/shared';
-import { BoardRenderer } from '../board/board-renderer.js';
+import { BoardRenderer } from '../renderer/BoardRenderer.js';
 import { createNotificationCenter, type NotificationCenter } from '../components/NotificationCenter.js';
 import { GameHudShell } from '../components/GameHudShell.js';
 import { InteractiveMapSurface } from '../components/InteractiveMapSurface.js';
@@ -104,11 +104,8 @@ import {
   addChatMessage,
 } from '../game/systems/ChatSystem.js';
 
-import {
-  startRenderLoop,
-  updateTopBar, updateTeamPanel, updateActionPanel, updateItemsPanel,
-  centerCameraOnCell, handleMouseMove, handleClick, handleMouseLeave, handleResize,
-} from '../game/systems/UIUpdates.js';
+import { startRenderLoop, centerCameraOnCell, handleMouseMove, handleClick, handleMouseLeave, handleResize } from '../game/ClientRenderLoop.js';
+import { registerHudRefresh } from '../game/ClientHudBridge.js';
 
 import {
   handleRollDice,
@@ -124,6 +121,7 @@ import { getThemeTokens } from '../design/ThemeConfig.js';
 let notificationCenter: NotificationCenter | null = null;
 let gameViewModel: GameViewModel | null = null;
 let gameHudShell: GameHudShell | null = null;
+let unregisterHudRefresh: (() => void) | null = null;
 
 // ===== 入口函数 =====
 
@@ -173,6 +171,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   });
   page.appendChild(gameHudShell.getElement());
   syncViewModel();
+  unregisterHudRefresh = registerHudRefresh(() => { syncViewModel(); gameHudShell?.update(); });
 
   // Init: load configs first, then player progress, then game
   const playerName = context.playerName || t('game.defaultPlayerName');
@@ -220,10 +219,8 @@ export function createGamePage(controller: GameController): HTMLElement {
       }
       centerCameraOnCell(0);
       startRenderLoop();
-      updateTopBar();
-      updateTeamPanel();
-      updateActionPanel();
-      updateItemsPanel();
+      syncViewModel();
+      gameHudShell?.update();
       addChatMessage(t('game.welcomeMessage'), 'system');
       checkTalentSelection();
       startTutorial();
@@ -271,9 +268,15 @@ export function createGamePage(controller: GameController): HTMLElement {
   // Canvas events - no drag/zoom, only hover and click
   interactiveMap.getElement().addEventListener('map:hover', (event) => {
     const detail = (event as CustomEvent).detail;
-    if (detail?.cell && gameHudShell) { gameHudShell.showCellHover(detail.cell, detail.clientX, detail.clientY); }
+    if (detail?.cell && gameHudShell) gameHudShell.showCellHover(detail.cell, detail.clientX, detail.clientY);
   });
   interactiveMap.getElement().addEventListener('map:leave', () => gameHudShell?.hideCellHover());
+  window.addEventListener('game:cell-hover', (event) => {
+    const detail = (event as CustomEvent).detail;
+    if (detail?.cell && gameHudShell) gameHudShell.showCellHover(detail.cell, detail.clientX, detail.clientY);
+    else gameHudShell?.hideCellHover();
+  });
+  window.addEventListener('game:cell-leave', () => gameHudShell?.hideCellHover());
   canvas.addEventListener('mousemove', handleMouseMove);
   canvas.addEventListener('click', handleClick);
   canvas.addEventListener('mouseleave', handleMouseLeave);
@@ -428,7 +431,8 @@ function initTeam(): void {
         if (result.data.team && currentPlayer) {
           currentPlayer.teamId = result.data.team.id;
         }
-        updateTeamPanel();
+        syncViewModel();
+        gameHudShell?.update();
       }
     });
   }
@@ -584,6 +588,8 @@ function syncViewModel(): void {
 // ===== Tutorial System =====
 
 export function cleanupGamePage(page: HTMLElement): void {
+  unregisterHudRefresh?.();
+  unregisterHudRefresh = null;
   gameHudShell?.destroy();
   gameHudShell = null;
   gameViewModel = null;

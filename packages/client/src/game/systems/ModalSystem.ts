@@ -14,7 +14,7 @@ import {
 } from '../../state/GameStore.js';
 import { isTalentActive, getMaxLoanAmount } from './GameLogic.js';
 import { addChatMessage } from './ChatSystem.js';
-import { updateTopBar, updateActionPanel } from './UIUpdates.js';
+import { requestHudRefresh } from '../ClientHudBridge.js';
 import { t } from '../i18n.js';
 
 export function showTransportModal(fromCell: Cell, cost: number, destinations: Cell[]): void {
@@ -137,8 +137,8 @@ export function showBankModal(): void {
         if (result.ok) {
           addChatMessage(t('bank.loanSuccess', { amount }), 'system');
           modal.remove();
-          updateTopBar();
-          updateActionPanel();
+          requestHudRefresh();
+          requestHudRefresh();
         } else {
           addChatMessage(result.error || t('common.unknownError'), 'error');
         }
@@ -159,8 +159,8 @@ export function showBankModal(): void {
         if (result.ok) {
           addChatMessage(t('bank.repaySuccess', { amount, interest }), 'system');
           modal.remove();
-          updateTopBar();
-          updateActionPanel();
+          requestHudRefresh();
+          requestHudRefresh();
         } else {
           addChatMessage(result.error || t('common.unknownError'), 'error');
         }

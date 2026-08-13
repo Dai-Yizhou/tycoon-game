@@ -56,8 +56,8 @@
     "canvasContextError": "Cannot acquire Canvas 2D context"
   },
   "game": {
-    "title": "Monopoly.io",
-    "subtitle": "Classic board game, new multiplayer experience",
+    "title": "rentfree.io",
+    "subtitle": "(???)",
     "startButton": "Start Game",
     "loginButton": "Login",
     "guestButton": "Guest Mode",

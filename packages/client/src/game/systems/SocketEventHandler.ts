@@ -35,7 +35,8 @@ import type { OtherPlayerInfo } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
 import { startServerPathAnimation, showIntersectionChoice } from './MovementSystem.js';
 import { addEarnedMoney } from './AchievementSystem.js';
-import { updateTopBar, updateTeamPanel, updateActionPanel, updateRendererPlayers, updateBoardTheme, updateTopBarTime } from './UIUpdates.js';
+import { requestHudRefresh } from '../ClientHudBridge.js';
+import { updateRendererPlayers, updateBoardTheme, updateTopBarTime } from '../ClientRenderLoop.js';
 import { getPlayerTimezone, getLocalDayNight } from './MapLoader.js';
 import { applyTeamMembers } from './TeamSystem.js';
 import { checkBankruptcy } from './GameLogic.js';
@@ -202,8 +203,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       if (isCurrentPlayer) {
         checkBankruptcy();
         // 金钱变化后刷新操作面板（按钮依赖金钱判断可用性）
-        updateActionPanel();
-        updateTopBar();
+        requestHudRefresh();
       }
     } else if (payload.fieldId === 'credit') {
       if (isCurrentPlayer) {
@@ -219,7 +219,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     }
     // 数值变更后刷新顶部面板
     if (isCurrentPlayer) {
-      updateTopBar();
+      requestHudRefresh();
     }
   });
 
@@ -261,7 +261,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
         rollBtn.style.background = '';
       }
       addChatMessage(t('jail.released'), 'system');
-      updateActionPanel();
+      requestHudRefresh();
     } else {
       const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {
@@ -356,7 +356,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       if (payload.members) {
         applyTeamMembers(payload.members);
       }
-      updateTeamPanel();
+      requestHudRefresh();
     }
   });
 
@@ -367,7 +367,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       currentPlayer.teamId = null;
     }
     addChatMessage(t('team.teamDisbanded'), 'system');
-    updateTeamPanel();
+    requestHudRefresh();
   });
 
   // 监听服务端繁荣度变化

@@ -56,8 +56,8 @@
     "canvasContextError": "无法获取 Canvas 2D 上下文"
   },
   "game": {
-    "title": "大富翁.io",
-    "subtitle": "经典棋盘游戏，全新多人体验",
+    "title": "rentfree.io",
+    "subtitle": "（还没想好的副标题）",
     "startButton": "开始游戏",
     "loginButton": "登录",
     "guestButton": "游客模式",
