@@ -111,7 +111,7 @@ export interface EraManagerOptions {
  * - 新棋盘加载与玩家迁移
  *
  * 构造函数接受可选的 GameWorld / TypedServer 依赖：
- * - 提供 GameWorld 时，结算从真实玩家数据计算；否则按空玩家列表结算（兼容旧测试）。
+ * - 提供 GameWorld 时，结算从真实玩家数据计算；否则按空玩家列表结算。
  * - 提供 TypedServer 时，广播 `server.eraEndingSoon` / 结算通知等事件。
  *   `server.eraChanged` 由 GameWorld.setEra 触发，经 SocketManager 自动转发。
  */

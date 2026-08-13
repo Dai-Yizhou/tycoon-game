@@ -128,9 +128,8 @@ export class HandlerRegistry {
     // 初始化道具系统
     this.itemRegistry = new ItemRegistry();
     this.itemRegistry.registerBatch(BUILTIN_ITEM_TEMPLATES);
-    // 注意：itemEffectsHandler 需要 Bank 实例，在 app.ts 中初始化
-    this.itemEffectsHandler = null as any; // 占位，将在 app.ts 中设置
-    this.itemHandler = null as any; // 占位，将在 app.ts 中设置
+    this.itemEffectsHandler = null as any;
+    this.itemHandler = null as any;
     // 初始化调试处理器
     this.debugHandler = new DebugHandler(io, world);
     // 初始化组队系统（TeamManager 为纯数据层，TeamHandler 负责协议与 I/O）
@@ -346,15 +345,7 @@ export class HandlerRegistry {
   }
 
   /**
-   * 处理到达格子后的事件（Task 10 + Task 11 + Task 13）
-   *
-   * 包括：
-   * - 起点格：发放补充资金
-   * - 监狱格：进入监狱
-   * - 地产格：租金支付（已有 PropertyHandler）
-   * - 事件格：随机触发事件（Task 11）
-   * - 交通枢纽：付费传送（Task 13）
-   * - 纪念碑：修缮（Task 13）
+   * 处理到达格子后的事件。
    */
   handleCellEvent(playerId: string, cellId: number, socket: TypedSocket): void {
     // 处理起点格（经过起点发放补充资金）
@@ -406,7 +397,7 @@ export class HandlerRegistry {
   }
 
   /**
-   * 处理游戏开始时的启动资金发放（Task 10）
+   * 处理游戏开始时的启动资金发放。
    */
   handleGameStart(playerId: string): void {
     this.startHandler.handleGameStart(playerId);

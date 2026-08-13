@@ -159,7 +159,7 @@ export class EventHandler {
             `玩家 ${playerId} 触发 behavior ${behaviorId}: ${behaviorResult.event.msg}`,
           );
 
-          // 构造兼容的返回结果（event 字段使用内置占位事件）
+          // 构造事件结果，保留事件处理器的统一返回结构
           return {
             event: {
               id: `behavior-${behaviorId}`,

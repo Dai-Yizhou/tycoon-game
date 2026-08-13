@@ -90,8 +90,8 @@ node dist/index.js
 ```
 
 入口 `src/index.ts` 的 `bootstrap()` 执行：
-1. `loadConfig()` 从环境变量加载配置
-2. `createApp(config)` 创建应用（Express + Socket.IO + 全部管理器）
+1. `loadConfig()` 从环境变量加载配置（`src/config.ts`）
+2. `createApp(config)` 创建应用（`src/app.ts`，包含 Express、Socket.IO 与全部管理器）
 3. `startHttpServer()` 监听端口
 4. 注册 SIGINT/SIGTERM 优雅关闭
 

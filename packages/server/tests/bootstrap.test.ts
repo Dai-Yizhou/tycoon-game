@@ -7,7 +7,6 @@
  * 3. SIGINT 触发关闭（通过关闭流程模拟）
  */
 
-import { createServer } from 'node:http';
 import { DEFAULT_SERVER_CONFIG, type ServerConfig } from '@game/shared';
 import { createApp, gracefulShutdown, startHttpServer } from '../src/app';
 import { GameWorld } from '../src/world/GameWorld';
@@ -23,9 +22,7 @@ describe('app lifecycle', () => {
   describe('startHttpServer', () => {
     it('listens on the configured port and returns the bound port', async () => {
       const config: ServerConfig = { ...baseConfig, port: 0 };
-      const { app } = createApp(config);
-      // 直接用 supertest 风格的启动：取 httpServer 后启动
-      const httpServer = createServer(app);
+      const { httpServer } = createApp(config);
       const { port } = await startHttpServer(httpServer, config);
       expect(port).toBeGreaterThan(0);
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));

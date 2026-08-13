@@ -234,7 +234,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     });
   }
 
-  // 初始化经济系统（Task 14）
+  // 初始化经济系统
   const bank = new Bank(world);
   const mortgage = new Mortgage(io, world);
   const taxation = new Taxation(io, world, bank);
@@ -249,7 +249,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   // 注册业务事件处理器（需要在经济系统初始化后）
   const handlerRegistry = registerHandlers(io, world);
 
-  // 初始化道具系统（Task 15）
+  // 初始化道具系统
   handlerRegistry.setBank(bank);
   handlerRegistry.setBankruptcy(bankruptcy);
   handlerRegistry.setItemHandler(bank);
@@ -513,51 +513,6 @@ export async function gracefulShutdown(
       resolve();
     });
   });
-}
-
-// -----------------------------------------------------------------------------
-// 兼容旧 API：保留旧函数签名（向后兼容现有测试）
-// -----------------------------------------------------------------------------
-
-/**
- * 旧版 `createServer` 函数（兼容现有测试）
- *
- * @deprecated 推荐使用 `createApp` + `startHttpServer`
- */
-export function createServer(
-  app: Application,
-  config: { corsOrigin: string },
-): { httpServer: http.Server; io: SocketIOServer } {
-  const httpServer = http.createServer(app);
-  const io = new SocketIOServer(httpServer, {
-    cors: { origin: config.corsOrigin },
-    pingTimeout: 30_000,
-    pingInterval: 25_000,
-    transports: ['websocket', 'polling'],
-    maxHttpBufferSize: 1e6,
-  });
-
-  io.on('connection', (socket) => {
-    logger.info(`legacy socket connected: ${socket.id}`);
-    socket.emit('welcome', {
-      socketId: socket.id,
-      serverTime: new Date().toISOString(),
-    });
-  });
-
-  return { httpServer, io };
-}
-
-/**
- * 旧版 `loadConfig`（兼容现有测试）
- *
- * @deprecated 推荐使用 `./config.js` 的 `loadConfig`
- */
-export function loadConfig(): ServerConfig {
-  // 重新实现以保持向后兼容（延迟加载避免循环引用）
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { loadConfig: loadConfigImpl } = require('./config.js') as typeof import('./config.js');
-  return loadConfigImpl();
 }
 
 /**

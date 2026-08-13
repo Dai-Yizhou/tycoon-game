@@ -1,5 +1,6 @@
 import request from 'supertest';
-import { createApp, loadConfig } from '../src/app';
+import { createApp } from '../src/app';
+import { loadConfig } from '../src/config';
 
 describe('server app', () => {
   describe('loadConfig', () => {

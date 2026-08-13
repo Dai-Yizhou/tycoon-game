@@ -82,7 +82,7 @@ packages/
 - 提供 HTTP API (`/api/map`) 和 WebSocket 实时通信
 - 地图数据：`server/map.json`（棋盘格子数据）、`server/map-meta.json`（地图元数据）
 - 配置目录：`server/config/`（天赋/成就/格子行为脚本）
-- 配置通过环境变量加载（`loadConfig()`）
+- 配置通过 `packages/server/src/config.ts` 的 `loadConfig()` 加载
 
 ### @game/client
 

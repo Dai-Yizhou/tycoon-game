@@ -166,7 +166,7 @@ export class DiceHandler {
 
       logger.debug(`玩家 ${playerId} 掷骰: ${dice} 点，步数 ${steps}`);
 
-      // 9. Task 10: 监狱中掷骰扣除信用值
+      // 监狱中掷骰扣除信用值
       if (player.status === PlayerStatus.Jail) {
         this.registry.getJailHandler().handleJailDiceRoll(playerId);
       }

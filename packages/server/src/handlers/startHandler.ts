@@ -4,7 +4,6 @@
  * 负责：
  * - 游戏开始时发放启动资金（startBonus）
  * - 经过起点时发放补充资金（passBonus）
- * - 天赋选择（占位，未来实现）
  *
  * 设计原则：
  * - 资金发放必须在服务端（防作弊）
@@ -28,7 +27,7 @@ export interface StartConfig {
   startBonus?: number;
   /** 经过起点补充资金，默认 200 */
   passBonus?: number;
-  /** 天赋选项列表（占位） */
+  /** 天赋选项列表 */
   talents?: string[];
 }
 
@@ -80,10 +79,6 @@ export class StartHandler {
    * 注册起点相关事件处理器
    */
   register(_socket: TypedSocket): void {
-    // 占位：天赋选择事件
-    // socket.on('client.selectTalent', (payload, ack) => {
-    //   this.handleSelectTalent(socket, payload, ack);
-    // });
   }
 
   /**
@@ -260,19 +255,6 @@ export class StartHandler {
     logger.debug(`玩家 ${player.id} 获得 ${amount} 资金（原因: ${reason}），当前: ${newValue}`);
   }
 
-  /**
-   * 占位：天赋选择处理
-   *
-   * Task 15 将完整实现天赋系统
-   */
-  // private handleSelectTalent(
-  //   socket: TypedSocket,
-  //   payload: { talentId: string },
-  //   ack?: (result: AckResult<{ talentId: string }>) => void,
-  // ): void {
-  //   // 占位：未来实现天赋选择逻辑
-  //   ack?.({ ok: false, error: 'not_implemented' });
-  // }
 }
 
 /**

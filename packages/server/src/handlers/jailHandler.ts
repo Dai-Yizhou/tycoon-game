@@ -301,10 +301,10 @@ export class JailHandler {
   }
 
   /**
-   * 占位：使用道具出狱
+   * 使用道具出狱。
    *
    * @param playerId 玩家 ID
-   * @param itemId 道具 ID（如复活令）
+   * @param itemId 道具 ID
    * @returns 是否成功出狱
    */
   useItemToRelease(playerId: string, itemId: string): boolean {

@@ -9,7 +9,7 @@
  *
  * 设计原则：
  * - 破产判定：净资产连续低于或等于 0 超过一定时间
- * - 复活期限：破产玩家有一段时间可以被复活令复活（Task 15）
+ * - 复活期限：破产玩家有一段时间可以被复活令复活
  * - 清除机制：超过复活期限，清除所有地产、贷款、税收记录，重回起点
  * - 状态标记：破产玩家状态为 PlayerStatus.Bankrupt
  */
@@ -343,9 +343,7 @@ export class Bankruptcy {
   }
 
   /**
-   * 复活破产玩家（使用复活令）
-   *
-   * Task 15 将实现复活令道具，此处提供接口
+   * 复活破产玩家（使用复活令）。
    */
   revivePlayer(playerId: string, _socket: TypedSocket): RevivalResult {
     const player = this.world.getPlayer(playerId);

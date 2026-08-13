@@ -6,7 +6,7 @@
  * - `EraStore`    : 时代持久化
  * - `InMemoryPlayerStore` : 玩家内存实现（开发/测试）
  * - `InMemoryEraStore`    : 时代内存实现（开发/测试/单实例）
- * - `MongoPlayerStore`    : MongoDB 实现占位（Task 21 完整化）
+ * - `MongoPlayerStore`    : MongoDB 玩家持久化实现
  */
 
 export * from './PlayerStore.js';
