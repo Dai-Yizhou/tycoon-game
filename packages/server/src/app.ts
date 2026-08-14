@@ -23,7 +23,7 @@ import { logger } from './utils/logger.js';
 import { GameWorld } from './world/GameWorld.js';
 import { SocketManager, type TypedServer } from './transport/SocketManager.js';
 import { registerHandlers } from './transport/handlers.js';
-import { Bank, Mortgage, Taxation, Bankruptcy } from './economy/index.js';
+import { Mortgage, Taxation, Bankruptcy } from './economy/index.js';
 import { readFileSync } from 'node:fs';
 import { parseMapData, parseMapMeta } from '@game/shared';
 import { DayNightCycle, DEFAULT_DAY_NIGHT_CONFIG } from './world/DayNightCycle.js';
@@ -69,7 +69,6 @@ export interface CreatedApp {
   httpServer: http.Server;
   /** 经济系统实例 */
   economy?: {
-    bank: Bank;
     mortgage: Mortgage;
     taxation: Taxation;
     bankruptcy: Bankruptcy;
@@ -230,21 +229,19 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   }
 
   // 初始化经济系统
-  const bank = new Bank(world);
   const mortgage = new Mortgage(io, world);
-  const taxation = new Taxation(io, world, bank);
-  const bankruptcy = new Bankruptcy(io, world, bank, mortgage, taxation);
+  const taxation = new Taxation(io, world);
+  const bankruptcy = new Bankruptcy(io, world, mortgage, taxation);
 
   // 启动经济系统定时器
   taxation.startTaxTimer();
   bankruptcy.startBankruptcyCheck();
 
-  logger.info('Economy system initialized (bank, mortgage, taxation, bankruptcy)');
+  logger.info('Economy system initialized (mortgage, taxation, bankruptcy)');
 
   // 注册业务事件处理器（需要在经济系统初始化后）
   const handlerRegistry = registerHandlers(io, world);
 
-  handlerRegistry.setBank(bank);
   handlerRegistry.setBankruptcy(bankruptcy);
 
   // 初始化昼夜循环（从服务器启动时开始计时）
@@ -367,7 +364,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     world,
     socketManager,
     httpServer,
-    economy: { bank, mortgage, taxation, bankruptcy },
+    economy: { mortgage, taxation, bankruptcy },
     dayNightCycle,
     timeZoneManager,
     prosperityManager,

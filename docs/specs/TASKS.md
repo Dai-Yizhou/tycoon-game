@@ -361,12 +361,10 @@
     - packages/server/tests/handlers/transportHandler.test.ts
     - packages/server/tests/handlers/monumentHandler.test.ts
 
-### [x] Task 14: 经济系统（银行/抵押/破产）
+### [x] Task 14: 经济系统（抵押/破产）
 - **Priority**: high
 - **Depends On**: Task 9
 - **Description**:
-  - 银行系统：贷款、还款、利息计算（利率与信用值挂钩）
-  - 信用值动态变化：欠款降低、还款恢复
   - 抵押系统：地产抵押、区域竞拍
   - 破产机制：破产判定、复活期限、清除地产
   - 合租与财产共享
@@ -374,22 +372,17 @@
   - 服务端经济系统权威校验
 - **Acceptance Criteria Addressed**: AC-3, AC-4, AC-14
 - **Test Requirements**:
-  - `programmatic` TR-14.1: 贷款后财产增加，负债记录正确 ✓
-  - `programmatic` TR-14.2: 利息按信用值正确计算 ✓
-  - `programmatic` TR-14.3: 还款后信用值逐步恢复 ✓
   - `programmatic` TR-14.4: 破产后地产被清除，回到起点 ✓
   - `programmatic` TR-14.5: 昼夜计税正确执行 ✓
 - **Notes**: 经济系统是游戏核心，需要大量单元测试覆盖边界情况
 - **完成报告**:
-  - 后端：创建 4 个经济模块（Bank、Mortgage、Taxation、Bankruptcy），位于 `packages/server/src/economy/`。
+  - 后端：创建 Mortgage、Taxation、Bankruptcy 经济模块，位于 `packages/server/src/economy/`。
   - 核心功能：
-    - Bank：贷款、还款、利息计算（利率与信用值挂钩），信用值随欠款降低、还款恢复。
     - Mortgage：地产抵押、区域竞拍（auctionStarted/bidPlaced/auctionEnded 事件）。
     - Taxation：昼夜计税（定时器周期执行，财富税/地产税/投资税），与 DayNightCycle 集成。
     - Bankruptcy：破产判定、复活期限、清算（清除地产、回到起点），revive 机制。
-  - 集成：app.ts 中初始化全部经济模块并启动定时器（`taxation.startTaxTimer()`、`bankruptcy.startBankruptcyCheck()`）；通过 Socket 事件 `client.bankLoan`/`client.bankRepay`/`client.mortgageProperty`/`client.redeemProperty` 暴露 API。
+  - 集成：app.ts 中初始化经济模块并启动定时器（`taxation.startTaxTimer()`、`bankruptcy.startBankruptcyCheck()`）；通过 Socket 事件 `client.mortgageProperty`/`client.redeemProperty` 暴露 API。
   - 文件结构：
-    - packages/server/src/economy/Bank.ts
     - packages/server/src/economy/Mortgage.ts
     - packages/server/src/economy/Taxation.ts
     - packages/server/src/economy/Bankruptcy.ts
@@ -478,7 +471,6 @@
   - **实现具体天赋选项**：
     - **视野**：控制玩家视野范围（始终小于棋盘）
     - **信用值启用开关**：启用/禁用信用值数值系统
-    - **银行启用开关**：启用/禁用银行/贷款系统
     - **备选字段启用开关**：启用/禁用备选数值字段（如环保值）
 - **Acceptance Criteria Addressed**: AC-14, AC-1
 - **Test Requirements**:

@@ -3,7 +3,6 @@
  */
 
 import { Taxation, DEFAULT_TAX_CONFIG, type TaxConfig } from '../../src/economy/Taxation';
-import { Bank, DEFAULT_BANK_CONFIG } from '../../src/economy/Bank';
 import { GameWorld } from '../../src/world/GameWorld';
 import { PlayerManager } from '../../src/world/PlayerManager';
 import type { Player, MapData, Cell } from '@game/shared';
@@ -12,7 +11,6 @@ import type { TypedServer } from '../../src/transport/SocketManager';
 
 describe('Taxation System', () => {
   let world: GameWorld;
-  let bank: Bank;
   let taxation: Taxation;
   let playerManager: PlayerManager;
   let mockIo: TypedServer;
@@ -30,8 +28,7 @@ describe('Taxation System', () => {
     } as any as TypedServer;
 
     // 创建经济系统实例
-    bank = new Bank(world, DEFAULT_BANK_CONFIG);
-    taxation = new Taxation(mockIo, world, bank, {
+    taxation = new Taxation(mockIo, world, {
       ...DEFAULT_TAX_CONFIG,
       wealthTaxRate: 2, // 2%
       propertyTaxRate: 1, // 1%
@@ -164,9 +161,8 @@ describe('Taxation System', () => {
   });
 
   describe('财产税计算', () => {
-    it('财产税按净资产计算且低于最低征税额免税', () => {
-      // 富玩家财产 5000，无负债，最低征税 1000
-      // 实现：净资产 >= minWealthForTax 时按全额净资产计税（无豁免额度减除）
+    it('财产税按当前财产计算且低于最低征税额免税', () => {
+      // 富玩家当前财产 5000，最低征税 1000
       // 财产税 = floor(5000 * 2%) = 100
 
       const result = taxation.triggerManualTax(richPlayer.id);
@@ -183,22 +179,11 @@ describe('Taxation System', () => {
       expect(result.taxRecord).toBeUndefined();
     });
 
-    it('考虑负债计算净资产税', () => {
-      // 冻结时间，避免贷款利息随真实流逝时间累积导致净资产产生浮点抖动
-      jest.useFakeTimers();
-
-      // 富玩家贷款 2000（银行放款会先增加财产，故净资产仍为 5000）
-      bank.requestLoan(richPlayer.id, 2000);
-
-      // 净资产 = (5000 + 2000) - 2000 = 5000
-      // 财产税 = floor(5000 * 2%) = 100
-
+    it('按当前财产计算财产税', () => {
       const result = taxation.triggerManualTax(richPlayer.id);
 
       expect(result.success).toBe(true);
       expect(result.taxRecord!.wealthTax).toBe(100);
-
-      jest.useRealTimers();
     });
   });
 

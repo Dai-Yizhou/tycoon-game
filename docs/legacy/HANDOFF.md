@@ -28,7 +28,7 @@
     - `ModalSystem.ts` — 模态窗口管理
     - `MovementSystem.ts` — 移动逻辑
     - `SocketEventHandler.ts` — Socket 事件处理
-    - `TeamSystem.ts` / `ChatSystem.ts` / `ItemSystem.ts` / `BankSystem.ts` — 各子系统
+    - `TeamSystem.ts` / `ChatSystem.ts` / `ItemSystem.ts` — 各子系统
     - `TalentSystem.ts` / `AchievementSystem.ts` / `TutorialSystem.ts` — 天赋/成就/教程
     - `MapLoader.ts` / `ConfigLoader.ts` — 配置加载
   - `packages/client/src/state/GameStore.ts` — 全局状态集中管理（getter + setter）
@@ -64,7 +64,6 @@
 
 ### 关键架构决策
 - **服务端权威**：所有游戏事件处理在服务端完成，客户端仅发送请求并同步状态。
-- **银行权威**：`Bank` 负责贷款、利息、还款和信用变化；客户端只发 `client.bankLoan` / `client.bankRepay`。
 - **单一 Socket 入口**：`createSocket` 创建连接，`SocketEventHandler` 集中消费服务端事件，`GameHudShell` 只消费 ViewModel。
 - **直接编辑配置**：编辑 `packages/server/config/` 与 `packages/client/public/config/` 中的 JSON，重启或构建后生效。
 - **状态管理**：通过 `GameStore.ts` 的 getter/setter 统一管理，禁止直接修改导入变量。

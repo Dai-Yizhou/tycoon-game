@@ -73,7 +73,7 @@
 | `src/handlers/monumentHandler.ts` | 纪念碑状态与修缮 |
 | `src/events/EventHandler.ts`、`EventRegistry.ts`、`EventEffects.ts`、`eventTemplates.ts` | 事件注册、模板和效果 |
 | `src/behavior/BehaviorEngine.ts` | 加载 `config/behaviors/*.json` 并权威执行行为 |
-| `src/economy/Bank.ts`、`Mortgage.ts`、`Taxation.ts`、`Bankruptcy.ts` | 银行、抵押、税收、破产账本和周期任务 |
+| `src/economy/Mortgage.ts`、`Taxation.ts`、`Bankruptcy.ts` | 抵押、税收、破产账本和周期任务 |
 | `src/team/TeamManager.ts`、`src/handlers/teamHandler.ts` | 队伍纯数据与 Socket 协议 |
 | `src/chat/ChatManager.ts` | 聊天消息与频道状态 |
 | `src/notifications/NotificationManager.ts` | 通知管理能力；接线以具体 handler 为准 |
@@ -115,7 +115,7 @@
 | `src/components/ActionBarComponent.ts`、`TopBarComponent.ts`、`ChatPanel.ts`、`PropertyModal.ts`、`InvestmentModal.ts`、`TransportModal.ts`、`MonumentModal.ts`、`JailIndicator.ts`、`NotificationCenter.ts` 等 | UI 展示与请求代理 |
 | `src/game/systems/MapLoader.ts` | 请求 `/api/map`、标准化地图、计算本地昼夜 |
 | `src/game/systems/MovementSystem.ts` | 服务端移动事件的动画和岔路选择界面 |
-| `src/game/systems/BankSystem.ts`、`ChatSystem.ts`、`TeamSystem.ts`、`TutorialSystem.ts`、`GameLogic.ts` | 对应请求/投影/引导逻辑 |
+| `src/game/systems/ChatSystem.ts`、`TeamSystem.ts`、`TutorialSystem.ts`、`GameLogic.ts` | 对应请求/投影/引导逻辑 |
 
 `packages/client/public/config/behaviors/` 是客户端可读行为副本。旧 HUD、部分 hooks 和历史文档引用的文件若不在上述当前树中，不得补写为现行文件。`ai-bot` 与 `ai_bot_try` 不在本次运行时文件地图和清理边界内。
 

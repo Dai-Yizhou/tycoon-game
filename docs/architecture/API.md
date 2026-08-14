@@ -21,7 +21,6 @@
 | `client.choosePath` | `MovementHandler` | 多岔路选择合法下一格 |
 | `client.move` | `MovementHandler` | 调试/授权移动入口，普通流程不能绕过掷骰链 |
 | `client.buyProperty` / `upgradeProperty` / `mortgageProperty` / `redeemProperty` | `PropertyHandler` | 地产购买、升级、抵押、赎回 |
-| `client.bankLoan` / `bankRepay` | `HandlerRegistry` + `Bank` | 贷款与还款 |
 | `client.buyInvestment` / `triggerInvestmentEvent` | `InvestmentHandler` | 投资购买与事件结算 |
 | `client.useTransport` / `getTransportDestinations` | `TransportHandler` | 查询目的地与付费传送 |
 | `client.repairMonument` / `getMonumentStatus` | `MonumentHandler` | 纪念碑状态查询与修缮 |

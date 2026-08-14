@@ -3,7 +3,6 @@
  */
 
 import { Bankruptcy, DEFAULT_BANKRUPTCY_CONFIG, type BankruptcyConfig } from '../../src/economy/Bankruptcy';
-import { Bank, DEFAULT_BANK_CONFIG } from '../../src/economy/Bank';
 import { Mortgage, DEFAULT_MORTGAGE_CONFIG } from '../../src/economy/Mortgage';
 import { Taxation, DEFAULT_TAX_CONFIG } from '../../src/economy/Taxation';
 import { GameWorld } from '../../src/world/GameWorld';
@@ -15,7 +14,6 @@ import { Socket } from 'socket.io';
 
 describe('Bankruptcy System', () => {
   let world: GameWorld;
-  let bank: Bank;
   let mortgage: Mortgage;
   let taxation: Taxation;
   let bankruptcy: Bankruptcy;
@@ -42,10 +40,9 @@ describe('Bankruptcy System', () => {
     } as any as TypedSocket;
 
     // 创建经济系统实例
-    bank = new Bank(world, DEFAULT_BANK_CONFIG);
     mortgage = new Mortgage(mockIo, world, DEFAULT_MORTGAGE_CONFIG);
-    taxation = new Taxation(mockIo, world, bank, DEFAULT_TAX_CONFIG);
-    bankruptcy = new Bankruptcy(mockIo, world, bank, mortgage, taxation, {
+    taxation = new Taxation(mockIo, world, DEFAULT_TAX_CONFIG);
+    bankruptcy = new Bankruptcy(mockIo, world, mortgage, taxation, {
       ...DEFAULT_BANKRUPTCY_CONFIG,
       bankruptcyThresholdTime: 1000, // 1 秒（测试用）
       revivalPeriod: 5000, // 5 秒（测试用）
@@ -110,18 +107,8 @@ describe('Bankruptcy System', () => {
 
   describe('破产判定', () => {
     it('TR-14.4-A: 资产为负一段时间后触发破产', () => {
-      // 设置财产为负（通过贷款）
-      player.values['credit'].current = 100; // 提高贷款上限
-      world.updatePlayer(player);
-      bank.requestLoan(player.id, 1000);
-
-      // 贷款会同时增加财产与负债（净资产 = 财产 - 负债），花掉所得使净资产为负
       player.values['money'].current = 0;
       world.updatePlayer(player);
-
-      // 检查净资产为负
-      const netWorth = bank.getPlayerNetWorth(player.id);
-      expect(netWorth).toBeLessThan(0);
 
       // 启动破产检查（加速测试）
       bankruptcy.startBankruptcyCheck();
@@ -135,12 +122,6 @@ describe('Bankruptcy System', () => {
     });
 
     it('资产恢复为正后不破产', () => {
-      // 设置财产为负
-      player.values['credit'].current = 100;
-      world.updatePlayer(player);
-      bank.requestLoan(player.id, 1000);
-
-      // 花掉贷款所得，使净资产为负
       player.values['money'].current = 0;
       world.updatePlayer(player);
 
@@ -150,10 +131,10 @@ describe('Bankruptcy System', () => {
       // 推进部分时间（未到判定阈值，fake timers）
       jest.advanceTimersByTime(500);
 
-      // 恢复资产（还款）
+      // 恢复资产
       player.values['money'].current = 2000;
       world.updatePlayer(player);
-      bank.repayLoan(player.id, 1000);
+      player.values['money'].current = 2000;
 
       // 继续推进
       jest.advanceTimersByTime(1500);
@@ -164,12 +145,6 @@ describe('Bankruptcy System', () => {
     });
 
     it('监狱玩家不破产判定', () => {
-      // 设置财产为负
-      player.values['credit'].current = 100;
-      world.updatePlayer(player);
-      bank.requestLoan(player.id, 1000);
-
-      // 花掉贷款所得，使净资产为负
       player.values['money'].current = 0;
       world.updatePlayer(player);
 
@@ -190,11 +165,6 @@ describe('Bankruptcy System', () => {
 
   describe('复活机制', () => {
     beforeEach(async () => {
-      // 触发破产
-      player.values['credit'].current = 100;
-      world.updatePlayer(player);
-      bank.requestLoan(player.id, 1000);
-
       bankruptcy.triggerBankruptcy(player.id, 'manual');
     });
 
@@ -219,17 +189,6 @@ describe('Bankruptcy System', () => {
       const updatedPlayer = world.getPlayer(player.id);
       expect(updatedPlayer!.values['money'].current).toBe(DEFAULT_BANKRUPTCY_CONFIG.revivalStartingMoney);
       expect(updatedPlayer!.values['credit'].current).toBe(DEFAULT_BANKRUPTCY_CONFIG.revivalStartingCredit);
-    });
-
-    it('复活后保留贷款（不自动清除）', () => {
-      bankruptcy.revivePlayer(player.id, mockSocket);
-
-      // 复活只重置金钱/信用/位置/状态，不会自动清除贷款（与 API 文档一致）
-      const loans = bank.getPlayerLoans(player.id);
-      expect(loans.length).toBe(1);
-
-      const debt = bank.getPlayerTotalDebt(player.id);
-      expect(debt).toBeGreaterThan(0);
     });
 
     it('复活后恢复为正常状态', () => {
@@ -258,11 +217,6 @@ describe('Bankruptcy System', () => {
       cell.extra.ownerships = [{ playerId: player.id, share: 1.0, purchasePrice: 500 }];
       world.updatePlayer(player);
 
-      // 触发破产
-      player.values['credit'].current = 100;
-      world.updatePlayer(player);
-      bank.requestLoan(player.id, 1000);
-
       bankruptcy.triggerBankruptcy(player.id, 'manual');
     });
 
@@ -273,13 +227,6 @@ describe('Bankruptcy System', () => {
       // 检查地产所有权已清除
       const cell = mapData[1];
       expect(cell.extra.owners).not.toContain(player.id);
-    });
-
-    it('清算后清除所有负债', () => {
-      jest.advanceTimersByTime(6000);
-
-      const debt = bank.getPlayerTotalDebt(player.id);
-      expect(debt).toBe(0);
     });
 
     it('清算后清除税收记录', () => {

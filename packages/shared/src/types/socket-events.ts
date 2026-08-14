@@ -137,18 +137,6 @@ export interface ClientToServerEvents {
   ) => void;
 
 
-  /** 银行：贷款 */
-  'client.bankLoan': (
-    payload: { amount: number },
-    ack?: (result: AckResult<{ amount: number; creditDelta: number }>) => void,
-  ) => void;
-
-  /** 银行：还款 */
-  'client.bankRepay': (
-    payload: { amount: number },
-    ack?: (result: AckResult<{ amount: number }>) => void,
-  ) => void;
-
   /** 组队邀请（服务端权威：客户端仅发送请求，邀请由服务端校验并创建） */
   'client.inviteToTeam': (
     payload: { targetPlayerId: string },

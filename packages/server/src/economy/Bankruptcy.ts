@@ -10,7 +10,7 @@
  * 设计原则：
  * - 破产判定：净资产连续低于或等于 0 超过一定时间
  * - 复活期限：破产玩家有一段时间可以重开
- * - 清除机制：超过复活期限，清除所有地产、贷款、税收记录，重回起点
+ * - 清除机制：超过复活期限，清除所有地产和税收记录，重回起点
  * - 状态标记：破产玩家状态为 PlayerStatus.Bankrupt
  */
 
@@ -18,7 +18,6 @@ import { PlayerStatus } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
-import type { Bank } from './Bank.js';
 import type { Mortgage } from './Mortgage.js';
 import type { Taxation } from './Taxation.js';
 
@@ -104,7 +103,6 @@ export interface RevivalResult {
 export class Bankruptcy {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
-  private readonly bank: Bank;
   private readonly mortgage: Mortgage;
   private readonly taxation: Taxation;
   private readonly config: BankruptcyConfig;
@@ -116,14 +114,12 @@ export class Bankruptcy {
   constructor(
     io: TypedServer,
     world: GameWorld,
-    bank: Bank,
     mortgage: Mortgage,
     taxation: Taxation,
     config: BankruptcyConfig = DEFAULT_BANKRUPTCY_CONFIG,
   ) {
     this.io = io;
     this.world = world;
-    this.bank = bank;
     this.mortgage = mortgage;
     this.taxation = taxation;
     this.config = config;
@@ -160,7 +156,7 @@ export class Bankruptcy {
   /**
    * 执行破产检查
    *
-   * 检查所有玩家的净资产，记录连续为负的时间
+   * 检查所有玩家的当前财产，记录连续为零的时间
    */
   private executeBankruptcyCheck(): void {
     const players = this.world.getAllPlayers();
@@ -176,7 +172,7 @@ export class Bankruptcy {
         continue;
       }
 
-      const netWorth = this.bank.getPlayerNetWorth(player.id);
+      const netWorth = player.values.money?.current ?? 0;
 
       // 检查净资产是否为负或为零（财产=0即破产）
       if (netWorth <= 0) {
@@ -221,7 +217,7 @@ export class Bankruptcy {
 
     // 2. 创建破产记录
     const bankruptcyId = `bankruptcy_${playerId}_${Date.now()}`;
-    const netWorth = this.bank.getPlayerNetWorth(playerId);
+    const netWorth = player.values.money?.current ?? 0;
 
     const record: BankruptcyRecord = {
       id: bankruptcyId,
@@ -262,7 +258,7 @@ export class Bankruptcy {
   /**
    * 执行清算（超过复活期限）
    *
-   * 清除所有地产、贷款、税收记录，重回起点
+   * 清除所有地产、税收记录，重回起点
    */
   private executeLiquidation(playerId: string): void {
     const player = this.world.getPlayer(playerId);
@@ -282,23 +278,20 @@ export class Bankruptcy {
     // 1. 清除所有地产所有权
     this.clearAllProperties(playerId);
 
-    // 2. 清除所有贷款
-    this.bank.clearPlayerLoans(playerId);
-
-    // 3. 清除税收记录
+    // 2. 清除税收记录
     this.taxation.clearTaxRecords(playerId);
 
-    // 4. 清理相关竞拍
+    // 3. 清理相关竞拍
     this.mortgage.clearAllAuctions();
 
-    // 5. 更新破产记录状态
+    // 4. 更新破产记录状态
     record.status = 'completed';
     this.bankruptcyRecords.set(playerId, record);
 
-    // 6. 清除定时器
+    // 5. 清除定时器
     this.bankruptcyTimers.delete(playerId);
 
-    // 7. 广播清算完成事件
+    // 6. 广播清算完成事件
     this.io.emit('server.playerLiquidated', {
       playerId,
       bankruptcyId: record.id,
@@ -517,12 +510,11 @@ export class Bankruptcy {
 export function createBankruptcy(
   io: TypedServer,
   world: GameWorld,
-  bank: Bank,
   mortgage: Mortgage,
   taxation: Taxation,
   config?: BankruptcyConfig,
 ): Bankruptcy {
-  return new Bankruptcy(io, world, bank, mortgage, taxation, config);
+  return new Bankruptcy(io, world, mortgage, taxation, config);
 }
 
 // 辅助函数

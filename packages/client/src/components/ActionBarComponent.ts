@@ -1,6 +1,5 @@
 import type { GameEffectHooks } from '../game/GameEffects.js';
 import type { GameViewModel } from '../game/GameViewModel.js';
-import { showBankModal } from '../game/systems/BankSystem.js';
 
 export interface ActionBarConfig {
   onRoll?: () => void;
@@ -63,13 +62,6 @@ export class ActionBarComponent {
       roll.addEventListener('click', () => this.config.onRoll?.());
       this.actions.appendChild(roll);
     }
-    const bank = document.createElement('button');
-    bank.type = 'button';
-    bank.dataset.action = 'bank';
-    bank.className = 'new-action-bar__button new-action-bar__button--secondary';
-    bank.textContent = '银行';
-    bank.addEventListener('click', showBankModal);
-    this.actions.appendChild(bank);
   }
 
   destroy(): void {

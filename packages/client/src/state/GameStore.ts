@@ -115,10 +115,6 @@ export let rollCooldownTimer: ReturnType<typeof setInterval> | null = null;
 export let isInJail = false;
 export let jailEndTime = 0;
 
-// 银行
-export let loanAmount = 0;
-export let loanInterestRate = 0.05;
-
 // 昼夜
 export let DAY_NIGHT_CYCLE = 15 * 60 * 1000;
 export let dayNightStartTime = Date.now();
@@ -169,7 +165,6 @@ export let topBarProsperityEl: HTMLElement | null = null;
 export let topBarProsperityFillEl: HTMLElement | null = null;
 export let topBarRegionFieldsEl: HTMLElement | null = null;
 export let topBarTimeEl: HTMLElement | null = null;
-export let bankBtnEl: HTMLButtonElement | null = null;
 export let teamPanelContentEl: HTMLElement | null = null;
 export let chatChannelContainer: HTMLElement | null = null;
 
@@ -213,8 +208,6 @@ export function setRollCooldownEnd(val: number): void { rollCooldownEnd = val; }
 export function setRollCooldownTimer(val: ReturnType<typeof setInterval> | null): void { rollCooldownTimer = val; }
 export function setIsInJail(val: boolean): void { isInJail = val; }
 export function setJailEndTime(val: number): void { jailEndTime = val; }
-export function setLoanAmount(val: number): void { loanAmount = val; }
-export function setLoanInterestRate(val: number): void { loanInterestRate = val; }
 export function setDayNightCycle(val: number): void { DAY_NIGHT_CYCLE = val; }
 export function setDayNightStartTime(val: number): void { dayNightStartTime = val; }
 export function setServerTimeOffset(val: number): void { serverTimeOffset = val; }
@@ -238,7 +231,6 @@ export function setTopBarProsperityEl(val: HTMLElement | null): void { topBarPro
 export function setTopBarProsperityFillEl(val: HTMLElement | null): void { topBarProsperityFillEl = val; }
 export function setTopBarRegionFieldsEl(val: HTMLElement | null): void { topBarRegionFieldsEl = val; }
 export function setTopBarTimeEl(val: HTMLElement | null): void { topBarTimeEl = val; }
-export function setBankBtnEl(val: HTMLButtonElement | null): void { bankBtnEl = val; }
 export function setTeamPanelContentEl(val: HTMLElement | null): void { teamPanelContentEl = val; }
 export function setChatChannelContainer(val: HTMLElement | null): void { chatChannelContainer = val; }
 export function setDetailPanelExpanded(val: boolean): void { detailPanelExpanded = val; }

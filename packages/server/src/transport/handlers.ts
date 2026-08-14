@@ -21,7 +21,7 @@ import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from './SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ChatManager } from '../chat/index.js';
-import { Bank, Bankruptcy } from '../economy/index.js';
+import { Bankruptcy } from '../economy/index.js';
 import { DiceHandler, MovementHandler, PropertyHandler, StartHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, DebugHandler, TeamHandler } from '../handlers/index.js';
 import { TeamManager, DEFAULT_TEAM_CONFIG } from '../team/index.js';
 import { EventHandler } from '../events/index.js';
@@ -85,7 +85,6 @@ export class HandlerRegistry {
   private readonly teamManager: TeamManager;
   private readonly teamHandler: TeamHandler;
   private readonly chatManager: ChatManager;
-  private bank: Bank | null = null;
   private bankruptcy: Bankruptcy | null = null;
   private timeZoneManager: TimeZoneManager | null = null;
 
@@ -157,7 +156,6 @@ export class HandlerRegistry {
     // 注册组队处理器
     this.teamHandler.register(socket);
     this.handleChat(socket);
-    this.handleBank(socket);
     this.handleBankruptRestart(socket);
   }
 
@@ -270,11 +268,6 @@ export class HandlerRegistry {
    */
   getTeamManager(): TeamManager {
     return this.teamManager;
-  }
-
-  setBank(bank: Bank): void {
-    this.bank = bank;
-    logger.info('Bank 已注入 HandlerRegistry');
   }
 
   /**
@@ -413,49 +406,6 @@ export class HandlerRegistry {
     }
   }
 
-
-  private handleBank(socket: TypedSocket): void {
-    socket.on('client.bankLoan', (payload, ack) => {
-      safeHandle(socket, ErrorCodes.InternalError, () => {
-        const playerId = socket.data.playerId;
-        if (!playerId) { ack?.({ ok: false, error: 'not_authenticated' }); return; }
-        if (!this.bank) { ack?.({ ok: false, error: 'bank_system_not_available' }); return; }
-        if (!Number.isFinite(payload?.amount) || payload.amount <= 0) { ack?.({ ok: false, error: 'invalid_amount' }); return; }
-        const before = this.world.getPlayer(playerId);
-        const beforeMoney = before?.values.money?.current ?? 0;
-        const beforeCredit = before?.values.credit?.current ?? 0;
-        const result = this.bank.requestLoan(playerId, payload.amount);
-        if (!result.success) { ack?.({ ok: false, error: result.error }); return; }
-        const player = this.world.getPlayer(playerId);
-        if (player) {
-          this.world.updatePlayer(player);
-          this.io.emit('server.valueChanged', { playerId, fieldId: 'money', current: player.values.money?.current ?? beforeMoney, delta: (player.values.money?.current ?? beforeMoney) - beforeMoney });
-          this.io.emit('server.valueChanged', { playerId, fieldId: 'credit', current: player.values.credit?.current ?? beforeCredit, delta: (player.values.credit?.current ?? beforeCredit) - beforeCredit });
-        }
-        ack?.({ ok: true, data: { amount: payload.amount, creditDelta: (player?.values.credit?.current ?? beforeCredit) - beforeCredit } });
-      });
-    });
-    socket.on('client.bankRepay', (payload, ack) => {
-      safeHandle(socket, ErrorCodes.InternalError, () => {
-        const playerId = socket.data.playerId;
-        if (!playerId) { ack?.({ ok: false, error: 'not_authenticated' }); return; }
-        if (!this.bank) { ack?.({ ok: false, error: 'bank_system_not_available' }); return; }
-        if (!Number.isFinite(payload?.amount) || payload.amount <= 0) { ack?.({ ok: false, error: 'invalid_amount' }); return; }
-        const before = this.world.getPlayer(playerId);
-        const beforeMoney = before?.values.money?.current ?? 0;
-        const beforeCredit = before?.values.credit?.current ?? 0;
-        const result = this.bank.repayLoan(playerId, payload.amount);
-        if (!result.success) { ack?.({ ok: false, error: result.error }); return; }
-        const player = this.world.getPlayer(playerId);
-        if (player) {
-          this.world.updatePlayer(player);
-          this.io.emit('server.valueChanged', { playerId, fieldId: 'money', current: player.values.money?.current ?? beforeMoney, delta: (player.values.money?.current ?? beforeMoney) - beforeMoney });
-          this.io.emit('server.valueChanged', { playerId, fieldId: 'credit', current: player.values.credit?.current ?? beforeCredit, delta: (player.values.credit?.current ?? beforeCredit) - beforeCredit });
-        }
-        ack?.({ ok: true, data: { amount: result.amountPaid } });
-      });
-    });
-  }
 
   /**
    * 破产重开处理器（由客户端 handleBankruptRestart 调用）

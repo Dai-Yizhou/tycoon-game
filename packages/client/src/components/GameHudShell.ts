@@ -3,7 +3,6 @@ import type { GameViewModel } from "../game/GameViewModel.js";
 
 export interface GameHudShellConfig {
   onRoll?: () => void;
-  onBank?: () => void;
   onChatSend?: (message: string, channel: string) => void;
   onCellHover?: (cell: any, x: number, y: number) => void;
   onCellLeave?: () => void;
@@ -91,7 +90,6 @@ export class GameHudShell {
             <span class="dice-status" data-ui="dice-status">就绪</span>
           </div>
           <div class="action-cluster">
-            <button class="act-btn" data-action="bank">银行</button>
           </div>
           <div class="actionbar-spacer"></div>
         </footer>
@@ -104,7 +102,6 @@ export class GameHudShell {
     this.root.querySelector('[data-action="chat-send"]')?.addEventListener("click", () => this.sendChat());
     this.input.addEventListener("keydown", (e) => { if (e.key === "Enter") this.sendChat(); });
     this.root.querySelector('[data-action="roll"]')?.addEventListener("click", () => this.config.onRoll?.());
-    this.root.querySelector('[data-action="bank"]')?.addEventListener("click", () => this.config.onBank?.());
 
     // Subscriptions
     this.unsubscribers.push(

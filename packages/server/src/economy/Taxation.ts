@@ -17,7 +17,6 @@ import { CellTypes, getExtra, normalizeCellType, getValueCurrent } from '@game/s
 import { logger } from '../utils/logger.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { TypedServer } from '../transport/SocketManager.js';
-import type { Bank } from './Bank.js';
 
 /**
  * 税收配置
@@ -84,16 +83,14 @@ export interface TaxResult {
 export class Taxation {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
-  private readonly bank: Bank;
   private readonly config: TaxConfig;
   private readonly taxRecords: Map<string, TaxRecord[]> = new Map(); // playerId -> taxRecords
   private taxTimer: NodeJS.Timeout | null = null;
   private lastTaxTime: number = 0;
 
-  constructor(io: TypedServer, world: GameWorld, bank: Bank, config: TaxConfig = DEFAULT_TAX_CONFIG) {
+  constructor(io: TypedServer, world: GameWorld, config: TaxConfig = DEFAULT_TAX_CONFIG) {
     this.io = io;
     this.world = world;
-    this.bank = bank;
     this.config = config;
   }
 
@@ -226,14 +223,11 @@ export class Taxation {
    */
   private calculateWealthTax(player: Player): number {
     const money = this.getPlayerMoney(player);
-    const debt = this.bank.getPlayerTotalDebt(player.id);
-    const netWorth = money - debt;
-
-    if (netWorth < this.config.minWealthForTax) {
+    if (money < this.config.minWealthForTax) {
       return 0;
     }
 
-    return Math.floor(netWorth * (this.config.wealthTaxRate / 100));
+    return Math.floor(money * (this.config.wealthTaxRate / 100));
   }
 
   /**
@@ -391,8 +385,7 @@ export class Taxation {
 export function createTaxation(
   io: TypedServer,
   world: GameWorld,
-  bank: Bank,
   config?: TaxConfig,
 ): Taxation {
-  return new Taxation(io, world, bank, config);
+  return new Taxation(io, world, config);
 }

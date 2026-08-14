@@ -78,12 +78,6 @@ export interface JailSlice {
   jailEndTime: number;
 }
 
-/** 银行/贷款状态 */
-export interface BankSlice {
-  loanAmount: number;
-  loanInterestRate: number;
-}
-
 /** 昼夜与繁荣度状态 */
 export interface DayNightSlice {
   cycleDuration: number;
@@ -223,7 +217,7 @@ export const CHAT_CHANNEL_DEFS: ChatChannelDef[] = [
 /** 状态变更事件，标识哪个切片发生了变化 */
 export type StateChangeKey =
   | 'player' | 'movement' | 'camera' | 'dice' | 'cooldown' | 'jail'
-  | 'bank' | 'dayNight'
+  | 'dayNight'
   | 'regions' | 'chat' | 'team' | 'tutorial' | 'otherPlayers' | 'behavior'
   | 'all';
 
@@ -284,8 +278,6 @@ export class GameViewModel {
   private dice: DiceSlice = { diceValue: 0, diceAnimating: false, diceAnimStart: 0 };
   private cooldown: CooldownSlice = { rollCooldownEnd: 0, rollCooldownTimer: null };
   private jail: JailSlice = { isInJail: false, jailEndTime: 0 };
-
-  private bank: BankSlice = { loanAmount: 0, loanInterestRate: 0.05 };
 
   private dayNight: DayNightSlice = {
     cycleDuration: 15 * 60 * 1000,
@@ -405,13 +397,6 @@ export class GameViewModel {
     this.notify('jail', source);
   }
 
-  // ===== Bank =====
-  getBank(): BankSlice { return this.bank; }
-  setBank(partial: Partial<BankSlice>, source = 'external'): void {
-    Object.assign(this.bank, partial);
-    this.notify('bank', source);
-  }
-
   // ===== Day/Night =====
   getDayNight(): DayNightSlice { return this.dayNight; }
   setDayNight(partial: Partial<DayNightSlice>, source = 'external'): void {
@@ -512,7 +497,6 @@ export class GameViewModel {
     this.dice = { diceValue: 0, diceAnimating: false, diceAnimStart: 0 };
     this.cooldown = { rollCooldownEnd: 0, rollCooldownTimer: null };
     this.jail = { isInJail: false, jailEndTime: 0 };
-    this.bank = { loanAmount: 0, loanInterestRate: 0.05 };
     this.dayNight = { cycleDuration: 15 * 60 * 1000, cycleStartTime: Date.now(), serverTimeOffset: 0, prosperity: 100 };
     this.regions = { mapRegions: [], valueFieldDefs: [], regionProsperityMap: new Map() };
     this.chat = { activeChannels: new Set(['system']), history: [] };

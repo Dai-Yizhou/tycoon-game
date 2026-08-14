@@ -34,7 +34,7 @@ packages/server/src/index.ts: bootstrap()
   -> createApp(config)
      -> Express / HTTP / Socket.IO
      -> GameWorld + 地图解析
-     -> Bank / Mortgage / Taxation / Bankruptcy
+     -> Mortgage / Taxation / Bankruptcy
      -> HandlerRegistry
      -> DayNightCycle / TimeZoneManager / ProsperityManager
      -> BehaviorEngine / EraManager / PlayerStore
@@ -70,7 +70,7 @@ io.on('connection', socket)
      -> DiceHandler / MovementHandler / PropertyHandler
      -> StartHandler / JailHandler / InvestmentHandler
      -> TransportHandler / MonumentHandler / TeamHandler
-     -> chat / bank / bankruptcy restart
+     -> chat / bankruptcy restart
      -> debugHandler（仅调试开关满足时）
   -> app.ts 注册 triggerSettlement 调试处理器
 ```
@@ -79,7 +79,7 @@ io.on('connection', socket)
 
 ## 服务端权威流
 
-客户端只发起 `client.*` 请求或查询；handler 从 `socket.data.playerId` 获取身份，读取 `GameWorld` 和各管理器，校验权限、位置、冷却、余额和业务约束，再写入服务端状态。随机骰子、移动最终位置、地产与投资、银行账本、税收、破产、队伍共享数值、繁荣度和时代状态均以服务端结果为准。
+客户端只发起 `client.*` 请求或查询；handler 从 `socket.data.playerId` 获取身份，读取 `GameWorld` 和各管理器，校验权限、位置、冷却、余额和业务约束，再写入服务端状态。随机骰子、移动最终位置、地产与投资、抵押、税收、破产、队伍共享数值、繁荣度和时代状态均以服务端结果为准。
 
 ```mermaid
 sequenceDiagram

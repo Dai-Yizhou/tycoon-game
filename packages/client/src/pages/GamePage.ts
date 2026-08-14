@@ -11,7 +11,6 @@
  * - 破产机制：仅破产时可回起点重开
  * - 一次停留仅可进行一次购买/升级操作
  * - 视野系统：相机跟随玩家，不可缩放/拖移
- * - 银行/贷款系统：信用值联动
  * - 投资项目系统：购买、合租
  * - 交通枢纽系统：付费传送
  * - 纪念碑系统：修缮增加信用值
@@ -56,12 +55,12 @@ import {
   regionProsperityMap, renderer,
   rollCooldownTimer,
   setActionUsedThisTurn, setAnimationFrameId,
-  setBankBtnEl, setCameraTarget, setCanRoll, setCanvasEl, setChatChannelContainer,
+  setCameraTarget, setCanRoll, setCanvasEl, setChatChannelContainer,
   setCurrentCredit, setCurrentEnv, setCurrentMoney, setCurrentPlayer, setCurrentPlayerName,
   setCurrentPlayerPosition, setDayNightCycle, setDayNightStartTime,
   setDiceAnimating, setGameSocket, setIsBankrupt,
   setIsInJail, setIsMoving, setIsWaitingForChoice, setLastLocalIsDay,
-  setLastPlayerTimezone, setLoanAmount, setMapIndex, setMapRegions,
+  setLastPlayerTimezone, setMapIndex, setMapRegions,
   setOtherPlayers, setPlayerDisplayPos,
   setProsperity, setProsperityTimer, setRenderer, setRollCooldownTimer,
   setServerTimeOffset, setTeamMembers, setTeamPanelContentEl,
@@ -150,7 +149,6 @@ export function createGamePage(controller: GameController): HTMLElement {
   page.appendChild(backButton);
   gameHudShell = new GameHudShell(gameViewModel, effects, {
     onRoll: handleRollDice,
-    onBank: () => { window.dispatchEvent(new CustomEvent('game:open-bank')); },
     onChatSend: (message, channel) => {
       if (gameSocket) gameSocket.emit('client.chat', { channel, content: message });
       else addChatMessage(t('chat.you') + message, channel);
@@ -319,7 +317,6 @@ function initMockPlayer(name: string): void {
   setIsBankrupt(false);
   setIsInJail(false);
   setActionUsedThisTurn(false);
-  setLoanAmount(0);
 }
 
 // ===== Map Loading =====
@@ -607,7 +604,6 @@ export function cleanupGamePage(page: HTMLElement): void {
   setTopBarProsperityFillEl(null);
   setTopBarRegionFieldsEl(null);
   setTopBarTimeEl(null);
-  setBankBtnEl(null);
   setTeamPanelContentEl(null);
   setChatChannelContainer(null);
   setIsMoving(false);
@@ -627,7 +623,6 @@ export function cleanupGamePage(page: HTMLElement): void {
   setCurrentEnv(0);
   setCurrentPlayerPosition(0);
 (window as any).currentPlayerPosition = currentPlayerPosition;
-  setLoanAmount(0);
   setProsperity(100);
   setLastPlayerTimezone('');
   setLastLocalIsDay(null);

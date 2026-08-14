@@ -7,12 +7,11 @@
 
 import { t } from '../i18n.js';
 import {
-  currentPlayerPosition, currentMoney, currentCredit,
+  currentPlayerPosition, currentMoney,
   isBankrupt, actionUsedThisTurn, ownedProperties,
   ownedInvestments, canRoll, isMoving, diceAnimating,
   isWaitingForChoice, isInJail, rollCooldownEnd, rollCooldown,
   mapIndex, gameSocket, rollBtn, rollCooldownTimer,
-  loanAmount,
   cName, cType, cOwners,
   cTransportCost,
   setCanRoll,
@@ -212,11 +211,4 @@ export function handleBankruptRestart(): void {
       addChatMessage(t('bankruptcy.restartFailed', { error: result.error || t('common.unknown') }), 'error');
     }
   });
-}
-
-// ===== 银行系统 =====
-
-export function getMaxLoanAmount(): number {
-  const baseLimit = currentCredit * 20;
-  return Math.max(0, baseLimit - loanAmount);
 }

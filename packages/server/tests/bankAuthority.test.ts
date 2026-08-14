@@ -19,18 +19,7 @@ function buildSocket(): { socket: TypedSocket; handlers: Map<string, (...args: a
   return { socket, handlers };
 }
 
-describe('bank and bankruptcy socket authority', () => {
-  test('registers bank requests and delegates mutations to the injected Bank', () => {
-    const world = new GameWorld(); world.addPlayer(buildPlayer());
-    const bank = { requestLoan: jest.fn(() => ({ success: true, loan: { amount: 400 } })), repayLoan: jest.fn(() => ({ success: true, amountPaid: 100 })) };
-    const registry = new HandlerRegistry({ emit: jest.fn() } as unknown as TypedServer, world);
-    registry.setBank(bank as any);
-    const { socket, handlers } = buildSocket(); registry.registerForSocket(socket);
-    handlers.get('client.bankLoan')?.({ amount: 400 }, jest.fn()); handlers.get('client.bankRepay')?.({ amount: 100 }, jest.fn());
-    expect(bank.requestLoan).toHaveBeenCalledWith('player-1', 400);
-    expect(bank.repayLoan).toHaveBeenCalledWith('player-1', 100);
-  });
-
+describe('bankruptcy socket authority', () => {
   test('delegates bankruptRestart to the injected Bankruptcy instance', () => {
     const world = new GameWorld(); world.addPlayer(buildPlayer());
     const bankruptcy = { revivePlayer: jest.fn(() => ({ success: true })) };

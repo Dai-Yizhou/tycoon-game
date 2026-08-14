@@ -37,7 +37,6 @@
 | 当前金钱 | `currentMoney` | `server.valueChanged` (fieldId: 'money') | 服务端权威 |
 | 当前信用值 | `currentCredit` | `server.valueChanged` (fieldId: 'credit') | 服务端权威 |
 | 环境/备选数值 | `currentEnv` | `server.valueChanged` (fieldId: 'environment'/'env') | 服务端权威 |
-| 当前贷款金额 | `loanAmount` | `server.valueChanged` + `server.bankLoan` | 服务端权威 |
 | 当前繁荣度 | prosperity | `server.prosperityChanged` | 服务端权威 |
 | 天赋点 | `availableTP` | `server.talentLearned` / `server.talentUnlearned` | 服务端权威 |
 | 活跃天赋 | `activeTalents` | `server.talentToggled` | 服务端权威 |
@@ -54,7 +53,6 @@
 | 购买投资 | 站在投资格 | `client.buyInvestment` | 仅当回合内未使用其他行动 |
 | 交通传送 | 站在交通枢纽格 | `client.getTransportDestinations` → 选目标 → `client.useTransport` | 分两步：先获取目的地列表，再发送传送请求 |
 | 修缮纪念碑 | 站在纪念碑格 | `client.repairMonument` | 仅当回合内未使用其他行动 |
-| 银行 | 站在银行格（需天赋激活） | `client.bankLoan` / `client.bankRepay` | 弹窗显示贷款/还款界面 |
 | 道具背包 | 任何时候 | `client.getItems` → 选择道具 → `client.useItem` | 弹窗显示道具列表 |
 | 天赋面板 | 任何时候 | `client.learnTalent` / `client.unlearnTalent` / `client.toggleTalent` | 弹窗显示天赋树 |
 | 成就面板 | 任何时候 | 纯本地渲染 | 成就数据由 `server.achievementUnlocked` 事件更新 |
@@ -117,8 +115,6 @@
 | `client.repairMonument` | `{ monumentId }` | MonumentHandler | 修缮纪念碑 |
 | `client.getTransportDestinations` | `{ hubCellId }` | TransportHandler | 获取交通枢纽目的地 |
 | `client.useTransport` | `{ hubCellId, targetCellId }` | TransportHandler | 交通传送 |
-| `client.bankLoan` | `{ amount }` | BankHandler | 银行贷款 |
-| `client.bankRepay` | `{ amount }` | BankHandler | 银行还款 |
 | `client.useItem` | `{ itemId, targetCellId?, targetPlayerId? }` | ItemHandler | 使用道具 |
 | `client.chat` | `{ channel, content }` | ChatManager | 发送聊天消息 |
 | `client.inviteToTeam` | `{ targetPlayerId }` | TeamHandler | 邀请组队 |
@@ -166,7 +162,6 @@
 | 弹窗函数 | 触发条件 | 发送的请求 | 状态更新方式 |
 |----------|----------|------------|-------------|
 | `showTransportModal` | 交通枢纽传送 | `client.useTransport` | 服务端事件驱动 |
-| `showBankModal` | 银行操作 | `client.bankLoan` / `client.bankRepay` | 服务端事件驱动 |
 | `showSealItemModal` | 使用查封令 | `client.useItem` | 服务端事件驱动 |
 | `showReviveItemModal` | 使用复活令 | `client.useItem` | 服务端事件驱动 |
 
@@ -174,7 +169,7 @@
 
 | 面板函数 | 更新内容 |
 |----------|----------|
-| `updateTopBar` | 金钱、信用值、贷款、繁荣度、天赋点、时间 |
+| `updateTopBar` | 金钱、信用值、繁荣度、天赋点、时间 |
 | `updateActionPanel` | 根据当前格子类型显示操作按钮 |
 | `updateTeamPanel` | 队伍成员列表、操作按钮 |
 | `updateItemsPanel` | 道具列表 |
@@ -201,8 +196,6 @@ isMoving: boolean                      // 是否正在移动动画
 isWaitingForChoice: boolean            // 是否等待岔路选择
 actionUsedThisTurn: boolean            // 本回合是否已使用行动
 rollCooldownEnd: number                // 掷骰冷却结束时间
-loanAmount: number                     // 贷款金额
-loanInterestRate: number               // 贷款利率
 
 // 状态集合
 ownedProperties: Set<number>           // 拥有的地产ID集合
@@ -288,7 +281,6 @@ ui/
 ## 六、当前已知 UI 问题
 
 1. **按钮显示/触发混乱**：部分操作按钮在不应出现时仍显示（如非地产格显示购买按钮），需根据 `currentPlayerPosition` 对应的格子类型精确控制按钮显示
-2. **弹窗缺少关闭反馈**：银行弹窗贷款/还款成功后未自动关闭
 3. **道具面板状态同步**：道具使用后需等待服务端事件才能更新 UI，存在短暂延迟
 4. **队伍面板显示**：`teamMembers` 数据由 `server.teamUpdated` 事件权威更新，但 UI 在某些解散场景下未及时清理
 5. **国际化键缺失**：`common.confirmUse`、`common.notConnected` 等键在语言包中缺失
