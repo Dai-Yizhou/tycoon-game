@@ -39,8 +39,6 @@ export class AIBot {
   private mapData: MapData = [];
   private otherPlayers: Map<string, { id: string; username: string; position: number; status: PlayerStatus }> = new Map();
   private team: Team | null = null;
-  private talentPoints = 0;
-  private learnedTalents: string[] = [];
   private isDay = true;
   private cycleMinutes = 15;
   private lastDiceResult = 0;
@@ -51,7 +49,6 @@ export class AIBot {
   private pendingTeamInvite: { inviterId: string; inviterName: string; teamId: string } | null = null;
   private ownedPropertyIds: Set<number> = new Set();
   private maxLevelPropertyIds: Set<number> = new Set();
-  private items: unknown[] = [];
 
   private lastMoveEventKey: string = '';
 
@@ -136,9 +133,6 @@ export class AIBot {
     if (config.autoTeam !== undefined) {
       this.config.autoTeam = config.autoTeam;
     }
-    if (config.autoTalent !== undefined) {
-      this.config.autoTalent = config.autoTalent;
-    }
     if (config.reserveMoney !== undefined) {
       this.config.reserveMoney = config.reserveMoney;
     }
@@ -205,11 +199,6 @@ export class AIBot {
       case 'upgradeProperty':
         if (args?.cellId) {
           await this.doUpgradeProperty(args.cellId as number);
-        }
-        break;
-      case 'learnTalent':
-        if (args?.talentId) {
-          await this.doLearnTalent(args.talentId as string);
         }
         break;
       case 'chat':
@@ -349,7 +338,6 @@ export class AIBot {
     this.socket.on('server.gameState', (payload: { player: Player; team: Team | null; serverTime: number }) => {
       this.player = payload.player;
       this.team = payload.team;
-      this.items = payload.player.items;
       this.logger.event('收到游戏状态同步', {
         position: this.player.position.cellId,
         money: this.player.values?.['money']?.current ?? 0,
@@ -514,23 +502,6 @@ export class AIBot {
       });
     });
 
-    this.socket.on('server.talentLearned', (payload: { playerId: string; talentId: string }) => {
-      this.bugDetector.onTalentLearned();
-      if (this.player && payload.playerId === this.player.id) {
-        if (!this.learnedTalents.includes(payload.talentId)) {
-          this.learnedTalents.push(payload.talentId);
-        }
-        this.talentPoints = Math.max(0, this.talentPoints - 1);
-        this.logger.event(`学习了天赋「${payload.talentId}」`);
-      }
-    });
-
-    this.socket.on('server.talentToggled', (payload: { playerId: string; talentId: string; enabled: boolean }) => {
-      if (this.player && payload.playerId === this.player.id) {
-        this.logger.event(`天赋「${payload.talentId}」${payload.enabled ? '已启用' : '已禁用'}`);
-      }
-    });
-
     this.socket.on('server.diceRolled', (payload: { playerId: string; dice: number; steps: number }) => {
       if (this.player && payload.playerId === this.player.id) {
         this.lastDiceResult = payload.dice;
@@ -559,12 +530,6 @@ export class AIBot {
       this.logger.event(`[通知:${payload.type}] ${payload.title}: ${payload.content}`);
     });
 
-    this.socket.on('server.itemAcquired', (payload: { playerId: string; itemName?: string; quantity?: number }) => {
-      if (this.player && payload.playerId === this.player.id) {
-        this.logger.event(`获得道具「${payload.itemName ?? '?'}」x${payload.quantity ?? 1}`);
-      }
-    });
-
     this.socket.on('server.cellSealed', (payload: { cellId: number; playerName: string }) => {
       this.logger.event(`格子 ${payload.cellId} 被「${payload.playerName}」查封`);
     });
@@ -590,8 +555,6 @@ export class AIBot {
       otherPlayers: this.otherPlayers,
       currentCell: this.mapData[position] ?? null,
       team: this.team,
-      talentPoints: this.talentPoints,
-      learnedTalents: this.learnedTalents,
       isDay: this.isDay,
       cycleMinutes: this.cycleMinutes,
       lastDiceResult: this.lastDiceResult,
@@ -600,7 +563,6 @@ export class AIBot {
       pendingPathChoice: this.pendingPathChoice,
       pendingTeamInvite: this.pendingTeamInvite,
       ownedPropertyIds: this.ownedPropertyIds,
-      items: this.items as GameStateSnapshot['items'],
       mortgagedProperties: [],
       investments: [],
       unimplementedOperations: [],
@@ -678,9 +640,6 @@ export class AIBot {
         break;
       case 'inviteToTeam':
         await this.doInviteToTeam(decision.targetPlayerId);
-        break;
-      case 'learnTalent':
-        await this.doLearnTalent(decision.talentId);
         break;
       case 'repairMonument':
         await this.doRepairMonument(decision.monumentId);
@@ -823,21 +782,6 @@ export class AIBot {
         this.logger.action(`组队邀请已发送给「${targetName}」`);
       } else {
         this.logger.warning('发送组队邀请失败', { targetPlayerId, error: result.error });
-      }
-    });
-  }
-
-  private async doLearnTalent(talentId: string): Promise<void> {
-    if (!this.socket) return;
-    this.logger.action(`尝试学习天赋「${talentId}」`);
-    this.bugDetector.recordAction({ type: 'learnTalent', startTime: Date.now(), talentId });
-
-    this.socket.emit('client.learnTalent', { talentId }, (result: AckResult<{ talentId: string; pointsRemaining: number }>) => {
-      if (result.ok && result.data) {
-        this.talentPoints = result.data.pointsRemaining;
-        this.logger.action(`学习天赋成功「${talentId}」（剩余天赋点：${result.data.pointsRemaining}）`);
-      } else {
-        this.logger.warning('学习天赋失败', { talentId, error: result.error });
       }
     });
   }

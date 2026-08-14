@@ -7,14 +7,12 @@
  * 决策优先级：
  * 1. 岔路选择（随机化路径，覆盖所有方向）
  * 2. 组队邀请响应（随机接受/拒绝）
- * 3. 道具使用（有道具时随机使用）
- * 4. 格子操作（按格子类型触发对应操作）
- * 5. 天赋学习/切换/取消（覆盖天赋系统）
- * 6. 银行操作（贷款/还款，即使服务端未实现也尝试以检测缺失）
- * 7. 抵押/赎回（资金低时抵押，恢复后赎回）
- * 8. 掷骰
- * 9. 社交行为（组队/聊天/离队）
- * 10. 心跳和状态查询
+ * 3. 格子操作（按格子类型触发对应操作）
+ * 4. 银行操作
+ * 5. 抵押/赎回
+ * 6. 掷骰
+ * 7. 社交行为
+ * 8. 心跳
  */
 
 import type { GameStateSnapshot, BotConfig } from './types.js';
@@ -32,24 +30,15 @@ export type Decision =
   | { type: 'rejectTeamInvite'; inviterId: string }
   | { type: 'inviteToTeam'; targetPlayerId: string }
   | { type: 'leaveTeam' }
-  | { type: 'learnTalent'; talentId: string }
-  | { type: 'unlearnTalent'; talentId: string }
-  | { type: 'toggleTalent'; talentId: string; enabled: boolean }
-  | { type: 'getTalentInfo' }
   | { type: 'repairMonument'; monumentId: number }
   | { type: 'useTransport'; hubCellId: number; targetCellId: number }
   | { type: 'getTransportDestinations'; hubCellId: number }
   | { type: 'buyInvestment'; cellId: number }
-  | { type: 'useItem'; itemId: string; targetCellId?: number }
-  | { type: 'getItems' }
   | { type: 'bankLoan'; amount: number }
   | { type: 'bankRepay'; amount: number }
   | { type: 'chat'; channel: 'region' | 'all' | 'team'; content: string }
   | { type: 'ping' }
-  | { type: 'requestItemDrop' };
-
-/** 所有可学习天赋 ID */
-const ALL_TALENTS = ['credit', 'env', 'team_boost', 'bank_system', 'investment_bonus', 'item_lucky', 'seal_master', 'transport_discount', 'eagle_eye'];
+  ;
 
 /** 聊天消息池 */
 const CHAT_MESSAGES = [
@@ -65,13 +54,8 @@ export class DecisionEngine {
   private lastInviteAttempt = 0;
   private lastChatTime = 0;
   private lastPingTime = 0;
-  private lastTalentInfoTime = 0;
-  private lastGetItemsTime = 0;
-  private lastItemDropTime = 0;
   private lastLeaveTeamTime = 0;
-  private lastToggleTalentTime = 0;
   private lastBankOperationTime = 0;
-  private talentRotationIndex = 0;
 
   constructor(config: BotConfig) {
     this.config = config;
@@ -117,49 +101,34 @@ export class DecisionEngine {
       return { type: 'idle' };
     }
     if (state.status === 'jail') {
-      // 监狱中尝试使用道具
-      if (state.items.length > 0 && Math.random() < 0.3) {
-        const item = state.items[0];
-        return { type: 'useItem', itemId: item.id };
-      }
       return { type: 'idle' };
     }
     if (state.status === 'frozen') {
       return { type: 'idle' };
     }
 
-    // 4. 道具使用（有道具时偶尔使用）
-    if (state.items.length > 0 && Math.random() < 0.15) {
-      const item = state.items[Math.floor(Math.random() * state.items.length)];
-      return { type: 'useItem', itemId: item.id };
-    }
-
-    // 5. 格子操作（检查当前格子类型，覆盖所有格子类型）
+    // 3. 格子操作
     const cellAction = this.checkCellAction(state);
     if (cellAction) return cellAction;
 
-    // 6. 天赋学习/切换/取消（覆盖天赋系统全部操作）
-    const talentAction = this.checkTalentActions(state);
-    if (talentAction) return talentAction;
-
-    // 7. 银行操作（贷款/还款，即使未实现也尝试以检测缺失）
+    // 4. 银行操作
     const bankAction = this.checkBankActions(state);
     if (bankAction) return bankAction;
 
-    // 8. 抵押/赎回（资金管理）
+    // 5. 抵押/赎回
     const mortgageAction = this.checkMortgageActions(state);
     if (mortgageAction) return mortgageAction;
 
-    // 9. 掷骰（无冷却时）
+    // 6. 掷骰
     if (!state.cooldownActive) {
       return { type: 'rollDice' };
     }
 
-    // 10. 社交行为
+    // 7. 社交行为
     const socialAction = this.checkSocialActions(state);
     if (socialAction) return socialAction;
 
-    // 11. 心跳和状态查询（定期）
+    // 8. 心跳
     const maintenanceAction = this.checkMaintenanceActions(state);
     if (maintenanceAction) return maintenanceAction;
 
@@ -243,7 +212,6 @@ export class DecisionEngine {
       }
 
       case 'start': {
-        // 起点格子：天赋学习在后面处理
         break;
       }
 
@@ -256,47 +224,6 @@ export class DecisionEngine {
         // 未知格子类型 — 记录以便检测新格子类型
         break;
       }
-    }
-
-    return null;
-  }
-
-  /** 天赋系统操作（学习/切换/取消） */
-  private checkTalentActions(state: GameStateSnapshot): Decision | null {
-    if (!this.config.autoTalent) return null;
-
-    const now = Date.now();
-
-    // 在起点且有天赋点 → 学习天赋
-    if (state.talentPoints > 0 && state.position === 0) {
-      // 随机选择一个未学习的天赋
-      const unlearned = ALL_TALENTS.filter(t => !state.learnedTalents.includes(t));
-      if (unlearned.length > 0) {
-        const talentId = unlearned[Math.floor(Math.random() * unlearned.length)];
-        return { type: 'learnTalent', talentId };
-      }
-    }
-
-    // 每 60 秒切换一次天赋启用状态（覆盖 toggleTalent）
-    if (now - this.lastToggleTalentTime > 60000 && state.learnedTalents.length > 0) {
-      this.lastToggleTalentTime = now;
-      const talentId = state.learnedTalents[this.talentRotationIndex % state.learnedTalents.length];
-      this.talentRotationIndex++;
-      // 随机启用/禁用
-      const enabled = Math.random() < 0.5;
-      return { type: 'toggleTalent', talentId, enabled };
-    }
-
-    // 每 90 秒查询一次天赋信息（覆盖 getTalentInfo）
-    if (now - this.lastTalentInfoTime > 90000) {
-      this.lastTalentInfoTime = now;
-      return { type: 'getTalentInfo' };
-    }
-
-    // 偶尔取消一个天赋再重新学习（覆盖 unlearnTalent，仅在起点）
-    if (state.position === 0 && state.learnedTalents.length > 0 && Math.random() < 0.05) {
-      const talentId = state.learnedTalents[Math.floor(Math.random() * state.learnedTalents.length)];
-      return { type: 'unlearnTalent', talentId };
     }
 
     return null;
@@ -380,18 +307,6 @@ export class DecisionEngine {
     if (now - this.lastPingTime > 30000) {
       this.lastPingTime = now;
       return { type: 'ping' };
-    }
-
-    // 查询道具列表（每 60 秒）
-    if (now - this.lastGetItemsTime > 60000) {
-      this.lastGetItemsTime = now;
-      return { type: 'getItems' };
-    }
-
-    // 请求道具掉落（每 120 秒，覆盖 requestItemDrop）
-    if (now - this.lastItemDropTime > 120000) {
-      this.lastItemDropTime = now;
-      return { type: 'requestItemDrop' };
     }
 
     return null;

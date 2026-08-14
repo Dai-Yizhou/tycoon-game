@@ -10,17 +10,12 @@ export class DecisionMaker {
   }
   
   makeDecision(state: GameStateSnapshot): DecisionType | Decision {
-    const { money, credit, properties, currentCell, isAlive, talentPoints, learnedTalents, investments, totalDebt, netWorth } = state;
+    const { money, credit, properties, currentCell, isAlive, investments, totalDebt, netWorth } = state;
     
     if (!isAlive) return { type: 'rollDice' };
     if (!currentCell) return { type: 'rollDice' };
     
     const cellType = normalizeCellType(currentCell);
-    
-    if (talentPoints > 0) {
-      const talentDecision = this.decideTalent(state);
-      if (talentDecision) return talentDecision;
-    }
     
     if (cellType === CellTypes.Property) {
       const owners = getExtra<string[]>(currentCell, 'owners', []);
@@ -422,48 +417,4 @@ export class DecisionMaker {
     return { type: 'rollDice' };
   }
   
-  private decideTalent(state: GameStateSnapshot): Decision | null {
-    const { talentPoints, learnedTalents, money, properties, netWorth } = state;
-    const { talentPriority, talentUnlockOrder, talentSynergyWeight, gainSeeking, longTermGainWeight } = this.gene;
-    
-    if (talentPoints <= 0) return null;
-    
-    const economicTalents = ['economist', 'vision_basic', 'credit_enable', 'money', 'bank', 'loan', 'income'];
-    const strategicTalents = ['explorer', 'investor', 'monopolist', 'property', 'invest'];
-    
-    const learnedEconomic = learnedTalents.filter(t => 
-      economicTalents.some(e => t.toLowerCase().includes(e))
-    ).length;
-    const learnedStrategic = learnedTalents.filter(t => 
-      strategicTalents.some(s => t.toLowerCase().includes(s))
-    ).length;
-    
-    let learnScore = 0;
-    
-    learnScore += talentPriority * 2.5;
-    learnScore += longTermGainWeight * 2;
-    
-    const synergyBonus = Math.min(learnedEconomic + learnedStrategic, 4) * talentSynergyWeight * 0.5;
-    learnScore += synergyBonus;
-    
-    const wealthFactor = Math.min(netWorth / 50000, 1);
-    learnScore += wealthFactor * gainSeeking;
-    
-    const propertyFactor = Math.min(properties.length / 6, 1);
-    learnScore += propertyFactor * 0.5;
-    
-    const category: 'economic' | 'strategic' | 'random' = talentUnlockOrder > 0.5 
-      ? (learnedEconomic > learnedStrategic ? 'strategic' : 'economic')
-      : (learnedStrategic > learnedEconomic ? 'economic' : 'random');
-    
-    if (learnScore > 1.5 + talentPriority) {
-      return { type: 'learnTalent', talentCategory: category };
-    }
-    
-    if (learnScore > 0.8 && Math.random() < talentPriority * 0.5) {
-      return { type: 'learnTalent', talentCategory: category };
-    }
-    
-    return null;
-  }
 }

@@ -11,7 +11,6 @@ export interface FitnessWeights {
   comeback: number;
   netWorth: number;
   debt: number;
-  talent: number;
 }
 
 export const DEFAULT_WEIGHTS: FitnessWeights = {
@@ -24,7 +23,6 @@ export const DEFAULT_WEIGHTS: FitnessWeights = {
   comeback: 0.08,
   netWorth: 0.12,
   debt: 0.03,
-  talent: 0.02
 };
 
 export class FitnessEvaluator {
@@ -72,7 +70,6 @@ export class FitnessEvaluator {
       comebackScore: Math.min(state.comebackScore / 15, 1),
       netWorthScore: Math.min(Math.max(netWorth / 100000, 0), 1),
       debtScore: totalDebt > 0 ? Math.max(0, 1 - totalDebt / Math.max(netWorth, 1)) : 1,
-      talentScore: Math.min((state.talentCount ?? 0) / 6, 1)
     };
   }
   
@@ -108,7 +105,6 @@ export class FitnessEvaluator {
       this.weights.comeback * scores.comebackScore +
       this.weights.netWorth * (scores as any).netWorthScore +
       this.weights.debt * (scores as any).debtScore +
-      this.weights.talent * (scores as any).talentScore
     );
   }
 }

@@ -23,9 +23,6 @@ export interface Gene {
   longTermGainWeight: number;
   safetyFactor: number;
   
-  talentPriority: number;
-  talentUnlockOrder: number;
-  talentSynergyWeight: number;
   
   teamPreference: number;
   teamTrustThreshold: number;
@@ -45,7 +42,6 @@ export const GENE_PARAMS: (keyof Gene)[] = [
   'loanThreshold', 'loanAmountRatio', 'repayThreshold', 'interestTolerance',
   'reserveRatio', 'emergencyReserveRatio',
   'pathPreference', 'shortTermGainWeight', 'longTermGainWeight', 'safetyFactor',
-  'talentPriority', 'talentUnlockOrder', 'talentSynergyWeight',
   'teamPreference', 'teamTrustThreshold', 'tradeWillingness',
   'riskTolerance', 'monopolyStrategy', 'lossAversion', 'gainSeeking'
 ];
@@ -75,9 +71,6 @@ export class GeneClass implements Gene {
   longTermGainWeight: number = 0;
   safetyFactor: number = 0;
   
-  talentPriority: number = 0;
-  talentUnlockOrder: number = 0;
-  talentSynergyWeight: number = 0;
   
   teamPreference: number = 0;
   teamTrustThreshold: number = 0;
@@ -114,9 +107,6 @@ export class GeneClass implements Gene {
       this.longTermGainWeight = values.longTermGainWeight ?? 0;
       this.safetyFactor = values.safetyFactor ?? 0;
       
-      this.talentPriority = values.talentPriority ?? 0;
-      this.talentUnlockOrder = values.talentUnlockOrder ?? 0;
-      this.talentSynergyWeight = values.talentSynergyWeight ?? 0;
       
       this.teamPreference = values.teamPreference ?? 0;
       this.teamTrustThreshold = values.teamTrustThreshold ?? 0;

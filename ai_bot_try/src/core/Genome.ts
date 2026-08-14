@@ -12,7 +12,6 @@ export interface FitnessScores {
   comebackScore: number;
   netWorthScore?: number;
   debtScore?: number;
-  talentScore?: number;
 }
 
 export class Genome {

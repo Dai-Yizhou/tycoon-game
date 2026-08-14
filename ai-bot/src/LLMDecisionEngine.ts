@@ -101,14 +101,6 @@ export class LLMDecisionEngine {
 所有者: ${(state.currentCell.extra['owners'] as string[] | undefined)?.join(', ') || '无主'}`
       : '无当前格子信息';
 
-    const itemsInfo = state.items.length > 0
-      ? state.items.map(i => `- ${i.name || i.id} x${i.quantity}`).join('\n')
-      : '无道具';
-
-    const talentsInfo = state.learnedTalents.length > 0
-      ? state.learnedTalents.join(', ')
-      : '无';
-
     return `你正在玩大富翁.io 游戏。请根据当前游戏状态，决定下一步行动。
 
 ## 你的性格设定
@@ -122,8 +114,6 @@ ${this.customStrategy}
 - 金钱: ${state.money}
 - 信用值: ${state.credit}
 - 状态: ${state.status}
-- 天赋点: ${state.talentPoints}
-- 已学天赋: ${talentsInfo}
 - 昼夜: ${state.isDay ? '白天' : '夜晚'}
 - 掷骰冷却: ${state.cooldownActive ? '冷却中' : '可用'}
 - 上次掷骰: ${state.lastDiceResult || '无'} (${state.lastDiceSteps || 0}步)
@@ -131,9 +121,6 @@ ${this.customStrategy}
 
 ## 当前格子信息
 ${cellInfo}
-
-## 道具
-${itemsInfo}
 
 ## 其他玩家
 ${otherPlayersInfo || '无其他玩家'}
@@ -150,9 +137,7 @@ ${state.pendingTeamInvite ? `- 组队邀请: 来自 ${state.pendingTeamInvite.in
 - acceptTeamInvite: 接受组队邀请
 - rejectTeamInvite: 拒绝组队邀请
 - inviteToTeam: 邀请其他玩家组队
-- learnTalent: 学习天赋（在起点且有天赋点时）
 - repairMonument: 修缮纪念碑
-- useItem: 使用道具
 - chat: 发送聊天消息
 - leaveTeam: 离开队伍
 - useTransport: 使用交通枢纽传送
@@ -164,10 +149,8 @@ ${state.pendingTeamInvite ? `- 组队邀请: 来自 ${state.pendingTeamInvite.in
   "reason": "简短的决策理由（中文，1-2句话）",
   "params": {
     "cellId": 123,
-    "talentId": "credit",
     "content": "聊天内容",
     "targetPlayerId": "player-id",
-    "itemId": "item-id"
   }
 }
 
@@ -249,21 +232,9 @@ params 中的字段根据 action 类型可选填写。
           }
           break;
 
-        case 'learnTalent':
-          if (params.talentId && state.talentPoints > 0 && state.position === 0) {
-            return { type: 'learnTalent', talentId: params.talentId };
-          }
-          break;
-
         case 'repairMonument':
           if (state.currentCell) {
             return { type: 'repairMonument', monumentId: state.currentCell.id };
-          }
-          break;
-
-        case 'useItem':
-          if (params.itemId) {
-            return { type: 'useItem', itemId: params.itemId, targetCellId: params.cellId };
           }
           break;
 

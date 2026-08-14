@@ -38,7 +38,6 @@ export class BotManager {
       autoBuy: config.autoBuy ?? true,
       autoUpgrade: config.autoUpgrade ?? true,
       autoTeam: config.autoTeam ?? true,
-      autoTalent: config.autoTalent ?? true,
       reserveMoney: config.reserveMoney ?? 500,
       logDir: config.logDir ?? './logs',
     };

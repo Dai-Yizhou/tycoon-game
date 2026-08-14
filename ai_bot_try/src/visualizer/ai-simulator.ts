@@ -371,7 +371,6 @@ app.post('/api/board-battle', async (req, res) => {
         position: p.position.cellId,
         isAlive: p.status !== 2,
         properties: currentGameAdapter.getPlayerProperties ? currentGameAdapter.getPlayerProperties(p.id).length : 0,
-        talentPoints: p.values['talentPoints']?.current || 0
       })),
       maxTurns: 200,
       paused: true
@@ -537,7 +536,7 @@ function calculatePlayerScore(player: any): number {
   return money + credit * 100;
 }
 
-function getActionDescription(decision: { type: string; loanAmountRatio?: number; repayAmountRatio?: number; talentCategory?: string }, snapshot: GameStateSnapshot, player: any): string {
+function getActionDescription(decision: { type: string; loanAmountRatio?: number; repayAmountRatio?: number }, snapshot: GameStateSnapshot, player: any): string {
   const cellName = snapshot.currentCell ? getExtra<string>(snapshot.currentCell, 'name', '') : '';
   switch (decision.type) {
     case 'rollDice':
@@ -556,9 +555,6 @@ function getActionDescription(decision: { type: string; loanAmountRatio?: number
     case 'repay':
       const repayAmount = decision.repayAmountRatio !== undefined ? Math.round(decision.repayAmountRatio * 100) : 50;
       return `偿还贷款 (${repayAmount}%)`;
-    case 'learnTalent':
-      const category = decision.talentCategory === 'economic' ? '经济' : '战略';
-      return `学习${category}天赋`;
     default:
       return decision.type;
   }

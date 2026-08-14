@@ -52,7 +52,6 @@ export type BrowserActionType =
   | 'clickBuy'
   | 'clickUpgrade'
   | 'clickClose'
-  | 'clickTalent'
   | 'clickTeam'
   | 'clickDirection'
   | 'typeChat'
@@ -72,7 +71,7 @@ export interface BrowserAction {
 
 /** 浏览器中可点击的按钮标识 */
 export interface VisibleButton {
-  /** 按钮标识（dice / buy / upgrade / close / talent / team） */
+  /** 按钮标识（dice / buy / upgrade / close / team） */
   id: string;
   /** 按钮显示文本 */
   text: string;
@@ -981,11 +980,6 @@ export class BrowserAIPlayer {
         keywords: ['关闭', 'close', 'Close', '×', '取消', '跳过', '下一步', '确认', '开始'],
       },
       {
-        id: 'talent',
-        selectors: ['.page-card-btn[title*="天赋"]', '#talent-panel', '[data-panel="talent"]', '[data-action="talent"]'],
-        keywords: ['天赋', 'talent', 'Talent', '学习'],
-      },
-      {
         id: 'team',
         selectors: ['#team-button', '[data-action="team"]', '[data-panel="team"]', 'button'],
         keywords: ['组队', 'team', 'Team', '队伍'],
@@ -1361,7 +1355,7 @@ export class BrowserAIPlayer {
    */
   private buildVisionPrompt(): string {
     return `分析这张大富翁游戏截图，输出JSON决定下一步操作。
-动作: clickDice(掷骰)|clickBuy(购买)|clickUpgrade(升级)|clickClose(关弹窗)|clickTalent(天赋)|wait(等待)
+动作: clickDice(掷骰)|clickBuy(购买)|clickUpgrade(升级)|clickClose(关弹窗)|wait(等待)
 优先级: 有弹窗先关弹窗，否则掷骰推进游戏。
 {"description":"画面描述","state":{"money":0,"position":0,"availableButtons":["dice"]},"action":{"type":"clickDice","reason":"理由"}}`;
   }
@@ -1464,8 +1458,6 @@ export class BrowserAIPlayer {
         return '.modal-close, [data-action="close"], .close, .btn-cancel, .modal-overlay .btn-cancel, button[class*="cancel"]';
       case 'clickDirection':
         return '.direction-option, .path-option, .junction-option, [data-direction], .cell-node.selectable, .map-cell.selectable, .option-node';
-      case 'clickTalent':
-        return '#talent-panel, [data-panel="talent"], [data-action="talent"]';
       case 'clickTeam':
         return '#team-button, [data-action="team"], [data-panel="team"]';
       case 'typeChat':
@@ -1485,7 +1477,6 @@ export class BrowserAIPlayer {
       upgrade: '#upgrade-button, [data-action="upgrade"]',
       close: '.modal-close, [data-action="close"], .btn-cancel, .modal-overlay .btn-cancel',
       direction: '.direction-option, [data-direction], .cell-node.selectable',
-      talent: '#talent-panel, [data-action="talent"]',
       team: '#team-button, [data-action="team"]',
     };
     return mapping[buttonId] || '';
@@ -1495,7 +1486,7 @@ export class BrowserAIPlayer {
    * 校验动作类型是否合法
    */
   private isValidActionType(type: string): type is BrowserActionType {
-    return ['clickDice', 'clickBuy', 'clickUpgrade', 'clickClose', 'clickTalent', 'clickTeam', 'clickDirection', 'typeChat', 'wait'].includes(type);
+    return ['clickDice', 'clickBuy', 'clickUpgrade', 'clickClose', 'clickTeam', 'clickDirection', 'typeChat', 'wait'].includes(type);
   }
 
   /**
@@ -1674,7 +1665,7 @@ export class BrowserAIPlayer {
     // 4. 有弹窗时关闭（刚打开的天赋/组队面板除外，避免死循环）
     const closeBtn = hasButton('close');
     const lastActionType = this.lastAction?.type;
-    const justOpenedPanel = lastActionType === 'clickTalent' || lastActionType === 'clickTeam';
+    const justOpenedPanel = lastActionType === 'clickTeam';
     if (closeBtn && hasModal && !justOpenedPanel && this.consecutiveCloseFailures < 3) {
       return { type: 'clickClose', selector: closeBtn.selector, reason: '检测到弹窗，关闭后继续游戏' };
     }
@@ -1683,10 +1674,6 @@ export class BrowserAIPlayer {
     }
 
     // 5. 有天赋面板入口时打开天赋（仅当无阻塞弹窗时）
-    const talentBtn = hasButton('talent');
-    if (talentBtn && !hasModal) {
-      return { type: 'clickTalent', selector: talentBtn.selector, reason: '检测到天赋面板可用' };
-    }
 
     // 6. 无可执行操作
     return { type: 'wait', reason: '当前无可用按钮，等待' };
@@ -1805,13 +1792,6 @@ export class BrowserAIPlayer {
               direction: action.text || action.selector,
             });
           }
-        }
-        break;
-
-      case 'clickTalent':
-        if (action.selector) {
-          await this.clickElement(action.selector);
-          this.logger.action('已点击天赋面板');
         }
         break;
 
@@ -2010,8 +1990,6 @@ export class BrowserAIPlayer {
       otherPlayers: new Map(),
       currentCell: null,
       team: null,
-      talentPoints: 0,
-      learnedTalents: [],
       isDay: true,
       cycleMinutes: 15,
       lastDiceResult: 0,
@@ -2020,7 +1998,6 @@ export class BrowserAIPlayer {
       pendingPathChoice: null,
       pendingTeamInvite: null,
       ownedPropertyIds: new Set(),
-      items: [],
       mortgagedProperties: [],
       investments: [],
       unimplementedOperations: [],

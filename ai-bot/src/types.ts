@@ -29,7 +29,6 @@ export interface Player {
   teamId: string | null;
   position: PlayerPosition;
   values: Record<string, ValueField>;
-  items: unknown[];
   status: PlayerStatus;
   createdAt: number;
   lastActiveAt: number;
@@ -84,7 +83,6 @@ export interface BotConfig {
   autoBuy: boolean;
   autoUpgrade: boolean;
   autoTeam: boolean;
-  autoTalent: boolean;
   reserveMoney: number;
   logDir: string;
   useLLM?: boolean;
@@ -102,8 +100,6 @@ export interface GameStateSnapshot {
   otherPlayers: Map<string, { id: string; username: string; position: number; status: PlayerStatus }>;
   currentCell: Cell | null;
   team: Team | null;
-  talentPoints: number;
-  learnedTalents: string[];
   isDay: boolean;
   cycleMinutes: number;
   lastDiceResult: number;
@@ -112,18 +108,9 @@ export interface GameStateSnapshot {
   pendingPathChoice: { fromCellId: number; options: { cellId: number; label?: string }[] } | null;
   pendingTeamInvite: { inviterId: string; inviterName: string; teamId: string } | null;
   ownedPropertyIds: Set<number>;
-  items: Item[];
   mortgagedProperties: MortgagedProperty[];
   investments: InvestmentHolding[];
   unimplementedOperations: string[];
-}
-
-export interface Item {
-  id: string;
-  type: string;
-  name?: string;
-  quantity: number;
-  metadata?: Record<string, unknown>;
 }
 
 export interface MortgagedProperty {

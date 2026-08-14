@@ -132,8 +132,6 @@ export class GameSimulator {
           currentCell: null,
           isTurn: postSnapshot.isTurn,
           isAlive: postSnapshot.isAlive,
-          talentPoints: 0,
-          learnedTalents: [],
           totalDebt: 0,
           netWorth: postSnapshot.money
         };
@@ -332,7 +330,7 @@ export class GameSimulator {
       totalActions: Math.max(totalActions, 1),
       successfulActions: Math.max(snapshot.properties.length + snapshot.investments.length, 1),
       totalInvestments: totalInvested, investmentReturns, comebackScore, survivalTurns,
-      totalDebt: snapshot.totalDebt, netWorth: snapshot.netWorth, talentCount: snapshot.learnedTalents.length
+      totalDebt: snapshot.totalDebt, netWorth: snapshot.netWorth
     };
   }
 
@@ -346,7 +344,6 @@ export class GameSimulator {
       totalInvestments: player.totalInvestments, investmentReturns: player.investmentReturns,
       comebackScore, survivalTurns, totalDebt: 0,
       netWorth: player.money + player.properties.reduce((sum, p) => sum + p.price, 0),
-      talentCount: 0
     };
   }
 

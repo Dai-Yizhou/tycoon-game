@@ -20,7 +20,6 @@ interface ParsedArgs {
   autoBuy: boolean;
   autoUpgrade: boolean;
   autoTeam: boolean;
-  autoTalent: boolean;
   reserveMoney: number;
   logDir: string;
   dashboard: boolean;
@@ -51,7 +50,6 @@ function parseArgs(argv: string[]): ParsedArgs {
     autoBuy: true,
     autoUpgrade: true,
     autoTeam: true,
-    autoTalent: true,
     reserveMoney: 500,
     logDir: '/Volumes/T7_APFS/monopoly-io-game/ai-bot/logs',
     dashboard: false,
@@ -85,7 +83,6 @@ function parseArgs(argv: string[]): ParsedArgs {
       case '--no-buy': args.autoBuy = false; break;
       case '--no-upgrade': args.autoUpgrade = false; break;
       case '--no-team': args.autoTeam = false; break;
-      case '--no-talent': args.autoTalent = false; break;
       case '--reserve': args.reserveMoney = parseInt(next ?? '500', 10) || 500; i++; break;
       case '--log-dir': args.logDir = next ?? args.logDir; i++; break;
       case '--dashboard': args.dashboard = true; break;
@@ -122,7 +119,6 @@ AI 玩家程序 - 自动进行游戏操作并生成自然语言日志
   --no-buy            禁用自动购买
   --no-upgrade        禁用自动升级
   --no-team           禁用自动组队
-  --no-talent         禁用自动学习天赋
   --reserve <n>       购买保留资金（默认 500）
 
 日志与面板:
@@ -179,7 +175,6 @@ async function main(): Promise<void> {
   console.log(`  自动购买: ${args.autoBuy}`);
   console.log(`  自动升级: ${args.autoUpgrade}`);
   console.log(`  自动组队: ${args.autoTeam}`);
-  console.log(`  自动天赋: ${args.autoTalent}`);
   console.log(`  保留资金: ${args.reserveMoney}`);
   console.log(`  日志目录: ${args.logDir}`);
   console.log(`  控制面板: ${args.dashboard ? '启用 (端口 ' + args.dashboardPort + ')' : '禁用'}`);
@@ -257,7 +252,6 @@ async function main(): Promise<void> {
       autoBuy: args.autoBuy,
       autoUpgrade: args.autoUpgrade,
       autoTeam: args.autoTeam,
-      autoTalent: args.autoTalent,
       reserveMoney: args.reserveMoney,
       logDir: args.logDir,
     };

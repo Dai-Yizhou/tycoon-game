@@ -179,11 +179,6 @@ export class GameAdvisor {
     }
 
     // 检查天赋系统
-    if (state.talentPoints > 0 && state.position === 0) {
-      // 正常情况，有天赋点且在起点
-    } else if (state.talentPoints > 5) {
-      this.addObservation('balance', `天赋点累积过多（${state.talentPoints}），可能缺少学习天赋的途径`);
-    }
 
     // 检查未实现的操作
     for (const op of state.unimplementedOperations) {

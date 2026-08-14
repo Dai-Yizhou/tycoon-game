@@ -1,7 +1,7 @@
 import server from '@game/server';
 import { PlayerStatus, type Cell, type Player, type MapData, type MapMeta } from '@game/shared';
 import { getExtra, normalizeCellType, CellTypes, parseMapData, parseMapMeta, getValueCurrent } from '@game/shared';
-const { GameWorld, Bank, DEFAULT_BANK_CONFIG, TalentHandler, TalentRegistry, HandlerRegistry } = server;
+const { GameWorld, Bank, DEFAULT_BANK_CONFIG, HandlerRegistry } = server;
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -10,13 +10,12 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-export type DecisionType = 'rollDice' | 'buy' | 'upgrade' | 'invest' | 'loan' | 'repay' | 'learnTalent';
+export type DecisionType = 'rollDice' | 'buy' | 'upgrade' | 'invest' | 'loan' | 'repay';
 
 export interface Decision {
   type: DecisionType;
   loanAmountRatio?: number;
   repayAmountRatio?: number;
-  talentCategory?: 'economic' | 'strategic' | 'random';
 }
 
 export interface GameStateSnapshot {
@@ -29,8 +28,6 @@ export interface GameStateSnapshot {
   currentCell: Cell | null;
   isTurn: boolean;
   isAlive: boolean;
-  talentPoints: number;
-  learnedTalents: string[];
   totalDebt: number;
   netWorth: number;
 }
@@ -78,8 +75,6 @@ class MockTypedServer {
 export class RealGameAdapter {
   private world: GameWorld;
   private bank: Bank;
-  private talentRegistry: TalentRegistry;
-  private talentHandler: TalentHandler;
   private handlerRegistry: HandlerRegistry;
   currentTurn: number;
   private maxTurns: number;
@@ -108,11 +103,7 @@ export class RealGameAdapter {
     this.handlerRegistry = new HandlerRegistry(this.mockIo as any, this.world);
     
     this.bank = new Bank(this.world, DEFAULT_BANK_CONFIG);
-    this.talentRegistry = new TalentRegistry();
-    this.talentHandler = new TalentHandler(this.mockIo as any, this.world, {} as any, this.talentRegistry);
-
     for (const player of players) {
-      this.talentHandler.initializePlayerTalentPoints(player.id, 5);
       const socket = new MockTypedSocket((event, data) => {
         this.emitter.emit('playerEvent', { playerId: player.id, event, data });
       });
@@ -144,7 +135,6 @@ export class RealGameAdapter {
         values: {
           money: { id: 'money', name: '财产', current: 10000, min: 0 },
           credit: { id: 'credit', name: '信用值', current: 50, min: 0, max: 100 },
-          talentPoints: { id: 'talentPoints', name: '天赋值', current: 5, min: 0 }
         },
         items: [],
         status: PlayerStatus.Normal,
@@ -172,8 +162,6 @@ export class RealGameAdapter {
         currentCell: null,
         isTurn: false,
         isAlive: false,
-        talentPoints: 0,
-        learnedTalents: [],
         totalDebt: 0,
         netWorth: 0
       };
@@ -181,7 +169,6 @@ export class RealGameAdapter {
 
     const money = getValueCurrent(player, 'money', 0);
     const credit = getValueCurrent(player, 'credit', 50);
-    const talentPoints = getValueCurrent(player, 'talentPoints', 0);
     const totalDebt = this.bank.getPlayerTotalDebt(playerId);
     const netWorth = this.bank.getPlayerNetWorth(playerId);
 
@@ -191,7 +178,6 @@ export class RealGameAdapter {
 
     const properties = this.getPlayerProperties(playerId);
     const investments = this.getPlayerInvestments(playerId);
-    const learnedTalents = this.talentRegistry.getPlayerTalents(playerId).map(t => t.talentId);
 
     return {
       playerId,
@@ -203,8 +189,6 @@ export class RealGameAdapter {
       currentCell,
       isTurn: true,
       isAlive: player.status !== PlayerStatus.Bankrupt,
-      talentPoints,
-      learnedTalents,
       totalDebt,
       netWorth
     };
@@ -235,9 +219,6 @@ export class RealGameAdapter {
         break;
       case 'repay':
         this.repayLoan(player, decisionParams.repayAmountRatio);
-        break;
-      case 'learnTalent':
-        this.learnTalent(player, decisionParams.talentCategory);
         break;
     }
 
@@ -498,53 +479,6 @@ export class RealGameAdapter {
       this.addAction(player.id, `还款 ${repayAmount} 元，信用值+${result.creditChange}`);
     } else {
       this.addAction(player.id, `还款失败: ${result.error}`);
-    }
-  }
-
-  private learnTalent(player: Player, categoryPreference?: 'economic' | 'strategic' | 'random'): void {
-    const talents = this.talentRegistry.getAllTalents();
-    const learned = this.talentRegistry.getPlayerTalents(player.id);
-    const available = talents.filter(t => !learned.some(l => l.talentId === t.id));
-
-    if (available.length === 0) {
-      this.addAction(player.id, '没有可学习的天赋');
-      return;
-    }
-
-    const affordable = available.filter(t => t.talentPointsCost <= this.talentRegistry.getPlayerTalentPoints(player.id));
-    if (affordable.length === 0) {
-      this.addAction(player.id, '天赋值不足');
-      return;
-    }
-    
-    let candidates = affordable;
-    const pref = categoryPreference ?? 'random';
-    
-    if (pref !== 'random') {
-      const economicKeywords = ['econom', 'money', 'credit', 'loan', 'bank', '收入', '经济', '财富', '金融'];
-      const strategicKeywords = ['invest', 'property', 'monopoly', 'explor', '战略', '投资', '垄断', '探索'];
-      
-      const isEconomic = (t: any) => economicKeywords.some(k => 
-        (t.id || '').toLowerCase().includes(k) || (t.name || '').toLowerCase().includes(k)
-      );
-      const isStrategic = (t: any) => strategicKeywords.some(k => 
-        (t.id || '').toLowerCase().includes(k) || (t.name || '').toLowerCase().includes(k)
-      );
-      
-      if (pref === 'economic') {
-        const economicTalents = affordable.filter(isEconomic);
-        if (economicTalents.length > 0) candidates = economicTalents;
-      } else if (pref === 'strategic') {
-        const strategicTalents = affordable.filter(isStrategic);
-        if (strategicTalents.length > 0) candidates = strategicTalents;
-      }
-    }
-
-    const talent = candidates[Math.floor(Math.random() * candidates.length)];
-    const result = this.talentRegistry.learnTalent(player.id, talent.id);
-
-    if (result.success) {
-      this.addAction(player.id, `学习天赋: ${talent.name}`);
     }
   }
 

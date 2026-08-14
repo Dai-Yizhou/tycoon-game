@@ -59,7 +59,7 @@ export function startDashboard(options: DashboardOptions = {}): (entry: LogEntry
   });
 
   app.post('/api/bots/create', async (req, res) => {
-    const { username, serverUrl, guest, decisionInterval, autoBuy, autoUpgrade, autoTeam, autoTalent, reserveMoney } = req.body;
+    const { username, serverUrl, guest, decisionInterval, autoBuy, autoUpgrade, autoTeam, reserveMoney } = req.body;
 
     if (!username) {
       res.status(400).json({ error: '用户名不能为空' });
@@ -80,7 +80,6 @@ export function startDashboard(options: DashboardOptions = {}): (entry: LogEntry
         autoBuy,
         autoUpgrade,
         autoTeam,
-        autoTalent,
         reserveMoney,
       });
       res.json({ success: true, bot: bot.getFullState() });
@@ -728,7 +727,6 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
           <option value="rollDice">掷骰</option>
           <option value="buyProperty">购买地产</option>
           <option value="upgradeProperty">升级地产</option>
-          <option value="learnTalent">学习天赋</option>
           <option value="chat">发送聊天</option>
           <option value="repairMonument">修缮纪念碑</option>
         </select>
@@ -752,7 +750,6 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
         <label><input type="checkbox" id="addbot-buy" style="width:auto;margin-right:6px;" checked /> 自动购买</label>
         <label><input type="checkbox" id="addbot-upgrade" style="width:auto;margin-right:6px;" checked /> 自动升级</label>
         <label><input type="checkbox" id="addbot-team" style="width:auto;margin-right:6px;" checked /> 自动组队</label>
-        <label><input type="checkbox" id="addbot-talent" style="width:auto;margin-right:6px;" checked /> 自动天赋</label>
         <button id="btn-add-bot">创建并启动 AI 玩家</button>
         <div id="addbot-status" style="margin-top: 8px; font-size: 12px; color: #8b949e;"></div>
       </div>
@@ -1445,7 +1442,6 @@ async function addBot() {
   var autoBuy = document.getElementById('addbot-buy').checked;
   var autoUpgrade = document.getElementById('addbot-upgrade').checked;
   var autoTeam = document.getElementById('addbot-team').checked;
-  var autoTalent = document.getElementById('addbot-talent').checked;
   var statusEl = document.getElementById('addbot-status');
 
   if (!username) {
@@ -1467,7 +1463,6 @@ async function addBot() {
         autoBuy: autoBuy,
         autoUpgrade: autoUpgrade,
         autoTeam: autoTeam,
-        autoTalent: autoTalent
       })
     });
     var data = await response.json();

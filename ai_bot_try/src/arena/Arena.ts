@@ -28,7 +28,6 @@ export interface SimPlayerState {
   survivalTurns?: number;
   totalDebt?: number;
   netWorth?: number;
-  talentCount?: number;
 }
 
 export class Arena {

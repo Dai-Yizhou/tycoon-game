@@ -44,11 +44,10 @@ interface OtherPlayerTracker {
 }
 
 interface PendingAction {
-  type: 'rollDice' | 'buyProperty' | 'upgradeProperty' | 'joinTeam' | 'learnTalent';
+  type: 'rollDice' | 'buyProperty' | 'upgradeProperty' | 'joinTeam';
   startTime: number;
   cellId?: number;
   teamId?: string;
-  talentId?: string;
 }
 
 export class BugDetector {
@@ -168,14 +167,6 @@ export class BugDetector {
   /** 组队成功 */
   onTeamJoined(): void {
     const idx = this.pendingActions.findIndex(a => a.type === 'joinTeam');
-    if (idx >= 0) {
-      this.pendingActions.splice(idx, 1);
-    }
-  }
-
-  /** 天赋学习成功 */
-  onTalentLearned(): void {
-    const idx = this.pendingActions.findIndex(a => a.type === 'learnTalent');
     if (idx >= 0) {
       this.pendingActions.splice(idx, 1);
     }
