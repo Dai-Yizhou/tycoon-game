@@ -8,7 +8,7 @@
  * - 财产检查
  */
 
-import { describe, it, expect, beforeEach, vi } from '@jest/globals';
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { TransportHandler, type TransportResult, type TransportNetworkState } from '../../src/handlers/transportHandler.js';
 import { GameWorld } from '../../src/world/GameWorld.js';
 import type { TypedServer, TypedSocket } from '../../src/transport/SocketManager.js';
@@ -19,15 +19,15 @@ import { PlayerStatus } from '@game/shared';
 function createMockSocket(playerId?: string): TypedSocket {
   return {
     data: { playerId },
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedSocket;
 }
 
 function createMockIO(): TypedServer {
   return {
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedServer;
 }
 
@@ -40,7 +40,6 @@ function createTestPlayer(id: string, money: number = 1000): Player {
     values: {
       money: { id: 'money', name: '财产', current: money, min: 0 },
     },
-    items: [],
     status: PlayerStatus.Normal,
     createdAt: Date.now(),
     lastActiveAt: Date.now(),
@@ -77,19 +76,17 @@ function createTestMapMeta(): MapMeta {
     id: 'test-map',
     name: 'Test Map',
     version: '1.0.0',
+    templateName: 'default',
+    timezones: [
+      { id: 'tz-1', offsetMinutes: 0, cellIds: [0, 1, 2, 3, 4] },
+    ],
+    regions: [],
     valueFieldDefinitions: [
       { id: 'money', name: '财产', current: 1000, min: 0 },
     ],
-    timezoneConfig: {
-      globalTimezone: 'Asia/Shanghai',
-      cellTimezones: {},
-    },
-    eraInfo: {
-      currentEraId: 'era-1',
-      eraName: '测试时代',
-      startDate: Date.now(),
-      endDate: Date.now() + 86400000 * 30,
-    },
+    dayNightCycleMinutes: 15,
+    startCellId: 0,
+    config: {},
   };
 }
 
@@ -103,12 +100,12 @@ describe('TransportHandler', () => {
     world = new GameWorld();
     mockIO = createMockIO();
     mockSocket = createMockSocket('player1');
-    handler = new TransportHandler(mockIO, world);
 
-    // 加载测试地图
+    // 先加载地图，再创建 handler（TransportHandler 构造时读取地图初始化枢纽网络）
     const mapData = createTestMapData();
     const mapMeta = createTestMapMeta();
     world.loadMap(mapData, mapMeta);
+    handler = new TransportHandler(mockIO, world);
   });
 
   describe('TR-13.1: 付费传送', () => {
@@ -224,7 +221,7 @@ describe('TransportHandler', () => {
 
       // 结果应该为 null（因为财产不足）
       expect(result).not.toBeNull(); // executeTransport 不检查财产，只执行操作
-      expect(player.values['money'].current).toBe(-20); // 允许负数（由上层检查）
+      expect(player.values['money'].current).toBe(0); // 财产不足时被 clamp 到 0
     });
   });
 

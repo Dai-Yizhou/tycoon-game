@@ -7,8 +7,6 @@
  * - 任意新数值字段（如新增 'reputation'）无需修改本类型，仅在地图配置中定义即可
  */
 
-import type { Item } from './item.js';
-
 /**
  * 玩家状态枚举
  *
@@ -90,8 +88,6 @@ export interface Player {
    * 实际包含哪些字段由地图元数据决定。
    */
   values: Record<string, ValueField>;
-  /** 玩家持有的道具列表 */
-  items: Item[];
   /** 玩家当前状态 */
   status: PlayerStatus;
   /** 玩家创建时间（Unix 毫秒） */

@@ -2,7 +2,7 @@
  * i18n 模块测试
  */
 
-import { t, setLocale, getLocale, getSupportedLocales, getCurrentLocaleData } from '../../src/i18n/index.js';
+import { t, setLocale, getLocale, getSupportedLocales, getCurrentLocaleData } from '../src/i18n/index';
 
 describe('i18n', () => {
   beforeEach(() => {
@@ -28,13 +28,13 @@ describe('i18n', () => {
   describe('t function', () => {
     it('should translate key correctly', () => {
       expect(t('common.loading')).toBe('加载中...');
-      expect(t('game.title')).toBe('大富翁.io');
+      expect(t('game.title')).toBe('rentfree.io');
     });
 
     it('should translate key with params', () => {
       setLocale('zh-CN');
       expect(t('dice.moveSteps', { count: 5 })).toBe('移动 5 步');
-      expect(t('property.rentPaid', { amount: 100 })).toBe('支付租金 100');
+      expect(t('property.rentPaid', { amount: 100 })).toBe('支付租金 100 元');
     });
 
     it('should return key for non-existent translation', () => {
@@ -42,14 +42,14 @@ describe('i18n', () => {
     });
 
     it('should translate nested keys', () => {
-      expect(t('achievement.category.wealth')).toBe('财富类');
-      expect(t('achievement.rarity.legendary')).toBe('传说');
+      expect(t('property.levelFormat', { level: 2 })).toBe('等级 2/4');
+      expect(t('transport.costValue', { cost: 100 })).toBe('💰 100 元');
     });
 
     it('should work with English locale', () => {
       setLocale('en-US');
       expect(t('common.loading')).toBe('Loading...');
-      expect(t('game.title')).toBe('Monopoly.io');
+      expect(t('game.title')).toBe('rentfree.io');
     });
   });
 

@@ -2,7 +2,7 @@
  * StartHandler 和 JailHandler 测试
  */
 
-import { describe, it, expect, beforeEach, vi } from '@jest/globals';
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { StartHandler, DEFAULT_START_CONFIG } from '../../src/handlers/startHandler.js';
 import { JailHandler, DEFAULT_JAIL_CONFIG } from '../../src/handlers/jailHandler.js';
 import { GameWorld } from '../../src/world/GameWorld.js';
@@ -15,23 +15,23 @@ import { PlayerStatus, CellTypes } from '@game/shared';
 function createMockSocket(playerId?: string): TypedSocket {
   return {
     data: { playerId },
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedSocket;
 }
 
 function createMockIO(): TypedServer {
   return {
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedServer;
 }
 
 function createMockRegistry(): HandlerRegistry {
   return {
-    handleMovement: vi.fn(),
-    getJailHandler: vi.fn(),
-    getStartHandler: vi.fn(),
+    handleMovement: jest.fn(),
+    getJailHandler: jest.fn(),
+    getStartHandler: jest.fn(),
   } as unknown as HandlerRegistry;
 }
 
@@ -45,7 +45,6 @@ function createTestPlayer(id: string, cellId: number = 1, status = PlayerStatus.
       money: { id: 'money', name: '资金', current: 1000 },
       credit: { id: 'credit', name: '信用值', current: 100 },
     },
-    items: [],
     status,
     createdAt: Date.now(),
     lastActiveAt: Date.now(),
@@ -120,14 +119,15 @@ describe('StartHandler', () => {
       expect(bonus).toBe(0);
     });
 
-    it('没有 money 字段时应该返回 0', () => {
+    it('没有 money 字段时仍返回默认启动资金', () => {
       const player = createTestPlayer('player1');
       delete player.values.money;
       world.addPlayer(player);
 
       const bonus = handler.handleGameStart('player1');
 
-      expect(bonus).toBe(0);
+      // startHandler 使用 getStartConfig().startBonus（默认 2000），不受 values 缺失影响
+      expect(bonus).toBe(2000);
     });
   });
 

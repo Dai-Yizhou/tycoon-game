@@ -8,7 +8,7 @@ import {
   mapIndex, isMoving, isServerAnimating, remainingSteps, previousCellId,
   playerDisplayX, playerDisplayY, moveFromX, moveFromY, moveToX, moveToY,
   moveStartTime, moveStepDuration, serverPath, serverPathIndex,
-  currentPlayerPosition, gameSocket, talentsLocked,
+  currentPlayerPosition, gameSocket,
   cIcon, cName, easeInOutQuad,
   setCurrentPlayerPosition, setIsMoving, setRemainingSteps, setPreviousCellId,
   setPlayerDisplayPos, setMoveFrom, setMoveTo, setMoveStartTime,
@@ -17,7 +17,6 @@ import {
   renderer, canvasEl,
 } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
-import { addAchievementProgress } from './AchievementSystem.js';
 import { requestHudRefresh } from '../ClientHudBridge.js';
 import { onPlayerArrived } from './GameLogic.js';
 import { t } from '@game/shared';
@@ -84,13 +83,6 @@ export function startServerPathAnimation(path: number[]): void {
   setRemainingSteps(0);
   window.dispatchEvent(new CustomEvent('game:cell-leave'));
   requestHudRefresh();
-  addAchievementProgress('first_move', 1);
-  addAchievementProgress('moves_50', 1);
-  addAchievementProgress('moves_200', 1);
-  if (currentPlayerPosition === 0 && !talentsLocked) {
-    import('../../state/GameStore.js').then(m => m.setTalentsLocked(true));
-    requestHudRefresh();
-  }
   advanceServerPathStep();
 }
 

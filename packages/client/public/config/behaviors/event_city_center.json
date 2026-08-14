@@ -9,7 +9,5 @@
     { "msg": "🎁 商场抽奖获得 100 元", "money": 100, "credit": 0, "env": 0 },
     { "msg": "🌱 参加城市绿化活动，环保值+4", "money": 0, "credit": 3, "env": 4 },
     { "msg": "📉 股票大跌，损失 150 元", "money": -150, "credit": -5, "env": 0 },
-    { "msg": "🔑 获得查封令道具", "money": 0, "credit": 0, "env": 0, "item": "seal" },
-    { "msg": "🩹 获得复活令道具", "money": 0, "credit": 0, "env": 0, "item": "revive" }
   ]
 }

@@ -7,7 +7,7 @@ import type { Player } from '@game/shared';
 import { PlayerStatus } from '@game/shared';
 
 function createPlayer(id: string): Player {
-  return { id, username: `player_${id}`, teamId: null, position: { cellId: 0 }, values: {}, items: [], status: PlayerStatus.Normal, createdAt: Date.now(), lastActiveAt: Date.now() };
+  return { id, username: `player_${id}`, teamId: null, position: { cellId: 0 }, values: {}, status: PlayerStatus.Normal, createdAt: Date.now(), lastActiveAt: Date.now() };
 }
 
 function createSocket(id: string, playerId: string): TypedSocket {

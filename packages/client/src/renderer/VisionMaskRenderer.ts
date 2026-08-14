@@ -4,7 +4,7 @@
  * 负责渲染视野遮罩效果：
  * - 视野内格子正常显示
  * - 视野外格子雾化/变暗
- * - 视野大小由天赋决定（默认可配置）
+ * - 视野大小由渲染配置决定
  * - 视野始终小于棋盘（关键设计）
  */
 
@@ -139,18 +139,14 @@ export class VisionMaskRenderer {
 export const DEFAULT_VISION_RADIUS = 150;
 
 /**
- * 计算视野半径（考虑天赋和道具）
+ * 计算最终视野半径
  *
  * @param baseRadius 基础视野半径
- * @param talentBonus 天赋加成（百分比）
- * @param itemBonus 道具临时加成（百分比）
  * @returns 最终视野半径
  */
 export function calculateVisionRadius(
   baseRadius: number = DEFAULT_VISION_RADIUS,
-  talentBonus: number = 0,
-  itemBonus: number = 0,
+  bonus: number = 0,
 ): number {
-  const totalBonus = talentBonus + itemBonus;
-  return baseRadius * (1 + totalBonus / 100);
+  return baseRadius * (1 + bonus / 100);
 }

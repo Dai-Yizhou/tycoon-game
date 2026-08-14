@@ -9,8 +9,6 @@
     { "msg": "🎁 获得 VIP 优惠券，可抵 100 元", "money": 100, "credit": 0, "env": 0, "weight": 5, "good": true, "creditModifier": 0.3 },
     { "msg": "📉 市场波动，损失 180 元", "money": -180, "credit": 0, "env": 0, "weight": 6, "good": false, "creditModifier": -0.2 },
     { "msg": "⭐ 商业谈判成功，信用值+15", "money": 50, "credit": 15, "env": 0, "weight": 3, "good": true, "creditModifier": 0.8 },
-    { "msg": "🔑 获得查封令道具", "money": 0, "credit": 0, "env": 0, "item": "seal", "weight": 2, "good": true, "creditModifier": 0.1 },
-    { "msg": "🩹 获得复活令道具", "money": 0, "credit": 0, "env": 0, "item": "revive", "weight": 2, "good": true, "creditModifier": 0.1 },
     { "msg": "🌱 企业环保行动，环保值+6", "money": 0, "credit": 3, "env": 6, "weight": 4, "good": true, "creditModifier": 0.4 },
     { "msg": "💎 获得投资指南，投资收益+10%", "money": 0, "credit": 5, "env": 0, "weight": 3, "good": true, "creditModifier": 0.5 }
   ]

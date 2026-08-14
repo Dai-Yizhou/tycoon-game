@@ -207,6 +207,7 @@ export class ProsperityManager extends EventEmitter {
     this.updateTimer = setInterval(() => {
       this.updateAllProsperities();
     }, this.config.updateInterval);
+    this.updateTimer.unref();
 
     logger.info(`繁荣度更新定时器已启动，间隔 ${this.config.updateInterval} 毫秒`);
   }

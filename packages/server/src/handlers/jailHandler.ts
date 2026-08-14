@@ -4,7 +4,7 @@
  * 负责：
  * - 监狱状态管理（踩中监狱格子进入监狱）
  * - 监狱期间惩罚（冷却延长、禁用收租、扣除信用值）
- * - 出狱机制（时间到期或使用道具）
+ * - 出狱机制（时间到期）
  * - 监狱时长配置（从地图元数据读取）
  *
  * 设计原则：
@@ -15,7 +15,7 @@
  */
 
 import type { ValueChangedPayload } from '@game/shared';
-import { CellTypes, ItemTypes, PlayerStatus, getExtra } from '@game/shared';
+import { CellTypes, PlayerStatus, getExtra } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -298,37 +298,6 @@ export class JailHandler {
       logger.error('释放玩家错误', err);
       return false;
     }
-  }
-
-  /**
-   * 使用道具出狱。
-   *
-   * @param playerId 玩家 ID
-   * @param itemId 道具 ID
-   * @returns 是否成功出狱
-   */
-  useItemToRelease(playerId: string, itemId: string): boolean {
-    const player = this.world.getPlayer(playerId);
-    if (!player || player.status !== PlayerStatus.Jail || !player.items) {
-      return false;
-    }
-
-    const item = player.items.find(candidate => candidate.id === itemId);
-    if (!item || item.type !== ItemTypes.Revive || item.quantity < 1) {
-      return false;
-    }
-
-    if (!this.releasePlayer(playerId)) {
-      return false;
-    }
-
-    if (item.quantity > 1) {
-      item.quantity -= 1;
-    } else {
-      player.items = player.items.filter(candidate => candidate.id !== itemId);
-    }
-    this.world.updatePlayer(player);
-    return true;
   }
 
   /**

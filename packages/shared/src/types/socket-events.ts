@@ -36,11 +36,9 @@
 
 import type { Cell } from './cell.js';
 import type { ChatChannel, ChatMessage } from './chat.js';
-import type { Item } from './item.js';
 import type { Player } from './player.js';
 import type { Team, TeamInvite, TeamMemberView } from './team.js';
 import type { ValueField } from './player.js';
-import type { PlayerTalent } from './talent.js';
 
 // ---------------------------------------------------------------------------
 // 共用负载（Payloads）
@@ -138,11 +136,6 @@ export interface ClientToServerEvents {
     ack?: (result: AckResult<{ cell: Cell; cost: number }>) => void,
   ) => void;
 
-  /** 使用道具 */
-  'client.useItem': (
-    payload: { itemId: string; targetCellId?: number; targetPlayerId?: string },
-    ack?: (result: AckResult) => void,
-  ) => void;
 
   /** 银行：贷款 */
   'client.bankLoan': (
@@ -192,33 +185,6 @@ export interface ClientToServerEvents {
     ack?: (result: AckResult<{ message: ChatMessage }>) => void,
   ) => void;
 
-  /** 学习天赋 */
-  'client.learnTalent': (
-    payload: { talentId: string },
-    ack?: (result: AckResult<{ talentId: string; pointsRemaining: number }>) => void,
-  ) => void;
-
-  /** 取消学习天赋 */
-  'client.unlearnTalent': (
-    payload: { talentId: string },
-    ack?: (result: AckResult<{ talentId: string; refundedPoints: number; pointsRemaining: number }>) => void,
-  ) => void;
-
-  /** 切换天赋启用状态 */
-  'client.toggleTalent': (
-    payload: { talentId: string; enabled: boolean },
-    ack?: (result: AckResult<{ talentId: string; enabled: boolean }>) => void,
-  ) => void;
-
-  /** 获取天赋信息 */
-  'client.getTalentInfo': (
-    payload: {},
-    ack?: (result: AckResult<{
-      availableTalents: { id: string; name: string; description: string; type: string; talentPointsCost: number; effects: unknown[] }[];
-      learnedTalents: PlayerTalent[];
-      talentPoints: number;
-    }>) => void,
-  ) => void;
 
   /** 客户端 → 服务端心跳 */
   'client.ping': (
@@ -250,17 +216,6 @@ export interface ClientToServerEvents {
     ack?: (result: AckResult) => void,
   ) => void;
 
-  /** 获取玩家道具列表 */
-  'client.getItems': (
-    payload: Record<string, never>,
-    ack?: (result: AckResult) => void,
-  ) => void;
-
-  /** 请求道具掉落 */
-  'client.requestItemDrop': (
-    payload: { itemType?: string },
-    ack?: (result: AckResult) => void,
-  ) => void;
 
   /** 修缮纪念碑 */
   'client.repairMonument': (
@@ -293,7 +248,7 @@ export interface ClientToServerEvents {
 
   /** 调试：注入测试数据（仅调试模式可用） */
   'client.debugInject': (
-    payload: { money?: number; credit?: number; items?: string[] },
+    payload: { money?: number; credit?: number },
     ack?: (result: AckResult) => void,
   ) => void;
 
@@ -408,26 +363,6 @@ export interface ServerToClientEvents {
     revivedByName?: string;
   }) => void;
 
-  /** 道具获取 */
-  'server.itemAcquired': (payload: {
-    playerId: string;
-    item?: Item;
-    itemType?: string;
-    itemName?: string;
-    quantity?: number;
-  }) => void;
-
-  /** 道具使用 */
-  'server.itemUsed': (payload: {
-    playerId?: string;
-    item?: Item;
-    success?: boolean;
-    itemType?: string;
-    itemName?: string;
-    effects?: unknown[];
-    sealState?: unknown;
-    revivedPlayerId?: string;
-  }) => void;
 
   /** 通用通知（弹窗） */
   'server.notification': (payload: {
@@ -542,26 +477,6 @@ export interface ServerToClientEvents {
   /** 全局初始数值字段定义（用于客户端 UI 渲染） */
   'server.valueFieldDefinitions': (payload: { definitions: ValueField[] }) => void;
 
-  /** 天赋学习成功 */
-  'server.talentLearned': (payload: {
-    playerId: string;
-    talentId: string;
-    talent: PlayerTalent;
-  }) => void;
-
-  /** 天赋取消学习 */
-  'server.talentUnlearned': (payload: {
-    playerId: string;
-    talentId: string;
-    refundedPoints: number;
-  }) => void;
-
-  /** 天赋启用/禁用 */
-  'server.talentToggled': (payload: {
-    playerId: string;
-    talentId: string;
-    enabled: boolean;
-  }) => void;
 
   /** 错误 */
   'server.error': (payload: { code: string; message: string }) => void;
@@ -573,22 +488,6 @@ export interface ServerToClientEvents {
   'server.transportDestinationsChanged': (payload: {
     hubId: number;
     destinations: Array<{ cellId: number; name?: string }>;
-  }) => void;
-
-  /** 格子查封恢复 */
-  'server.cellUnsealed': (payload: {
-    cellId: number;
-    sealId: string;
-    unsealedAt: number;
-  }) => void;
-
-  /** 格子被查封 */
-  'server.cellSealed': (payload: {
-    cellId: number;
-    playerId: string;
-    playerName: string;
-    duration: number;
-    endTime: number;
   }) => void;
 
   /** 投资项目被购买 */

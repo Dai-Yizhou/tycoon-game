@@ -2,12 +2,12 @@
  * 抵押系统测试
  */
 
-import { Mortgage, DEFAULT_MORTGAGE_CONFIG, type MortgageConfig } from '../src/economy/Mortgage';
-import { GameWorld } from '../src/world/GameWorld';
-import { PlayerManager } from '../src/world/PlayerManager';
+import { Mortgage, DEFAULT_MORTGAGE_CONFIG, type MortgageConfig } from '../../src/economy/Mortgage';
+import { GameWorld } from '../../src/world/GameWorld';
+import { PlayerManager } from '../../src/world/PlayerManager';
 import type { Player, MapData, Cell } from '@game/shared';
 import { PlayerStatus, CellTypes } from '@game/shared';
-import type { TypedServer, TypedSocket } from '../src/transport/SocketManager';
+import type { TypedServer, TypedSocket } from '../../src/transport/SocketManager';
 
 describe('Mortgage System', () => {
   let world: GameWorld;
@@ -21,6 +21,7 @@ describe('Mortgage System', () => {
   let propertyCell: Cell;
 
   beforeEach(() => {
+    jest.useFakeTimers();
     playerManager = new PlayerManager();
     world = new GameWorld({ playerManager });
 
@@ -85,7 +86,6 @@ describe('Mortgage System', () => {
         money: { id: 'money', name: '财产', current: 1000, min: 0 },
         credit: { id: 'credit', name: '信用值', current: 50, min: 0, max: 100 },
       },
-      items: [],
       status: PlayerStatus.Normal,
       createdAt: Date.now(),
       lastActiveAt: Date.now(),
@@ -101,7 +101,6 @@ describe('Mortgage System', () => {
         money: { id: 'money', name: '财产', current: 2000, min: 0 },
         credit: { id: 'credit', name: '信用值', current: 60, min: 0, max: 100 },
       },
-      items: [],
       status: PlayerStatus.Normal,
       createdAt: Date.now(),
       lastActiveAt: Date.now(),
@@ -114,6 +113,7 @@ describe('Mortgage System', () => {
   afterEach(() => {
     mortgage.clearAllAuctions();
     playerManager.clear();
+    jest.useRealTimers();
   });
 
   describe('地产抵押', () => {
@@ -156,7 +156,7 @@ describe('Mortgage System', () => {
       const result = mortgage.mortgageProperty(player.id, 1, mockSocket);
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('不是所有者');
+      expect(result.error).toContain('你不是该地产的所有者');
     });
 
     it('已抵押地产不能再次抵押', () => {
@@ -235,14 +235,14 @@ describe('Mortgage System', () => {
       expect(result.error).toContain('财产不足');
     });
 
-    it('竞拍结束后转移所有权', async () => {
+    it('竞拍结束后转移所有权', () => {
       const auction = mortgage.getCellAuction(1);
 
       // 出价
       mortgage.placeBid(otherPlayer.id, auction!.id, 600, mockSocket);
 
-      // 等待竞拍结束
-      await new Promise(resolve => setTimeout(resolve, 15000));
+      // 推进到竞拍结束（fake timers）
+      jest.advanceTimersByTime(15000);
 
       // 检查所有权转移
       const updatedCell = world.getMapData()?.find(c => c.id === 1);
@@ -251,9 +251,9 @@ describe('Mortgage System', () => {
       expect(updatedCell!.extra.isMortgaged).toBe(false);
     });
 
-    it('无竞拍者地产保持抵押状态', async () => {
-      // 不出价，等待竞拍结束
-      await new Promise(resolve => setTimeout(resolve, 15000));
+    it('无竞拍者地产保持抵押状态', () => {
+      // 不出价，推进到竞拍结束（fake timers）
+      jest.advanceTimersByTime(15000);
 
       // 检查所有权未改变
       const updatedCell = world.getMapData()?.find(c => c.id === 1);
@@ -263,11 +263,11 @@ describe('Mortgage System', () => {
   });
 
   describe('赎回抵押', () => {
-    beforeEach(async () => {
+    beforeEach(() => {
       mortgage.mortgageProperty(player.id, 1, mockSocket);
 
-      // 等待竞拍结束（无竞拍者）
-      await new Promise(resolve => setTimeout(resolve, 15000));
+      // 推进到竞拍结束（无竞拍者，fake timers）
+      jest.advanceTimersByTime(15000);
     });
 
     it('赎回后恢复地产状态', () => {
@@ -367,12 +367,13 @@ describe('Mortgage System', () => {
       }));
     });
 
-    it('竞拍结束时广播结果事件', async () => {
+    it('竞拍结束时广播结果事件', () => {
       mortgage.mortgageProperty(player.id, 1, mockSocket);
       const auction = mortgage.getCellAuction(1);
       mortgage.placeBid(otherPlayer.id, auction!.id, 600, mockSocket);
 
-      await new Promise(resolve => setTimeout(resolve, 15000));
+      // 推进到竞拍结束（fake timers）
+      jest.advanceTimersByTime(15000);
 
       expect(mockIo.emit).toHaveBeenCalledWith('server.auctionEnded', expect.objectContaining({
         auctionId: auction!.id,
@@ -381,9 +382,10 @@ describe('Mortgage System', () => {
       }));
     });
 
-    it('赎回时广播赎回事件', async () => {
+    it('赎回时广播赎回事件', () => {
       mortgage.mortgageProperty(player.id, 1, mockSocket);
-      await new Promise(resolve => setTimeout(resolve, 15000));
+      // 推进到竞拍结束（fake timers）
+      jest.advanceTimersByTime(15000);
 
       mortgage.redeemMortgage(player.id, 1, mockSocket);
 

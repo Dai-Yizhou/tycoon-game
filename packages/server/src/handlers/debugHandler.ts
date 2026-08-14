@@ -37,8 +37,6 @@ export interface DebugInjectPayload {
   money?: number;
   /** 要设置的信用值 */
   credit?: number;
-  /** 要注入的道具类型列表 */
-  items?: string[];
 }
 
 /**
@@ -88,7 +86,6 @@ export class DebugHandler {
    * 将玩家数据重置为初始值：
    * - 金钱、信用值回初始值
    * - 位置回到起点（cellId: 0）
-   * - 清空道具
    * - 状态恢复为 Normal
    *
    * 仅在 `DebugFeatures.QuickReset` 启用时响应。
@@ -126,9 +123,8 @@ export class DebugHandler {
         player.values['credit'].current = INITIAL_CREDIT;
       }
 
-      // 重置位置、道具、状态
+      // 重置位置和状态
       player.position = { cellId: 0 };
-      player.items = [];
       player.status = PlayerStatus.Normal;
       player.lastActiveAt = Date.now();
 
@@ -158,7 +154,6 @@ export class DebugHandler {
    * 注入指定的测试数据：
    * - 设置金钱数额（如提供）
    * - 设置信用值（如提供）
-   * - 注入道具（如提供）
    *
    * 仅在 `DebugFeatures.InjectTestData` 启用时响应。
    */
@@ -210,27 +205,12 @@ export class DebugHandler {
         });
       }
 
-      // 注入道具
-      if (Array.isArray(payload.items) && payload.items.length > 0) {
-        const now = Date.now();
-        for (const itemType of payload.items) {
-          player.items.push({
-            id: `debug_${itemType}_${now}_${Math.random().toString(36).slice(2, 8)}`,
-            type: itemType,
-            name: itemType,
-            quantity: 1,
-            acquiredAt: now,
-          });
-        }
-      }
-
       player.lastActiveAt = Date.now();
       this.world.updatePlayer(player);
 
       logger.info(`[debug] 玩家 ${playerId} 注入测试数据`, {
         money: payload.money,
         credit: payload.credit,
-        itemCount: payload.items?.length ?? 0,
       });
 
       ack?.({ ok: true, data: { player } });

@@ -7,22 +7,16 @@
 import {
   currentMoney, currentCredit, loanAmount, loanInterestRate, gameSocket,
 } from '../../state/GameStore.js';
-import { isTalentActive } from './GameLogic.js';
 import { addChatMessage } from './ChatSystem.js';
 import { requestHudRefresh } from '../ClientHudBridge.js';
 import { t } from '../i18n.js';
 
 export function getMaxLoanAmount(): number {
-  if (!isTalentActive('bank')) return 0;
   const baseLimit = currentCredit * 20;
   return Math.max(0, baseLimit - loanAmount);
 }
 
 export function showBankModal(): void {
-  if (!isTalentActive('bank')) {
-    addChatMessage(t('bank.notEnabled'), 'system');
-    return;
-  }
 
   const maxLoan = getMaxLoanAmount();
   const modal = document.createElement('div');

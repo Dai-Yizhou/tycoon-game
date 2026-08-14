@@ -81,7 +81,7 @@ export async function loadMapData(): Promise<{
 
 function getFallbackMapData(): unknown[] {
   return [
-    { id: 0, x: 600, y: 500, destinations: [1, 39], name: '起点', type: 'start', price: 0, rent: [], description: ['游戏起点', '经过可得200元', '可设置天赋'], extra: [], behavior: '', icon: '🚩', level: 0, upgradeCost: [], owners: [], isMortgaged: 0, mortgagePrice: 0 },
+    { id: 0, x: 600, y: 500, destinations: [1, 39], name: '起点', type: 'start', price: 0, rent: [], description: ['游戏起点', '经过可得200元'], extra: [], behavior: '', icon: '🚩', level: 0, upgradeCost: [], owners: [], isMortgaged: 0, mortgagePrice: 0 },
     { id: 1, x: 750, y: 480, destinations: [0, 2], name: '樱花大道', type: 'property', price: 120, rent: [8, 40, 120, 280, 450], description: ['浪漫商业街'], extra: [], behavior: '', icon: '🌸', level: 0, upgradeCost: [50, 100, 150, 200], owners: [], isMortgaged: 0, mortgagePrice: 60 },
     { id: 2, x: 880, y: 420, destinations: [1, 3], name: '市中心事件', type: 'event', price: 0, rent: [], description: ['繁华市中心的随机事件'], extra: [], behavior: 'event_city_center', icon: '❓', level: 0, upgradeCost: [], owners: [], isMortgaged: 0, mortgagePrice: 0 },
     { id: 3, x: 980, y: 330, destinations: [2, 4], name: '科技大厦', type: 'property', price: 200, rent: [16, 80, 200, 450, 700], description: ['高科技办公楼'], extra: [], behavior: '', icon: '🏢', level: 0, upgradeCost: [100, 150, 200, 300], owners: [], isMortgaged: 0, mortgagePrice: 100 },

@@ -34,7 +34,6 @@ describe('EventEffectsHandler', () => {
         money: { id: 'money', name: '财产', current: 1000, min: 0 },
         credit: { id: 'credit', name: '信用值', current: 50, min: 0 },
       },
-      items: [],
       status: 'normal',
       createdAt: Date.now(),
       lastActiveAt: Date.now(),

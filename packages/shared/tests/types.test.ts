@@ -16,7 +16,6 @@ import {
   getValueField,
   isPlayerActionable,
   PlayerStatus,
-  type Item,
   type Player,
   type ValueField,
 } from '../src/types/player';
@@ -270,20 +269,12 @@ describe('shared types', () => {
     };
 
     function makePlayer(values: Record<string, ValueField> = {}): Player {
-      const item: Item = {
-        id: 'item-1',
-        type: 'seal',
-        name: '查封令',
-        quantity: 1,
-        acquiredAt: Date.now(),
-      };
       return {
         id: 'p1',
         username: 'tester',
         teamId: null,
         position: { cellId: 0 },
         values,
-        items: [item],
         status: PlayerStatus.Normal,
         createdAt: Date.now(),
         lastActiveAt: Date.now(),
@@ -335,11 +326,5 @@ describe('shared types', () => {
       expect(isPlayerActionable(player)).toBe(false);
     });
 
-    it('Player 持有 Item 实例', () => {
-      const player = makePlayer();
-      expect(player.items).toHaveLength(1);
-      expect(player.items[0]?.type).toBe('seal');
-      expect(player.items[0]?.quantity).toBe(1);
-    });
   });
 });

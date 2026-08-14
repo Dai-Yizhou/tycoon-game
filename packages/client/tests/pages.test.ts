@@ -40,12 +40,12 @@ describe('Pages', () => {
       // 检查标题
       const title = page.querySelector('.game-title');
       expect(title).toBeTruthy();
-      expect(title?.textContent).toBe('大富翁.io');
+      expect(title?.textContent).toBe('rentfree.io');
 
       // 检查副标题
       const subtitle = page.querySelector('.subtitle');
       expect(subtitle).toBeTruthy();
-      expect(subtitle?.textContent).toBe('多人在线大富翁');
+      expect(subtitle?.textContent).toBe('（还没想好的副标题）');
 
       // 检查开始按钮
       const button = page.querySelector('.start-button');
@@ -76,7 +76,7 @@ describe('Pages', () => {
       // 检查标题
       const title = page.querySelector('.login-title');
       expect(title).toBeTruthy();
-      expect(title?.textContent).toBe('输入你的名字');
+      expect(title?.textContent).toBe('登录');
 
       // 检查输入框
       const input = page.querySelector('.username-input');
@@ -171,15 +171,15 @@ describe('Pages', () => {
       // 检查 canvas
       const canvas = page.querySelector('#game-canvas');
       expect(canvas).toBeTruthy();
-      expect(canvas?.getAttribute('width')).toBe('960');
-      expect(canvas?.getAttribute('height')).toBe('640');
+      expect(canvas?.getAttribute('width')).toBe('1024');
+      expect(canvas?.getAttribute('height')).toBe('768');
 
-      // 检查 HUD
-      const hud = page.querySelector('.hud');
+      // 检查 HUD（新版 GameHudShell 唯一入口）
+      const hud = page.querySelector('.game-hud-shell');
       expect(hud).toBeTruthy();
 
       // 检查玩家名显示
-      const playerName = page.querySelector('.player-name');
+      const playerName = page.querySelector('[data-ui="player-name"]');
       expect(playerName?.textContent).toContain('测试玩家');
     });
 

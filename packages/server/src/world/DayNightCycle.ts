@@ -130,6 +130,7 @@ export class DayNightCycle extends EventEmitter {
     this.cycleTimer = setInterval(() => {
       this.onCycleTick();
     }, tickInterval);
+    this.cycleTimer.unref();
 
     // 定时检查阶段切换
     this.schedulePhaseChange();
@@ -246,6 +247,7 @@ export class DayNightCycle extends EventEmitter {
     this.phaseChangeTimer = setTimeout(() => {
       this.onPhaseChange();
     }, nextChangeDelay);
+    this.phaseChangeTimer.unref();
   }
 
   /**

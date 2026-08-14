@@ -28,7 +28,6 @@ function createPlayer(): Player {
     teamId: null,
     position: { cellId: 1 },
     values: {},
-    items: [],
     status: PlayerStatus.Normal,
     createdAt: Date.now(),
     lastActiveAt: Date.now(),

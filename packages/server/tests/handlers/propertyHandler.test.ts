@@ -41,7 +41,6 @@ function createTestPlayer(id: string, money: number = 1000): Player {
     values: {
       money: { id: 'money', name: '财产', current: money, min: 0 },
     },
-    items: [],
     status: PlayerStatus.Normal,
     createdAt: Date.now(),
     lastActiveAt: Date.now(),
@@ -159,9 +158,9 @@ describe('PropertyHandler', () => {
 
       const result = (handler as any).executeBuyProperty(player, cell, price);
 
-      // 应该能购买（财产会被扣为负数，但实际应该在 handler 层被阻止）
-      // 这里测试的是内部逻辑，实际校验在上层
-      expect(player.values['money'].current).toBe(-50); // 50 - 100
+      // 内部方法直接扣除财产，setPlayerMoney 会 clamp 到 0（防止负数）
+      // 财产不足的校验在实际调用链上层（handleBuyProperty 返回 insufficient_money）
+      expect(player.values['money'].current).toBe(0); // clamp：max(0, 50 - 100)
     });
   });
 

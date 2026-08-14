@@ -58,7 +58,7 @@ export class PlayerRenderer {
   render(player: Player, cell: Cell | undefined, cameraState: CameraState, index: number): void {
     if (!cell) return;
     const position = player.position;
-    if (position == null || position.cellId < 0) return;
+    if (position === null || position === undefined || position.cellId < 0) return;
 
     // 从世界坐标转换到屏幕坐标（格子中心偏移，避免重叠）
     const { screenX, screenY } = this.worldToScreen(

@@ -172,9 +172,6 @@ export class AuthService {
       isGuest: false,
       createdAt: now,
       lastLoginAt: now,
-      talents: [],
-      achievements: [],
-      talentPoints: 0,
     };
 
     await this.userStore.saveUser(user);
@@ -265,9 +262,6 @@ export class AuthService {
       isGuest: true,
       createdAt: now,
       lastLoginAt: now,
-      talents: [],
-      achievements: [],
-      talentPoints: 0,
     };
 
     await this.userStore.saveUser(user);

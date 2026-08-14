@@ -120,7 +120,7 @@ export const VISION_MASK_COLORS = {
   /** 视野内（透明，不遮挡） */
   visibleAlpha: 0,
   /** 视野外（半透明，遮挡） */
-  maskedAlpha: 0.4,
+  maskedAlpha: 0.6,
   /** 遮罩背景色 */
   maskFill: '#94a3b8',
 };

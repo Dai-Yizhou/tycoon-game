@@ -9,8 +9,6 @@
     { "msg": "🎁 商场抽奖获得 100 元", "money": 100, "credit": 0, "env": 0, "weight": 4, "good": true, "creditModifier": 0.2 },
     { "msg": "🌱 参加城市绿化活动，环保值+4", "money": 0, "credit": 3, "env": 4, "weight": 5, "good": true, "creditModifier": 0.4 },
     { "msg": "📉 股票大跌，损失 150 元", "money": -150, "credit": -5, "env": 0, "weight": 5, "good": false, "creditModifier": -0.3 },
-    { "msg": "🔑 获得查封令道具", "money": 0, "credit": 0, "env": 0, "item": "seal", "weight": 2, "good": true, "creditModifier": 0.1 },
-    { "msg": "🩹 获得复活令道具", "money": 0, "credit": 0, "env": 0, "item": "revive", "weight": 2, "good": true, "creditModifier": 0.1 },
     { "msg": "🎊 城市庆典，区域内所有人获得 100 元", "money": 100, "credit": 0, "env": 0, "target": "region", "weight": 3, "good": true, "creditModifier": 0.2 },
     { "msg": "🚨 区域治安检查，区域内所有人信用值-3", "money": 0, "credit": -3, "env": 0, "target": "region", "weight": 4, "good": false, "creditModifier": -0.3 }
   ]

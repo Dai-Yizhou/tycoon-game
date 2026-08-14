@@ -111,6 +111,7 @@ export class Taxation {
     this.taxTimer = setInterval(() => {
       this.executeTaxCycle();
     }, this.config.taxInterval);
+    this.taxTimer.unref(); // 后台定时器：不阻止进程退出（生产环境由 HTTP 服务器保持存活）
 
     logger.info(`计税定时器已启动，周期 ${this.config.taxInterval} 毫秒`);
   }

@@ -4,21 +4,18 @@
  * 功能：
  * - 顶部状态栏：显示区域数值（金钱/信用/环保）
  * - 左下角聊天框：系统/队伍/区域频道
- * - 右上角队伍面板 + 页面卡片（设置/天赋/成就）
+ * - 右上角队伍面板与页面卡片
  * - 鼠标悬停格子显示悬浮卡片
  * - 操作控件根据当前格子动态显示/隐藏
  * - 平滑移动动画 + 岔路口方向选择
  * - 破产机制：仅破产时可回起点重开
  * - 一次停留仅可进行一次购买/升级操作
  * - 视野系统：相机跟随玩家，不可缩放/拖移
- * - 天赋系统：起点处勾选启用
- * - 成就系统：记录进展，计算天赋值
- * - 道具系统：查封令、复活令
  * - 银行/贷款系统：信用值联动
  * - 投资项目系统：购买、合租
  * - 交通枢纽系统：付费传送
  * - 纪念碑系统：修缮增加信用值
- * - 监狱系统：进入监狱状态
+ * - 监狱系统：进入和离开监狱状态
  */
 
 declare global {
@@ -26,7 +23,6 @@ declare global {
     resetTutorial: () => void;
     clearGameData: () => void;
     toggleTutorial: () => void;
-    useItem: (itemId: string) => void;
     showTeamInvite: () => void;
     showTeamManagement: () => void;
     removeTeamMember: (memberId: string) => void;
@@ -50,8 +46,7 @@ import { NoOpEffectHooks } from '../game/GameEffects.js';
 import { GameViewModel } from '../game/GameViewModel.js';
 
 import {
-  achievements,
-  activeTalents, animationFrameId,
+  animationFrameId,
   currentPlayer, currentPlayerPosition, currentPlayerName, currentMoney, currentCredit, currentEnv, isBankrupt, actionUsedThisTurn,
   isMoving, canRoll, isWaitingForChoice, isServerAnimating, isInJail, jailEndTime, dayNightStartTime, DAY_NIGHT_CYCLE, serverTimeOffset,
   gameSocket, investmentShares,
@@ -59,19 +54,19 @@ import {
   otherPlayers, ownedInvestments, ownedProperties,
   propertyLevels, prosperityTimer,
   regionProsperityMap, renderer,
-  rollCooldownTimer, setAchievements,
-  setActionUsedThisTurn, setAnimationFrameId, setAvailableTP,
+  rollCooldownTimer,
+  setActionUsedThisTurn, setAnimationFrameId,
   setBankBtnEl, setCameraTarget, setCanRoll, setCanvasEl, setChatChannelContainer,
   setCurrentCredit, setCurrentEnv, setCurrentMoney, setCurrentPlayer, setCurrentPlayerName,
   setCurrentPlayerPosition, setDayNightCycle, setDayNightStartTime,
   setDiceAnimating, setGameSocket, setIsBankrupt,
-  setIsInJail, setIsMoving, setIsWaitingForChoice, setItems, setLastLocalIsDay,
+  setIsInJail, setIsMoving, setIsWaitingForChoice, setLastLocalIsDay,
   setLastPlayerTimezone, setLoanAmount, setMapIndex, setMapRegions,
   setOtherPlayers, setPlayerDisplayPos,
   setProsperity, setProsperityTimer, setRenderer, setRollCooldownTimer,
-  setServerTimeOffset, setTalentDefs, setTalentsLocked, setTeamMembers, setTeamPanelContentEl,
-  setTopBarProsperityEl, setTopBarProsperityFillEl, setTopBarRegionFieldsEl, setTopBarTalentsEl,
-  setTopBarTimeEl, setTotalMoneyEarned, setValueFieldDefs,
+  setServerTimeOffset, setTeamMembers, setTeamPanelContentEl,
+  setTopBarProsperityEl, setTopBarProsperityFillEl, setTopBarRegionFieldsEl,
+  setTopBarTimeEl, setValueFieldDefs,
   // 辅助函数
   // 类型
   type RegionInfo,
@@ -81,10 +76,6 @@ import {
   setDiceDisplayEl, setRollBtn, setActionButtonsEl, setChatBoxEl,
 } from '../state/GameStore.js';
 
-
-import {
-  loadTalentConfig, loadAchievementConfig, loadPlayerProgress,
-} from '../game/systems/ConfigLoader.js';
 
 import {
   normalizeClientMapData,
@@ -97,8 +88,6 @@ import {
 import {
   startTutorial,
 } from '../game/systems/TutorialSystem.js';
-
-import { checkTalentSelection } from '../game/systems/TalentSystem.js';
 
 import {
   addChatMessage,
@@ -132,7 +121,6 @@ export function createGamePage(controller: GameController): HTMLElement {
   const context = controller.getContext();
   const page = document.createElement('div');
   page.className = 'page game-page';
-  // 当前地图文件尚无主题配置，暂用 northeast；未来由地图配置覆盖。
   const designSnapshot = new DesignAdapter(getThemeTokens((globalThis as { __GAME_THEME__?: string }).__GAME_THEME__ ?? 'northeast')).createSnapshot('day');
   applyGamePageThemeSnapshot(page, designSnapshot);
   gameViewModel = new GameViewModel();
@@ -155,7 +143,6 @@ export function createGamePage(controller: GameController): HTMLElement {
   setRenderer(new BoardRenderer(canvas, { theme: designSnapshot }));
   renderer!.drawPlaceholder(t('common.loadingMap'));
 
-  // Build isolated HUD layer. Business actions stay in GamePage.
   const backButton = document.createElement('button');
   backButton.className = 'back-button';
   backButton.textContent = '返回';
@@ -173,7 +160,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   syncViewModel();
   unregisterHudRefresh = registerHudRefresh(() => { syncViewModel(); gameHudShell?.update(); });
 
-  // Init: load configs first, then player progress, then game
+  // Init: load map data, then start game
   const playerName = context.playerName || t('game.defaultPlayerName');
   setCurrentPlayerName(playerName);
   initMockPlayer(playerName);
@@ -196,11 +183,8 @@ export function createGamePage(controller: GameController): HTMLElement {
   }
   initTeam();
 
-  Promise.all([loadTalentConfig(), loadAchievementConfig(), loadMapData()]).then(
-    ([talents, achDefs, mapResult]) => {
-      setTalentDefs(talents);
-      setAchievements(achDefs);
-      loadPlayerProgress();
+  Promise.all([loadMapData()]).then(
+    ([mapResult]) => {
       if (!renderer || !mapResult) return;
       const { mapData, regions, valueFields } = mapResult;
       setMapRegions(regions);
@@ -222,7 +206,6 @@ export function createGamePage(controller: GameController): HTMLElement {
       syncViewModel();
       gameHudShell?.update();
       addChatMessage(t('game.welcomeMessage'), 'system');
-      checkTalentSelection();
       startTutorial();
     },
   );
@@ -323,7 +306,6 @@ function initMockPlayer(name: string): void {
       credit: { id: 'credit', name: t('hud.credit'), current: 50, min: 0, max: 100 },
       env: { id: 'env', name: t('hud.env'), current: 0, min: 0 },
     },
-    items: [],
     status: 'normal',
     createdAt: Date.now(),
     lastActiveAt: Date.now(),
@@ -337,7 +319,6 @@ function initMockPlayer(name: string): void {
   setIsBankrupt(false);
   setIsInJail(false);
   setActionUsedThisTurn(false);
-  setItems([]);
   setLoanAmount(0);
 }
 
@@ -372,7 +353,7 @@ async function loadMapData(): Promise<{ mapData: MapData; regions: RegionInfo[];
 
 function getFallbackMapData(): unknown[] {
   return [
-    { id: 0, x: 600, y: 500, destinations: [1, 39], name: '起点', type: 'start', price: 0, rent: [], description: ['游戏起点', '经过可得200元', '可设置天赋'], extra: [], behavior: '', icon: '🚩', level: 0, upgradeCost: [], owners: [], isMortgaged: 0, mortgagePrice: 0 },
+    { id: 0, x: 600, y: 500, destinations: [1, 39], name: '起点', type: 'start', price: 0, rent: [], description: ['游戏起点', '经过可得200元'], extra: [], behavior: '', icon: '🚩', level: 0, upgradeCost: [], owners: [], isMortgaged: 0, mortgagePrice: 0 },
     { id: 1, x: 750, y: 480, destinations: [0, 2], name: '樱花大道', type: 'property', price: 120, rent: [8, 40, 120, 280, 450], description: ['浪漫商业街'], extra: [], behavior: '', icon: '🌸', level: 0, upgradeCost: [50, 100, 150, 200], owners: [], isMortgaged: 0, mortgagePrice: 60 },
     { id: 2, x: 880, y: 420, destinations: [1, 3], name: '市中心事件', type: 'event', price: 0, rent: [], description: ['繁华市中心的随机事件'], extra: [], behavior: 'event_city_center', icon: '❓', level: 0, upgradeCost: [], owners: [], isMortgaged: 0, mortgagePrice: 0 },
     { id: 3, x: 980, y: 330, destinations: [2, 4], name: '科技大厦', type: 'property', price: 200, rent: [16, 80, 200, 450, 700], description: ['高科技办公楼'], extra: [], behavior: '', icon: '🏢', level: 0, upgradeCost: [100, 150, 200, 300], owners: [], isMortgaged: 0, mortgagePrice: 100 },
@@ -610,7 +591,6 @@ export function cleanupGamePage(page: HTMLElement): void {
     notificationCenter.destroy();
     notificationCenter = null;
   }
-  // 清理 socket 监听器
   if (gameSocket) {
     unregisterSocketHandlers(gameSocket);
     setGameSocket(null);
@@ -623,7 +603,6 @@ export function cleanupGamePage(page: HTMLElement): void {
   setDiceDisplayEl(null);
   setActionButtonsEl(null);
   setChatBoxEl(null);
-  setTopBarTalentsEl(null);
   setTopBarProsperityEl(null);
   setTopBarProsperityFillEl(null);
   setTopBarRegionFieldsEl(null);
@@ -643,7 +622,6 @@ export function cleanupGamePage(page: HTMLElement): void {
   propertyLevels.clear();
   ownedInvestments.clear();
   investmentShares.clear();
-  setItems([]);
   setCurrentMoney(2000);
   setCurrentCredit(50);
   setCurrentEnv(0);
@@ -657,14 +635,6 @@ export function cleanupGamePage(page: HTMLElement): void {
   setServerTimeOffset(0);
   setDayNightCycle(15 * 60 * 1000);
   setTeamMembers([]);
-  activeTalents.clear();
-  setAvailableTP(0);
-  setTalentsLocked(false);
-  setTotalMoneyEarned(0);
-  for (const ach of achievements) {
-    ach.current = 0;
-    ach.completed = false;
-  }
   page.remove();
 }
 

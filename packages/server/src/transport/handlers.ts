@@ -2,7 +2,6 @@
  * Socket 事件处理器
  *
  * 集中注册业务事件处理器：
- * - `client.ping`       : 心跳（已在 SocketManager 中处理，此处可重写）
  * - `client.rollDice`   : 掷骰子
  * - `client.move`       : 移动（调试用）
  * - `client.choosePath` : 路径选择（多岔路）
@@ -23,10 +22,9 @@ import type { TypedServer, TypedSocket } from './SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ChatManager } from '../chat/index.js';
 import { Bank, Bankruptcy } from '../economy/index.js';
-import { DiceHandler, MovementHandler, PropertyHandler, StartHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, ItemHandler, DebugHandler, TeamHandler } from '../handlers/index.js';
+import { DiceHandler, MovementHandler, PropertyHandler, StartHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, DebugHandler, TeamHandler } from '../handlers/index.js';
 import { TeamManager, DEFAULT_TEAM_CONFIG } from '../team/index.js';
 import { EventHandler } from '../events/index.js';
-import { ItemRegistry, ItemEffectsHandler, BUILTIN_ITEM_TEMPLATES } from '../items/index.js';
 import type { ProsperityManager } from '../world/ProsperityManager.js';
 import type { TimeZoneManager } from '../world/TimeZoneManager.js';
 
@@ -68,7 +66,7 @@ function safeHandle(socket: TypedSocket, code: ErrorCode, fn: () => void): void 
  * 处理器注册器
  *
  * 维护一个 io 引用以便支持后续任务（如房间管理、玩家加入游戏流程）。
- * 当前注册骰子、移动、地产、起点、监狱、事件、投资、交通、纪念碑、道具、组队和聊天处理器。
+ * 当前注册骰子、移动、地产、起点、监狱、事件、投资、交通、纪念碑、组队和聊天处理器。
  * DebugHandler 仅在调试模式下注册。
  */
 export class HandlerRegistry {
@@ -83,9 +81,6 @@ export class HandlerRegistry {
   private readonly investmentHandler: InvestmentHandler;
   private readonly transportHandler: TransportHandler;
   private readonly monumentHandler: MonumentHandler;
-  private readonly itemRegistry: ItemRegistry;
-  private itemEffectsHandler: ItemEffectsHandler;
-  private itemHandler: ItemHandler;
   private readonly debugHandler: DebugHandler;
   private readonly teamManager: TeamManager;
   private readonly teamHandler: TeamHandler;
@@ -125,11 +120,6 @@ export class HandlerRegistry {
     this.transportHandler = new TransportHandler(io, world);
     // 初始化纪念碑处理器
     this.monumentHandler = new MonumentHandler(io, world);
-    // 初始化道具系统
-    this.itemRegistry = new ItemRegistry();
-    this.itemRegistry.registerBatch(BUILTIN_ITEM_TEMPLATES);
-    this.itemEffectsHandler = null as any;
-    this.itemHandler = null as any;
     // 初始化调试处理器
     this.debugHandler = new DebugHandler(io, world);
     // 初始化组队系统（TeamManager 为纯数据层，TeamHandler 负责协议与 I/O）
@@ -144,7 +134,6 @@ export class HandlerRegistry {
    * 暴露此方法便于在 SocketManager 之外使用（如测试中手动模拟连接）。
    */
   registerForSocket(socket: TypedSocket): void {
-    this.handlePing(socket);
     // 使用新的 DiceHandler 和 MovementHandler
     this.diceHandler.register(socket);
     this.movementHandler.register(socket);
@@ -158,10 +147,6 @@ export class HandlerRegistry {
     // 使用 TransportHandler 和 MonumentHandler
     this.transportHandler.register(socket);
     this.monumentHandler.register(socket);
-    // 使用 ItemHandler（如果已初始化）
-    if (this.itemHandler) {
-      this.itemHandler.register(socket);
-    }
     // 注册调试处理器（仅在调试功能启用时）
     if (
       isFeatureEnabled(DebugFeatures.QuickReset) ||
@@ -273,27 +258,6 @@ export class HandlerRegistry {
   }
 
   /**
-   * 获取 ItemRegistry（用于外部调用）
-   */
-  getItemRegistry(): ItemRegistry {
-    return this.itemRegistry;
-  }
-
-  /**
-   * 获取 ItemEffectsHandler（用于外部调用）
-   */
-  getItemEffectsHandler(): ItemEffectsHandler {
-    return this.itemEffectsHandler;
-  }
-
-  /**
-   * 获取 ItemHandler（用于外部调用）
-   */
-  getItemHandler(): ItemHandler {
-    return this.itemHandler;
-  }
-
-  /**
    * 获取 DebugHandler（用于外部调用）
    */
   getDebugHandler(): DebugHandler {
@@ -306,17 +270,6 @@ export class HandlerRegistry {
    */
   getTeamManager(): TeamManager {
     return this.teamManager;
-  }
-
-  /**
-   * 设置 ItemEffectsHandler 和 ItemHandler（在 app.ts 中调用）
-   *
-   * @param bank 银行实例
-   */
-  setItemHandler(bank: any): void {
-    this.itemEffectsHandler = new ItemEffectsHandler(this.io, this.world, this.itemRegistry, bank);
-    this.itemHandler = new ItemHandler(this.io, this.world, this.itemRegistry, this.itemEffectsHandler, this.jailHandler);
-    logger.info('ItemHandler 已初始化');
   }
 
   setBank(bank: Bank): void {
@@ -377,19 +330,6 @@ export class HandlerRegistry {
       return;
     }
 
-    // 检查格子是否被查封（查封后无法收取租金）
-    if (this.itemEffectsHandler && this.itemEffectsHandler.isCellSealed(cellId)) {
-      logger.debug(`格子 ${cellId} 已被查封，无法收取租金`);
-      socket.emit('server.notification', {
-        id: `seal-block-${Date.now()}`,
-        type: 'warning',
-        title: '格子已被查封',
-        content: '该格子已被查封，无法进行任何操作',
-        durationMs: 3000,
-      });
-      return;
-    }
-
     const result = this.propertyHandler.handleRentPayment(playerId, cellId, socket);
     if (!result) {
       logger.debug(`玩家 ${playerId} 在格子 ${cellId} 无需支付租金`);
@@ -401,24 +341,6 @@ export class HandlerRegistry {
    */
   handleGameStart(playerId: string): void {
     this.startHandler.handleGameStart(playerId);
-  }
-
-  /**
-   * 心跳响应（与 SocketManager 中的轻量实现保持兼容）
-   */
-  private handlePing(socket: TypedSocket): void {
-    socket.on('client.ping', (payload, ack) => {
-      safeHandle(socket, ErrorCodes.InternalError, () => {
-        const response = {
-          timestamp: payload?.timestamp ?? Date.now(),
-          serverTime: Date.now(),
-        };
-        if (typeof ack === 'function') {
-          ack(response);
-        }
-        socket.emit('server.pong', response);
-      });
-    });
   }
 
   private handleChat(socket: TypedSocket): void {

@@ -3,11 +3,7 @@
  *
  * 管理时代切换、棋盘结算、纪念碑铭记等功能。
  *
- * 对应需求：
- * - FR-19：记载玩家游戏进展，成就跨棋盘保留，按各方面游戏进展计算天赋值，
- *          各方面表现出色的玩家被写入纪念碑。
- * - FR-20：每个时代结束时进行结算，结算基于所有启用的数值字段，
- *          结算后切换到下一个时代的棋盘，时代切换对应现实世界 3-6 个月。
+ * 时代结算基于启用的数值字段、地产和投资持有情况，并更新纪念碑铭记。
  */
 
 import type { CellType, EraInfo, MapData, MapMeta, MonumentRecord, Player, ValueField } from '@game/shared';
@@ -15,7 +11,6 @@ import { CellTypes, getExtra, normalizeCellType } from '@game/shared';
 import type { EraStore } from '../storage/EraStore.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { TypedServer } from '../transport/SocketManager.js';
-import type { TalentRegistry } from '../talents/TalentRegistry.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -50,8 +45,6 @@ export interface PlayerSettlement {
   investmentCount: number;
   /** 综合评分（多维度归一化加和，不单一以财富论） */
   comprehensiveScore: number;
-  /** 天赋值奖励 */
-  talentPointsReward: number;
   /** 是否被写入纪念碑 */
   inMonument: boolean;
   /** 纪念碑类别 */
@@ -96,8 +89,6 @@ export interface EraManagerOptions {
   defaultDuration?: number;
   /** 结算提前广播时间（毫秒），默认 7 天 */
   settlementAdvanceTime?: number;
-  /** 天赋注册表（可选，提供则结算时发放天赋值奖励） */
-  talentRegistry?: TalentRegistry;
 }
 
 /**
@@ -107,7 +98,6 @@ export interface EraManagerOptions {
  * - 时代计时与切换触发
  * - 棋盘结算逻辑（基于所有启用的数值字段）
  * - 纪念碑状态更新（各方面表现出色的玩家被铭记）
- * - 天赋值结算（综合多维度评价）
  * - 新棋盘加载与玩家迁移
  *
  * 构造函数接受可选的 GameWorld / TypedServer 依赖：
@@ -119,7 +109,6 @@ export class EraManager {
   private readonly store: EraStore;
   private readonly world?: GameWorld;
   private readonly io?: TypedServer;
-  private readonly talentRegistry?: TalentRegistry;
   private readonly defaultDuration: number;
   private readonly settlementAdvanceTime: number;
   private currentEra: EraInfo | null = null;
@@ -131,7 +120,6 @@ export class EraManager {
     this.store = store;
     this.world = world;
     this.io = io;
-    this.talentRegistry = options?.talentRegistry;
     this.defaultDuration = options?.defaultDuration ?? 90 * 24 * 60 * 60 * 1000;
     this.settlementAdvanceTime = options?.settlementAdvanceTime ?? 7 * 24 * 60 * 60 * 1000;
   }
@@ -213,6 +201,7 @@ export class EraManager {
       this.endingSoonTimer = setTimeout(() => {
         this.announceEraEndingSoon();
       }, endingSoonDelay);
+      this.endingSoonTimer.unref();
 
       logger.info(`Era ending-soon announcement scheduled in ${endingSoonDelay / 1000 / 60 / 60} hours`);
     }
@@ -225,6 +214,7 @@ export class EraManager {
           logger.error('Era settlement error:', err);
         });
       }, settlementDelay);
+      this.settlementTimer.unref();
 
       logger.info(`Settlement scheduled in ${settlementDelay / 1000 / 60 / 60} hours`);
     }
@@ -235,6 +225,7 @@ export class EraManager {
         logger.error('Era check error:', err);
       });
     }, 60 * 60 * 1000);
+    this.checkInterval.unref();
   }
 
   /**
@@ -291,8 +282,7 @@ export class EraManager {
    * 执行时代结算
    *
    * 结算基于所有启用的数值字段（财产、信用值、备选数值等），
-   * 计算每个玩家的综合评分（多维度归一化，不单一以财富论），
-   * 将各方面表现出色的玩家写入纪念碑，并更新天赋值。
+   * 计算每个玩家的综合评分并将表现出色的玩家写入纪念碑。
    *
    * @returns 结算结果
    */
@@ -318,8 +308,6 @@ export class EraManager {
     // 生成纪念碑铭记
     const monumentRecords = this.generateMonumentRecords(playerSettlements);
 
-    // 更新玩家天赋值（基于综合评价）
-    this.applyTalentRewards(playerSettlements);
 
     // 更新时代信息
     this.currentEra.settled = true;
@@ -374,13 +362,6 @@ export class EraManager {
         comprehensiveScore += max > 0 ? value / max : 0;
       }
 
-      // 天赋值奖励：基于综合评分 + 纪念碑加成 + 地产/投资加成
-      const talentPointsReward = this.calculateTalentReward(
-        comprehensiveScore,
-        propertyCount,
-        investmentCount,
-      );
-
       return {
         playerId: player.id,
         userId: player.id, // 简化，实际应该从账号系统获取
@@ -389,7 +370,6 @@ export class EraManager {
         propertyCount,
         investmentCount,
         comprehensiveScore,
-        talentPointsReward,
         inMonument: false,
         monumentCategories: [],
       };
@@ -408,32 +388,6 @@ export class EraManager {
     }
     // 回退默认字段
     return ['money', 'credit'];
-  }
-
-  /**
-   * 计算天赋值奖励（综合多维度评价）
-   */
-  private calculateTalentReward(
-    comprehensiveScore: number,
-    propertyCount: number,
-    investmentCount: number,
-  ): number {
-    // 基础奖励：综合评分（每分 2 点，向上取整）
-    let reward = Math.floor(comprehensiveScore * 2);
-
-    // 地产规模加成
-    if (propertyCount >= 6) {
-      reward += 2;
-    } else if (propertyCount >= 3) {
-      reward += 1;
-    }
-
-    // 投资规模加成
-    if (investmentCount >= 2) {
-      reward += 1;
-    }
-
-    return reward;
   }
 
   /**
@@ -566,23 +520,6 @@ export class EraManager {
   }
 
   /**
-   * 应用天赋值奖励
-   *
-   * 若注入了 TalentRegistry，则将奖励发放到玩家账户；否则仅记录在结算数据中。
-   */
-  private applyTalentRewards(settlements: PlayerSettlement[]): void {
-    if (!this.talentRegistry) {
-      return;
-    }
-
-    for (const s of settlements) {
-      if (s.talentPointsReward > 0) {
-        this.talentRegistry.addTalentPoints(s.playerId, s.talentPointsReward);
-      }
-    }
-  }
-
-  /**
    * 广播结算结果
    */
   private broadcastSettlement(
@@ -602,7 +539,7 @@ export class EraManager {
       durationMs: 0,
     });
 
-    // 纪念碑铭记广播（通过通用通知 + 纪念碑状态）
+    // 纪念碑铭记广播
     for (const record of monumentRecords) {
       this.io.emit('server.notification', {
         id: `monument_${record.category}_${Date.now()}`,

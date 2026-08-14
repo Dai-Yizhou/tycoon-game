@@ -2,7 +2,7 @@
  * DiceHandler 测试
  */
 
-import { describe, it, expect, beforeEach, vi } from '@jest/globals';
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { DiceHandler, DEFAULT_COOLDOWN_CONFIG } from '../../src/handlers/diceHandler.js';
 import { GameWorld } from '../../src/world/GameWorld.js';
 import { HandlerRegistry } from '../../src/transport/handlers.js';
@@ -14,21 +14,21 @@ import { PlayerStatus } from '@game/shared';
 function createMockSocket(playerId?: string): TypedSocket {
   return {
     data: { playerId },
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedSocket;
 }
 
 function createMockIO(): TypedServer {
   return {
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedServer;
 }
 
 function createMockRegistry(): HandlerRegistry {
   return {
-    handleMovement: vi.fn(),
+    handleMovement: jest.fn(),
   } as unknown as HandlerRegistry;
 }
 
@@ -39,7 +39,6 @@ function createTestPlayer(id: string, cellId: number = 1, status = PlayerStatus.
     teamId: null,
     position: { cellId },
     values: {},
-    items: [],
     status,
     createdAt: Date.now(),
     lastActiveAt: Date.now(),

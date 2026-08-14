@@ -151,7 +151,6 @@ describe('TeamManager', () => {
             money: { id: 'money', name: '财产', current: 1000 },
             credit: { id: 'credit', name: '信用值', current: 50 },
           },
-          items: [],
           status: 'normal',
           createdAt: Date.now(),
           lastActiveAt: Date.now(),
@@ -165,7 +164,6 @@ describe('TeamManager', () => {
             money: { id: 'money', name: '财产', current: 2000 },
             credit: { id: 'credit', name: '信用值', current: 80 },
           },
-          items: [],
           status: 'normal',
           createdAt: Date.now(),
           lastActiveAt: Date.now(),
@@ -192,7 +190,6 @@ describe('TeamManager', () => {
           values: {
             credit: { id: 'credit', name: '信用值', current: 50 },
           },
-          items: [],
           status: 'normal',
           createdAt: Date.now(),
           lastActiveAt: Date.now(),
@@ -205,7 +202,6 @@ describe('TeamManager', () => {
           values: {
             credit: { id: 'credit', name: '信用值', current: 80 },
           },
-          items: [],
           status: 'normal',
           createdAt: Date.now(),
           lastActiveAt: Date.now(),

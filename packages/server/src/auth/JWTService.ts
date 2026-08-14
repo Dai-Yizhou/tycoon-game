@@ -52,9 +52,8 @@ export class JWTService {
       exp: Math.floor(Date.now() / 1000) + this.config.expiresIn,
     };
 
-    return jwt.sign(payload, this.config.secret, {
-      expiresIn: this.config.expiresIn,
-    });
+    // payload 已显式携带 exp，不能同时传 expiresIn 选项（jsonwebtoken 会报错）
+    return jwt.sign(payload, this.config.secret);
   }
 
   /**

@@ -2,12 +2,12 @@
  * 破产机制测试
  */
 
-import { Bankruptcy, DEFAULT_BANKRUPTCY_CONFIG, type BankruptcyConfig } from '../src/economy/Bankruptcy';
-import { Bank, DEFAULT_BANK_CONFIG } from '../src/economy/Bank';
-import { Mortgage, DEFAULT_MORTGAGE_CONFIG } from '../src/economy/Mortgage';
-import { Taxation, DEFAULT_TAX_CONFIG } from '../src/economy/Taxation';
-import { GameWorld } from '../src/world/GameWorld';
-import { PlayerManager } from '../src/world/PlayerManager';
+import { Bankruptcy, DEFAULT_BANKRUPTCY_CONFIG, type BankruptcyConfig } from '../../src/economy/Bankruptcy';
+import { Bank, DEFAULT_BANK_CONFIG } from '../../src/economy/Bank';
+import { Mortgage, DEFAULT_MORTGAGE_CONFIG } from '../../src/economy/Mortgage';
+import { Taxation, DEFAULT_TAX_CONFIG } from '../../src/economy/Taxation';
+import { GameWorld } from '../../src/world/GameWorld';
+import { PlayerManager } from '../../src/world/PlayerManager';
 import type { Player, MapData, Cell } from '@game/shared';
 import { PlayerStatus, CellTypes } from '@game/shared';
 import type { TypedServer, TypedSocket } from '../src/transport/SocketManager';
@@ -26,6 +26,7 @@ describe('Bankruptcy System', () => {
   let mapData: MapData;
 
   beforeEach(() => {
+    jest.useFakeTimers();
     playerManager = new PlayerManager();
     world = new GameWorld({ playerManager });
 
@@ -48,6 +49,7 @@ describe('Bankruptcy System', () => {
       ...DEFAULT_BANKRUPTCY_CONFIG,
       bankruptcyThresholdTime: 1000, // 1 秒（测试用）
       revivalPeriod: 5000, // 5 秒（测试用）
+      bankruptcyCheckInterval: 100, // 100ms（测试用，加速破产检查）
     });
 
     // 创建测试地图数据
@@ -90,7 +92,6 @@ describe('Bankruptcy System', () => {
         money: { id: 'money', name: '财产', current: 100, min: 0 },
         credit: { id: 'credit', name: '信用值', current: 50, min: 0, max: 100 },
       },
-      items: [],
       status: PlayerStatus.Normal,
       createdAt: Date.now(),
       lastActiveAt: Date.now(),
@@ -104,14 +105,19 @@ describe('Bankruptcy System', () => {
     taxation.stopTaxTimer();
     mortgage.clearAllAuctions();
     playerManager.clear();
+    jest.useRealTimers();
   });
 
   describe('破产判定', () => {
-    it('TR-14.4-A: 资产为负一段时间后触发破产', async () => {
+    it('TR-14.4-A: 资产为负一段时间后触发破产', () => {
       // 设置财产为负（通过贷款）
       player.values['credit'].current = 100; // 提高贷款上限
       world.updatePlayer(player);
       bank.requestLoan(player.id, 1000);
+
+      // 贷款会同时增加财产与负债（净资产 = 财产 - 负债），花掉所得使净资产为负
+      player.values['money'].current = 0;
+      world.updatePlayer(player);
 
       // 检查净资产为负
       const netWorth = bank.getPlayerNetWorth(player.id);
@@ -120,44 +126,52 @@ describe('Bankruptcy System', () => {
       // 启动破产检查（加速测试）
       bankruptcy.startBankruptcyCheck();
 
-      // 等待破产判定时间（1秒）
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // 推进到超过破产判定阈值（fake timers）
+      jest.advanceTimersByTime(1500);
 
       // 检查玩家是否破产
       const isBankrupt = bankruptcy.isPlayerBankrupt(player.id);
       expect(isBankrupt).toBe(true);
     });
 
-    it('资产恢复为正后不破产', async () => {
+    it('资产恢复为正后不破产', () => {
       // 设置财产为负
       player.values['credit'].current = 100;
       world.updatePlayer(player);
       bank.requestLoan(player.id, 1000);
 
+      // 花掉贷款所得，使净资产为负
+      player.values['money'].current = 0;
+      world.updatePlayer(player);
+
       // 启动破产检查
       bankruptcy.startBankruptcyCheck();
 
-      // 等待部分时间
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // 推进部分时间（未到判定阈值，fake timers）
+      jest.advanceTimersByTime(500);
 
       // 恢复资产（还款）
       player.values['money'].current = 2000;
       world.updatePlayer(player);
       bank.repayLoan(player.id, 1000);
 
-      // 继续等待
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // 继续推进
+      jest.advanceTimersByTime(1500);
 
       // 检查玩家未破产
       const isBankrupt = bankruptcy.isPlayerBankrupt(player.id);
       expect(isBankrupt).toBe(false);
     });
 
-    it('监狱玩家不破产判定', async () => {
+    it('监狱玩家不破产判定', () => {
       // 设置财产为负
       player.values['credit'].current = 100;
       world.updatePlayer(player);
       bank.requestLoan(player.id, 1000);
+
+      // 花掉贷款所得，使净资产为负
+      player.values['money'].current = 0;
+      world.updatePlayer(player);
 
       // 设置为监狱状态
       world.getPlayerManager().updateStatus(player.id, PlayerStatus.Jail);
@@ -165,8 +179,8 @@ describe('Bankruptcy System', () => {
       // 启动破产检查
       bankruptcy.startBankruptcyCheck();
 
-      // 等待破产判定时间
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // 推进到超过破产判定阈值（fake timers）
+      jest.advanceTimersByTime(1500);
 
       // 检查玩家未破产
       const isBankrupt = bankruptcy.isPlayerBankrupt(player.id);
@@ -207,15 +221,15 @@ describe('Bankruptcy System', () => {
       expect(updatedPlayer!.values['credit'].current).toBe(DEFAULT_BANKRUPTCY_CONFIG.revivalStartingCredit);
     });
 
-    it('复活后清除贷款和负债', () => {
+    it('复活后保留贷款（不自动清除）', () => {
       bankruptcy.revivePlayer(player.id, mockSocket);
 
-      // 检查贷款已清除
+      // 复活只重置金钱/信用/位置/状态，不会自动清除贷款（与 API 文档一致）
       const loans = bank.getPlayerLoans(player.id);
-      expect(loans.length).toBe(0);
+      expect(loans.length).toBe(1);
 
       const debt = bank.getPlayerTotalDebt(player.id);
-      expect(debt).toBe(0);
+      expect(debt).toBeGreaterThan(0);
     });
 
     it('复活后恢复为正常状态', () => {
@@ -225,9 +239,9 @@ describe('Bankruptcy System', () => {
       expect(updatedPlayer!.status).toBe(PlayerStatus.Normal);
     });
 
-    it('超过复活期限后无法复活', async () => {
-      // 等待复活期限结束（5秒）
-      await new Promise(resolve => setTimeout(resolve, 6000));
+    it('超过复活期限后无法复活', () => {
+      // 推进到超过复活期限（fake timers）
+      jest.advanceTimersByTime(6000);
 
       const result = bankruptcy.revivePlayer(player.id, mockSocket);
 
@@ -252,24 +266,24 @@ describe('Bankruptcy System', () => {
       bankruptcy.triggerBankruptcy(player.id, 'manual');
     });
 
-    it('TR-14.4: 破产超过期限后清除地产', async () => {
-      // 等待清算（5秒）
-      await new Promise(resolve => setTimeout(resolve, 6000));
+    it('TR-14.4: 破产超过期限后清除地产', () => {
+      // 推进到超过复活期限触发清算（fake timers）
+      jest.advanceTimersByTime(6000);
 
       // 检查地产所有权已清除
       const cell = mapData[1];
       expect(cell.extra.owners).not.toContain(player.id);
     });
 
-    it('清算后清除所有负债', async () => {
-      await new Promise(resolve => setTimeout(resolve, 6000));
+    it('清算后清除所有负债', () => {
+      jest.advanceTimersByTime(6000);
 
       const debt = bank.getPlayerTotalDebt(player.id);
       expect(debt).toBe(0);
     });
 
-    it('清算后清除税收记录', async () => {
-      await new Promise(resolve => setTimeout(resolve, 6000));
+    it('清算后清除税收记录', () => {
+      jest.advanceTimersByTime(6000);
 
       const taxRecords = taxation.getPlayerTaxRecords(player.id);
       expect(taxRecords.length).toBe(0);
@@ -317,11 +331,11 @@ describe('Bankruptcy System', () => {
       }));
     });
 
-    it('清算时广播清算事件', async () => {
+    it('清算时广播清算事件', () => {
       bankruptcy.triggerBankruptcy(player.id, 'manual');
 
-      // 等待清算
-      await new Promise(resolve => setTimeout(resolve, 6000));
+      // 推进到超过复活期限触发清算（fake timers）
+      jest.advanceTimersByTime(6000);
 
       expect(mockIo.emit).toHaveBeenCalledWith('server.playerLiquidated', expect.objectContaining({
         playerId: player.id,

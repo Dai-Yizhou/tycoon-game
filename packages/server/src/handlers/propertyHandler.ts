@@ -523,11 +523,15 @@ export class PropertyHandler {
       // 3. 更新玩家数据
       this.world.updatePlayer(player);
 
+      // 重新读取更新后的所有权数据（避免执行前的旧数组引用导致除零/持股比例错误）
+      const finalOwners = getExtra<string[]>(cell, 'owners', []) ?? [];
+      const finalOwnerships = getExtra<PropertyOwnership[]>(cell, 'ownerships', []) ?? [];
+
       return {
         cell,
         ownership: {
           playerId: player.id,
-          share: owners.length === 1 ? 1.0 : price / (ownerships.reduce((sum, o) => sum + o.purchasePrice, 0)),
+          share: finalOwners.length === 1 ? 1.0 : price / (finalOwnerships.reduce((sum, o) => sum + o.purchasePrice, 0)),
           purchasePrice: price,
         },
       };

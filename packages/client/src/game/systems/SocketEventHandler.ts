@@ -34,12 +34,10 @@ import {
 import type { OtherPlayerInfo } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
 import { startServerPathAnimation, showIntersectionChoice } from './MovementSystem.js';
-import { addEarnedMoney } from './AchievementSystem.js';
 import { requestHudRefresh } from '../ClientHudBridge.js';
 import { updateRendererPlayers, updateBoardTheme, updateTopBarTime } from '../ClientRenderLoop.js';
 import { getPlayerTimezone, getLocalDayNight } from './MapLoader.js';
 import { applyTeamMembers } from './TeamSystem.js';
-import { checkBankruptcy } from './GameLogic.js';
 
 const registeredSockets = new WeakSet<TypedClientSocket>();
 const eventObservers = new WeakMap<TypedClientSocket, (event: string) => void>();
@@ -55,8 +53,7 @@ const SOCKET_EVENTS = [
   'server.valueChanged', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
   'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft', 'server.teamMemberKicked',
   'server.teamUpdated', 'server.teamDisbanded', 'server.prosperityChanged', 'server.gameState',
-  'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.itemAcquired',
-  'server.itemUsed', 'server.cellSealed', 'server.cellUnsealed', 'server.playerRevived',
+  'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.playerRevived',
 ] as const;
 
 /**
@@ -192,19 +189,11 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       if (isCurrentPlayer) {
         currentPlayer!.values.money.current = payload.current;
         setCurrentMoney(payload.current);
-        if (payload.delta > 0) {
-          addEarnedMoney(payload.delta);
-        }
       }
       if (otherPlayer || isCurrentPlayer) {
         updateRendererPlayers();
       }
-      // 服务端数值同步后检查破产
-      if (isCurrentPlayer) {
-        checkBankruptcy();
-        // 金钱变化后刷新操作面板（按钮依赖金钱判断可用性）
-        requestHudRefresh();
-      }
+      if (isCurrentPlayer) requestHudRefresh();
     } else if (payload.fieldId === 'credit') {
       if (isCurrentPlayer) {
         currentPlayer!.values.credit.current = payload.current;

@@ -27,8 +27,6 @@ export interface StartConfig {
   startBonus?: number;
   /** 经过起点补充资金，默认 200 */
   passBonus?: number;
-  /** 天赋选项列表 */
-  talents?: string[];
 }
 
 /**
@@ -37,7 +35,6 @@ export interface StartConfig {
 export const DEFAULT_START_CONFIG: StartConfig = {
   startBonus: 2000,
   passBonus: 200,
-  talents: [],
 };
 
 /**
@@ -216,7 +213,6 @@ export class StartHandler {
     return {
       startBonus: customConfig.startBonus as number | undefined,
       passBonus: customConfig.passBonus as number | undefined,
-      talents: customConfig.startTalents as string[] | undefined,
     };
   }
 

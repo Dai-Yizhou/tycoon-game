@@ -229,9 +229,6 @@ export class EventHandler {
         parts.push(`${fieldId} ${sign}${totalDelta}`);
       }
     }
-    if (result.itemAcquisitions.length > 0) {
-      parts.push(`道具: ${result.itemAcquisitions.map(i => i.itemType).join(', ')}`);
-    }
     const effectDesc = parts.join(', ');
 
     // 通知类型

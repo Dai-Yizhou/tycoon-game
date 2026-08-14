@@ -4,8 +4,6 @@
  * 账号系统相关类型，包括用户数据、登录响应、JWT payload 等。
  */
 
-import type { PlayerTalent } from './talent.js';
-import type { Item } from './item.js';
 
 /**
  * 用户账号信息
@@ -27,12 +25,6 @@ export interface UserAccount {
   createdAt: number;
   /** 最后登录时间（Unix 毫秒） */
   lastLoginAt: number;
-  /** 已学习的天赋列表 */
-  talents: PlayerTalent[];
-  /** 已解锁的成就 ID 列表 */
-  achievements: string[];
-  /** 天赋值余额 */
-  talentPoints: number;
 }
 
 /**
@@ -109,8 +101,6 @@ export interface PlayerGameState {
   position: { cellId: number };
   /** 动态数值字段 */
   values: Record<string, { id: string; name: string; current: number; min?: number; max?: number }>;
-  /** 持有道具 */
-  items: Item[];
   /** 玩家状态 */
   status: string;
   /** 持有的地产列表 */

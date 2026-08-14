@@ -20,20 +20,6 @@ export interface OtherPlayerInfo {
   primaryValue: number;
 }
 
-export interface TalentDef {
-  id: string; name: string; icon: string; description: string;
-  cost: number; category: string; prerequisites: string[]; conflicts: string[];
-  branchId: string; rarity: string; requires?: string;
-  current?: number; goal?: number; completed?: boolean;
-}
-
-export interface AchievementDef {
-  id: string; name: string; description: string; icon: string;
-  category: string; rarity: string; target: number; tpReward: number;
-  secret: boolean; progress: number;
-  current: number; goal: number; completed: boolean;
-}
-
 export interface RegionInfo {
   id: string; name: string; color: string; cellIds: number[];
   prosperity: number; timezone: string;
@@ -129,19 +115,6 @@ export let rollCooldownTimer: ReturnType<typeof setInterval> | null = null;
 export let isInJail = false;
 export let jailEndTime = 0;
 
-// 天赋
-export let TALENT_DEFS: TalentDef[] = [];
-export let activeTalents: Set<string> = new Set();
-export let availableTP = 0;
-export let talentsLocked = false;
-
-// 成就
-export let achievements: AchievementDef[] = [];
-export let totalMoneyEarned = 0;
-
-// 道具
-export let items: { id: string; name: string; icon: string; count: number }[] = [];
-
 // 银行
 export let loanAmount = 0;
 export let loanInterestRate = 0.05;
@@ -192,7 +165,6 @@ export let diceDisplayEl: HTMLElement | null = null;
 export let actionButtonsEl: HTMLElement | null = null;
 export let chatBoxEl: HTMLElement | null = null;
 export let hoverCardEl: HTMLElement | null = null;
-export let topBarTalentsEl: HTMLElement | null = null;
 export let topBarProsperityEl: HTMLElement | null = null;
 export let topBarProsperityFillEl: HTMLElement | null = null;
 export let topBarRegionFieldsEl: HTMLElement | null = null;
@@ -200,7 +172,6 @@ export let topBarTimeEl: HTMLElement | null = null;
 export let bankBtnEl: HTMLButtonElement | null = null;
 export let teamPanelContentEl: HTMLElement | null = null;
 export let chatChannelContainer: HTMLElement | null = null;
-export let itemsPanelEl: HTMLElement | null = null;
 
 // ===== 状态更新函数 =====
 
@@ -242,13 +213,6 @@ export function setRollCooldownEnd(val: number): void { rollCooldownEnd = val; }
 export function setRollCooldownTimer(val: ReturnType<typeof setInterval> | null): void { rollCooldownTimer = val; }
 export function setIsInJail(val: boolean): void { isInJail = val; }
 export function setJailEndTime(val: number): void { jailEndTime = val; }
-export function setTalentDefs(val: TalentDef[]): void { TALENT_DEFS = val; }
-export function setActiveTalents(val: Set<string>): void { activeTalents = val; }
-export function setAvailableTP(val: number): void { availableTP = val; }
-export function setTalentsLocked(val: boolean): void { talentsLocked = val; }
-export function setAchievements(val: AchievementDef[]): void { achievements = val; }
-export function setTotalMoneyEarned(val: number): void { totalMoneyEarned = val; }
-export function setItems(val: { id: string; name: string; icon: string; count: number }[]): void { items = val; }
 export function setLoanAmount(val: number): void { loanAmount = val; }
 export function setLoanInterestRate(val: number): void { loanInterestRate = val; }
 export function setDayNightCycle(val: number): void { DAY_NIGHT_CYCLE = val; }
@@ -270,7 +234,6 @@ export function setDiceDisplayEl(val: HTMLElement | null): void { diceDisplayEl 
 export function setActionButtonsEl(val: HTMLElement | null): void { actionButtonsEl = val; }
 export function setChatBoxEl(val: HTMLElement | null): void { chatBoxEl = val; }
 export function setHoverCardEl(val: HTMLElement | null): void { hoverCardEl = val; }
-export function setTopBarTalentsEl(val: HTMLElement | null): void { topBarTalentsEl = val; }
 export function setTopBarProsperityEl(val: HTMLElement | null): void { topBarProsperityEl = val; }
 export function setTopBarProsperityFillEl(val: HTMLElement | null): void { topBarProsperityFillEl = val; }
 export function setTopBarRegionFieldsEl(val: HTMLElement | null): void { topBarRegionFieldsEl = val; }
@@ -278,7 +241,6 @@ export function setTopBarTimeEl(val: HTMLElement | null): void { topBarTimeEl = 
 export function setBankBtnEl(val: HTMLButtonElement | null): void { bankBtnEl = val; }
 export function setTeamPanelContentEl(val: HTMLElement | null): void { teamPanelContentEl = val; }
 export function setChatChannelContainer(val: HTMLElement | null): void { chatChannelContainer = val; }
-export function setItemsPanelEl(val: HTMLElement | null): void { itemsPanelEl = val; }
 export function setDetailPanelExpanded(val: boolean): void { detailPanelExpanded = val; }
 export function setDetailPanelUpdateTimer(val: ReturnType<typeof setInterval> | null): void { detailPanelUpdateTimer = val; }
 export function setLastLocalIsDay(val: boolean | null): void { lastLocalIsDay = val; }

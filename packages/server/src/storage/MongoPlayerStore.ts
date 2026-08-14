@@ -26,15 +26,6 @@ interface PlayerDocument extends Document {
   position: { cellId: number };
   /** 动态数值字段集合 */
   values: Record<string, { id: string; name: string; current: number; min?: number; max?: number }>;
-  /** 玩家持有的道具列表 */
-  items: Array<{
-    id: string;
-    type: string;
-    name: string;
-    quantity: number;
-    expiresAt?: number;
-    acquiredAt: number;
-  }>;
   /** 玩家当前状态 */
   status: string;
   /** 玩家创建时间（Unix 毫秒） */
@@ -134,14 +125,6 @@ export class MongoPlayerStore implements PlayerStore {
       teamId: player.teamId,
       position: { cellId: player.position.cellId },
       values: player.values,
-      items: player.items.map((item) => ({
-        id: item.id,
-        type: item.type,
-        name: item.name,
-        quantity: item.quantity,
-        expiresAt: item.expiresAt,
-        acquiredAt: item.acquiredAt,
-      })),
       status: player.status,
       createdAt: player.createdAt,
       lastActiveAt: player.lastActiveAt,
@@ -158,14 +141,6 @@ export class MongoPlayerStore implements PlayerStore {
       teamId: doc.teamId,
       position: { cellId: doc.position.cellId },
       values: doc.values,
-      items: doc.items.map((item) => ({
-        id: item.id,
-        type: item.type,
-        name: item.name,
-        quantity: item.quantity,
-        expiresAt: item.expiresAt,
-        acquiredAt: item.acquiredAt,
-      })),
       status: doc.status as Player['status'],
       createdAt: doc.createdAt,
       lastActiveAt: doc.lastActiveAt,

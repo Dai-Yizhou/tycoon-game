@@ -2,7 +2,7 @@
  * MovementHandler 测试
  */
 
-import { describe, it, expect, beforeEach, vi } from '@jest/globals';
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { MovementHandler } from '../../src/handlers/movementHandler.js';
 import { GameWorld } from '../../src/world/GameWorld.js';
 import type { TypedServer, TypedSocket } from '../../src/transport/SocketManager.js';
@@ -13,15 +13,15 @@ import { PlayerStatus } from '@game/shared';
 function createMockSocket(playerId?: string): TypedSocket {
   return {
     data: { playerId },
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedSocket;
 }
 
 function createMockIO(): TypedServer {
   return {
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedServer;
 }
 
@@ -32,7 +32,6 @@ function createTestPlayer(id: string, cellId: number = 1): Player {
     teamId: null,
     position: { cellId },
     values: {},
-    items: [],
     status: PlayerStatus.Normal,
     createdAt: Date.now(),
     lastActiveAt: Date.now(),

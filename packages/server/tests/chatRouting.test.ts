@@ -14,7 +14,6 @@ function buildPlayer(id: string, cellId: number, teamId: string | null = null): 
     teamId,
     position: { cellId },
     values: {},
-    items: [],
     status: PlayerStatus.Normal,
     createdAt: Date.now(),
     lastActiveAt: Date.now(),

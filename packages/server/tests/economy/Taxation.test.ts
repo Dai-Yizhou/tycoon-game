@@ -2,13 +2,13 @@
  * 计税系统测试
  */
 
-import { Taxation, DEFAULT_TAX_CONFIG, type TaxConfig } from '../src/economy/Taxation';
-import { Bank, DEFAULT_BANK_CONFIG } from '../src/economy/Bank';
-import { GameWorld } from '../src/world/GameWorld';
-import { PlayerManager } from '../src/world/PlayerManager';
+import { Taxation, DEFAULT_TAX_CONFIG, type TaxConfig } from '../../src/economy/Taxation';
+import { Bank, DEFAULT_BANK_CONFIG } from '../../src/economy/Bank';
+import { GameWorld } from '../../src/world/GameWorld';
+import { PlayerManager } from '../../src/world/PlayerManager';
 import type { Player, MapData, Cell } from '@game/shared';
 import { PlayerStatus, CellTypes } from '@game/shared';
-import type { TypedServer } from '../src/transport/SocketManager';
+import type { TypedServer } from '../../src/transport/SocketManager';
 
 describe('Taxation System', () => {
   let world: GameWorld;
@@ -94,7 +94,6 @@ describe('Taxation System', () => {
         money: { id: 'money', name: '财产', current: 500, min: 0 },
         credit: { id: 'credit', name: '信用值', current: 50, min: 0, max: 100 },
       },
-      items: [],
       status: PlayerStatus.Normal,
       createdAt: Date.now(),
       lastActiveAt: Date.now(),
@@ -110,7 +109,6 @@ describe('Taxation System', () => {
         money: { id: 'money', name: '财产', current: 5000, min: 0 },
         credit: { id: 'credit', name: '信用值', current: 80, min: 0, max: 100 },
       },
-      items: [],
       status: PlayerStatus.Normal,
       createdAt: Date.now(),
       lastActiveAt: Date.now(),
@@ -166,14 +164,15 @@ describe('Taxation System', () => {
   });
 
   describe('财产税计算', () => {
-    it('财产税 = max(0, 财产 - minWealth) * wealthTaxRate', () => {
-      // 富玩家财产 5000，最低征税 1000
-      // 财产税 = (5000 - 1000) * 2% = 80
+    it('财产税按净资产计算且低于最低征税额免税', () => {
+      // 富玩家财产 5000，无负债，最低征税 1000
+      // 实现：净资产 >= minWealthForTax 时按全额净资产计税（无豁免额度减除）
+      // 财产税 = floor(5000 * 2%) = 100
 
       const result = taxation.triggerManualTax(richPlayer.id);
 
       expect(result.success).toBe(true);
-      expect(result.taxRecord!.wealthTax).toBe(80);
+      expect(result.taxRecord!.wealthTax).toBe(100);
     });
 
     it('财产低于最低征税额免税', () => {
@@ -185,16 +184,21 @@ describe('Taxation System', () => {
     });
 
     it('考虑负债计算净资产税', () => {
-      // 富玩家贷款
+      // 冻结时间，避免贷款利息随真实流逝时间累积导致净资产产生浮点抖动
+      jest.useFakeTimers();
+
+      // 富玩家贷款 2000（银行放款会先增加财产，故净资产仍为 5000）
       bank.requestLoan(richPlayer.id, 2000);
 
-      // 净资产 = 5000 - 2000 = 3000
-      // 财产税 = (3000 - 1000) * 2% = 40
+      // 净资产 = (5000 + 2000) - 2000 = 5000
+      // 财产税 = floor(5000 * 2%) = 100
 
       const result = taxation.triggerManualTax(richPlayer.id);
 
       expect(result.success).toBe(true);
-      expect(result.taxRecord!.wealthTax).toBe(40);
+      expect(result.taxRecord!.wealthTax).toBe(100);
+
+      jest.useRealTimers();
     });
   });
 
@@ -333,12 +337,17 @@ describe('Taxation System', () => {
     });
 
     it('计税周期完成时广播事件', () => {
+      jest.useFakeTimers();
       taxation.startTaxTimer();
-      taxation.triggerManualTax(richPlayer.id);
+
+      // 推进一个计税周期，触发 executeTaxCycle 广播周期完成事件
+      jest.advanceTimersByTime(60000);
 
       expect(mockIo.emit).toHaveBeenCalledWith('server.taxCycleComplete', expect.objectContaining({
         timestamp: expect.any(Number),
       }));
+
+      jest.useRealTimers();
     });
   });
 });

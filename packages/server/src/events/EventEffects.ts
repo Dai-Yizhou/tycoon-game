@@ -3,7 +3,7 @@
  *
  * 负责：
  * - 应用事件效果到玩家数值字段
- * - 处理不同类型的效果（数值变化、获得道具等）
+ * - 处理数值变化效果
  * - 广播数值变化事件
  *
  * 设计原则：
@@ -12,6 +12,7 @@
  * - 所有效果在服务端权威执行
  */
 
+/* eslint-disable no-case-declarations -- case 块内声明为有意为之 */
 import type { EventEffect, Player, ValueField } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer } from '../transport/SocketManager.js';

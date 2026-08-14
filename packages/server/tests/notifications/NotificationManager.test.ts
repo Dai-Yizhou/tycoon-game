@@ -65,14 +65,6 @@ describe('NotificationManager', () => {
       expect(notification.targetPlayerId).toBe('player2');
     });
 
-    test('创建复活令目标选择通知', () => {
-      const notification = manager.createReviveOrderSelectNotification('player1', [
-        { id: 'bankrupt1', name: '破产玩家1' },
-      ]);
-      expect(notification).toBeDefined();
-      expect(notification.metadata?.bankruptPlayers).toBeDefined();
-    });
-
     test('创建路径选择通知', () => {
       const notification = manager.createPathSelectNotification('player1', 10, [
         { cellId: 11, label: '路径A' },
@@ -82,11 +74,6 @@ describe('NotificationManager', () => {
       expect(notification.actions?.length).toBe(2);
     });
 
-    test('创建道具获得通知', () => {
-      const notification = manager.createItemAcquiredNotification('player1', '查封令');
-      expect(notification).toBeDefined();
-      expect(notification.content).toContain('查封令');
-    });
   });
 
   describe('通知查询', () => {

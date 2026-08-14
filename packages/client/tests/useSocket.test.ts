@@ -13,7 +13,12 @@ jest.mock('socket.io-client', () => ({
     connected: true,
     on: jest.fn(),
     once: jest.fn(),
-    emit: jest.fn(),
+    emit: jest.fn((event: string, payload: unknown, ack?: (r: unknown) => void) => {
+      // 模拟服务端立即回执，避免 ping/waitForConnection 永久挂起
+      if (typeof ack === 'function') {
+        ack({ timestamp: Date.now(), serverTime: Date.now() });
+      }
+    }),
     disconnect: jest.fn(),
   })),
 }));

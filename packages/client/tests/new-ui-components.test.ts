@@ -12,7 +12,7 @@ describe("GameHudShell", () => {
     const root = shell.getElement();
     expect(root.dataset.ui).toBe("game-hud-shell");
     // 验证关键 HUD 覆盖层元素存在
-    for (const ui of ["top-bar", "player-badge", "resource-strip", "day-night", "zone-tag", "chat-panel", "items-panel", "action-dock", "hover-card"]) {
+    for (const ui of ["top-bar", "player-badge", "resource-strip", "day-night", "zone-tag", "chat-panel", "action-dock", "hover-card"]) {
       expect(root.querySelector(`[data-ui="${ui}"]`)).not.toBeNull();
     }
     // 验证操作回调

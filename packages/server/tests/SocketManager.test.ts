@@ -27,7 +27,6 @@ function buildPlayer(id: string, overrides: Partial<Player> = {}): Player {
     teamId: null,
     position: { cellId: 0 },
     values: {},
-    items: [],
     status: PlayerStatus.Normal,
     createdAt: Date.now(),
     lastActiveAt: Date.now(),

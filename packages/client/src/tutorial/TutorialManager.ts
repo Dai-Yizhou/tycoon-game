@@ -96,12 +96,6 @@ export const BUILTIN_TUTORIAL_STEPS: TutorialStep[] = [
     type: 'info',
   },
   {
-    id: 'talent',
-    title: '选择天赋',
-    description: 'tutorial.step4',
-    type: 'info',
-  },
-  {
     id: 'complete',
     title: '引导完成',
     description: 'tutorial.complete',

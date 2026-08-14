@@ -46,6 +46,22 @@ function createMockContext(): CanvasRenderingContext2D {
     scale: noop,
     rotate: noop,
     setLineDash: noop,
+    setTransform: noop,
+    transform: noop,
+    resetTransform: noop,
+    arcTo: noop,
+    ellipse: noop,
+    rect: noop,
+    roundRect: noop,
+    bezierCurveTo: noop,
+    quadraticCurveTo: noop,
+    clip: noop,
+    drawImage: noop,
+    createPattern: jest.fn(() => null),
+    createImageData: jest.fn(() => ({ data: [], width: 0, height: 0 })),
+    getImageData: jest.fn(() => ({ data: [], width: 0, height: 0 })),
+    measureText: jest.fn((text: string) => ({ width: text.length * 8, actualBoundingBoxLeft: 0, actualBoundingBoxRight: text.length * 8 })),
+    isPointInPath: jest.fn(() => false),
     createLinearGradient: jest.fn(() => mockGradient),
     createRadialGradient: jest.fn(() => mockGradient),
   } as unknown as CanvasRenderingContext2D;
@@ -110,7 +126,6 @@ function createTestPlayer(positionX: number, positionY: number): Player {
     name: '测试玩家',
     position: { x: positionX, y: positionY, cellId: 0 },
     values: { money: 1000 },
-    items: [],
     status: 'active',
     teamId: null,
   };
@@ -312,12 +327,24 @@ describe('Task 5: BoardRenderer System', () => {
     });
 
     it('should set vision center and radius', () => {
-      const renderer = new BoardRenderer(canvas);
-      renderer.setVisionCenter(200, 200);
-      renderer.setVisionRadius(200);
+      const ctx = createMockContext();
+      const visionRenderer = new VisionMaskRenderer(ctx);
+      const vision = {
+        radius: 200,
+        shape: 'circle' as const,
+        centerX: 200,
+        centerY: 200,
+      };
+      const cameraState = {
+        zoom: 1,
+        offsetX: 0,
+        offsetY: 0,
+        viewportWidth: 800,
+        viewportHeight: 600,
+      };
 
       // 验证设置成功（通过间接方法）
-      expect(() => renderer.render()).not.toThrow();
+      expect(() => visionRenderer.render(vision, cameraState)).not.toThrow();
     });
 
     it('should ensure vision radius is smaller than board (TR-5.5)', () => {
@@ -385,7 +412,6 @@ describe('Task 5: BoardRenderer System', () => {
 
       const player = createTestPlayer(0);
       renderer.updatePlayers([player]);
-      renderer.setVisionCenter(100, 100);
 
       // 执行完整渲染流程
       renderer.render();

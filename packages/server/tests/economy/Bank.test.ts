@@ -2,9 +2,9 @@
  * 银行系统测试
  */
 
-import { Bank, DEFAULT_BANK_CONFIG, type BankConfig } from '../src/economy/Bank';
-import { GameWorld } from '../src/world/GameWorld';
-import { PlayerManager } from '../src/world/PlayerManager';
+import { Bank, DEFAULT_BANK_CONFIG, type BankConfig } from '../../src/economy/Bank';
+import { GameWorld } from '../../src/world/GameWorld';
+import { PlayerManager } from '../../src/world/PlayerManager';
 import type { Player } from '@game/shared';
 import { PlayerStatus } from '@game/shared';
 
@@ -29,7 +29,6 @@ describe('Bank System', () => {
         money: { id: 'money', name: '财产', current: 1000, min: 0 },
         credit: { id: 'credit', name: '信用值', current: 50, min: 0, max: 100 },
       },
-      items: [],
       status: PlayerStatus.Normal,
       createdAt: Date.now(),
       lastActiveAt: Date.now(),
@@ -198,15 +197,22 @@ describe('Bank System', () => {
     });
 
     it('还清贷款后移除记录', () => {
-      // 还清全部
-      const totalDebt = bank.getPlayerTotalDebt(player.id);
-      player.values['money'].current = totalDebt + 1000; // 确保有足够财产
-      world.updatePlayer(player);
+      // 冻结时间：连续比例计息会让两次 Date.now() 之间的微小间隔累积利息，
+      // 导致还款金额无法精确清账而 flaky
+      jest.useFakeTimers();
+      try {
+        // 还清全部
+        const totalDebt = bank.getPlayerTotalDebt(player.id);
+        player.values['money'].current = totalDebt + 1000; // 确保有足够财产
+        world.updatePlayer(player);
 
-      bank.repayLoan(player.id, totalDebt);
+        bank.repayLoan(player.id, totalDebt);
 
-      const loans = bank.getPlayerLoans(player.id);
-      expect(loans.length).toBe(0);
+        const loans = bank.getPlayerLoans(player.id);
+        expect(loans.length).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 
@@ -223,19 +229,27 @@ describe('Bank System', () => {
       expect(netWorth).toBe(initialMoney);
     });
 
-    it('净资产可为负（负债超过财产）', () => {
-      // 设置财产为 100
-      player.values['money'].current = 100;
-      world.updatePlayer(player);
+    it('净资产在贷款后保持不变（贷款金额计入资产）', () => {
+      // 冻结时间：避免毫秒级计息使净资产略低于 100 导致 flaky
+      jest.useFakeTimers();
+      try {
+        // 设置财产为 100
+        player.values['money'].current = 100;
+        world.updatePlayer(player);
 
-      // 贷款 1000（假设上限足够）
-      player.values['credit'].current = 100; // 提高上限
-      world.updatePlayer(player);
-      bank.requestLoan(player.id, 1000);
+        // 贷款 1000（假设上限足够）
+        player.values['credit'].current = 100; // 提高上限
+        world.updatePlayer(player);
+        bank.requestLoan(player.id, 1000);
 
-      const netWorth = bank.getPlayerNetWorth(player.id);
-
-      expect(netWorth).toBeLessThan(0);
+        const playerAfter = world.getPlayer(player.id)!;
+        // 贷款 1000 加到财产，负债 = 1000，净资产 = 100+1000-1000 = 100
+        expect(playerAfter.values.money.current).toBe(1100);
+        const netWorth = bank.getPlayerNetWorth(player.id);
+        expect(netWorth).toBe(100);
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 

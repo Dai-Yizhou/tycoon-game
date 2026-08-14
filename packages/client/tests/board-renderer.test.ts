@@ -62,7 +62,7 @@ describe('BoardRenderer', () => {
     const viewport = renderer.getViewport();
     expect(viewport.width).toBe(800);
     expect(viewport.height).toBe(600);
-    expect(viewport.zoom).toBe(0.8);
+    expect(viewport.zoom).toBe(1);
   });
 
   it('throws on invalid context', () => {

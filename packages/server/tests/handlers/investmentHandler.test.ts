@@ -7,7 +7,7 @@
  * - TR-12.3: 事件触发时投资项目收益/损失正确
  */
 
-import { describe, it, expect, beforeEach, vi } from '@jest/globals';
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { InvestmentHandler, type EventTriggerResult } from '../../src/handlers/investmentHandler.js';
 import { GameWorld } from '../../src/world/GameWorld.js';
 import type { TypedServer, TypedSocket } from '../../src/transport/SocketManager.js';
@@ -19,15 +19,15 @@ import type { PropertyOwnership } from '../../src/handlers/propertyHandler.js';
 function createMockSocket(playerId?: string): TypedSocket {
   return {
     data: { playerId },
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedSocket;
 }
 
 function createMockIO(): TypedServer {
   return {
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedServer;
 }
 
@@ -40,7 +40,6 @@ function createTestPlayer(id: string, money: number = 1000): Player {
     values: {
       money: { id: 'money', name: '财产', current: money, min: 0 },
     },
-    items: [],
     status: PlayerStatus.Normal,
     createdAt: Date.now(),
     lastActiveAt: Date.now(),
@@ -82,6 +81,11 @@ function createTestMapMeta(): MapMeta {
     id: 'test-map',
     name: 'Test Map',
     version: '1.0.0',
+    templateName: 'default',
+    timezones: [],
+    regions: [],
+    dayNightCycleMinutes: 15,
+    startCellId: 0,
     valueFieldDefinitions: [
       { id: 'money', name: '财产', current: 1000, min: 0 },
     ],

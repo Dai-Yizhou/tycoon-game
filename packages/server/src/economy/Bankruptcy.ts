@@ -3,13 +3,13 @@
  *
  * 负责：
  * - 破产判定（财产为负或为零一段时间）
- * - 复活期限（破产玩家可被复活令复活）
+ * - 复活期限（破产玩家可在期限内重开）
  * - 清除地产（未复活则清除所有地产，重回起点）
  * - 破产恢复（重置玩家状态）
  *
  * 设计原则：
  * - 破产判定：净资产连续低于或等于 0 超过一定时间
- * - 复活期限：破产玩家有一段时间可以被复活令复活
+ * - 复活期限：破产玩家有一段时间可以重开
  * - 清除机制：超过复活期限，清除所有地产、贷款、税收记录，重回起点
  * - 状态标记：破产玩家状态为 PlayerStatus.Bankrupt
  */
@@ -141,6 +141,7 @@ export class Bankruptcy {
     this.bankruptcyCheckTimer = setInterval(() => {
       this.executeBankruptcyCheck();
     }, this.config.bankruptcyCheckInterval);
+    this.bankruptcyCheckTimer.unref();
 
     logger.info(`破产检查定时器已启动，周期 ${this.config.bankruptcyCheckInterval} 毫秒`);
   }
@@ -306,7 +307,7 @@ export class Bankruptcy {
 
     logger.debug(`玩家 ${playerId} 清算完成，已清除所有资产`);
 
-    // 注意：此时玩家仍处于破产状态，需要手动移除或等待复活令
+    // 注意：此时玩家仍处于破产状态，需要手动移除
   }
 
   /**
@@ -343,7 +344,7 @@ export class Bankruptcy {
   }
 
   /**
-   * 复活破产玩家（使用复活令）。
+   * 复活破产玩家。
    */
   revivePlayer(playerId: string, _socket: TypedSocket): RevivalResult {
     const player = this.world.getPlayer(playerId);

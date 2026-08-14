@@ -515,7 +515,6 @@ export class SocketManager {
       teamId: null,
       position: { cellId: 0 },
       values,
-      items: [],
       status: PlayerStatus.Normal,
       createdAt: now,
       lastActiveAt: now,

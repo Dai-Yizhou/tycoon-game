@@ -48,7 +48,7 @@ export const CellTypes = {
   Transport: 'transport',
   /** 纪念碑：可修缮 */
   Monument: 'monument',
-  /** 起点：经过或停留时获得资金/天赋 */
+  /** 起点：经过或停留时获得资金 */
   Start: 'start',
   /** 监狱：踩中进入受限状态 */
   Jail: 'jail',
@@ -126,7 +126,7 @@ export function getExtra<T = unknown>(
   key: string,
   defaultValue?: T,
 ): T | undefined {
-  if (cell == null || cell.extra == null) {
+  if (cell === null || cell === undefined || cell.extra === null || cell.extra === undefined) {
     return defaultValue;
   }
   const value = cell.extra[key];

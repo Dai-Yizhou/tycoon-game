@@ -8,7 +8,7 @@
  * - 纪念碑状态管理
  */
 
-import { describe, it, expect, beforeEach, vi } from '@jest/globals';
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { MonumentHandler, type RepairResult, type MonumentState } from '../../src/handlers/monumentHandler.js';
 import type { ProsperityManager } from '../../src/world/ProsperityManager.js';
 import { GameWorld } from '../../src/world/GameWorld.js';
@@ -20,15 +20,15 @@ import { PlayerStatus } from '@game/shared';
 function createMockSocket(playerId?: string): TypedSocket {
   return {
     data: { playerId },
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedSocket;
 }
 
 function createMockIO(): TypedServer {
   return {
-    emit: vi.fn(),
-    on: vi.fn(),
+    emit: jest.fn(),
+    on: jest.fn(),
   } as unknown as TypedServer;
 }
 
@@ -42,7 +42,6 @@ function createTestPlayer(id: string, money: number = 1000, credit: number = 0):
       money: { id: 'money', name: '财产', current: money, min: 0 },
       credit: { id: 'credit', name: '信用值', current: credit, min: 0 },
     },
-    items: [],
     status: PlayerStatus.Normal,
     createdAt: Date.now(),
     lastActiveAt: Date.now(),
@@ -114,25 +113,25 @@ function createMockProsperityManager(): ProsperityManager {
   cellRegions.set(2, 'region-1');
 
   const mock = {
-    findRegionByCellId: vi.fn((cellId: number) => cellRegions.get(cellId)),
-    increaseProsperity: vi.fn((regionId: string, amount: number) => {
+    findRegionByCellId: jest.fn((cellId: number) => cellRegions.get(cellId)),
+    increaseProsperity: jest.fn((regionId: string, amount: number) => {
       const current = regionProsperities.get(regionId) ?? 0;
       regionProsperities.set(regionId, Math.min(100, current + amount));
     }),
-    decreaseProsperity: vi.fn(),
-    getCellProsperity: vi.fn((cellId: number) => {
+    decreaseProsperity: jest.fn(),
+    getCellProsperity: jest.fn((cellId: number) => {
       const regionId = cellRegions.get(cellId);
       if (regionId) return regionProsperities.get(regionId) ?? 100;
       return 100;
     }),
-    getProsperity: vi.fn((regionId: string) => regionProsperities.get(regionId) ?? 100),
-    getRegionState: vi.fn(),
-    getAllRegionStates: vi.fn(() => []),
-    getRegionCount: vi.fn(() => regionProsperities.size),
-    startUpdateTimer: vi.fn(),
-    stopUpdateTimer: vi.fn(),
-    on: vi.fn(),
-    emit: vi.fn(),
+    getProsperity: jest.fn((regionId: string) => regionProsperities.get(regionId) ?? 100),
+    getRegionState: jest.fn(),
+    getAllRegionStates: jest.fn(() => []),
+    getRegionCount: jest.fn(() => regionProsperities.size),
+    startUpdateTimer: jest.fn(),
+    stopUpdateTimer: jest.fn(),
+    on: jest.fn(),
+    emit: jest.fn(),
   };
 
   return mock as unknown as ProsperityManager;
@@ -150,12 +149,12 @@ describe('MonumentHandler', () => {
     mockIO = createMockIO();
     mockSocket = createMockSocket('player1');
     mockProsperityManager = createMockProsperityManager();
-    handler = new MonumentHandler(mockIO, world, mockProsperityManager);
 
-    // 加载测试地图
+    // 先加载地图，再创建 handler（MonumentHandler 构造时读取地图初始化纪念碑状态）
     const mapData = createTestMapData();
     const mapMeta = createTestMapMeta();
     world.loadMap(mapData, mapMeta);
+    handler = new MonumentHandler(mockIO, world, mockProsperityManager);
   });
 
   describe('TR-13.3: 修缮纪念碑', () => {
@@ -257,7 +256,7 @@ describe('MonumentHandler', () => {
 
       // executeRepair 不检查财产，只执行操作
       expect(result).not.toBeNull();
-      expect(player.values['money'].current).toBe(-50); // 50 - 100
+      expect(player.values['money'].current).toBe(0); // 财产不足时被 clamp 到 0
     });
   });
 

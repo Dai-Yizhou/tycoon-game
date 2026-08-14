@@ -4,7 +4,7 @@
  * 负责：
  * - 从磁盘加载 behavior JSON 配置文件（路径：config/behaviors/${behaviorId}.json）
  * - 随机选择一个事件并应用效果到玩家
- * - 支持的效果类型：money（金钱）、credit（信用值）、env（环保值）、item（道具）
+ * - 支持的效果类型：money（金钱）、credit（信用值）、env（环保值）
  * - 支持 region 目标：效果影响区域内的所有玩家（FR-4）
  * - 效果应用后通过 socket 广播 server.valueChanged 事件
  *
@@ -21,7 +21,6 @@ import { logger } from '../utils/logger.js';
 import type { TypedServer } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { ProsperityManager } from '../world/ProsperityManager.js';
-import type { ItemEffectsHandler } from '../items/ItemEffects.js';
 
 /**
  * 行为事件目标类型
@@ -49,8 +48,6 @@ export interface BehaviorEvent {
   credit?: number;
   /** 环保值变化 */
   env?: number;
-  /** 获得道具 ID（如 'seal'、'revive'） */
-  item?: string;
   /** 效果目标：player（默认）或 region（区域内所有玩家） */
   target?: BehaviorEventTarget;
   /** 权重（默认1，值越大概率越高） */
@@ -89,8 +86,6 @@ export interface BehaviorExecuteResult {
   affectedPlayerIds: string[];
   /** 数值变化结果列表 */
   valueChanges: BehaviorValueChange[];
-  /** 获得道具的玩家 ID 列表 */
-  itemAcquisitions: { playerId: string; itemType: string }[];
 }
 
 /**
@@ -131,8 +126,6 @@ export class BehaviorEngine {
   private readonly world: GameWorld;
   /** 繁荣度管理器（可选，用于区域查找） */
   private readonly prosperityManager: ProsperityManager | null;
-  /** 道具效果处理器（可选，用于发放道具） */
-  private readonly itemEffectsHandler: ItemEffectsHandler | null;
   /** behavior 配置文件根目录 */
   private readonly configDir: string;
   /** 配置缓存 */
@@ -143,14 +136,12 @@ export class BehaviorEngine {
     world: GameWorld,
     options?: {
       prosperityManager?: ProsperityManager | null;
-      itemEffectsHandler?: ItemEffectsHandler | null;
       configDir?: string;
     },
   ) {
     this.io = io;
     this.world = world;
     this.prosperityManager = options?.prosperityManager ?? null;
-    this.itemEffectsHandler = options?.itemEffectsHandler ?? null;
     this.configDir = options?.configDir ?? path.resolve(process.cwd(), 'config', 'behaviors');
   }
 
@@ -307,7 +298,7 @@ export class BehaviorEngine {
    * 1. 加载 behavior 配置
    * 2. 加权随机选择一个事件（受玩家信用值影响）
    * 3. 根据 target 决定影响范围（player 或 region）
-   * 4. 应用效果（money/credit/env/item）
+   * 4. 应用效果（money/credit/env）
    * 5. 广播 server.valueChanged
    *
    * @param behaviorId 行为 ID
@@ -334,7 +325,6 @@ export class BehaviorEngine {
 
       // 4. 应用效果
       const valueChanges: BehaviorValueChange[] = [];
-      const itemAcquisitions: { playerId: string; itemType: string }[] = [];
 
       for (const pid of affectedPlayerIds) {
         const targetPlayer = this.world.getPlayer(pid);
@@ -344,13 +334,6 @@ export class BehaviorEngine {
         const changes = this.applyNumericEffects(targetPlayer, event);
         valueChanges.push(...changes);
 
-        // 道具效果（仅给触发玩家发放道具）
-        if (event.item && pid === player.id) {
-          const acquired = this.applyItemEffect(pid, event.item);
-          if (acquired) {
-            itemAcquisitions.push({ playerId: pid, itemType: event.item });
-          }
-        }
       }
 
       // 5. 广播数值变化
@@ -370,7 +353,6 @@ export class BehaviorEngine {
         target,
         affectedPlayerIds,
         valueChanges,
-        itemAcquisitions,
       };
     } catch (err) {
       logger.error(`behavior 执行错误: ${behaviorId}`, err instanceof Error ? err : undefined);
@@ -530,54 +512,6 @@ export class BehaviorEngine {
   }
 
   /**
-   * 应用道具效果（给玩家发放道具）
-   *
-   * @param playerId 玩家 ID
-   * @param itemType 道具类型
-   * @returns 是否成功
-   */
-  private applyItemEffect(playerId: string, itemType: string): boolean {
-    // 优先使用 ItemEffectsHandler
-    if (this.itemEffectsHandler) {
-      return this.itemEffectsHandler.giveItemToPlayer(playerId, itemType);
-    }
-
-    // 回退：直接添加道具到玩家（简化实现）
-    const player = this.world.getPlayer(playerId);
-    if (!player) return false;
-
-    if (!player.items) {
-      player.items = [];
-    }
-
-    // 查找是否已持有同类道具
-    const existing = player.items.find(item => item.type === itemType);
-    if (existing) {
-      existing.quantity += 1;
-    } else {
-      player.items.push({
-        id: `${itemType}-${Date.now()}`,
-        type: itemType,
-        name: itemType,
-        quantity: 1,
-        acquiredAt: Date.now(),
-      });
-    }
-
-    this.world.updatePlayer(player);
-
-    // 广播道具获得事件
-    this.io.emit('server.itemAcquired', {
-      playerId,
-      itemType,
-      itemName: itemType,
-      quantity: 1,
-    });
-
-    return true;
-  }
-
-  /**
    * 广播数值变化
    *
    * @param changes 数值变化列表
@@ -609,7 +543,6 @@ export function createBehaviorEngine(
   world: GameWorld,
   options?: {
     prosperityManager?: ProsperityManager | null;
-    itemEffectsHandler?: ItemEffectsHandler | null;
     configDir?: string;
   },
 ): BehaviorEngine {

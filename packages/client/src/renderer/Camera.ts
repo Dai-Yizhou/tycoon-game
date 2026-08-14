@@ -28,8 +28,8 @@ export interface CameraBounds {
 export type BoardViewport = CameraState;
 
 export const DEFAULT_CAMERA_BOUNDS: CameraBounds = {
-  minZoom: 0.8,
-  maxZoom: 0.8,
+  minZoom: 0.5,
+  maxZoom: 2,
   zoomFactor: 1.1,
 };
 
@@ -51,7 +51,7 @@ export class Camera {
     bounds: CameraBounds = DEFAULT_CAMERA_BOUNDS,
   ) {
     this.state = {
-      zoom: bounds.minZoom,
+      zoom: 1,
       offsetX: 0,
       offsetY: 0,
       viewportWidth,

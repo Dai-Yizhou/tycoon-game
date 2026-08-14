@@ -4,7 +4,6 @@
  * 负责系统通知管理：
  * - 系统通知中心
  * - 通知弹窗（带操作按钮）
- * - 复活令目标选择
  * - 组队邀请弹窗
  * - 路径选择弹窗
  * - 通知历史查看
@@ -106,17 +105,6 @@ export const NOTIFICATION_TEMPLATES = {
     ],
     durationMs: 60000,
   },
-  // 复活令目标选择
-  reviveOrderSelect: {
-    type: 'warning' as NotificationType,
-    title: '选择复活目标',
-    contentTemplate: '请选择一个破产玩家进行复活',
-    actions: [
-      { label: '选择', action: 'select-revive-target' },
-      { label: '取消', action: 'cancel-revive-order' },
-    ],
-    durationMs: 0,
-  },
   // 路径选择
   pathSelect: {
     type: 'info' as NotificationType,
@@ -148,20 +136,6 @@ export const NOTIFICATION_TEMPLATES = {
     title: '错误',
     contentTemplate: '',
     durationMs: 0,
-  },
-  // 道具获得
-  itemAcquired: {
-    type: 'success' as NotificationType,
-    title: '道具获得',
-    contentTemplate: '您获得了道具：{itemName}',
-    durationMs: 3000,
-  },
-  // 格子查封
-  cellSealed: {
-    type: 'warning' as NotificationType,
-    title: '格子被查封',
-    contentTemplate: '格子 {cellId} 已被查封，无法操作',
-    durationMs: 5000,
   },
   // 玩家复活
   playerRevived: {
@@ -327,26 +301,6 @@ export class NotificationManager {
   }
 
   /**
-   * 创建复活令目标选择通知
-   *
-   * @param playerId 玩家 ID
-   * @param bankruptPlayers 破产玩家列表
-   * @returns 通知
-   */
-  createReviveOrderSelectNotification(
-    playerId: string,
-    bankruptPlayers: { id: string; name: string }[],
-  ): Notification {
-    const notification = this.createFromTemplate('reviveOrderSelect', {}, playerId);
-
-    if (notification) {
-      notification.metadata = { bankruptPlayers };
-    }
-
-    return notification!;
-  }
-
-  /**
    * 创建路径选择通知
    *
    * @param playerId 玩家 ID
@@ -388,28 +342,6 @@ export class NotificationManager {
     const notification = this.createFromTemplate('systemMessage', {}, targetPlayerId)!;
     notification.content = content;
     return notification;
-  }
-
-  /**
-   * 创建道具获得通知
-   *
-   * @param playerId 玩家 ID
-   * @param itemName 道具名称
-   * @returns 通知
-   */
-  createItemAcquiredNotification(playerId: string, itemName: string): Notification {
-    return this.createFromTemplate('itemAcquired', { itemName }, playerId)!;
-  }
-
-  /**
-   * 创建格子查封通知
-   *
-   * @param cellId 格子 ID
-   * @param targetPlayerId 目标玩家 ID（null 表示全局）
-   * @returns 通知
-   */
-  createCellSealedNotification(cellId: number, targetPlayerId?: string | null): Notification {
-    return this.createFromTemplate('cellSealed', { cellId }, targetPlayerId)!;
   }
 
   /**

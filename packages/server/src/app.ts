@@ -7,7 +7,7 @@
  *
  * 设计原则：
  * - 工厂函数不直接启动 HTTP server（便于测试 + 灵活部署）
- * - 启动由 `index.ts` 中的 `startServer` 完成
+ * - 启动由 `index.ts` 中的 `bootstrap` 完成
  * - 鉴权/限流/事件处理器由 SocketManager 与 HandlerRegistry 注入
  */
 
@@ -24,7 +24,6 @@ import { GameWorld } from './world/GameWorld.js';
 import { SocketManager, type TypedServer } from './transport/SocketManager.js';
 import { registerHandlers } from './transport/handlers.js';
 import { Bank, Mortgage, Taxation, Bankruptcy } from './economy/index.js';
-import { ItemEffectsHandler } from './items/index.js';
 import { readFileSync } from 'node:fs';
 import { parseMapData, parseMapMeta } from '@game/shared';
 import { DayNightCycle, DEFAULT_DAY_NIGHT_CONFIG } from './world/DayNightCycle.js';
@@ -74,10 +73,6 @@ export interface CreatedApp {
     mortgage: Mortgage;
     taxation: Taxation;
     bankruptcy: Bankruptcy;
-  };
-  /** 道具系统实例 */
-  items?: {
-    itemEffectsHandler: ItemEffectsHandler;
   };
   /** 昼夜循环实例 */
   dayNightCycle?: DayNightCycle;
@@ -249,13 +244,8 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   // 注册业务事件处理器（需要在经济系统初始化后）
   const handlerRegistry = registerHandlers(io, world);
 
-  // 初始化道具系统
   handlerRegistry.setBank(bank);
   handlerRegistry.setBankruptcy(bankruptcy);
-  handlerRegistry.setItemHandler(bank);
-  const itemEffectsHandler = handlerRegistry.getItemEffectsHandler();
-
-  logger.info('Item system initialized (registry, effects handler)');
 
   // 初始化昼夜循环（从服务器启动时开始计时）
   const dayNightCycle = new DayNightCycle(
@@ -297,7 +287,6 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   // 初始化行为执行引擎（FR-1/FR-4）
   const behaviorEngine = new BehaviorEngine(io, world, {
     prosperityManager,
-    itemEffectsHandler,
   });
   handlerRegistry.setBehaviorEngine(behaviorEngine);
   logger.info('BehaviorEngine initialized and injected into EventHandler and DebugHandler');
@@ -379,7 +368,6 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     socketManager,
     httpServer,
     economy: { bank, mortgage, taxation, bankruptcy },
-    items: { itemEffectsHandler },
     dayNightCycle,
     timeZoneManager,
     prosperityManager,
@@ -416,14 +404,12 @@ export function startHttpServer(
  * - 关闭 HTTP server（不再接受新连接）
  * - 关闭 Socket.IO（断开所有客户端）
  * - 清理经济系统定时器
- * - 清理道具系统定时器
  * - 停止繁荣度更新定时器
  * - 兜底超时（默认 5s）
  *
  * @param httpServer HTTP server
  * @param socketManager Socket 管理器（可选）
  * @param economy 经济系统实例（可选）
- * @param items 道具系统实例（可选）
  * @param dayNightCycle 昼夜循环实例（可选）
  * @param prosperityManager 繁荣度管理器实例（可选）
  * @param eraManager 时代管理器实例（可选）
@@ -433,7 +419,6 @@ export async function gracefulShutdown(
   httpServer: http.Server,
   socketManager?: SocketManager,
   economy?: { taxation: Taxation; bankruptcy: Bankruptcy },
-  items?: { itemEffectsHandler: ItemEffectsHandler },
   dayNightCycle?: DayNightCycle,
   prosperityManager?: ProsperityManager,
   eraManager?: EraManager,
@@ -468,16 +453,6 @@ export async function gracefulShutdown(
       logger.info('DayNightCycle stopped');
     } catch (err) {
       logger.error('error stopping dayNightCycle', err);
-    }
-  }
-
-  // 清理道具系统
-  if (items) {
-    try {
-      items.itemEffectsHandler.cleanup();
-      logger.info('Item system cleaned up');
-    } catch (err) {
-      logger.error('error cleaning up item system', err);
     }
   }
 

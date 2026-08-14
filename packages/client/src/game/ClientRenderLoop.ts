@@ -16,7 +16,7 @@ export function updateRendererPlayers(): void {
     id: player.id, username: player.username, position: player.position,
     status: player.status as Player['status'],
     values: { money: { id: 'money', name: t('hud.money'), current: player.primaryValue, min: 0 } },
-    teamId: null, items: [], createdAt: Date.now(), lastActiveAt: Date.now(),
+    teamId: null, createdAt: Date.now(), lastActiveAt: Date.now(),
   }))];
   renderer.updatePlayers(players);
 }

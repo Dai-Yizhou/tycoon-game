@@ -9,7 +9,7 @@ function buildPlayer(): Player {
     id: 'player-1', username: 'player-1', teamId: null, position: { cellId: 0 }, values: {
       money: { id: 'money', name: '财产', current: 2000, min: 0 },
       credit: { id: 'credit', name: '信用值', current: 50, min: 0, max: 100 },
-    }, items: [], status: PlayerStatus.Normal, createdAt: Date.now(), lastActiveAt: Date.now(),
+    }, status: PlayerStatus.Normal, createdAt: Date.now(), lastActiveAt: Date.now(),
   };
 }
 

@@ -19,8 +19,6 @@ const tutorialSteps = [
   { title: t('tutorial.step4'), content: t('tutorial.step4Content') },
   { title: t('tutorial.stepTransport'), content: t('tutorial.stepTransportContent') },
   { title: t('tutorial.stepMonument'), content: t('tutorial.stepMonumentContent') },
-  { title: t('tutorial.stepTalent'), content: t('tutorial.stepTalentContent') },
-  { title: t('tutorial.stepAchievement'), content: t('tutorial.stepAchievementContent') },
   { title: t('tutorial.step7'), content: t('tutorial.step7Content') },
 ];
 

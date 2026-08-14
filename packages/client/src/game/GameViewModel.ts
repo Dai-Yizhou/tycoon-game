@@ -78,55 +78,6 @@ export interface JailSlice {
   jailEndTime: number;
 }
 
-/** 天赋定义 */
-export interface TalentDef {
-  id: string;
-  name: string;
-  description: string;
-  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-  cost: number;
-  requires?: string;
-  branch: 'economy' | 'social' | 'exploration';
-}
-
-/** 天赋状态 */
-export interface TalentSlice {
-  talentDefs: TalentDef[];
-  activeTalents: Set<string>;
-  availableTP: number;
-  talentsLocked: boolean;
-}
-
-/** 成就定义 */
-export interface AchievementDef {
-  id: string;
-  name: string;
-  description: string;
-  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'ultimate' | 'unique';
-  goal: number;
-  current: number;
-  completed: boolean;
-  tpReward: number;
-}
-
-/** 成就状态 */
-export interface AchievementSlice {
-  achievements: AchievementDef[];
-  totalMoneyEarned: number;
-}
-
-/** 道具状态 */
-export interface ItemEntry {
-  id: string;
-  name: string;
-  icon: string;
-  count: number;
-}
-
-export interface ItemSlice {
-  items: ItemEntry[];
-}
-
 /** 银行/贷款状态 */
 export interface BankSlice {
   loanAmount: number;
@@ -172,7 +123,6 @@ export interface BehaviorEvent {
   money?: number;
   credit?: number;
   env?: number;
-  item?: string;
 }
 
 export interface BehaviorConfig {
@@ -273,7 +223,7 @@ export const CHAT_CHANNEL_DEFS: ChatChannelDef[] = [
 /** 状态变更事件，标识哪个切片发生了变化 */
 export type StateChangeKey =
   | 'player' | 'movement' | 'camera' | 'dice' | 'cooldown' | 'jail'
-  | 'talents' | 'achievements' | 'items' | 'bank' | 'dayNight'
+  | 'bank' | 'dayNight'
   | 'regions' | 'chat' | 'team' | 'tutorial' | 'otherPlayers' | 'behavior'
   | 'all';
 
@@ -335,15 +285,6 @@ export class GameViewModel {
   private cooldown: CooldownSlice = { rollCooldownEnd: 0, rollCooldownTimer: null };
   private jail: JailSlice = { isInJail: false, jailEndTime: 0 };
 
-  private talents: TalentSlice = {
-    talentDefs: [],
-    activeTalents: new Set(),
-    availableTP: 0,
-    talentsLocked: false,
-  };
-
-  private achievements: AchievementSlice = { achievements: [], totalMoneyEarned: 0 };
-  private items: ItemSlice = { items: [] };
   private bank: BankSlice = { loanAmount: 0, loanInterestRate: 0.05 };
 
   private dayNight: DayNightSlice = {
@@ -464,27 +405,6 @@ export class GameViewModel {
     this.notify('jail', source);
   }
 
-  // ===== Talents =====
-  getTalents(): TalentSlice { return this.talents; }
-  setTalents(partial: Partial<TalentSlice>, source = 'external'): void {
-    Object.assign(this.talents, partial);
-    this.notify('talents', source);
-  }
-
-  // ===== Achievements =====
-  getAchievements(): AchievementSlice { return this.achievements; }
-  setAchievements(partial: Partial<AchievementSlice>, source = 'external'): void {
-    Object.assign(this.achievements, partial);
-    this.notify('achievements', source);
-  }
-
-  // ===== Items =====
-  getItems(): ItemSlice { return this.items; }
-  setItems(partial: Partial<ItemSlice>, source = 'external'): void {
-    Object.assign(this.items, partial);
-    this.notify('items', source);
-  }
-
   // ===== Bank =====
   getBank(): BankSlice { return this.bank; }
   setBank(partial: Partial<BankSlice>, source = 'external'): void {
@@ -592,9 +512,6 @@ export class GameViewModel {
     this.dice = { diceValue: 0, diceAnimating: false, diceAnimStart: 0 };
     this.cooldown = { rollCooldownEnd: 0, rollCooldownTimer: null };
     this.jail = { isInJail: false, jailEndTime: 0 };
-    this.talents = { talentDefs: [], activeTalents: new Set(), availableTP: 0, talentsLocked: false };
-    this.achievements = { achievements: [], totalMoneyEarned: 0 };
-    this.items = { items: [] };
     this.bank = { loanAmount: 0, loanInterestRate: 0.05 };
     this.dayNight = { cycleDuration: 15 * 60 * 1000, cycleStartTime: Date.now(), serverTimeOffset: 0, prosperity: 100 };
     this.regions = { mapRegions: [], valueFieldDefs: [], regionProsperityMap: new Map() };

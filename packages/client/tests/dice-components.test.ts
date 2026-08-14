@@ -2,7 +2,7 @@
  * DiceButton 和 DiceAnimation 测试
  */
 
-import { describe, it, expect, beforeEach, vi } from '@jest/globals';
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { DiceButton, DEFAULT_DICE_BUTTON_CONFIG } from '../src/components/DiceButton';
 import { DiceAnimation, DEFAULT_DICE_ANIMATION_CONFIG } from '../src/components/DiceAnimation';
 
@@ -13,17 +13,17 @@ describe('DiceButton', () => {
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
-    vi.useFakeTimers();
+    jest.useFakeTimers();
   });
 
   afterEach(() => {
     button?.destroy();
     container?.remove();
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 
   it('应该创建掷骰按钮', () => {
-    const onClick = vi.fn();
+    const onClick = jest.fn();
     button = new DiceButton(container, {}, onClick);
 
     expect(button.getButton()).toBeDefined();
@@ -31,7 +31,7 @@ describe('DiceButton', () => {
   });
 
   it('应该触发点击回调', () => {
-    const onClick = vi.fn();
+    const onClick = jest.fn();
     button = new DiceButton(container, {}, onClick);
 
     button.getButton().click();
@@ -39,7 +39,7 @@ describe('DiceButton', () => {
   });
 
   it('应该在冷却期间禁用按钮', () => {
-    const onClick = vi.fn();
+    const onClick = jest.fn();
     button = new DiceButton(container, {}, onClick);
 
     button.startCooldown(5000);
@@ -48,17 +48,18 @@ describe('DiceButton', () => {
   });
 
   it('应该显示冷却倒计时', () => {
-    const onClick = vi.fn();
+    const onClick = jest.fn();
     button = new DiceButton(container, {}, onClick);
 
     button.startCooldown(5000);
+    jest.advanceTimersByTime(100);
 
     const cooldownText = container.querySelector('.cooldown-text');
     expect(cooldownText?.textContent).toContain('冷却');
   });
 
   it('应该能够设置可见性', () => {
-    const onClick = vi.fn();
+    const onClick = jest.fn();
     button = new DiceButton(container, {}, onClick);
 
     button.setVisible(false);
@@ -69,7 +70,7 @@ describe('DiceButton', () => {
   });
 
   it('应该正确销毁组件', () => {
-    const onClick = vi.fn();
+    const onClick = jest.fn();
     button = new DiceButton(container, {}, onClick);
 
     button.destroy();
@@ -125,7 +126,7 @@ describe('DiceAnimation', () => {
 
   it('应该能够启动动画', () => {
     animation = new DiceAnimation(container);
-    const onComplete = vi.fn();
+    const onComplete = jest.fn();
 
     animation.startAnimation(6, onComplete);
 

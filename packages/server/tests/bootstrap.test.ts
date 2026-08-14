@@ -18,14 +18,37 @@ const baseConfig: ServerConfig = {
   host: '127.0.0.1',
 };
 
+/**
+ * 统一清理 createApp 创建的应用：停止昼夜/经济/繁荣度/时代等定时器，
+ * 并关闭已监听的 HTTP 服务。避免 Jest worker 因未清理的 interval 无法优雅退出。
+ *
+ * 注意：不调用 socketManager.close()/io.close()——当 httpServer 未经过
+ * startHttpServer 时 io.close() 的完成回调不会触发，会导致 teardown 挂起。
+ */
+async function teardownApp(result: ReturnType<typeof createApp>): Promise<void> {
+  result.eraManager?.close();
+  result.prosperityManager?.stopUpdateTimer();
+  result.dayNightCycle?.stop();
+  result.economy?.taxation.stopTaxTimer();
+  result.economy?.bankruptcy.cleanup();
+  // 关闭 socket.io 引擎（探测确认 io.close() 对未监听/已监听服务器都能立即回调），
+  // 否则 io 引擎句柄会让 Jest 进程无法优雅退出。
+  result.io.close();
+  if (result.httpServer.listening) {
+    await new Promise<void>((resolve) => result.httpServer.close(() => resolve()));
+  }
+}
+
 describe('app lifecycle', () => {
   describe('startHttpServer', () => {
     it('listens on the configured port and returns the bound port', async () => {
       const config: ServerConfig = { ...baseConfig, port: 0 };
-      const { httpServer } = createApp(config);
+      const result = createApp(config);
+      const { httpServer } = result;
       const { port } = await startHttpServer(httpServer, config);
       expect(port).toBeGreaterThan(0);
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+      await teardownApp(result);
     });
   });
 
@@ -33,16 +56,18 @@ describe('app lifecycle', () => {
     it('closes http server within timeout', async () => {
       const config: ServerConfig = { ...baseConfig, port: 0 };
       const world = new GameWorld();
-      const { httpServer, io, socketManager } = createApp(config, {
+      const result = createApp(config, {
         world,
         socketManagerOptions: {},
       });
+      const { httpServer, io } = result;
       await startHttpServer(httpServer, config);
       expect(httpServer.listening).toBe(true);
 
       // 主动关闭
       const start = Date.now();
-      await gracefulShutdown(httpServer, socketManager, 2000);
+      await gracefulShutdown(httpServer);
+      await teardownApp(result);
       expect(httpServer.listening).toBe(false);
       expect(Date.now() - start).toBeLessThan(3000);
       // io 也应已关闭
@@ -51,11 +76,12 @@ describe('app lifecycle', () => {
 
     it('tolerates missing socketManager', async () => {
       const config: ServerConfig = { ...baseConfig, port: 0 };
-      const { httpServer, io, socketManager } = createApp(config);
+      const result = createApp(config);
+      const { httpServer } = result;
       await startHttpServer(httpServer, config);
-      await gracefulShutdown(httpServer, socketManager);
+      await gracefulShutdown(httpServer);
       expect(httpServer.listening).toBe(false);
-      void io;
+      await teardownApp(result);
     });
 
     it('timeout fallback forces resolve', async () => {
@@ -85,7 +111,7 @@ describe('app lifecycle', () => {
   });
 
   describe('createApp', () => {
-    it('returns app, io, world, httpServer, socketManager', () => {
+    it('returns app, io, world, httpServer, socketManager', async () => {
       const config: ServerConfig = { ...baseConfig, port: 0 };
       const world = new GameWorld();
       const result = createApp(config, {
@@ -97,19 +123,22 @@ describe('app lifecycle', () => {
       expect(result.world).toBe(world);
       expect(result.httpServer).toBeDefined();
       expect(result.socketManager).toBeDefined();
+      await teardownApp(result);
     });
 
-    it('skips socketManager when no options provided', () => {
+    it('skips socketManager when no options provided', async () => {
       const config: ServerConfig = { ...baseConfig, port: 0 };
       const result = createApp(config);
       expect(result.socketManager).toBeUndefined();
+      await teardownApp(result);
     });
 
-    it('serves static files when clientDistPath is provided', () => {
+    it('serves static files when clientDistPath is provided', async () => {
       const config: ServerConfig = { ...baseConfig, port: 0 };
       const result = createApp(config, { clientDistPath: '/tmp/nonexistent' });
       // 仅检查 createApp 不抛错；路径存在性由 express.static 内部处理
       expect(result.app).toBeDefined();
+      await teardownApp(result);
     });
   });
 
@@ -119,13 +148,15 @@ describe('app lifecycle', () => {
       const world = new GameWorld();
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const request = (await import('supertest')).default;
-      const { app } = createApp(config, { world, socketManagerOptions: {} });
+      const result = createApp(config, { world, socketManagerOptions: {} });
+      const { app } = result;
       const res = await request(app).get('/health');
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('ok');
       expect(res.body.players).toBe(0);
       expect(res.body.era).toBeNull();
       expect(typeof res.body.uptime).toBe('number');
+      await teardownApp(result);
     });
   });
 });

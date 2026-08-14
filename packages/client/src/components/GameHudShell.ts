@@ -16,7 +16,7 @@ export interface GameHudShellConfig {
  * - gp-topbar：顶部渐变透明状态栏（玩家信息 + 数值 + 昼夜）
  * - cell-hover-card：当前格悬浮详情卡
  * - hud-chat-dock：左下角可收起聊天/通知
- * - gp-actionbar：底部渐变透明行动栏（掷骰 + 动作 + 道具）
+ * - gp-actionbar：底部渐变透明行动栏（掷骰 + 动作）
  * - event-toast：顶部居中事件提示（默认隐藏）
  * - map-overlay：地图角落区域标签
  *
@@ -94,7 +94,6 @@ export class GameHudShell {
             <button class="act-btn" data-action="bank">银行</button>
           </div>
           <div class="actionbar-spacer"></div>
-          <div class="item-tray" data-ui="items-panel"></div>
         </footer>
       </div>`;
 
@@ -112,7 +111,6 @@ export class GameHudShell {
       this.vm.subscribe("player", () => this.update()),
       this.vm.subscribe("movement", () => this.update()),
       this.vm.subscribe("team", () => this.update()),
-      this.vm.subscribe("items", () => this.update()),
       this.vm.subscribe("dayNight", () => this.update()),
       this.vm.subscribe("chat", () => this.update()),
     );
@@ -133,7 +131,6 @@ export class GameHudShell {
     const player = this.vm.getPlayer();
     const movement = this.vm.getMovement();
     const team = this.vm.getTeam();
-    const items = this.vm.getItems();
     const chat = this.vm.getChat();
 
     // Player badge
@@ -160,16 +157,6 @@ export class GameHudShell {
     rollBtn.disabled = !canRoll;
     const statusEl = this.root.querySelector("[data-ui=dice-status]")!;
     statusEl.textContent = movement.isMoving ? "移动中" : canRoll ? "就绪" : "冷却中";
-
-    // Items tray
-    const trayEl = this.root.querySelector("[data-ui=items-panel]")!;
-    if (items.items.length > 0) {
-      trayEl.innerHTML = items.items.map(i =>
-        `<div class="item-slot item-slot--has" title="${i.name}">${i.name.slice(0, 2)}<span class="item-slot__count">${i.count}</span></div>`
-      ).join("");
-    } else {
-      trayEl.innerHTML = `<div class="item-slot" title="无道具">--</div>`;
-    }
 
     // Chat messages (last 10)
     const msgsEl = this.root.querySelector("[data-ui=chat-messages]")!;

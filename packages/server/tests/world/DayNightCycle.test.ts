@@ -113,13 +113,25 @@ describe('DayNightCycle', () => {
     });
 
     it('应该正确计算周期计数', () => {
-      dayNight.start();
+      const fast = new DayNightCycle(mockIO, mockWorld, {
+        ...DEFAULT_DAY_NIGHT_CONFIG,
+        cycleMinutes: 0.01,
+        dayRatio: 0.5,
+        broadcastChanges: false,
+      });
+      fast.start();
 
-      expect(dayNight.getCycleCount()).toBe(0);
+      expect(fast.getCycleCount()).toBe(0);
 
-      // 手动切换到白天会增加周期计数
-      dayNight.forceDay();
-      expect(dayNight.getCycleCount()).toBe(1);
+      // 前进到夜晚（Night→Night 不增加计数）
+      jest.advanceTimersByTime(310);
+      expect(fast.isNight()).toBe(true);
+      expect(fast.getCycleCount()).toBe(0);
+
+      // 前进到下一个白天（Night→Day 完整切换，计数 +1）
+      jest.advanceTimersByTime(310);
+      expect(fast.isDay()).toBe(true);
+      expect(fast.getCycleCount()).toBe(1);
     });
   });
 

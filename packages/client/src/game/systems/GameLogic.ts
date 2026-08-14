@@ -12,22 +12,18 @@ import {
   ownedInvestments, canRoll, isMoving, diceAnimating,
   isWaitingForChoice, isInJail, rollCooldownEnd, rollCooldown,
   mapIndex, gameSocket, rollBtn, rollCooldownTimer,
-  activeTalents, availableTP, loanAmount,
+  loanAmount,
   cName, cType, cOwners,
   cTransportCost,
   setCanRoll,
   setDiceValue, setDiceAnimating, setDiceAnimStart, setRollCooldownEnd,
   setRollCooldownTimer, setPlayerDisplayPos,
-  setCameraTarget, setActiveTalents, setAvailableTP,
+  setCameraTarget,
 } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
 import { requestHudRefresh } from '../ClientHudBridge.js';
 
 // ===== 辅助函数 =====
-
-export function isTalentActive(id: string): boolean {
-  return activeTalents.has(id);
-}
 
 // ===== 掷骰 & 冷却 =====
 
@@ -203,14 +199,8 @@ export function handleRestoreMonument(): void {
 export function handleBankruptRestart(): void {
   if (!isBankrupt || !gameSocket) return;
 
-  const savedActiveTalents = new Set(activeTalents);
-  const savedAvailableTP = availableTP;
-
   gameSocket.emit('client.bankruptRestart', {}, (result: { ok: boolean; error?: string }) => {
     if (result.ok) {
-      setActiveTalents(savedActiveTalents);
-      setAvailableTP(savedAvailableTP);
-
       if (rollBtn) {
         rollBtn.disabled = false;
         rollBtn.classList.remove('disabled');
@@ -227,21 +217,6 @@ export function handleBankruptRestart(): void {
 // ===== 银行系统 =====
 
 export function getMaxLoanAmount(): number {
-  if (!isTalentActive('bank')) return 0;
   const baseLimit = currentCredit * 20;
   return Math.max(0, baseLimit - loanAmount);
-}
-// ===== 破产检查 =====
-
-export function checkBankruptcy(): void {
-  if (isBankrupt) return;
-  if (currentMoney <= 0) {
-    addChatMessage(t('bankruptcy.declared'), 'system');
-    // 服务端权威：发送破产请求，由服务端处理
-    if (gameSocket) {
-      gameSocket.emit('client.bankruptRestart', {}, () => {
-        // 静默，服务端会通过 server.playerBankrupt 事件更新状态
-      });
-    }
-  }
 }

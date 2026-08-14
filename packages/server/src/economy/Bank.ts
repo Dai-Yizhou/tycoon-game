@@ -287,7 +287,11 @@ export class Bank {
   calculateAccruedInterest(loan: LoanRecord): void {
     const now = Date.now();
     const elapsed = now - loan.lastInterestCalculation;
-    const periods = elapsed / this.config.interestCalculationInterval;
+    const periods = Math.floor(elapsed / this.config.interestCalculationInterval);
+
+    if (periods <= 0) {
+      return;
+    }
 
     // 简单利息计算：principal * rate * periods
     const newInterest = loan.remainingPrincipal * (loan.interestRate / 100) * periods;

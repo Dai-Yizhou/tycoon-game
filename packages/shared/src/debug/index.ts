@@ -148,7 +148,7 @@ export const DebugFeatures = {
   ShowDebugInfo: 'show-debug-info',
   /** 启用骰子概率可视化 */
   DiceProbabilities: 'dice-probabilities',
-  /** 启用视野全开（无视天赋限制） */
+  /** 启用视野全开 */
   FullVision: 'full-vision',
 } as const;
 
