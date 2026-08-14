@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游戏页 HUD 信息层统一样式稿</title>
+    <style id="theme-vars">
+/* ============================================================
+   colors_and_type.css
+   语义令牌与组件样式 — 纯 CSS，无外部资源
+   ============================================================ */
+
+/* —— 全局语义令牌 —— */
+:root {
+  --tycoon-background: #ECE7DC;
+  --tycoon-foreground: #1A1A1A;
+  --tycoon-card: #FBF8F1;
+  --tycoon-primary: #1A1A1A;
+  --tycoon-border: #1A1A1A;
+  --tycoon-muted: #8A847A;
+  --tycoon-radius-sm: 2px;
+  --tycoon-radius-md: 6px;
+  --tycoon-radius-lg: 14px;
+
+  --player-red: #C0392B;
+  --player-blue: #2C5F8D;
+  --player-green: #4A7C3F;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-serif: Georgia, "Times New Roman", "Songti SC", serif;
+  --font-black: "Arial Black", "Helvetica Neue", Impact, "Heiti SC", sans-serif;
+  --font-mono: "SF Mono", "Menlo", "Monaco", "Consolas", "Courier New", monospace;
+  --font-han: "PingFang SC", "Heiti SC", "STHeiti", "Microsoft YaHei", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  color: var(--tycoon-foreground);
+  background: var(--tycoon-background);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* —— 页面骨架 —— */
+.canvas { max-width: 1180px; margin: 0 auto; padding: 48px 56px 80px; }
+.canvas-header { border-bottom: 3px solid var(--tycoon-border); padding-bottom: 20px; margin-bottom: 44px; }
+.canvas-title { font-family: var(--font-serif); font-weight: 900; font-size: 30px; letter-spacing: 0.04em; margin: 0 0 6px; }
+.canvas-sub { color: var(--tycoon-muted); font-size: 13px; letter-spacing: 0.02em; }
+.section { margin-bottom: 56px; }
+.section-title {
+  font-family: var(--font-serif); font-weight: 900; font-size: 20px;
+  border-left: 6px solid var(--tycoon-border); padding-left: 12px; margin: 0 0 22px;
+}
+.section-note { color: var(--tycoon-muted); font-size: 12.5px; margin: 0 0 20px; max-width: 760px; }
+
+/* ============================================================
+   控件清单：区域卡片
+   ============================================================ */
+.inventory-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.region-card {
+  background: var(--tycoon-card); border: 2px solid var(--tycoon-border);
+  border-radius: var(--tycoon-radius-md); padding: 16px 18px;
+}
+.region-card__head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,.12); padding-bottom: 8px; }
+.region-card__title { font-weight: 800; font-size: 14px; margin: 0; }
+.region-card__ratio { font-family: var(--font-mono); font-size: 11px; color: var(--tycoon-muted); }
+.region-card__list { margin: 0; padding: 0; list-style: none; font-size: 12px; }
+.region-card__list li { padding: 2px 0; display: flex; gap: 8px; }
+.region-card__list code { font-family: var(--font-mono); font-size: 10.5px; color: var(--player-red); white-space: nowrap; }
+.region-card__rule { margin-top: 8px; font-size: 11px; color: var(--tycoon-muted); border-top: 1px dashed rgba(0,0,0,.15); padding-top: 6px; }
+
+/* ============================================================
+   预览帧容器
+   ============================================================ */
+.preview-block { margin-bottom: 36px; }
+.preview-label {
+  display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px;
+}
+.preview-label__tag {
+  font-family: var(--font-black); font-size: 13px; letter-spacing: 0.06em;
+  padding: 3px 10px; border: 2px solid var(--tycoon-border); background: var(--tycoon-card);
+}
+.preview-label__desc { font-size: 12.5px; color: var(--tycoon-muted); }
+
+.game-frame {
+  width: 100%; aspect-ratio: 16 / 10; max-width: 1100px;
+  border: 3px solid var(--tycoon-border); border-radius: 2px;
+  overflow: hidden; position: relative;
+}
+
+/* ============================================================
+   游戏页布局网格（方案A：全屏地图底层）
+   ============================================================ */
+.gp-layout {
+  display: grid;
+  grid-template-columns: 72fr 18fr;
+  grid-template-rows: 9fr 79fr 12fr;
+  height: 100%; width: 100%;
+  font-size: 11px;
+}
+
+/* —— 顶部状态栏 —— */
+.gp-topbar {
+  grid-column: 1 / -1; grid-row: 1;
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--gp-border, #4A2C2A);
+  background: var(--gp-bar-bg, #1E2024);
+}
+
+.player-badge { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.player-badge__avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--gp-fg, #E6DCC3);
+  background: var(--player-red); flex-shrink: 0;
+}
+.player-badge__name { font-weight: 800; font-size: 12px; color: var(--gp-fg, #E6DCC3); }
+.player-badge__team { font-size: 9px; color: var(--gp-muted, #9AA0A6); }
+
+.value-pills { display: flex; gap: 6px; flex-shrink: 0; }
+.value-pill {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 2px 8px; border: 1px solid var(--gp-border, #4A2C2A);
+  border-radius: 1px; background: var(--gp-card, #34373D); min-width: 56px;
+}
+.value-pill__label { font-size: 8px; color: var(--gp-muted, #9AA0A6); letter-spacing: 0.06em; text-transform: uppercase; }
+.value-pill__num { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--gp-fg, #E6DCC3); }
+.value-pill--accent .value-pill__num { color: var(--gp-accent, #D95A2B); }
+
+.topbar-spacer { flex: 1; }
+
+.cycle-indicator { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.cycle-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--gp-border, #4A2C2A); }
+.cycle-dot--day { background: #E8C84A; }
+.cycle-dot--night { background: #3A4A6B; }
+.cycle-text { font-size: 10px; color: var(--gp-muted, #9AA0A6); font-family: var(--font-mono); }
+
+.notice-bell {
+  position: relative; padding: 4px 8px; border: 1px solid var(--gp-border, #4A2C2A);
+  border-radius: 1px; font-size: 10px; color: var(--gp-fg, #E6DCC3); cursor: pointer;
+}
+.notice-bell__count {
+  position: absolute; top: -5px; right: -5px;
+  background: var(--gp-accent, #D95A2B); color: #FBF8F1;
+  font-size: 8px; font-weight: 800; padding: 0 3px; border-radius: 99px;
+  min-width: 12px; text-align: center;
+}
+
+/* —— 全屏地图底层 —— */
+.gp-map {
+  grid-column: 1; grid-row: 2 / 4;
+  position: relative; overflow: hidden;
+  background: var(--gp-map-bg, #1A1C1F);
+  background-image:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0 1px, transparent 1px 6px);
+}
+
+.board-area {
+  position: absolute; inset: 12px 12px 12px 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* 简化棋盘：格子路径 */
+.board-path {
+  display: flex; align-items: center; gap: 0; flex-wrap: wrap;
+  justify-content: center; max-width: 100%;
+}
+.board-cell {
+  width: 64px; height: 64px;
+  border: 1px solid var(--gp-cell-border, #4A2C2A);
+  background: var(--gp-cell-bg, #2C2F35);
+  border-radius: 1px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 4px; position: relative; flex-shrink: 0;
+  font-size: 8px;
+}
+.board-cell__type {
+  font-size: 7px; color: var(--gp-muted, #9AA0A6); letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.board-cell__name {
+  font-weight: 700; font-size: 8px; color: var(--gp-fg, #E6DCC3);
+  line-height: 1.1;
+}
+.board-cell__bar { height: 3px; background: var(--gp-accent, #D95A2B); }
+.board-cell--current {
+  border-color: var(--gp-accent, #D95A2B);
+  border-width: 2px;
+  box-shadow: 0 0 0 1px var(--gp-accent, #D95A2B);
+}
+.board-cell--junction::after {
+  content: ""; position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+  width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-bottom: 6px solid var(--gp-accent, #D95A2B);
+}
+.board-cell--branch {
+  border-style: dashed; border-color: var(--gp-accent, #D95A2B);
+}
+
+.board-link {
+  width: 14px; height: 2px; background: var(--gp-link, #555);
+  flex-shrink: 0;
+}
+.board-link--active { background: var(--gp-accent, #D95A2B); height: 3px; }
+
+/* 棋子 */
+.board-piece {
+  position: absolute; bottom: 2px; width: 12px; display: flex; flex-direction: column; align-items: center;
+}
+.board-piece__head {
+  width: 8px; height: 8px; border: 1.5px solid #1A1A1A; border-radius: 50%;
+  background: #F2E9D8; z-index: 2;
+}
+.board-piece__body {
+  width: 12px; height: 10px; margin-top: -1px;
+  background: var(--piece-color, var(--player-red));
+  clip-path: polygon(3px 0, 9px 0, 12px 10px, 0 10px);
+}
+.board-piece--p1 { --piece-color: var(--player-red); left: 8px; }
+.board-piece--p2 { --piece-color: var(--player-blue); left: 22px; }
+.board-piece--p3 { --piece-color: var(--player-green); left: 36px; }
+
+/* 地图角落标签 */
+.map-overlay {
+  position: absolute; z-index: 5;
+}
+.map-overlay--zone {
+  top: 8px; left: 12px;
+  font-size: 9px; color: var(--gp-muted, #9AA0A6);
+  border: 1px solid var(--gp-border, #4A2C2A);
+  background: var(--gp-card, #34373D); padding: 2px 8px; border-radius: 1px;
+}
+.map-overlay--prosperity {
+  top: 8px; right: 12px;
+  font-size: 9px; color: var(--gp-fg, #E6DCC3);
+  font-family: var(--font-mono);
+}
+
+/* 路径选择高亮 */
+.path-highlight {
+  position: absolute; z-index: 4;
+  border: 2px dashed var(--gp-accent, #D95A2B);
+  border-radius: 4px; pointer-events: none;
+}
+.path-label {
+  position: absolute; z-index: 6;
+  font-size: 9px; font-weight: 800; color: var(--gp-accent, #D95A2B);
+  background: var(--gp-card, #34373D); padding: 2px 6px; border-radius: 1px;
+  border: 1px solid var(--gp-accent, #D95A2B);
+}
+
+/* —— 悬浮信息层 —— */
+.gp-sidebar {
+  grid-column: 2; grid-row: 2 / 4;
+  display: flex; flex-direction: column;
+  border-left: 1px solid var(--gp-border, #4A2C2A);
+  background: var(--gp-sidebar-bg, #252830);
+  overflow: hidden;
+}
+
+.gp-tabs {
+  display: flex; border-bottom: 1px solid var(--gp-border, #4A2C2A);
+  flex-shrink: 0;
+}
+.gp-tab {
+  flex: 1; padding: 6px 4px; text-align: center;
+  font-size: 10px; font-weight: 700; cursor: pointer;
+  background: transparent; border: none; color: var(--gp-muted, #9AA0A6);
+  border-bottom: 2px solid transparent;
+}
+.gp-tab--active {
+  color: var(--gp-fg, #E6DCC3);
+  border-bottom-color: var(--gp-accent, #D95A2B);
+  background: var(--gp-card, #34373D);
+}
+
+.gp-panel { flex: 1; padding: 10px; overflow-y: auto; }
+
+/* 当前格详情卡 */
+.cell-card {
+  border: 1px solid var(--gp-border, #4A2C2A);
+  border-radius: 1px; background: var(--gp-card, #34373D);
+  padding: 10px; margin-bottom: 8px;
+}
+.cell-card__type {
+  font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--gp-accent, #D95A2B); margin-bottom: 2px;
+}
+.cell-card__name {
+  font-family: var(--font-serif); font-weight: 900; font-size: 14px;
+  color: var(--gp-fg, #E6DCC3); margin: 0 0 8px;
+}
+.cell-card__row {
+  display: flex; justify-content: space-between; font-size: 10px;
+  padding: 2px 0; border-bottom: 1px dotted rgba(255,255,255,.08);
+}
+.cell-card__row:last-child { border-bottom: none; }
+.cell-card__key { color: var(--gp-muted, #9AA0A6); }
+.cell-card__val { font-family: var(--font-mono); color: var(--gp-fg, #E6DCC3); font-weight: 700; }
+.cell-card__val--accent { color: var(--gp-accent, #D95A2B); }
+
+/* 玩家列表 */
+.player-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 4px; border-bottom: 1px dotted rgba(255,255,255,.08);
+  font-size: 10px;
+}
+.player-row__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(255,255,255,.2); }
+.player-row__name { font-weight: 700; color: var(--gp-fg, #E6DCC3); flex: 1; }
+.player-row__val { font-family: var(--font-mono); color: var(--gp-muted, #9AA0A6); font-size: 9px; }
+.player-row--current { background: rgba(217,90,43,.08); }
+
+/* 聊天 */
+.chat-msg { padding: 4px 0; border-bottom: 1px dotted rgba(255,255,255,.06); font-size: 9.5px; }
+.chat-msg__head { display: flex; gap: 4px; align-items: baseline; }
+.chat-msg__chan { font-size: 7px; padding: 0 3px; border-radius: 1px; font-weight: 700; }
+.chat-msg__chan--sys { background: #4A2C2A; color: #E6DCC3; }
+.chat-msg__chan--team { background: var(--player-blue); color: #FBF8F1; }
+.chat-msg__chan--zone { background: var(--player-green); color: #FBF8F1; }
+.chat-msg__author { font-weight: 700; color: var(--gp-fg, #E6DCC3); }
+.chat-msg__text { color: var(--gp-muted, #9AA0A6); margin-top: 1px; }
+.chat-input-bar {
+  display: flex; gap: 4px; padding: 6px 8px;
+  border-top: 1px solid var(--gp-border, #4A2C2A); flex-shrink: 0;
+}
+.chat-input {
+  flex: 1; background: var(--gp-card, #34373D); border: 1px solid var(--gp-border, #4A2C2A);
+  border-radius: 1px; padding: 4px 6px; font-size: 10px; color: var(--gp-fg, #E6DCC3);
+}
+.chat-send {
+  padding: 4px 8px; font-size: 10px; font-weight: 700;
+  background: var(--gp-accent, #D95A2B); color: #FBF8F1; border: none; border-radius: 1px;
+}
+
+/* —— 底部 HUD 行动层 —— */
+.gp-actionbar {
+  grid-column: 1; grid-row: 3; z-index: 1;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 14px;
+  border-top: 1px solid var(--gp-border, #4A2C2A);
+  background: var(--gp-bar-bg, #1E2024);
+}
+
+.dice-zone { display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0; }
+.dice-btn {
+  font-family: var(--font-sans); font-weight: 800; font-size: 13px;
+  padding: 8px 18px; border: 2px solid var(--gp-border, #4A2C2A);
+  border-radius: 1px; background: var(--gp-accent, #D95A2B); color: #FBF8F1;
+  cursor: pointer; box-shadow: 2px 2px 0 var(--gp-border, #4A2C2A);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.dice-btn:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--gp-border, #4A2C2A); }
+.dice-btn:disabled {
+  opacity: .4; cursor: not-allowed; transform: none; box-shadow: none;
+  background: var(--gp-card, #34373D);
+}
+.dice-status { font-size: 8px; color: var(--gp-muted, #9AA0A6); font-family: var(--font-mono); }
+
+.action-cluster { display: flex; gap: 6px; flex-shrink: 0; }
+.act-btn {
+  font-size: 11px; font-weight: 700; padding: 6px 12px;
+  border: 1px solid var(--gp-border, #4A2C2A); border-radius: 1px;
+  background: var(--gp-card, #34373D); color: var(--gp-fg, #E6DCC3);
+  cursor: pointer; white-space: nowrap;
+  transition: background .12s ease;
+}
+.act-btn:hover { background: #3D4047; }
+.act-btn--accent { background: var(--gp-accent, #D95A2B); color: #FBF8F1; border-color: var(--gp-accent, #D95A2B); }
+.act-btn--accent:hover { background: #EF6A36; }
+.act-btn__price { font-family: var(--font-mono); font-size: 9px; display: block; color: var(--gp-muted, #9AA0A6); }
+.act-btn--accent .act-btn__price { color: rgba(251,248,241,.7); }
+
+.actionbar-spacer { flex: 1; }
+
+.item-tray { display: flex; gap: 4px; flex-shrink: 0; }
+.item-slot {
+  width: 32px; height: 32px; border: 1px solid var(--gp-border, #4A2C2A);
+  border-radius: 1px; background: var(--gp-card, #34337D);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 8px; color: var(--gp-muted, #9AA0A6); cursor: pointer;
+  position: relative;
+}
+.item-slot--has { color: var(--gp-fg, #E6DCC3); border-color: var(--gp-accent, #D95A2B); }
+.item-slot__count {
+  position: absolute; top: -4px; right: -4px;
+  background: var(--gp-accent, #D95A2B); color: #FBF8F1;
+  font-size: 7px; font-weight: 800; padding: 0 3px; border-radius: 99px;
+}
+
+/* —— 浮层 —— */
+.event-toast {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  z-index: 10; padding: 8px 16px;
+  background: var(--gp-card, #34373D); border: 1px solid var(--gp-accent, #D95A2B);
+  border-radius: 1px; font-size: 11px; color: var(--gp-fg, #E6DCC3);
+  box-shadow: 0 2px 8px rgba(0,0,0,.4); white-space: nowrap;
+}
+.event-toast__title { font-weight: 800; color: var(--gp-accent, #D95A2B); }
+
+/* —— 控件标注 —— */
+.ctrl-tag {
+  position: absolute; z-index: 20;
+  font-size: 8px; font-weight: 700; letter-spacing: 0.04em;
+  background: rgba(217,90,43,.92); color: #FBF8F1;
+  padding: 1px 5px; border-radius: 1px; pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   东北走廊主题（暗色工业风）
+   ============================================================ */
+.theme-northeast {
+  --gp-bar-bg: #1E2024;
+  --gp-sidebar-bg: #252830;
+  --gp-map-bg: #1A1C1F;
+  --gp-card: #34373D;
+  --gp-fg: #E6DCC3;
+  --gp-border: #4A2C2A;
+  --gp-muted: #9AA0A6;
+  --gp-accent: #D95A2B;
+  --gp-cell-bg: #2C2F35;
+  --gp-cell-border: #4A2C2A;
+  --gp-link: #555;
+}
+
+/* ============================================================
+   设计决策记录
+   ============================================================ */
+.decisions {
+  background: var(--tycoon-card); border: 2px solid var(--tycoon-border);
+  border-radius: var(--tycoon-radius-md); padding: 20px 24px;
+}
+.decisions dl { margin: 0; }
+.decisions dt {
+  font-weight: 800; font-size: 13px; margin-top: 14px;
+  border-left: 4px solid var(--player-red); padding-left: 8px;
+}
+.decisions dt:first-child { margin-top: 0; }
+.decisions dd { margin: 4px 0 0; font-size: 12.5px; color: var(--tycoon-foreground); }
+.decisions dd code { font-family: var(--font-mono); font-size: 11px; color: var(--player-red); }
+
+/* ============================================================
+   响应式
+   ============================================================ */
+@media (max-width: 900px) {
+  .canvas { padding: 32px 24px 60px; }
+  .inventory-grid { grid-template-columns: 1fr; }
+  .game-frame { aspect-ratio: 16 / 10; }
+  .gp-layout { font-size: 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--tycoon-background);
+    --color-foreground: var(--tycoon-foreground);
+    --color-card: var(--tycoon-card);
+    --color-primary: var(--tycoon-primary);
+    --color-muted: var(--tycoon-muted);
+    --color-border: var(--tycoon-border);
+    --radius-sm: var(--tycoon-radius-sm);
+    --radius-md: var(--tycoon-radius-md);
+    --radius-lg: var(--tycoon-radius-lg);
+  }
+  @layer base {
+    body { background: var(--tycoon-background); color: var(--tycoon-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--tycoon-background); }
+      .text-background { color: var(--tycoon-background); }
+      .border-background { border-color: var(--tycoon-background); }
+      .ring-background { --tw-ring-color: var(--tycoon-background); }
+      .bg-foreground { background-color: var(--tycoon-foreground); }
+      .text-foreground { color: var(--tycoon-foreground); }
+      .border-foreground { border-color: var(--tycoon-foreground); }
+      .ring-foreground { --tw-ring-color: var(--tycoon-foreground); }
+      .bg-card { background-color: var(--tycoon-card); }
+      .text-card { color: var(--tycoon-card); }
+      .border-card { border-color: var(--tycoon-card); }
+      .ring-card { --tw-ring-color: var(--tycoon-card); }
+      .bg-primary { background-color: var(--tycoon-primary); }
+      .text-primary { color: var(--tycoon-primary); }
+      .border-primary { border-color: var(--tycoon-primary); }
+      .ring-primary { --tw-ring-color: var(--tycoon-primary); }
+      .bg-muted { background-color: var(--tycoon-muted); }
+      .text-muted { color: var(--tycoon-muted); }
+      .border-muted { border-color: var(--tycoon-muted); }
+      .ring-muted { --tw-ring-color: var(--tycoon-muted); }
+      .bg-border { background-color: var(--tycoon-border); }
+      .text-border { color: var(--tycoon-border); }
+      .border-border { border-color: var(--tycoon-border); }
+      .ring-border { --tw-ring-color: var(--tycoon-border); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+<style id=full-map-overlay-override>
+/* 全地图底层 + HUD 覆盖层：地图不再被布局栏切割 */
+.game-frame{aspect-ratio:16/10;background:#1A1C1F}
+.gp-layout{display:block;position:relative;height:100%;width:100%;font-size:11px}
+.gp-map{position:absolute;inset:0;z-index:1;width:100%;height:100%;background-color:var(--gp-map-bg,#1A1C1F)}
+.gp-topbar{position:absolute;inset:0 0 auto 0;height:9%;z-index:8;background:linear-gradient(180deg,rgba(20,22,25,.96),rgba(20,22,25,.72),transparent);border:0;padding:0 18px}
+.gp-sidebar{position:absolute;top:13%;right:16px;width:218px;height:auto;max-height:66%;z-index:7;display:flex;background:rgba(37,40,48,.94);border:1px solid var(--gp-border,#4A2C2A);box-shadow:0 8px 24px rgba(0,0,0,.35);overflow:hidden}
+.gp-sidebar .gp-tabs{display:none}
+.gp-sidebar .gp-panel{padding:10px}
+.gp-actionbar{position:absolute;inset:auto 0 0 0;height:14%;z-index:8;background:linear-gradient(0deg,rgba(20,22,25,.98),rgba(20,22,25,.72),transparent);border:0;padding:0 18px}
+.board-area{inset:10% 6% 16% 6%}
+.map-overlay--zone{top:12%;left:18px}
+.map-overlay--prosperity{top:12%;right:18px}
+.event-toast{top:13%;left:50%}
+.ctrl-tag{z-index:20}
+.path-label{z-index:6}
+.cell-card{background:rgba(52,55,61,.96)}
+@media(max-width:900px){.gp-sidebar{right:8px;width:190px;max-height:62%}.gp-topbar{padding:0 10px}.gp-actionbar{padding:0 10px}.board-area{inset:12% 3% 18% 3%}}
+</style><style id="overlay-layer-components">
+.gp-sidebar{display:none}.hud-chat-dock{position:absolute;right:16px;bottom:16%;width:236px;z-index:9;background:rgba(37,40,48,.94);border:1px solid var(--gp-border,#4A2C2A);box-shadow:0 8px 24px rgba(0,0,0,.35);padding:10px;color:var(--gp-fg,#E6DCC3)}
+.hud-chat-dock__head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.12);padding-bottom:6px;margin-bottom:6px;font-size:10px;font-weight:800}.hud-chat-dock__tabs{display:flex;gap:5px;color:var(--gp-muted,#9AA0A6);font-size:8px}.hud-chat-dock__tabs b{color:var(--gp-accent,#D95A2B)}
+.hud-chat-msg{font-size:9px;line-height:1.35;padding:4px 0;border-bottom:1px dotted rgba(255,255,255,.08)}.hud-chat-msg b{color:var(--gp-accent,#D95A2B);font-size:8px;margin-right:4px}.hud-chat-msg span{color:var(--gp-muted,#9AA0A6)}.hud-chat-dock__input{margin-top:7px;padding:5px 7px;border:1px solid var(--gp-border,#4A2C2A);color:var(--gp-muted,#9AA0A6);font-size:9px;background:rgba(52,55,61,.75)}
+.cell-hover-card{position:absolute;left:50%;top:24%;transform:translateX(-50%);z-index:8;width:190px;background:rgba(52,55,61,.97);border:1px solid var(--gp-accent,#D95A2B);box-shadow:0 8px 24px rgba(0,0,0,.42);padding:10px;color:var(--gp-fg,#E6DCC3)}.cell-hover-card:after{content:"";position:absolute;bottom:-7px;left:50%;width:12px;height:12px;background:rgba(52,55,61,.97);border-right:1px solid var(--gp-accent,#D95A2B);border-bottom:1px solid var(--gp-accent,#D95A2B);transform:translateX(-50%) rotate(45deg)}.cell-hover-card__type{font-size:8px;letter-spacing:.08em;color:var(--gp-accent,#D95A2B);text-transform:uppercase}.cell-hover-card__title{font:900 15px var(--font-serif);margin:2px 0 7px}.cell-hover-card__rows{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:9px}.cell-hover-card__rows span{color:var(--gp-muted,#9AA0A6)}.cell-hover-card__rows b{font-family:var(--font-mono);font-size:9px}@media(max-width:900px){.hud-chat-dock{right:8px;bottom:18%;width:190px}.cell-hover-card{top:27%;width:168px}}
+</style><style id=hud-refinement-override>
+/* HUD 信息层优化：通知居中、聊天左下收起、区域信息右上、详情卡贴格 */
+.event-toast{top:10%;left:50%;z-index:12;min-width:360px;text-align:center;background:rgba(52,55,61,.96);border-width:1px}
+.map-overlay--zone{top:12px;left:auto;right:18px}.map-overlay--prosperity{top:39px;right:18px}.cycle-indicator{position:absolute;right:128px;top:11px;z-index:9;background:rgba(37,40,48,.72);padding:4px 8px;border:1px solid rgba(255,255,255,.15)}
+.cell-hover-card{left:48%;top:36%;width:224px;transform:translate(-50%,-100%);pointer-events:none}.cell-hover-card:after{bottom:-7px}
+.hud-chat-dock{left:18px;right:auto;bottom:17%;width:360px;min-height:44px;padding:0;background:rgba(38,43,49,.42);border:1px solid rgba(230,220,195,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 8px 28px rgba(0,0,0,.24);overflow:hidden}
+.hud-chat-dock__head{height:44px;margin:0;padding:0 14px;border:0;color:rgba(230,220,195,.9);cursor:pointer}.hud-chat-dock__head:after{content:点击展开;margin-left:auto;color:rgba(230,220,195,.6);font-size:8px;font-weight:400}.hud-chat-msg,.hud-chat-dock__input{display:none}
+.hud-chat-dock:hover,.hud-chat-dock:focus-within{background:rgba(38,43,49,.78);border-color:rgba(217,90,43,.7)}.hud-chat-dock:hover .hud-chat-msg,.hud-chat-dock:focus-within .hud-chat-msg,.hud-chat-dock:hover .hud-chat-dock__input,.hud-chat-dock:focus-within .hud-chat-dock__input{display:block;margin:0 14px}.hud-chat-dock:hover .hud-chat-dock__head:after,.hud-chat-dock:focus-within .hud-chat-dock__head:after{content:收起}.hud-chat-dock:hover .hud-chat-msg:first-of-type,.hud-chat-dock:focus-within .hud-chat-msg:first-of-type{margin-top:6px}.hud-chat-dock:hover .hud-chat-dock__input,.hud-chat-dock:focus-within .hud-chat-dock__input{margin:7px 14px 12px}
+@media(max-width:900px){.hud-chat-dock{left:8px;bottom:19%;width:300px}.cell-hover-card{left:44%;width:190px}.event-toast{min-width:260px}.cycle-indicator{right:105px}}
+</style><style id="hud-unified-info-override">
+/* 统一区域信息：右上角单一容器，移除通知按钮 */
+.gp-topbar{padding-right:18px}.gp-topbar>.cycle-indicator{position:absolute;right:18px;top:10px;margin:0;background:rgba(37,40,48,.88);border:1px solid rgba(230,220,195,.24);padding:5px 9px;gap:8px}.gp-topbar>.notice-bell{display:none}
+.map-overlay--zone,.map-overlay--prosperity{top:auto;right:18px;left:auto;border:0;border-radius:0;background:transparent;padding:0;color:var(--gp-fg,#E6DCC3)}.map-overlay--zone{top:12px}.map-overlay--prosperity{top:37px;font-family:var(--font-mono);color:var(--gp-muted,#9AA0A6)}
+.gp-topbar:after{content:"东北走廊  ·  时区 3  ·  白昼 08:32  ·  繁荣度 67%";position:absolute;right:18px;top:10px;padding:5px 10px;border:1px solid rgba(230,220,195,.24);background:rgba(37,40,48,.88);color:var(--gp-fg,#E6DCC3);font:700 9px var(--font-mono);letter-spacing:.02em}
+.gp-topbar>.cycle-indicator{display:none}.map-overlay--zone,.map-overlay--prosperity{display:none}
+.hud-chat-dock{width:286px;min-height:52px;bottom:17%;left:18px;right:auto}.hud-chat-dock__head{height:52px;padding:0 13px}.hud-chat-dock:hover .hud-chat-msg,.hud-chat-dock:focus-within .hud-chat-msg,.hud-chat-dock:hover .hud-chat-dock__input,.hud-chat-dock:focus-within .hud-chat-dock__input{display:block;margin-left:13px;margin-right:13px}.hud-chat-dock:hover .hud-chat-dock__input,.hud-chat-dock:focus-within .hud-chat-dock__input{margin-bottom:13px}
+@media(max-width:900px){.gp-topbar:after{right:8px;font-size:8px}.hud-chat-dock{width:244px;bottom:19%}}
+</style></head>
+<body><main class="canvas">
+<header class="canvas-header">
+<div class="kicker" style="font:700 11px Arial,sans-serif;letter-spacing:.12em;color:var(--player-red);margin-bottom:4px">大富翁.io / UI 方向板 05</div>
+<h1 class="canvas-title">游戏页 HUD 信息层统一样式稿</h1>
+<p class="canvas-sub">地图铺满整个游戏窗口，所有功能以 HUD 覆盖层叠加。系统通知并入聊天区，当前格详情固定为地图悬浮卡片。基线 1440×900 横屏。</p>
+</header>
+
+<!-- ============================================================
+     控件清单
+     ============================================================ -->
+<section class="section">
+<h2 class="section-title">HUD 控件清单与图层归属</h2>
+<p class="section-note">每个控件只消费语义 ViewModel，不直接读取游戏核心对象或 Socket。按钮可用状态由集中式状态矩阵计算，业务模块不直接写 disabled。主题令牌来自 DesignAdapter 快照。</p>
+<div class="inventory-grid">
+
+<div class="region-card">
+<div class="region-card__head"><h3 class="region-card__title">顶部 HUD 状态层</h3><span class="region-card__ratio">row 1 · 9%</span></div>
+<ul class="region-card__list">
+<li><code>player-badge</code> 头像 + 名称 + 队伍标签</li>
+<li><code>value-pill</code> 财产 / 信用值 / 备选数值（如环保值）</li>
+<li><code>cycle-indicator</code> 昼夜状态 + 剩余时间</li>
+<li><code>notice-bell</code> 聊天入口 + 系统通知未读计数</li>
+</ul>
+<p class="region-card__rule">耦合约束：数值只从 Store.playerStats 读取；昼夜从 Store.cycle 读取。</p>
+</div>
+
+<div class="region-card">
+<div class="region-card__head"><h3 class="region-card__title">全屏地图底层</h3><span class="region-card__ratio">col 1 · row 2-3 · 72%</span></div>
+<ul class="region-card__list">
+<li><code>board-canvas</code> 棋盘格子、连线、棋子（Canvas 2D 渲染）</li>
+<li><code>zone-tag</code> 当前区域名称 + 繁荣度百分比</li>
+<li><code>path-highlight</code> 多岔路可选路径高亮（仅路径选择态）</li>
+</ul>
+<p class="region-card__rule">耦合约束：地图由 ViewModel.board 驱动；UI 不解析地图 JSON 内部结构。</p>
+</div>
+
+<div class="region-card">
+<div class="region-card__head"><h3 class="region-card__title">悬浮信息层</h3><span class="region-card__ratio">col 2 · row 2-3 · 18%</span></div>
+<ul class="region-card__list">
+<li><code>tab-bar</code> 当前格 / 玩家 / 聊天 三页签切换</li>
+<li><code>cell-card</code> cell-hover-card cell-hover-card 当前格详情悬浮卡片</li>
+<li><code>player-list</code> 在线玩家排行（名称、财产、位置）</li>
+<li><code>chat-feed</code> 频道消息流（系统 / 队伍 / 区域）</li>
+<li><code>chat-input</code> 消息输入框 + 发送按钮</li>
+</ul>
+<p class="region-card__rule">耦合约束：详情卡从 Store.hoverCell 读取；聊天与系统通知从 Store.chat 读取。</p>
+</div>
+
+<div class="region-card">
+<div class="region-card__head"><h3 class="region-card__title">底部 HUD 行动层</h3><span class="region-card__ratio">col 1 · row 3 · 12%</span></div>
+<ul class="region-card__list">
+<li><code>dice-btn</code> 掷骰主按钮（冷却禁用态）</li>
+<li><code>act-btn</code> 上下文动作：购买 / 升级 / 修缮 / 传送 / 合租</li>
+<li><code>item-tray</code> 道具槽：查封令 / 复活令（计数角标）</li>
+<li><code>path-prompt</code> 路径选择按钮组（仅多岔路态）</li>
+</ul>
+<p class="region-card__rule">耦合约束：按钮 disabled 由 actionMatrix(state) 集中计算；点击发 client.* 请求。</p>
+</div>
+
+</div>
+</section>
+
+<!-- ============================================================
+     预览帧
+     ============================================================ -->
+<section class="section">
+<h2 class="section-title">三种状态最小预览</h2>
+<p class="section-note">以下三帧均使用东北走廊主题（暗色工业风）展示。每帧为 16:10 横屏比例，标注橙色标签为关键控件名。状态矩阵决定按钮可用性，非业务模块直接写入。</p>
+
+<!-- ========== 帧A：待掷骰态 ========== -->
+<article class="preview-block">
+<div class="preview-label">
+<span class="preview-label__tag">A · 待掷骰</span>
+<span class="preview-label__desc">玩家回合开始，掷骰按钮就绪，无特殊事件。悬浮信息层默认展示当前格详情。</span>
+</div>
+<div class="game-frame theme-northeast">
+<div class="gp-layout">
+
+<!-- 顶部状态栏 -->
+<header class="gp-topbar">
+  <div class="player-badge">
+    <div class="player-badge__avatar"></div>
+    <div>
+      <div class="player-badge__name">玩家A</div>
+      <div class="player-badge__team">独行</div>
+    </div>
+  </div>
+  <div class="value-pills">
+    <div class="value-pill"><span class="value-pill__label">财产</span><span class="value-pill__num">$4,200</span></div>
+    <div class="value-pill value-pill--accent"><span class="value-pill__label">信用</span><span class="value-pill__num">78</span></div>
+    <div class="value-pill"><span class="value-pill__label">环保</span><span class="value-pill__num">42</span></div>
+  </div>
+  <div class="topbar-spacer"></div>
+  <div class="cycle-indicator">
+    <div class="cycle-dot cycle-dot--day"></div>
+    <span class="cycle-text">白昼 08:32</span>
+  </div>
+  <div class="notice-bell">通知<span class="notice-bell__count">3</span></div>
+  <span class="ctrl-tag" style="top:-7px;left:14px">player-badge · value-pill</span>
+</header>
+
+<!-- 全屏地图底层 -->
+<div class="gp-map">
+  <div class="map-overlay map-overlay--zone">东北走廊 · 时区 3</div>
+  <div class="map-overlay map-overlay--prosperity">繁荣度 67%</div>
+  <div class="board-area">
+    <div class="board-path">
+      <div class="board-cell">
+        <span class="board-cell__type">start</span>
+        <span class="board-cell__name">起点</span>
+        <div class="board-cell__bar" style="background:#4A7C3F"></div>
+      </div>
+      <div class="board-link"></div>
+      <div class="board-cell">
+        <span class="board-cell__type">property</span>
+        <span class="board-cell__name">华尔街</span>
+        <div class="board-cell__bar" style="background:var(--player-red)"></div>
+        <div class="board-piece board-piece--p1"><div class="board-piece__head"></div><div class="board-piece__body"></div></div>
+      </div>
+      <div class="board-link board-link--active"></div>
+      <div class="board-cell board-cell--current">
+        <span class="board-cell__type">property</span>
+        <span class="board-cell__name">第五大道</span>
+        <div class="board-cell__bar" style="background:var(--player-red)"></div>
+      </div>
+      <div class="board-link"></div>
+      <div class="board-cell">
+        <span class="board-cell__type">event</span>
+        <span class="board-cell__name">事件</span>
+        <div class="board-cell__bar" style="background:#8C4E3A"></div>
+        <div class="board-piece board-piece--p2"><div class="board-piece__head"></div><div class="board-piece__body"></div></div>
+      </div>
+      <div class="board-link"></div>
+      <div class="board-cell">
+        <span class="board-cell__type">transport</span>
+        <span class="board-cell__name">中央车站</span>
+        <div class="board-cell__bar" style="background:#2F4B7A"></div>
+      </div>
+      <div class="board-link"></div>
+      <div class="board-cell">
+        <span class="board-cell__type">monument</span>
+        <span class="board-cell__name">纪念碑</span>
+        <div class="board-cell__bar" style="background:#E8C84A"></div>
+        <div class="board-piece board-piece--p3"><div class="board-piece__head"></div><div class="board-piece__body"></div></div>
+      </div>
+    </div>
+  </div>
+  <span class="ctrl-tag" style="bottom:6px;left:12px">board-canvas · zone-tag</span>
+</div>
+
+<!-- 悬浮信息层 -->
+<aside class="gp-sidebar">
+  <div class="gp-tabs">
+    <button class="gp-tab gp-tab--active">当前格</button>
+    <button class="gp-tab">玩家</button>
+    <button class="gp-tab">聊天</button>
+  </div>
+  <div class="gp-panel">
+    <div class="cell-card">
+      <div class="cell-card__type">property · 地产</div>
+      <h4 class="cell-card__name">第五大道</h4>
+      <div class="cell-card__row"><span class="cell-card__key">价格</span><span class="cell-card__val">$600</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">租金 Lv1</span><span class="cell-card__val">$30</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">租金 Lv2</span><span class="cell-card__val">$80</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">租金 Lv3</span><span class="cell-card__val">$200</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">等级</span><span class="cell-card__val cell-card__val--accent">Lv.2 / 3</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">归属</span><span class="cell-card__val">玩家A</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">抵押</span><span class="cell-card__val">未抵押</span></div>
+    </div>
+    <div class="cell-card">
+      <div class="cell-card__type">区域</div>
+      <div class="cell-card__row"><span class="cell-card__key">繁荣度</span><span class="cell-card__val">67%</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">昼夜</span><span class="cell-card__val">白昼</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">环保值</span><span class="cell-card__val cell-card__val--accent">42</span></div>
+    </div>
+  </div>
+  <span class="ctrl-tag" style="top:30px;right:-7px">tab-bar · cell-card</span>
+</aside>
+
+<!-- 底部 HUD 行动层 -->
+<div class="cell-hover-card"><div class="cell-hover-card__type">property · 当前格</div><div class="cell-hover-card__title">第五大道</div><div class="cell-hover-card__rows"><span>价格</span><b>$600</b><span>租金 Lv2</span><b>$80</b><span>等级</span><b>Lv.2 / 3</b><span>归属</span><b>玩家A</b></div><span class="ctrl-tag" style="top:-7px;right:-7px">cell-hover-card</span></div><div class="hud-chat-dock"><div class="hud-chat-dock__head"><span>聊天 / 通知</span><span class="hud-chat-dock__tabs"><b>系统 3</b> 队伍 区域</span></div><div class="hud-chat-msg"><b>系统</b><span>你已抵达第五大道，可购买地产。</span></div><div class="hud-chat-msg"><b>队伍</b><span>暂无新的队伍消息。</span></div><div class="hud-chat-msg"><b>区域</b><span>玩家B：中央车站正在夜间计税。</span></div><div class="hud-chat-dock__input">发送消息…</div><span class="ctrl-tag" style="top:-7px;right:-7px">chat-dock · system-notice</span></div><footer class="gp-actionbar">
+  <div class="dice-zone">
+    <button class="dice-btn">掷骰</button>
+    <span class="dice-status">就绪</span>
+  </div>
+  <div class="action-cluster">
+    <button class="act-btn" disabled>升级<span class="act-btn__price">$200</span></button>
+    <button class="act-btn" disabled>抵押</button>
+  </div>
+  <div class="actionbar-spacer"></div>
+  <div class="item-tray">
+    <div class="item-slot item-slot--has" title="查封令">查封<span class="item-slot__count">1</span></div>
+    <div class="item-slot" title="复活令">复活</div>
+  </div>
+  <span class="ctrl-tag" style="bottom:-7px;left:14px">dice-btn · act-btn · item-tray</span>
+</footer>
+
+</div><!-- /gp-layout -->
+</div><!-- /game-frame -->
+</article>
+
+<!-- ========== 帧B：地产决策态 ========== -->
+<article class="preview-block">
+<div class="preview-label">
+<span class="preview-label__tag">B · 地产决策</span>
+<span class="preview-label__desc">玩家停在无主地产格，底部 HUD 行动层切换为购买/拍卖/跳过；掷骰禁用。顶部居中弹出系统通知。</span>
+</div>
+<div class="game-frame theme-northeast">
+<div class="gp-layout">
+
+<!-- 顶部状态栏 -->
+<header class="gp-topbar">
+  <div class="player-badge">
+    <div class="player-badge__avatar"></div>
+    <div>
+      <div class="player-badge__name">玩家A</div>
+      <div class="player-badge__team">独行</div>
+    </div>
+  </div>
+  <div class="value-pills">
+    <div class="value-pill"><span class="value-pill__label">财产</span><span class="value-pill__num">$4,200</span></div>
+    <div class="value-pill value-pill--accent"><span class="value-pill__label">信用</span><span class="value-pill__num">78</span></div>
+    <div class="value-pill"><span class="value-pill__label">环保</span><span class="value-pill__num">42</span></div>
+  </div>
+  <div class="topbar-spacer"></div>
+  <div class="cycle-indicator">
+    <div class="cycle-dot cycle-dot--day"></div>
+    <span class="cycle-text">白昼 08:32</span>
+  </div>
+  <div class="notice-bell">通知<span class="notice-bell__count">3</span></div>
+</header>
+
+<!-- 全屏地图底层 -->
+<div class="gp-map">
+  <div class="event-toast"><span class="event-toast__title">第五大道</span> — 无主地产，可购买 $600</div>
+  <div class="map-overlay map-overlay--zone">东北走廊 · 时区 3</div>
+  <div class="map-overlay map-overlay--prosperity">繁荣度 67%</div>
+  <div class="board-area">
+    <div class="board-path">
+      <div class="board-cell">
+        <span class="board-cell__type">start</span>
+        <span class="board-cell__name">起点</span>
+        <div class="board-cell__bar" style="background:#4A7C3F"></div>
+      </div>
+      <div class="board-link"></div>
+      <div class="board-cell">
+        <span class="board-cell__type">property</span>
+        <span class="board-cell__name">华尔街</span>
+        <div class="board-cell__bar" style="background:var(--player-red)"></div>
+      </div>
+      <div class="board-link"></div>
+      <div class="board-cell board-cell--current">
+        <span class="board-cell__type">property</span>
+        <span class="board-cell__name">第五大道</span>
+        <div class="board-cell__bar" style="background:#8A847A"></div>
+        <div class="board-piece board-piece--p1"><div class="board-piece__head"></div><div class="board-piece__body"></div></div>
+      </div>
+      <div class="board-link"></div>
+      <div class="board-cell">
+        <span class="board-cell__type">event</span>
+        <span class="board-cell__name">事件</span>
+        <div class="board-cell__bar" style="background:#8C4E3A"></div>
+        <div class="board-piece board-piece--p2"><div class="board-piece__head"></div><div class="board-piece__body"></div></div>
+      </div>
+      <div class="board-link"></div>
+      <div class="board-cell">
+        <span class="board-cell__type">transport</span>
+        <span class="board-cell__name">中央车站</span>
+        <div class="board-cell__bar" style="background:#2F4B7A"></div>
+      </div>
+      <div class="board-link"></div>
+      <div class="board-cell">
+        <span class="board-cell__type">monument</span>
+        <span class="board-cell__name">纪念碑</span>
+        <div class="board-cell__bar" style="background:#E8C84A"></div>
+        <div class="board-piece board-piece--p3"><div class="board-piece__head"></div><div class="board-piece__body"></div></div>
+      </div>
+    </div>
+  </div>
+  <span class="ctrl-tag" style="top:34px;left:50%;transform:translateX(-50%)">event-toast</span>
+</div>
+
+<!-- 悬浮信息层 -->
+<aside class="gp-sidebar">
+  <div class="gp-tabs">
+    <button class="gp-tab gp-tab--active">当前格</button>
+    <button class="gp-tab">玩家</button>
+    <button class="gp-tab">聊天</button>
+  </div>
+  <div class="gp-panel">
+    <div class="cell-card">
+      <div class="cell-card__type">property · 无主地产</div>
+      <h4 class="cell-card__name">第五大道</h4>
+      <div class="cell-card__row"><span class="cell-card__key">购买价</span><span class="cell-card__val cell-card__val--accent">$600</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">升级费</span><span class="cell-card__val">$200</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">租金 Lv1</span><span class="cell-card__val">$30</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">租金 Lv2</span><span class="cell-card__val">$80</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">租金 Lv3</span><span class="cell-card__val">$200</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">抵押价</span><span class="cell-card__val">$300</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">归属</span><span class="cell-card__val" style="color:var(--gp-muted)">无主</span></div>
+    </div>
+    <div class="cell-card">
+      <div class="cell-card__type">提示</div>
+      <div style="font-size:10px;color:var(--gp-muted);line-height:1.4">购买后经过可升级；他人经过需向你付租金。抵押后可在区域内竞拍。</div>
+    </div>
+  </div>
+</aside>
+
+<!-- 底部 HUD 行动层 -->
+<div class="cell-hover-card"><div class="cell-hover-card__type">property · 当前格</div><div class="cell-hover-card__title">第五大道</div><div class="cell-hover-card__rows"><span>价格</span><b>$600</b><span>租金 Lv2</span><b>$80</b><span>等级</span><b>Lv.2 / 3</b><span>归属</span><b>玩家A</b></div><span class="ctrl-tag" style="top:-7px;right:-7px">cell-hover-card</span></div><div class="hud-chat-dock"><div class="hud-chat-dock__head"><span>聊天 / 通知</span><span class="hud-chat-dock__tabs"><b>系统 3</b> 队伍 区域</span></div><div class="hud-chat-msg"><b>系统</b><span>你已抵达第五大道，可购买地产。</span></div><div class="hud-chat-msg"><b>队伍</b><span>暂无新的队伍消息。</span></div><div class="hud-chat-msg"><b>区域</b><span>玩家B：中央车站正在夜间计税。</span></div><div class="hud-chat-dock__input">发送消息…</div><span class="ctrl-tag" style="top:-7px;right:-7px">chat-dock · system-notice</span></div><footer class="gp-actionbar">
+  <div class="dice-zone">
+    <button class="dice-btn" disabled>掷骰</button>
+    <span class="dice-status">冷却中</span>
+  </div>
+  <div class="action-cluster">
+    <button class="act-btn act-btn--accent">购买<span class="act-btn__price">$600</span></button>
+    <button class="act-btn">拍卖</button>
+    <button class="act-btn">跳过</button>
+  </div>
+  <div class="actionbar-spacer"></div>
+  <div class="item-tray">
+    <div class="item-slot item-slot--has" title="查封令">查封<span class="item-slot__count">1</span></div>
+    <div class="item-slot" title="复活令">复活</div>
+  </div>
+  <span class="ctrl-tag" style="bottom:-7px;left:90px">act-btn(购买/拍卖/跳过)</span>
+</footer>
+
+</div><!-- /gp-layout -->
+</div><!-- /game-frame -->
+</article>
+
+<!-- ========== 帧C：路径选择态 ========== -->
+<article class="preview-block">
+<div class="preview-label">
+<span class="preview-label__tag">C · 路径选择</span>
+<span class="preview-label__desc">掷骰后到达多岔路口，地图高亮可选路径，行动栏切换为路径选择按钮组。悬浮信息层展示路径选项详情。</span>
+</div>
+<div class="game-frame theme-northeast">
+<div class="gp-layout">
+
+<!-- 顶部状态栏 -->
+<header class="gp-topbar">
+  <div class="player-badge">
+    <div class="player-badge__avatar"></div>
+    <div>
+      <div class="player-badge__name">玩家A</div>
+      <div class="player-badge__team">独行</div>
+    </div>
+  </div>
+  <div class="value-pills">
+    <div class="value-pill"><span class="value-pill__label">财产</span><span class="value-pill__num">$3,600</span></div>
+    <div class="value-pill value-pill--accent"><span class="value-pill__label">信用</span><span class="value-pill__num">78</span></div>
+    <div class="value-pill"><span class="value-pill__label">环保</span><span class="value-pill__num">42</span></div>
+  </div>
+  <div class="topbar-spacer"></div>
+  <div class="cycle-indicator">
+    <div class="cycle-dot cycle-dot--day"></div>
+    <span class="cycle-text">白昼 08:28</span>
+  </div>
+  <div class="notice-bell">通知<span class="notice-bell__count">5</span></div>
+</header>
+
+<!-- 全屏地图底层 -->
+<div class="gp-map">
+  <div class="map-overlay map-overlay--zone">东北走廊 · 时区 3</div>
+  <div class="map-overlay map-overlay--prosperity">繁荣度 67%</div>
+  <div class="board-area">
+    <div class="board-path" style="gap:0">
+      <div class="board-cell">
+        <span class="board-cell__type">start</span>
+        <span class="board-cell__name">起点</span>
+        <div class="board-cell__bar" style="background:#4A7C3F"></div>
+      </div>
+      <div class="board-link"></div>
+      <div class="board-cell board-cell--junction">
+        <span class="board-cell__type">junction</span>
+        <span class="board-cell__name">岔路口</span>
+        <div class="board-cell__bar" style="background:var(--gp-accent)"></div>
+        <div class="board-piece board-piece--p1"><div class="board-piece__head"></div><div class="board-piece__body"></div></div>
+      </div>
+      <div class="board-link board-link--active"></div>
+      <div class="board-cell board-cell--branch">
+        <span class="board-cell__type">property</span>
+        <span class="board-cell__name">华尔街</span>
+        <div class="board-cell__bar" style="background:var(--player-red)"></div>
+      </div>
+      <div style="width:14px"></div>
+      <div class="board-cell board-cell--branch" style="margin-left:-78px;margin-top:72px">
+        <span class="board-cell__type">monument</span>
+        <span class="board-cell__name">纪念碑</span>
+        <div class="board-cell__bar" style="background:#E8C84A"></div>
+      </div>
+    </div>
+    <span class="path-label" style="top:42%;left:42%">路径A → 华尔街</span>
+    <span class="path-label" style="top:58%;left:42%">路径B → 纪念碑</span>
+  </div>
+  <span class="ctrl-tag" style="bottom:6px;left:12px">path-highlight · path-label</span>
+</div>
+
+<!-- 悬浮信息层 -->
+<aside class="gp-sidebar">
+  <div class="gp-tabs">
+    <button class="gp-tab gp-tab--active">当前格</button>
+    <button class="gp-tab">玩家</button>
+    <button class="gp-tab">聊天</button>
+  </div>
+  <div class="gp-panel">
+    <div class="cell-card">
+      <div class="cell-card__type">junction · 多岔路口</div>
+      <h4 class="cell-card__name">选择路径</h4>
+      <div style="font-size:10px;color:var(--gp-muted);margin-bottom:8px">骰子点数：4 · 剩余步数：2</div>
+    </div>
+    <div class="cell-card">
+      <div class="cell-card__type">路径 A</div>
+      <h4 class="cell-card__name" style="font-size:12px">→ 华尔街</h4>
+      <div class="cell-card__row"><span class="cell-card__key">类型</span><span class="cell-card__val">地产</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">归属</span><span class="cell-card__val">玩家A</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">可升级</span><span class="cell-card__val cell-card__val--accent">是 · $200</span></div>
+    </div>
+    <div class="cell-card">
+      <div class="cell-card__type">路径 B</div>
+      <h4 class="cell-card__name" style="font-size:12px">→ 纪念碑</h4>
+      <div class="cell-card__row"><span class="cell-card__key">类型</span><span class="cell-card__val">纪念碑</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">修缮费</span><span class="cell-card__val">$150</span></div>
+      <div class="cell-card__row"><span class="cell-card__key">信用收益</span><span class="cell-card__val cell-card__val--accent">+10</span></div>
+    </div>
+  </div>
+</aside>
+
+<!-- 底部 HUD 行动层 -->
+<div class="cell-hover-card"><div class="cell-hover-card__type">property · 当前格</div><div class="cell-hover-card__title">第五大道</div><div class="cell-hover-card__rows"><span>价格</span><b>$600</b><span>租金 Lv2</span><b>$80</b><span>等级</span><b>Lv.2 / 3</b><span>归属</span><b>玩家A</b></div><span class="ctrl-tag" style="top:-7px;right:-7px">cell-hover-card</span></div><div class="hud-chat-dock"><div class="hud-chat-dock__head"><span>聊天 / 通知</span><span class="hud-chat-dock__tabs"><b>系统 3</b> 队伍 区域</span></div><div class="hud-chat-msg"><b>系统</b><span>你已抵达第五大道，可购买地产。</span></div><div class="hud-chat-msg"><b>队伍</b><span>暂无新的队伍消息。</span></div><div class="hud-chat-msg"><b>区域</b><span>玩家B：中央车站正在夜间计税。</span></div><div class="hud-chat-dock__input">发送消息…</div><span class="ctrl-tag" style="top:-7px;right:-7px">chat-dock · system-notice</span></div><footer class="gp-actionbar">
+  <div class="dice-zone">
+    <button class="dice-btn" disabled>掷骰</button>
+    <span class="dice-status">移动中</span>
+  </div>
+  <div class="action-cluster">
+    <button class="act-btn act-btn--accent">选择路径A<span class="act-btn__price">→ 华尔街</span></button>
+    <button class="act-btn act-btn--accent">选择路径B<span class="act-btn__price">→ 纪念碑</span></button>
+  </div>
+  <div class="actionbar-spacer"></div>
+  <div class="item-tray">
+    <div class="item-slot item-slot--has" title="查封令">查封<span class="item-slot__count">1</span></div>
+    <div class="item-slot" title="复活令">复活</div>
+  </div>
+  <span class="ctrl-tag" style="bottom:-7px;left:90px">path-prompt</span>
+</footer>
+
+</div><!-- /gp-layout -->
+</div><!-- /game-frame -->
+</article>
+
+</section>
+
+<!-- ============================================================
+     设计决策记录
+     ============================================================ -->
+<section class="section">
+<h2 class="section-title">设计决策记录</h2>
+<div class="decisions">
+<dl>
+<dt>为何选方案A"全屏地图底层"</dt>
+<dd>开放地图与非环形路径是本游戏的核心空间特征。方案A让地图占据 72% 视觉面积，保证玩家在任何时刻都能看到棋盘全貌与自身位置。顶部 HUD 状态层、悬浮信息层、底部 HUD 行动层分别从三个边缘包裹地图，不切割地图主体。方案B"控制台账本"的右侧固定面板会压缩地图纵深；方案C"区域分屏"的左右对称栏位分散地图焦点。</dd>
+
+<dt>控件为何按四区域编排</dt>
+<dd>对应玩家在回合中的四种认知焦点：<strong>我是谁</strong>（顶部 HUD 状态层：身份与数值）、<strong>我在哪</strong>（全屏地图底层：空间定位）、<strong>这是什么</strong>（悬浮信息层：当前格详情）、<strong>我能做什么</strong>（底部 HUD 行动层：可用动作）。四个区域与 SPEC 中 FR-2（掷骰移动）、FR-3~FR-9（格子类型交互）、FR-10~FR-12（数值系统）、FR-17~FR-18（聊天通知）的映射关系清晰。</dd>
+
+<dt>底部 HUD 行动层为何覆盖地图边缘</dt>
+<dd>行动栏不是常驻固定栏，而是"浮动覆盖"——它只在玩家需要做决策时浮现在地图底部边缘。待掷骰态下行动栏极简（仅掷骰按钮 + 道具槽），地产决策态下切换为购买/拍卖/跳过，路径选择态下切换为路径按钮。这种设计避免行动栏在无操作时浪费屏幕空间。实现上使用 <code>grid-row: 3; z-index: 1</code>，地图 <code>grid-row: 2/4</code> 跨越行动栏区域，行动栏叠加在地图底部。</dd>
+
+<dt>悬浮信息层为何用三页签而非全部展开</dt>
+<dd>18% 宽度不足以同时展示当前格详情、玩家列表和聊天。三页签（当前格/玩家/聊天）让玩家按需切换，降低信息密度压力。默认激活"当前格"页签——因为玩家最常需要的信息是"我停在了什么格子上"。聊天页签底部保留输入框，确保切换到聊天后可直接发送消息。</dd>
+
+<dt>三种状态预览的选择依据</dt>
+<dd>待掷骰（A）是最高频状态，验证基础布局与默认控件。地产决策（B）验证上下文动作切换——底部 HUD 行动层从掷骰变为购买/拍卖/跳过，同时浮出事件提示。路径选择（C）验证非环形地图的核心交互——多岔路高亮与路径对比信息。三种状态覆盖了 SPEC FR-2（掷骰）、FR-3（地产购买）、FR-1（连线路径）三个最核心的功能需求。</dd>
+
+<dt>主题令牌与低耦合</dt>
+<dd>三帧均使用东北走廊主题（<code>.theme-northeast</code>）展示。实际运行时，主题由 <code>DesignAdapter</code> 根据玩家所在区域动态切换（东北/深南/中西部/远西四套令牌）。所有控件颜色引用 <code>--gp-*</code> 变量而非硬编码值，确保主题切换时全部控件同步变化。控件不直接调用 <code>DesignAdapter</code>，而是接收 Store 下发的 token 快照。</dd>
+
+<dt>按钮状态矩阵</dt>
+<dd>所有 <code>disabled</code> 状态由集中式 <code>actionMatrix(state)</code> 函数计算，输入为游戏状态枚举（<code>idle / rolling / moving / property-decision / path-selection / jailed / bankrupt</code>），输出为各按钮的可用性。业务模块（如 MovementHandler）不直接写 <code>button.disabled = true</code>，只更新 Store 状态，UI 层响应状态变化自动更新按钮。这避免了分散的状态写入导致的按钮闪烁与不一致。</dd>
+</dl>
+</div>
+</section>
+
+</main></body>
+</html>

@@ -286,17 +286,17 @@ node dist/main.js \
 | 文档 | 路径 | 说明 |
 | --- | --- | --- |
 | 项目说明 | `README.md` | 项目整体介绍 |
-| 架构文档 | `docs/ARCHITECTURE.md` | 系统架构、技术选型、模块划分 |
-| API 参考 | `docs/API.md` | Socket.IO 事件、REST 端点、数据类型 |
-| 开发指南 | `docs/DEVELOPER.md` | 开发环境搭建、代码规范 |
-| 编码风格 | `docs/CODING_STYLE.md` | 代码风格约定 |
-| 内容创作 | `docs/CONTENT_CREATOR.md` | 地图/天赋/事件配置指南 |
-| 玩家手册 | `docs/PLAYER.md` | 游戏玩法说明 |
+| 架构文档 | `docs/architecture/ARCHITECTURE.md` | 系统架构、技术选型、模块划分 |
+| API 参考 | `docs/architecture/API.md` | Socket.IO 事件、REST 端点、数据类型 |
+| 开发指南 | `docs/guides/DEVELOPER.md` | 开发环境搭建、代码规范 |
+| 编码风格 | `docs/guides/CODING_STYLE.md` | 代码风格约定 |
+| 内容创作 | `docs/guides/CONTENT_CREATOR.md` | 地图/天赋/事件配置指南 |
+| 玩家手册 | `docs/player/PLAYER.md` | 游戏玩法说明 |
 | AI Bot 指南 | `ai-bot/docs/LLM_GUIDE.md` | LLM 配置和使用指南 |
 | 需求规格 | `.trae/specs/monopoly-io-game/spec.md` | 产品需求规格 |
 | 验收清单 | `.trae/specs/monopoly-io-game/checklist.md` | 验收检查清单 |
 | 任务列表 | `.trae/specs/monopoly-io-game/tasks.md` | 开发任务分解 |
-| 本文档 | `docs/HANDOVER.md` | 项目交接 |
+| 本文档 | `docs/handover/HANDOVER.md` | 项目交接 |
 
 ---
 

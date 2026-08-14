@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大富翁.io｜开放地图视觉方向</title>
+    <style id="theme-vars">
+:root {
+  --tycoon-background: #e9e8e4;
+  --tycoon-foreground: #151827;
+  --tycoon-card: #ffffff;
+  --tycoon-card-foreground: #151827;
+  --tycoon-popover: #ffffff;
+  --tycoon-popover-foreground: #151827;
+  --tycoon-primary: #263fd0;
+  --tycoon-primary-foreground: #ffffff;
+  --tycoon-muted: #d9dce4;
+  --tycoon-muted-foreground: #5b6171;
+  --tycoon-border: #7e8798;
+  --tycoon-input: #7e8798;
+  --tycoon-ring: #eaff32;
+  --tycoon-radius-sm: 10px;
+  --tycoon-radius-md: 16px;
+  --tycoon-radius-lg: 24px;
+  --font-display: "PingFang SC", "Microsoft YaHei", sans-serif;
+  --radius-xs: 6px; --radius-sm: 10px; --radius-md: 16px; --radius-pill: 999px;
+  --shadow-crisp: 4px 4px 0 currentColor;
+  --shadow-panel: 0 12px 28px rgba(9, 14, 31, .18);
+  --transition-fast: 160ms ease;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-display); background: #e9e8e4; color: #151827; }
+button { font: inherit; }
+.directions { min-width: 1180px; padding: 34px 38px 48px; }
+.page-title { display:flex; justify-content:space-between; align-items:end; margin-bottom: 24px; }
+.page-title h1 { margin:0; font-size:28px; letter-spacing:.06em; }
+.page-title p { margin:0; color:#5b6171; font-size:13px; }
+.direction-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; }
+.direction { --bg:#151a49; --ink:#fff; --muted:#bbc5ff; --line:#6987d6; --action:#eaff32; --crisis:#ff665e; --traffic:#35c9ef; --panel:#252d69; --road:#5066bd; --card:#1b225a; color:var(--ink); background:var(--bg); border-radius:var(--radius-md); overflow:hidden; box-shadow:var(--shadow-panel); }
+.direction.paper { --bg:#f6eddb; --ink:#293752; --muted:#6d7382; --line:#4e83c8; --action:#f5c843; --crisis:#e65247; --traffic:#35956c; --panel:#fff9ed; --road:#89aee0; --card:#fff8eb; }
+.direction.night { --bg:#07101e; --ink:#e8f6ff; --muted:#9aadc2; --line:#2a9ebf; --action:#f3af36; --crisis:#dd3d9d; --traffic:#40bfd4; --panel:#101e32; --road:#176983; --card:#0b1728; }
+.direction-head { display:flex; justify-content:space-between; align-items:center; padding:16px 18px 14px; border-bottom:1px solid color-mix(in srgb,var(--ink) 18%,transparent); }
+.direction-head h2 { margin:0; font-size:17px; letter-spacing:.05em; }
+.direction-head span { font-size:11px; font-weight:700; color:var(--muted); }
+.game { margin:14px; min-height:475px; position:relative; overflow:hidden; border:2px solid color-mix(in srgb,var(--ink) 55%,transparent); border-radius:var(--radius-sm); background:var(--card); }
+.hud { height:50px; display:flex; align-items:center; gap:8px; padding:8px; background:var(--panel); border-bottom:2px solid color-mix(in srgb,var(--ink) 25%,transparent); }
+.hud b { flex:1; min-width:0; padding:5px 6px; border-radius:var(--radius-xs); background:color-mix(in srgb,var(--bg) 70%,transparent); font-size:10px; white-space:nowrap; }
+.hud i { display:block; color:var(--muted); font-style:normal; font-size:8px; font-weight:500; }
+.map { position:relative; height:373px; background:var(--bg); isolation:isolate; }
+.paper .map { background-color:#f4e8ce; background-image:linear-gradient(#e8d9bc 1px,transparent 1px),linear-gradient(90deg,#e8d9bc 1px,transparent 1px); background-size:21px 21px; }
+.night .map { background-color:#07101e; background-image:linear-gradient(90deg,transparent 49%,#12263a 50%,transparent 51%),linear-gradient(transparent 49%,#12263a 50%,transparent 51%); background-size:52px 52px; }
+.road { position:absolute; height:13px; background:var(--road); border:2px solid var(--line); border-radius:var(--radius-pill); transform-origin:left center; z-index:1; }
+.paper .road { height:10px; border-width:2px; transform:rotate(var(--r)) skewX(-6deg); }
+.road.r1 { width:235px; left:58px; top:252px; transform:rotate(-40deg); }.road.r2 { width:168px; left:235px; top:105px; transform:rotate(28deg); }.road.r3 { width:145px; left:241px; top:252px; transform:rotate(-25deg); }.road.r4 { width:155px; left:288px; top:174px; transform:rotate(77deg); }.road.r5 { width:144px; left:80px; top:250px; transform:rotate(13deg); }
+.junction { position:absolute; left:229px; top:238px; width:39px; height:39px; border:4px solid var(--line); background:var(--action); border-radius:50%; z-index:2; }
+.route { position:absolute; z-index:4; display:flex; gap:5px; }.route.a { left:180px; top:200px; }.route.b { left:273px; top:272px; }
+.route button { border:2px solid var(--ink); color:var(--ink); background:var(--panel); border-radius:var(--radius-xs); padding:5px 7px; font-size:10px; font-weight:800; cursor:pointer; }
+.token { position:absolute; z-index:5; width:27px; height:32px; }.token::before { content:""; position:absolute; left:7px; width:15px; height:15px; border-radius:50%; background:var(--token,#fff); border:2px solid var(--ink); }.token::after { content:""; position:absolute; bottom:0; left:4px; width:20px; height:18px; background:var(--token,#fff); border:2px solid var(--ink); border-radius:12px 12px 5px 5px; }
+.t1{left:112px;top:212px;--token:#ff7669}.t2{left:248px;top:182px;--token:#f6dd56}.t3{left:327px;top:296px;--token:#63d9d5}.paper .token::after { border-radius:14px 14px 8px 8px; }
+.marker { position:absolute; z-index:3; min-width:52px; padding:5px 6px; border:2px solid var(--ink); border-radius:var(--radius-xs); color:var(--ink); background:var(--panel); font-size:9px; font-weight:800; text-align:center; }.marker::before { content:""; display:inline-block; width:7px; height:7px; margin-right:4px; border-radius:50%; background:var(--mark,var(--action)); }.estate{left:43px;top:290px;--mark:var(--action)}.event{right:26px;top:82px;--mark:var(--crisis)}.transit{right:28px;bottom:42px;--mark:var(--traffic)}.start{left:40px;top:70px;--mark:#fff}.jail{right:31px;top:216px;--mark:var(--crisis)}
+.turnbar { height:52px; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px; background:var(--panel); border-top:2px solid color-mix(in srgb,var(--ink) 24%,transparent); }.turnbar small{color:var(--muted);font-size:10px;font-weight:700}.dice { border:2px solid var(--ink); border-radius:var(--radius-sm); color:#151827; background:var(--action); box-shadow:3px 3px 0 var(--ink); padding:8px 12px; font-weight:900; letter-spacing:.04em; cursor:pointer; transition:transform var(--transition-fast),box-shadow var(--transition-fast),filter var(--transition-fast); }.dice:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--ink);filter:brightness(1.04)}.dice:focus-visible{outline:3px solid var(--crisis);outline-offset:3px}.dice:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { transition-duration:0.01ms !important; animation-duration:0.01ms !important; } }
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--tycoon-background);
+    --color-foreground: var(--tycoon-foreground);
+    --color-card: var(--tycoon-card);
+    --color-card-foreground: var(--tycoon-card-foreground);
+    --color-popover: var(--tycoon-popover);
+    --color-popover-foreground: var(--tycoon-popover-foreground);
+    --color-primary: var(--tycoon-primary);
+    --color-primary-foreground: var(--tycoon-primary-foreground);
+    --color-muted: var(--tycoon-muted);
+    --color-muted-foreground: var(--tycoon-muted-foreground);
+    --color-border: var(--tycoon-border);
+    --color-input: var(--tycoon-input);
+    --color-ring: var(--tycoon-ring);
+    --radius-sm: var(--tycoon-radius-sm);
+    --radius-md: var(--tycoon-radius-md);
+    --radius-lg: var(--tycoon-radius-lg);
+  }
+  @layer base {
+    body { background: var(--tycoon-background); color: var(--tycoon-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--tycoon-background); }
+      .text-background { color: var(--tycoon-background); }
+      .border-background { border-color: var(--tycoon-background); }
+      .ring-background { --tw-ring-color: var(--tycoon-background); }
+      .bg-foreground { background-color: var(--tycoon-foreground); }
+      .text-foreground { color: var(--tycoon-foreground); }
+      .border-foreground { border-color: var(--tycoon-foreground); }
+      .ring-foreground { --tw-ring-color: var(--tycoon-foreground); }
+      .bg-card { background-color: var(--tycoon-card); }
+      .text-card { color: var(--tycoon-card); }
+      .border-card { border-color: var(--tycoon-card); }
+      .ring-card { --tw-ring-color: var(--tycoon-card); }
+      .bg-card-foreground { background-color: var(--tycoon-card-foreground); }
+      .text-card-foreground { color: var(--tycoon-card-foreground); }
+      .border-card-foreground { border-color: var(--tycoon-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--tycoon-card-foreground); }
+      .bg-popover { background-color: var(--tycoon-popover); }
+      .text-popover { color: var(--tycoon-popover); }
+      .border-popover { border-color: var(--tycoon-popover); }
+      .ring-popover { --tw-ring-color: var(--tycoon-popover); }
+      .bg-popover-foreground { background-color: var(--tycoon-popover-foreground); }
+      .text-popover-foreground { color: var(--tycoon-popover-foreground); }
+      .border-popover-foreground { border-color: var(--tycoon-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--tycoon-popover-foreground); }
+      .bg-primary { background-color: var(--tycoon-primary); }
+      .text-primary { color: var(--tycoon-primary); }
+      .border-primary { border-color: var(--tycoon-primary); }
+      .ring-primary { --tw-ring-color: var(--tycoon-primary); }
+      .bg-primary-foreground { background-color: var(--tycoon-primary-foreground); }
+      .text-primary-foreground { color: var(--tycoon-primary-foreground); }
+      .border-primary-foreground { border-color: var(--tycoon-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--tycoon-primary-foreground); }
+      .bg-muted { background-color: var(--tycoon-muted); }
+      .text-muted { color: var(--tycoon-muted); }
+      .border-muted { border-color: var(--tycoon-muted); }
+      .ring-muted { --tw-ring-color: var(--tycoon-muted); }
+      .bg-muted-foreground { background-color: var(--tycoon-muted-foreground); }
+      .text-muted-foreground { color: var(--tycoon-muted-foreground); }
+      .border-muted-foreground { border-color: var(--tycoon-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--tycoon-muted-foreground); }
+      .bg-border { background-color: var(--tycoon-border); }
+      .text-border { color: var(--tycoon-border); }
+      .border-border { border-color: var(--tycoon-border); }
+      .ring-border { --tw-ring-color: var(--tycoon-border); }
+      .bg-input { background-color: var(--tycoon-input); }
+      .text-input { color: var(--tycoon-input); }
+      .border-input { border-color: var(--tycoon-input); }
+      .ring-input { --tw-ring-color: var(--tycoon-input); }
+      .bg-ring { background-color: var(--tycoon-ring); }
+      .text-ring { color: var(--tycoon-ring); }
+      .border-ring { border-color: var(--tycoon-ring); }
+      .ring-ring { --tw-ring-color: var(--tycoon-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body>
+  <main class="directions">
+    <header class="page-title"><div><h1>大富翁.io · 开放地图视觉方向</h1><p>2D 俯视自由棋盘／三人组队对局中的岔路选择</p></div><p>同一局部场景 · 各方向独立调性</p></header>
+    <section class="direction-grid" aria-label="三种开放地图视觉方向">
+      <article class="direction street">
+        <header class="direction-head"><h2>01　潮流街头</h2><span>深靛蓝 × 荧光行动</span></header>
+        <div class="game">
+          <div class="hud"><b><i>资金</i>￥8,420</b><b><i>信用</i>82</b><b><i>繁荣</i>Lv.3</b><b><i>昼夜</i>东八区 · 夜</b></div>
+          <div class="map" aria-label="街头开放地图预览">
+            <div class="road r1"></div><div class="road r2"></div><div class="road r3"></div><div class="road r4"></div><div class="road r5"></div><div class="junction"></div>
+            <div class="marker start">起点</div><div class="marker estate">地产 · 潮牌街</div><div class="marker event">事件 · 抢单</div><div class="marker transit">交通 · 地铁</div><div class="marker jail">监狱</div>
+            <div class="token t1" title="玩家一"></div><div class="token t2" title="玩家二"></div><div class="token t3" title="玩家三"></div>
+            <div class="route a"><button>↖ 商圈</button><button>→ 投资区</button></div><div class="route b"><button>↓ 纪念碑</button></div>
+          </div>
+          <div class="turnbar"><small>你的回合 · 天赋「街头嗅觉」</small><button class="dice">掷骰 · 4</button></div>
+        </div>
+      </article>
+      <article class="direction paper">
+        <header class="direction-head"><h2>02　手绘冒险</h2><span>暖纸张 × 蓝色路径</span></header>
+        <div class="game">
+          <div class="hud"><b><i>资金</i>￥8,420</b><b><i>信用</i>82</b><b><i>繁荣</i>Lv.3</b><b><i>昼夜</i>东八区 · 夜</b></div>
+          <div class="map" aria-label="手绘开放地图预览">
+            <div class="road r1"></div><div class="road r2"></div><div class="road r3"></div><div class="road r4"></div><div class="road r5"></div><div class="junction"></div>
+            <div class="marker start">起点旗</div><div class="marker estate">地产 · 风车屋</div><div class="marker event">事件 · 山火</div><div class="marker transit">交通 · 渡船</div><div class="marker jail">禁闭塔</div>
+            <div class="token t1" title="玩家一"></div><div class="token t2" title="玩家二"></div><div class="token t3" title="玩家三"></div>
+            <div class="route a"><button>↖ 森林</button><button>→ 集市</button></div><div class="route b"><button>↓ 纪念碑</button></div>
+          </div>
+          <div class="turnbar"><small>你的回合 · 天赋「寻路人」</small><button class="dice">掷骰 · 4</button></div>
+        </div>
+      </article>
+      <article class="direction night">
+        <header class="direction-head"><h2>03　都市夜行</h2><span>深蓝黑 × 区域光带</span></header>
+        <div class="game">
+          <div class="hud"><b><i>资金</i>￥8,420</b><b><i>信用</i>82</b><b><i>繁荣</i>Lv.3</b><b><i>昼夜</i>东八区 · 夜</b></div>
+          <div class="map" aria-label="夜行开放地图预览">
+            <div class="road r1"></div><div class="road r2"></div><div class="road r3"></div><div class="road r4"></div><div class="road r5"></div><div class="junction"></div>
+            <div class="marker start">起点 · 港湾</div><div class="marker estate">地产 · 云端层</div><div class="marker event">事件 · 断电</div><div class="marker transit">交通 · 轻轨</div><div class="marker jail">拘留所</div>
+            <div class="token t1" title="玩家一"></div><div class="token t2" title="玩家二"></div><div class="token t3" title="玩家三"></div>
+            <div class="route a"><button>↖ 港区</button><button>→ 金融城</button></div><div class="route b"><button>↓ 地标塔</button></div>
+          </div>
+          <div class="turnbar"><small>你的回合 · 天赋「夜间网络」</small><button class="dice">掷骰 · 4</button></div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

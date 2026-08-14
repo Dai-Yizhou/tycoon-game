@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>棋子形态与 1900 地域设计语法</title>
+    <style id="theme-vars">
+/* ============================================================
+   colors_and_type.css
+   《棋子形态与 1900 地域设计语法》— 语义令牌与组件样式
+   纯 CSS，无外部资源 / SVG / Canvas / 图片 / emoji / 渐变
+   （repeating-linear-gradient 仅用于纹理）
+   ============================================================ */
+
+/* —— 全局语义令牌 —— */
+:root {
+  --tycoon-background: #ECE7DC;
+  --tycoon-foreground: #1A1A1A;
+  --tycoon-card: #FBF8F1;
+  --tycoon-primary: #1A1A1A;
+  --tycoon-border: #1A1A1A;
+  --tycoon-muted: #8A847A;
+  --tycoon-radius-sm: 2px;
+  --tycoon-radius-md: 6px;
+  --tycoon-radius-lg: 14px;
+
+  /* 棋子形态参数 */
+  --piece-ink: #1A1A1A;
+  --piece-head-diameter: 22px;
+  --piece-torso-top: 16px;
+  --piece-torso-bottom: 26px;
+  --piece-torso-height: 30px;
+  --piece-outline-width: 3px;
+
+  /* 玩家色 */
+  --player-red: #C0392B;
+  --player-blue: #2C5F8D;
+  --player-green: #4A7C3F;
+
+  /* 连线 */
+  --line-map: #B0B0B0;
+  --line-current: #1A1A1A;
+  --line-key: #D95A2B;
+
+  /* 字体栈（系统字体，无外部资源） */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-serif: Georgia, "Times New Roman", "Songti SC", serif;
+  --font-black: "Arial Black", "Helvetica Neue", Impact, "Heiti SC", sans-serif;
+  --font-mono: "SF Mono", "Menlo", "Monaco", "Consolas", "Courier New", monospace;
+  --font-italic-serif: "Snell Roundhand", "Apple Chancery", Georgia, serif;
+  --font-han: "PingFang SC", "Heiti SC", "STHeiti", "Microsoft YaHei", sans-serif;
+  --font-telegraph: "Times New Roman", Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  color: var(--tycoon-foreground);
+  background: var(--tycoon-background);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* ============================================================
+   页面骨架
+   ============================================================ */
+.canvas { max-width: 1180px; margin: 0 auto; padding: 48px 56px 80px; }
+.canvas-header { border-bottom: 3px solid var(--tycoon-border); padding-bottom: 20px; margin-bottom: 44px; }
+.canvas-title { font-family: var(--font-serif); font-weight: 900; font-size: 30px; letter-spacing: 0.04em; margin: 0 0 6px; }
+.canvas-sub { color: var(--tycoon-muted); font-size: 13px; letter-spacing: 0.02em; }
+.section { margin-bottom: 60px; }
+.section-title {
+  font-family: var(--font-serif); font-weight: 900; font-size: 20px;
+  border-left: 6px solid var(--tycoon-border); padding-left: 12px; margin: 0 0 22px;
+}
+.section-note { color: var(--tycoon-muted); font-size: 12.5px; margin: 0 0 20px; max-width: 760px; }
+
+.param-list { margin: 8px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--tycoon-muted); }
+.param-list li { padding: 1px 0; }
+.param-list b { color: var(--tycoon-foreground); font-weight: 700; }
+
+/* ============================================================
+   区域一：棋子形态规范（高梯形上接圆形，纯 CSS）
+   ============================================================ */
+.piece-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.piece-card {
+  background: var(--tycoon-card);
+  border: 2px solid var(--tycoon-border);
+  border-radius: var(--tycoon-radius-md);
+  padding: 18px 16px 16px;
+  display: flex; flex-direction: column; align-items: center;
+  min-height: 168px;
+}
+.piece-card__name { font-weight: 800; font-size: 13px; margin-bottom: 2px; letter-spacing: 0.02em; }
+.piece-card__tag { font-size: 11px; color: var(--tycoon-muted); margin-bottom: 14px; }
+
+/* 棋子本体：容器宽 32px（含轮廓） */
+.piece { position: relative; width: 32px; display: flex; flex-direction: column; align-items: center; margin-bottom: 16px; }
+.piece-head {
+  width: var(--piece-head-diameter); height: var(--piece-head-diameter);
+  border: var(--piece-outline-width) solid var(--piece-ink);
+  border-radius: 50%;
+  background: var(--piece-head-fill, #F2E9D8);
+  box-sizing: border-box; position: relative; z-index: 2;
+}
+.piece-torso { position: relative; width: 32px; height: 36px; margin-top: -3px; }
+.piece-torso::before {
+  content: ""; position: absolute; inset: 0; background: var(--piece-ink);
+  clip-path: polygon(8px 0, 24px 0, 32px 36px, 0 36px);
+}
+.piece-torso::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 26px; height: 30px;
+  background: var(--piece-torso-fill, var(--player-red));
+  clip-path: polygon(5px 0, 21px 0, 26px 30px, 0 30px);
+}
+
+/* 变体 1：基础型 */
+.piece--basic { --piece-head-fill: #F2E9D8; }
+
+/* 变体 2：纹理型 — 细斜线纹理（呢料/棉布） */
+.piece--texture .piece-torso::after {
+  background:
+    repeating-linear-gradient(48deg, rgba(0,0,0,.24) 0 1px, transparent 1px 3px),
+    var(--piece-torso-fill, var(--player-blue));
+}
+
+/* 变体 3：昼型 — 明亮配色 */
+.piece--day { --piece-head-fill: #F5E6A8; }
+
+/* 变体 4：夜型 — 深色配色 + 1px 暗金亮边（沿真实形状勾勒） */
+.piece--night { --piece-head-fill: #3A3A3A; }
+.piece--night {
+  filter:
+    drop-shadow(1px 0 0 #E8B83A)
+    drop-shadow(-1px 0 0 #E8B83A)
+    drop-shadow(0 1px 0 #E8B83A)
+    drop-shadow(0 -1px 0 #E8B83A);
+}
+
+/* 变体 5：选中态 — 外扩 2px 亮色光环 */
+.piece--selected { box-shadow: 0 0 0 2px #E8B83A; }
+
+/* 玩家色样本行 */
+.player-swatches { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+.player-swatch { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.player-swatch__chip { width: 22px; height: 22px; border: 2px solid var(--tycoon-border); border-radius: 4px; }
+
+/* ============================================================
+   连线规范
+   ============================================================ */
+.line-rail {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 22px;
+  background: var(--tycoon-card); border: 2px solid var(--tycoon-border);
+  border-radius: var(--tycoon-radius-md); padding: 18px 22px;
+}
+.line-item { display: flex; flex-direction: column; gap: 8px; }
+.line-item__label { font-size: 11px; color: var(--tycoon-muted); }
+.line-row { display: flex; align-items: center; gap: 8px; }
+.line-bar { border-radius: 99px; display: inline-block; }
+.line-bar--map { width: 96px; height: 2px; background: var(--line-map); }
+.line-bar--current { width: 96px; height: 3px; background: var(--line-current); }
+.line-bar--key { width: 96px; height: 4px; background: var(--line-key); }
+.node-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tycoon-border); display: inline-block; }
+.arrow {
+  width: 0; height: 0;
+  border-top: 6px solid transparent; border-bottom: 6px solid transparent;
+  border-left: 10px solid var(--tycoon-border); display: inline-block;
+}
+
+/* ============================================================
+   区域二：四种地域设计语法板
+   ============================================================ */
+.grammar-board {
+  position: relative;
+  border: var(--r-border-w, 2px) solid var(--r-border, var(--tycoon-border));
+  border-radius: var(--r-radius, var(--tycoon-radius-md));
+  background-color: var(--r-board-bg, var(--tycoon-card));
+  color: var(--r-fg, var(--tycoon-foreground));
+  padding: 20px 22px 24px; margin-bottom: 26px; overflow: hidden;
+}
+.grammar-board::before {
+  content: ""; position: absolute; inset: 0;
+  background-image: var(--r-texture, none);
+  background-size: var(--r-texture-size, auto);
+  pointer-events: none; z-index: 0;
+}
+.grammar-board > * { position: relative; z-index: 1; }
+
+.grammar-board__head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; padding-bottom: 12px; margin-bottom: 16px;
+  border-bottom: 1px solid var(--r-rule, rgba(0,0,0,.18));
+}
+.grammar-board__title {
+  font-family: var(--r-title-font, var(--font-serif));
+  font-weight: var(--r-title-weight, 900);
+  font-style: var(--r-title-style, normal);
+  font-size: 18px; letter-spacing: var(--r-title-spacing, 0.02em); margin: 0;
+}
+.grammar-board__motion {
+  font-family: var(--r-func-font, var(--font-sans));
+  font-size: 11px; color: var(--r-motion-fg, var(--tycoon-muted));
+  max-width: 460px; text-align: right;
+}
+
+.grammar-row {
+  display: grid; grid-template-columns: 1.5fr 1.3fr 1fr 1fr 1fr 1.1fr;
+  gap: 16px; align-items: stretch;
+}
+.grammar-cell { display: flex; flex-direction: column; gap: 6px; }
+.grammar-cell__label {
+  font-family: var(--r-func-font, var(--font-sans));
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--r-label-fg, var(--tycoon-muted));
+}
+
+/* 色样组 */
+.swatch-stack { display: flex; flex-direction: column; gap: 6px; }
+.swatch { display: flex; align-items: center; gap: 8px; font-family: var(--r-func-font, var(--font-sans)); font-size: 11px; }
+.swatch__chip {
+  width: 26px; height: 26px;
+  border: 1px solid var(--r-border, var(--tycoon-border));
+  border-radius: var(--r-chip-radius, 3px); flex-shrink: 0;
+}
+.swatch__hex { font-weight: 700; }
+.swatch__use { color: var(--r-label-fg, var(--tycoon-muted)); }
+
+/* 文字样本 */
+.text-sample { display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+.text-sample__title {
+  font-family: var(--r-title-font, var(--font-serif));
+  font-weight: var(--r-title-weight, 900);
+  font-style: var(--r-title-style, normal);
+  font-size: 16px; letter-spacing: var(--r-title-spacing, 0.02em); line-height: 1.15;
+}
+.text-sample__func {
+  font-family: var(--r-func-font, var(--font-sans));
+  font-size: 12px; letter-spacing: var(--r-func-spacing, 0); color: var(--r-fg, var(--tycoon-foreground));
+}
+
+/* 边框片段 */
+.border-frag { height: 56px; border-radius: var(--r-radius, var(--tycoon-radius-md)); background: var(--r-frag-bg, transparent); }
+
+/* 地产格 */
+.property-cell {
+  min-height: 84px; padding: 10px 12px;
+  border: var(--r-cell-border, 2px solid var(--r-border, var(--tycoon-border)));
+  border-radius: var(--r-radius, var(--tycoon-radius-md));
+  background: var(--r-cell-bg, var(--r-board-bg, var(--tycoon-card)));
+  display: flex; flex-direction: column; justify-content: space-between;
+  position: relative; overflow: hidden;
+}
+.property-cell__name {
+  font-family: var(--r-title-font, var(--font-serif));
+  font-weight: var(--r-title-weight, 800);
+  font-style: var(--r-title-style, normal);
+  font-size: 13px; line-height: 1.1;
+}
+.property-cell__price { font-family: var(--r-num-font, var(--font-mono)); font-size: 12px; color: var(--r-accent, var(--tycoon-foreground)); }
+.property-cell__bar { height: 6px; background: var(--r-accent, var(--tycoon-border)); }
+
+/* 页签 */
+.tab {
+  align-self: start; padding: 6px 14px;
+  border: var(--r-border-w, 2px) solid var(--r-border, var(--tycoon-border));
+  border-bottom: none;
+  border-radius: var(--r-radius, var(--tycoon-radius-md)) var(--r-radius, var(--tycoon-radius-md)) 0 0;
+  background: var(--r-tab-bg, var(--tycoon-card));
+  font-family: var(--r-func-font, var(--font-sans)); font-size: 12px; font-weight: 700;
+}
+.tab-row { display: flex; flex-direction: column; gap: 0; }
+.tab-row__base { height: 2px; background: var(--r-border, var(--tycoon-border)); margin-top: -1px; }
+
+/* 显示框 */
+.display-box {
+  min-height: 60px; padding: 8px 12px;
+  border: var(--r-border-w, 2px) solid var(--r-border, var(--tycoon-border));
+  border-radius: var(--r-radius, var(--tycoon-radius-md));
+  background: var(--r-box-bg, var(--tycoon-card));
+  display: flex; flex-direction: column; gap: 2px;
+}
+.display-box__cap { font-family: var(--r-func-font, var(--font-sans)); font-size: 10px; color: var(--r-label-fg, var(--tycoon-muted)); }
+.display-box__val { font-family: var(--r-num-font, var(--font-mono)); font-size: 18px; font-weight: 700; }
+
+/* 掷骰按钮 */
+.dice-btn {
+  align-self: start; margin-top: auto;
+  font-family: var(--r-func-font, var(--font-sans));
+  font-weight: 800; font-size: 13px; letter-spacing: var(--r-func-spacing, 0.02em);
+  padding: 10px 16px;
+  border: var(--r-border-w, 2px) solid var(--r-border, var(--tycoon-border));
+  border-radius: var(--r-radius, var(--tycoon-radius-md));
+  background: var(--r-accent, var(--tycoon-primary));
+  color: var(--r-btn-fg, #FBF8F1);
+  cursor: pointer; box-shadow: var(--r-btn-shadow, none);
+  transition: transform .12s ease, background-color .12s ease, box-shadow .12s ease, opacity .12s ease;
+}
+.dice-btn:hover { background: var(--r-accent-hover, var(--r-accent, var(--tycoon-primary))); transform: var(--r-btn-hover-transform, translateY(-1px)); }
+.dice-btn:focus-visible { outline: var(--r-focus-w, 3px) solid var(--r-focus, #E8B83A); outline-offset: 2px; }
+.dice-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* ============================================================
+   风格 I：东北走廊·巴别塔的蒸汽
+   ============================================================ */
+.region-northeast {
+  --r-board-bg: #2C2E33; --r-fg: #E6DCC3; --r-border: #4A2C2A; --r-border-w: 1px;
+  --r-radius: 1px; --r-chip-radius: 1px; --r-accent: #D95A2B; --r-accent-hover: #EF6A36;
+  --r-rule: rgba(230,220,195,.22); --r-label-fg: #9AA0A6; --r-motion-fg: #C9A98A;
+  --r-title-font: var(--font-serif); --r-title-weight: 900; --r-title-style: normal; --r-title-spacing: 0.06em;
+  --r-func-font: "Arial Narrow", -apple-system, sans-serif; --r-func-spacing: 0.01em; --r-num-font: var(--font-mono);
+  --r-cell-bg: #34373D; --r-cell-border: 1px solid #4A2C2A; --r-box-bg: #34373D; --r-tab-bg: #34373D; --r-frag-bg: #34373D;
+  --r-btn-fg: #FBF8F1; --r-btn-shadow: 2px 2px 0 #4A2C2A; --r-btn-hover-transform: translate(-1px,-1px);
+  --r-focus: #D95A2B; --r-focus-w: 2px;
+  --r-texture:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.20) 0 2px, transparent 2px 6px);
+}
+.region-northeast .border-frag { border: 1px solid #4A2C2A; outline: 1px solid #4A2C2A; outline-offset: 3px; }
+.region-northeast .border-frag::after {
+  content: ""; display: block; height: 100%;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(217,90,43,.35) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-45deg, rgba(79,109,94,.30) 0 1px, transparent 1px 5px);
+}
+
+/* ============================================================
+   风格 II：深南腹地·被遗忘的门廊
+   ============================================================ */
+.region-south {
+  --r-board-bg: #E6DCC3; --r-fg: #3C3326; --r-border: #7B8D7A; --r-border-w: 1px;
+  --r-radius: 16px; --r-chip-radius: 12px; --r-accent: #8C4E3A; --r-accent-hover: #A45C46;
+  --r-rule: rgba(60,51,38,.20); --r-label-fg: #6B6450; --r-motion-fg: #7B8D7A;
+  --r-title-font: var(--font-italic-serif); --r-title-weight: 700; --r-title-style: italic; --r-title-spacing: 0.01em;
+  --r-func-font: Georgia, serif; --r-func-spacing: 0.04em; --r-num-font: Georgia, serif;
+  --r-cell-bg: #F0E7D0; --r-cell-border: 1px solid #7B8D7A; --r-box-bg: #F0E7D0; --r-tab-bg: #F0E7D0; --r-frag-bg: #F0E7D0;
+  --r-btn-fg: #FBF8F1; --r-btn-shadow: 2px 2px 0 #7B8D7A; --r-btn-hover-transform: translateY(-1px);
+  --r-focus: #8C4E3A; --r-focus-w: 2px;
+  --r-texture:
+    repeating-linear-gradient(91deg, rgba(60,51,38,.06) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(0deg, rgba(60,51,38,.04) 0 1px, transparent 1px 5px);
+}
+.region-south .border-frag {
+  border: 1px solid #8C4E3A; border-radius: 14px;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(140,78,58,.30) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(0deg, rgba(140,78,58,.30) 0 1px, transparent 1px 8px);
+}
+.region-south .property-cell::before {
+  content: ""; position: absolute; right: 8px; top: 8px;
+  width: 16px; height: 16px; border: 1px solid #8C4E3A; border-radius: 50% 0 50% 0; opacity: .7;
+}
+
+/* ============================================================
+   风格 III：中西部大平原·谷仓与铁轨
+   ============================================================ */
+.region-midwest {
+  --r-board-bg: #CBB089; --r-fg: #2A241C; --r-border: #6E6A64; --r-border-w: 3px;
+  --r-radius: 0px; --r-chip-radius: 0px; --r-accent: #2F4B7A; --r-accent-hover: #3A5C90;
+  --r-rule: rgba(42,36,28,.30); --r-label-fg: #5A5246; --r-motion-fg: #6E6A64;
+  --r-title-font: var(--font-black); --r-title-weight: 900; --r-title-style: normal; --r-title-spacing: 0.02em;
+  --r-func-font: var(--font-black); --r-func-spacing: 0.01em; --r-num-font: var(--font-mono);
+  --r-cell-bg: #D9C4A0; --r-cell-border: 3px solid #6E6A64; --r-box-bg: #D9C4A0; --r-tab-bg: #D9C4A0; --r-frag-bg: #D9C4A0;
+  --r-btn-fg: #FBF8F1; --r-btn-shadow: 3px 3px 0 #6E6A64; --r-btn-hover-transform: translate(-2px,-2px);
+  --r-focus: #2F4B7A; --r-focus-w: 3px;
+  --r-texture:
+    repeating-linear-gradient(90deg, rgba(42,36,28,.10) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(0deg, rgba(42,36,28,.10) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.06) 0 1px, transparent 1px 2px);
+}
+.region-midwest .border-frag { border: 4px solid #6E6A64; border-radius: 0; }
+.region-midwest .property-cell--selected {
+  background-image:
+    repeating-linear-gradient(45deg, rgba(47,75,122,.30) 0 4px, transparent 4px 8px);
+}
+
+/* ============================================================
+   风格 IV：远西边疆·断层与香火
+   ============================================================ */
+.region-farwest {
+  --r-board-bg: #DDE0DF; --r-fg: #3A2E2C; --r-border: #6D3F3F; --r-border-w: 2px;
+  --r-radius: 2px; --r-chip-radius: 2px; --r-accent: #B52B1D; --r-accent-hover: #CF3A2A;
+  --r-rule: rgba(61,46,44,.22); --r-label-fg: #7A6A66; --r-motion-fg: #6D3F3F;
+  --r-title-font: var(--font-telegraph); --r-title-weight: 700; --r-title-style: normal; --r-title-spacing: 0.14em;
+  --r-func-font: var(--font-han); --r-func-spacing: 0.06em; --r-num-font: var(--font-mono);
+  --r-cell-bg: #ECEDEC; --r-cell-border: 2px solid #6D3F3F; --r-box-bg: #ECEDEC; --r-tab-bg: #ECEDEC; --r-frag-bg: #ECEDEC;
+  --r-btn-fg: #FBF8F1; --r-btn-shadow: 2px 2px 0 #6D3F3F; --r-btn-hover-transform: translateY(-1px);
+  --r-focus: #A1B85A; --r-focus-w: 3px;
+  --r-texture:
+    repeating-linear-gradient(90deg, rgba(61,46,44,.06) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg, rgba(61,46,44,.06) 0 1px, transparent 1px 4px);
+}
+.region-farwest .grammar-board::after {
+  content: ""; position: absolute; inset: 0; background: rgba(255,255,255,.18); pointer-events: none; z-index: 0;
+}
+.region-farwest .border-frag {
+  border: 2px solid #6D3F3F; border-radius: 2px; transform: skew(-2deg);
+  background-image:
+    repeating-linear-gradient(30deg, rgba(109,63,63,.30) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(-60deg, rgba(109,63,63,.30) 0 1px, transparent 1px 7px);
+}
+.region-farwest .property-cell::after {
+  content: ""; position: absolute; left: 50%; top: -1px; transform: translateX(-50%);
+  width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 8px solid #6D3F3F;
+}
+
+/* ============================================================
+   掷骰按钮状态展示条（通用，无地域作用域）
+   ============================================================ */
+.btn-states {
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--tycoon-card); border: 2px solid var(--tycoon-border);
+  border-radius: var(--tycoon-radius-md); padding: 16px 20px; margin-bottom: 26px;
+}
+.btn-states__row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.btn-states__note { font-size: 11.5px; color: var(--tycoon-muted); margin: 0; max-width: 760px; }
+.btn-states .dice-btn { margin-top: 0; }
+.btn-states .dice-btn--plain { background: var(--tycoon-primary); color: #FBF8F1; border-color: var(--tycoon-border); box-shadow: 2px 2px 0 var(--tycoon-border); }
+.btn-states .dice-btn--plain:hover { background: #333333; }
+
+/* ============================================================
+   底部统一规则
+   ============================================================ */
+.universal-rule {
+  margin-top: 12px; padding: 20px 24px;
+  border: 3px double var(--tycoon-border); border-radius: var(--tycoon-radius-md); background: var(--tycoon-card);
+}
+.universal-rule__title { font-family: var(--font-serif); font-weight: 900; font-size: 16px; margin: 0 0 8px; }
+.universal-rule__text { font-size: 13px; color: var(--tycoon-foreground); margin: 0; }
+.universal-rule__text b { color: var(--tycoon-primary); }
+
+/* ============================================================
+   无障碍：降低动态
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--tycoon-background);
+    --color-foreground: var(--tycoon-foreground);
+    --color-card: var(--tycoon-card);
+    --color-primary: var(--tycoon-primary);
+    --color-muted: var(--tycoon-muted);
+    --color-border: var(--tycoon-border);
+    --radius-sm: var(--tycoon-radius-sm);
+    --radius-md: var(--tycoon-radius-md);
+    --radius-lg: var(--tycoon-radius-lg);
+  }
+  @layer base {
+    body { background: var(--tycoon-background); color: var(--tycoon-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--tycoon-background); }
+      .text-background { color: var(--tycoon-background); }
+      .border-background { border-color: var(--tycoon-background); }
+      .ring-background { --tw-ring-color: var(--tycoon-background); }
+      .bg-foreground { background-color: var(--tycoon-foreground); }
+      .text-foreground { color: var(--tycoon-foreground); }
+      .border-foreground { border-color: var(--tycoon-foreground); }
+      .ring-foreground { --tw-ring-color: var(--tycoon-foreground); }
+      .bg-card { background-color: var(--tycoon-card); }
+      .text-card { color: var(--tycoon-card); }
+      .border-card { border-color: var(--tycoon-card); }
+      .ring-card { --tw-ring-color: var(--tycoon-card); }
+      .bg-primary { background-color: var(--tycoon-primary); }
+      .text-primary { color: var(--tycoon-primary); }
+      .border-primary { border-color: var(--tycoon-primary); }
+      .ring-primary { --tw-ring-color: var(--tycoon-primary); }
+      .bg-muted { background-color: var(--tycoon-muted); }
+      .text-muted { color: var(--tycoon-muted); }
+      .border-muted { border-color: var(--tycoon-muted); }
+      .ring-muted { --tw-ring-color: var(--tycoon-muted); }
+      .bg-border { background-color: var(--tycoon-border); }
+      .text-border { color: var(--tycoon-border); }
+      .border-border { border-color: var(--tycoon-border); }
+      .ring-border { --tw-ring-color: var(--tycoon-border); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body>
+<main class="canvas">
+
+  <header class="canvas-header">
+    <h1 class="canvas-title">棋子形态与 1900 地域设计语法</h1>
+    <p class="canvas-sub">桌面静态画布 · 区域一 棋子形态规范 / 区域二 四种地域设计语法板</p>
+  </header>
+
+  <!-- ============================ 区域一 ============================ -->
+  <section class="section">
+    <h2 class="section-title">区域一 · 棋子形态规范</h2>
+    <p class="section-note">基础形态：高梯形上接圆形。不画脚、不画腿、不画胶囊小人；整体更厚重。纯 CSS 绘制，底部可直接接地。</p>
+
+    <ul class="param-list" style="margin-bottom:22px">
+      <li>圆形头部：直径 <b>22px</b>，居中</li>
+      <li>梯形躯干：上底 <b>16px</b>、下底 <b>26px</b>、高 <b>30px</b>，居中接在头部下方</li>
+      <li>轮廓：<b>3px</b> 深墨色实线（<b>#1A1A1A</b>）</li>
+      <li>总尺寸：约 <b>30×56px</b></li>
+      <li>底部可直接接地，不留间隙</li>
+    </ul>
+
+    <div class="piece-grid">
+
+      <div class="piece-card">
+        <div class="piece-card__name">1 · 基础型</div>
+        <div class="piece-card__tag">纯色躯干 · 头部浅色</div>
+        <div class="piece piece--basic" style="--piece-torso-fill: var(--player-red);">
+          <div class="piece-head"></div>
+          <div class="piece-torso"></div>
+        </div>
+        <ul class="param-list">
+          <li>头部 <b>#F2E9D8</b> · 躯干 玩家色</li>
+          <li>轮廓 <b>3px #1A1A1A</b></li>
+        </ul>
+      </div>
+
+      <div class="piece-card">
+        <div class="piece-card__name">2 · 纹理型</div>
+        <div class="piece-card__tag">细斜线纹理 · 呢料/棉布</div>
+        <div class="piece piece--texture" style="--piece-torso-fill: var(--player-blue);">
+          <div class="piece-head"></div>
+          <div class="piece-torso"></div>
+        </div>
+        <ul class="param-list">
+          <li>repeating-linear-gradient 48°</li>
+          <li>1px 暗线 / 3px 间距</li>
+        </ul>
+      </div>
+
+      <div class="piece-card">
+        <div class="piece-card__name">3 · 昼型</div>
+        <div class="piece-card__tag">明亮配色 · 头部浅黄</div>
+        <div class="piece piece--day" style="--piece-torso-fill: var(--player-green);">
+          <div class="piece-head"></div>
+          <div class="piece-torso"></div>
+        </div>
+        <ul class="param-list">
+          <li>头部 <b>#F5E6A8</b></li>
+          <li>躯干 中饱和玩家色</li>
+          <li>轮廓 <b>#1A1A1A</b></li>
+        </ul>
+      </div>
+
+      <div class="piece-card">
+        <div class="piece-card__name">4 · 夜型</div>
+        <div class="piece-card__tag">深色配色 · 暗金亮边</div>
+        <div class="piece piece--night" style="--piece-torso-fill: #8E2A20;">
+          <div class="piece-head"></div>
+          <div class="piece-torso"></div>
+        </div>
+        <ul class="param-list">
+          <li>头部 <b>#3A3A3A</b> · 躯干暗化</li>
+          <li>轮廓 +1px <b>#E8B83A</b> 暗金</li>
+        </ul>
+      </div>
+
+      <div class="piece-card">
+        <div class="piece-card__name">5 · 选中态</div>
+        <div class="piece-card__tag">外扩 2px 亮色光环</div>
+        <div class="piece piece--basic piece--selected" style="--piece-torso-fill: var(--player-blue);">
+          <div class="piece-head"></div>
+          <div class="piece-torso"></div>
+        </div>
+        <ul class="param-list">
+          <li>box-shadow 0 0 0 2px</li>
+          <li>亮色 <b>#E8B83A</b> · 形态不变</li>
+        </ul>
+      </div>
+
+      <div class="piece-card">
+        <div class="piece-card__name">6 · 玩家色样本</div>
+        <div class="piece-card__tag">三色 · 同一形态</div>
+        <div style="display:flex;gap:18px;align-items:flex-end;margin:6px 0 14px">
+          <div class="piece piece--basic" style="--piece-torso-fill: var(--player-red);margin:0"><div class="piece-head"></div><div class="piece-torso"></div></div>
+          <div class="piece piece--basic" style="--piece-torso-fill: var(--player-blue);margin:0"><div class="piece-head"></div><div class="piece-torso"></div></div>
+          <div class="piece piece--basic" style="--piece-torso-fill: var(--player-green);margin:0"><div class="piece-head"></div><div class="piece-torso"></div></div>
+        </div>
+        <div class="player-swatches">
+          <div class="player-swatch"><span class="player-swatch__chip" style="background:#C0392B"></span>红 <b>#C0392B</b></div>
+          <div class="player-swatch"><span class="player-swatch__chip" style="background:#2C5F8D"></span>蓝 <b>#2C5F8D</b></div>
+          <div class="player-swatch"><span class="player-swatch__chip" style="background:#4A7C3F"></span>绿 <b>#4A7C3F</b></div>
+        </div>
+      </div>
+
+    </div>
+
+    <h3 style="font-family:var(--font-serif);font-weight:900;font-size:16px;margin:30px 0 14px">连线规范</h3>
+    <div class="line-rail">
+      <div class="line-item">
+        <span class="line-item__label">地图线 2px · #B0B0B0</span>
+        <div class="line-row"><span class="line-bar line-bar--map"></span></div>
+      </div>
+      <div class="line-item">
+        <span class="line-item__label">当前路径 3px · #1A1A1A</span>
+        <div class="line-row"><span class="line-bar line-bar--current"></span></div>
+      </div>
+      <div class="line-item">
+        <span class="line-item__label">关键路径 4px · 强调色</span>
+        <div class="line-row"><span class="line-bar line-bar--key"></span></div>
+      </div>
+      <div class="line-item">
+        <span class="line-item__label">岔路节点 8px 实心圆</span>
+        <div class="line-row"><span class="node-dot"></span></div>
+      </div>
+      <div class="line-item">
+        <span class="line-item__label">方向箭头 简单三角</span>
+        <div class="line-row"><span class="arrow"></span></div>
+      </div>
+      <div class="line-item">
+        <span class="line-item__label">圆端 · 节点衔接</span>
+        <div class="line-row"><span class="line-bar line-bar--current"></span><span class="node-dot"></span><span class="line-bar line-bar--map"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ 区域二 ============================ -->
+  <section class="section">
+    <h2 class="section-title">区域二 · 四种地域设计语法</h2>
+    <p class="section-note">每种语法以横向小型"设计语法板"呈现：4 个色样、标题/功能文字样本、边框片段、1 个地产格、1 个页签、1 个显示框、1 个掷骰按钮。控件独立摆放，不组合为完整页面。</p>
+
+    <!-- ===== 风格 I · 东北走廊 ===== -->
+    <article class="grammar-board region-northeast">
+      <div class="grammar-board__head">
+        <h3 class="grammar-board__title">风格 I · 东北走廊 · 巴别塔的蒸汽</h3>
+        <p class="grammar-board__motion">动态描述：50ms 快速水平微振 · 跳跃式跳转（仅文字标注，不实现动画）</p>
+      </div>
+      <div class="grammar-row">
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">色样</span>
+          <div class="swatch-stack">
+            <div class="swatch"><span class="swatch__chip" style="background:#4A2C2A"></span><span class="swatch__hex">#4A2C2A</span><span class="swatch__use">砖墙棕红 · 主结构/边框</span></div>
+            <div class="swatch"><span class="swatch__chip" style="background:#2C2E33"></span><span class="swatch__hex">#2C2E33</span><span class="swatch__use">沥青灰黑 · 底色/背景</span></div>
+            <div class="swatch"><span class="swatch__chip" style="background:#4F6D5E"></span><span class="swatch__hex">#4F6D5E</span><span class="swatch__use">氧化浊绿 · 次级面板</span></div>
+            <div class="swatch"><span class="swatch__chip" style="background:#D95A2B"></span><span class="swatch__hex">#D95A2B</span><span class="swatch__use">电车火花橘红 · 强调</span></div>
+          </div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">文字样本</span>
+          <div class="text-sample">
+            <span class="text-sample__title">宽体粗衬线标题</span>
+            <span class="text-sample__func">紧凑无衬线功能字</span>
+          </div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">边框片段 · 极细平行双线</span>
+          <div class="border-frag"></div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">地产格</span>
+          <div class="property-cell">
+            <span class="property-cell__name">第五大道地块</span>
+            <span class="property-cell__price">$320</span>
+            <span class="property-cell__bar"></span>
+          </div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">页签</span>
+          <div class="tab-row"><span class="tab">产业</span><span class="tab-row__base"></span></div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">显示框 / 掷骰</span>
+          <div class="display-box"><span class="display-box__cap">现金</span><span class="display-box__val">$1,500</span></div>
+          <button class="dice-btn" type="button">掷骰</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ===== 风格 II · 深南腹地 ===== -->
+    <article class="grammar-board region-south">
+      <div class="grammar-board__head">
+        <h3 class="grammar-board__title">风格 II · 深南腹地 · 被遗忘的门廊</h3>
+        <p class="grammar-board__motion">动态描述：极长 ease-out · 响应延迟 +50-80ms · 缓慢弹起 ｜ 仅取材料与建筑语法</p>
+      </div>
+      <div class="grammar-row">
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">色样</span>
+          <div class="swatch-stack">
+            <div class="swatch"><span class="swatch__chip" style="background:#E6DCC3"></span><span class="swatch__hex">#E6DCC3</span><span class="swatch__use">褪色木白 · 底色/面板</span></div>
+            <div class="swatch"><span class="swatch__chip" style="background:#7B8D7A"></span><span class="swatch__hex">#7B8D7A</span><span class="swatch__use">苔藓灰绿 · 次级/边框</span></div>
+            <div class="swatch"><span class="swatch__chip" style="background:#8C4E3A"></span><span class="swatch__hex">#8C4E3A</span><span class="swatch__use">铁锈棕 · 强调/金属件</span></div>
+            <div class="swatch"><span class="swatch__chip" style="background:#5C6B7A"></span><span class="swatch__hex">#5C6B7A</span><span class="swatch__use">棉布褪色蓝 · 标题/功能</span></div>
+          </div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">文字样本</span>
+          <div class="text-sample">
+            <span class="text-sample__title">手写衬线斜体标题</span>
+            <span class="text-sample__func">松散功能字</span>
+          </div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">边框片段 · 十字格栅 · 大圆角</span>
+          <div class="border-frag"></div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">地产格</span>
+          <div class="property-cell">
+            <span class="property-cell__name">法语区门廊</span>
+            <span class="property-cell__price">$180</span>
+            <span class="property-cell__bar"></span>
+          </div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">页签</span>
+          <div class="tab-row"><span class="tab">地契</span><span class="tab-row__base"></span></div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">显示框 / 掷骰</span>
+          <div class="display-box"><span class="display-box__cap">现金</span><span class="display-box__val">$1,240</span></div>
+          <button class="dice-btn" type="button">掷骰</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ===== 风格 III · 中西部大平原 ===== -->
+    <article class="grammar-board region-midwest">
+      <div class="grammar-board__head">
+        <h3 class="grammar-board__title">风格 III · 中西部大平原 · 谷仓与铁轨</h3>
+        <p class="grammar-board__motion">动态描述：段落阻尼 · 硬回弹 · 匀速指针跳变（仅文字标注，不实现动画）</p>
+      </div>
+      <div class="grammar-row">
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">色样</span>
+          <div class="swatch-stack">
+            <div class="swatch"><span class="swatch__chip" style="background:#CBB089"></span><span class="swatch__hex">#CBB089</span><span class="swatch__use">干草黄 · 底色/面板</span></div>
+            <div class="swatch"><span class="swatch__chip" style="background:#6E6A64"></span><span class="swatch__hex">#6E6A64</span><span class="swatch__use">碎石灰 · 次级/边框</span></div>
+            <div class="swatch"><span class="swatch__chip" style="background:#9E6B40"></span><span class="swatch__hex">#9E6B40</span><span class="swatch__use">赭石棕 · 强调/木构</span></div>
+            <div class="swatch"><span class="swatch__chip" style="background:#2F4B7A"></span><span class="swatch__hex">#2F4B7A</span><span class="swatch__use">检疫品蓝 · 标题/标牌</span></div>
+          </div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">文字样本</span>
+          <div class="text-sample">
+            <span class="text-sample__title">极粗无衬线黑体</span>
+            <span class="text-sample__func">等距方块数字 0123</span>
+          </div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">边框片段 · 单线直角 · 3-4px 粗边框</span>
+          <div class="border-frag"></div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">地产格 · 选中态对角斜线</span>
+          <div class="property-cell property-cell--selected">
+            <span class="property-cell__name">联合畜栏</span>
+            <span class="property-cell__price">$120</span>
+            <span class="property-cell__bar"></span>
+          </div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">页签</span>
+          <div class="tab-row"><span class="tab">物业</span><span class="tab-row__base"></span></div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">显示框 / 掷骰</span>
+          <div class="display-box"><span class="display-box__cap">现金</span><span class="display-box__val">$980</span></div>
+          <button class="dice-btn" type="button">掷骰</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ===== 风格 IV · 远西边疆 ===== -->
+    <article class="grammar-board region-farwest">
+      <div class="grammar-board__head">
+        <h3 class="grammar-board__title">风格 IV · 远西边疆 · 断层与香火</h3>
+        <p class="grammar-board__motion">动态描述：10 秒周期水平摇摆 · 余震瞬间抖动（仅文字标注，不实现动画）</p>
+      </div>
+      <div class="grammar-row">
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">色样</span>
+          <div class="swatch-stack">
+            <div class="swatch"><span class="swatch__chip" style="background:#DDE0DF"></span><span class="swatch__hex">#DDE0DF</span><span class="swatch__use">浓雾灰白 · 底色/面板</span></div>
+            <div class="swatch"><span class="swatch__chip" style="background:#6D3F3F"></span><span class="swatch__hex">#6D3F3F</span><span class="swatch__use">红杉红褐 · 次级/木构</span></div>
+            <div class="swatch"><span class="swatch__chip" style="background:#B52B1D"></span><span class="swatch__hex">#B52B1D</span><span class="swatch__use">灯笼朱红 · 强调/灯笼</span></div>
+            <div class="swatch"><span class="swatch__chip" style="background:#A1B85A"></span><span class="swatch__hex">#A1B85A</span><span class="swatch__use">硫磺绿 · 标题/瓷釉</span></div>
+          </div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">文字样本</span>
+          <div class="text-sample">
+            <span class="text-sample__title">细长衬线电报体</span>
+            <span class="text-sample__func">方正汉字骨骼功能字</span>
+          </div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">边框片段 · 2 度斜切 · 冰裂纹</span>
+          <div class="border-frag"></div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">地产格 · 维多利亚尖顶</span>
+          <div class="property-cell">
+            <span class="property-cell__name">唐人街铺面</span>
+            <span class="property-cell__price">$200</span>
+            <span class="property-cell__bar"></span>
+          </div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">页签</span>
+          <div class="tab-row"><span class="tab">铺面</span><span class="tab-row__base"></span></div>
+        </div>
+        <div class="grammar-cell">
+          <span class="grammar-cell__label">显示框 / 掷骰</span>
+          <div class="display-box"><span class="display-box__cap">现金</span><span class="display-box__val">$1,120</span></div>
+          <button class="dice-btn" type="button">掷骰</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- 掷骰按钮状态展示条 -->
+    <div class="btn-states">
+      <span class="grammar-cell__label">掷骰按钮状态 · 通用（hover / focus-visible / disabled）</span>
+      <div class="btn-states__row">
+        <button class="dice-btn dice-btn--plain" type="button">默认 · hover 上移提亮</button>
+        <button class="dice-btn dice-btn--plain" type="button">聚焦 · focus-visible 外描环</button>
+        <button class="dice-btn dice-btn--plain" type="button" disabled>禁用 · disabled</button>
+      </div>
+      <p class="btn-states__note">hover 上移并提亮背景 · focus-visible 以亮色描出外环（outline-offset 2px） · disabled 降至 0.45 透明度并去除阴影与位移。prefers-reduced-motion 时所有过渡降至 0.01ms。</p>
+    </div>
+  </section>
+
+  <!-- ============================ 底部统一规则 ============================ -->
+  <section class="universal-rule">
+    <h2 class="universal-rule__title">跨地域统一规则</h2>
+    <p class="universal-rule__text"><b>棋子与连线形态跨地域不变</b>，地域只切换色彩、字体、边框、材料暗示与动态节奏描述。</p>
+  </section>
+
+</main>
+</body>
+</html>

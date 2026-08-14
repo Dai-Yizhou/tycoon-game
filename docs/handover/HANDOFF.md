@@ -173,7 +173,7 @@ pnpm --filter @game/client test
 
 ### 3. 新增文档
 
-- `docs/UI_REBUILD_HANDOFF.md` — UI 重构交接文档，明确需要显示的信息、数据流和组件拆分建议。
+- `docs/legacy/UI_REBUILD_HANDOFF.md` — UI 重构交接文档，明确需要显示的信息、数据流和组件拆分建议。
 
 ### 4. 破产重开服务端处理器
 
@@ -186,8 +186,8 @@ pnpm --filter @game/client test
 
 ### 5. 文档更新
 
-- `docs/ARCHITECTURE.md` 新增「破产重开流程」章节。
-- `docs/API.md` 新增 `client.bankruptRestart` 事件文档。
+- `docs/architecture/ARCHITECTURE.md` 新增「破产重开流程」章节。
+- `docs/architecture/API.md` 新增 `client.bankruptRestart` 事件文档。
 
 ### 6. 客户端测试注意事项
 

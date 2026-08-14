@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1900 美国地域设计语法</title>
+    <style id="theme-vars">
+:root {
+  --tycoon-background: #f7f3ea;
+  --tycoon-foreground: #20201e;
+  --tycoon-card: #fffdf7;
+  --tycoon-primary: #8b2522;
+  --tycoon-border: #2d2a26;
+  --tycoon-muted: #706c64;
+  --tycoon-radius-sm: 4px;
+  --tycoon-radius-md: 8px;
+  --tycoon-radius-lg: 14px;
+  --tycoon-ink: #20201e;
+  --tycoon-paper: #fffdf7;
+  --tycoon-sans: "Arial Narrow", "Noto Sans SC", Arial, sans-serif;
+  --tycoon-serif: Georgia, "Noto Serif SC", serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--tycoon-background);
+  color: var(--tycoon-foreground);
+  font-family: var(--tycoon-sans);
+}
+
+button, input, select, textarea { font: inherit; }
+
+.region-board {
+  --region-bg: #fffdf7;
+  --region-ink: #20201e;
+  --region-main: #8b2522;
+  --region-accent: #b59a6b;
+  --region-line: 2px;
+  --region-radius: var(--tycoon-radius-sm);
+  --region-display: var(--tycoon-serif);
+  --region-ui: var(--tycoon-sans);
+  background: var(--region-bg);
+  color: var(--region-ink);
+}
+
+.region-board.northeast {
+  --region-bg: #e4d9c8;
+  --region-ink: #4a3728;
+  --region-main: #8b2522;
+  --region-accent: #b59a6b;
+  --region-line: 2px;
+  --region-radius: 3px;
+  --region-display: Georgia, "Noto Serif SC", serif;
+  --region-ui: "Helvetica Neue", "Noto Sans SC", Arial, sans-serif;
+}
+
+.region-board.midwest {
+  --region-bg: #eef0ef;
+  --region-ink: #2c2e33;
+  --region-main: #a0522d;
+  --region-accent: #f5c542;
+  --region-line: 3px;
+  --region-radius: 0px;
+  --region-display: Impact, "Arial Black", "Noto Sans SC", sans-serif;
+  --region-ui: "Courier New", "Noto Sans SC", monospace;
+}
+
+.region-board.riverside {
+  --region-bg: #efe8d8;
+  --region-ink: #1c1c1c;
+  --region-main: #5c4033;
+  --region-accent: #b76e79;
+  --region-line: 1px;
+  --region-radius: 0px;
+  --region-display: Didot, "Bodoni 72", "Noto Serif SC", serif;
+  --region-ui: "Helvetica Neue", "Noto Sans SC", Arial, sans-serif;
+}
+
+.region-board.pacific {
+  --region-bg: #d8e0e5;
+  --region-ink: #1a1a1a;
+  --region-main: #6b2f24;
+  --region-accent: #e8b83a;
+  --region-line: 2px;
+  --region-radius: 2px;
+  --region-display: "Baskerville", "Noto Serif SC", serif;
+  --region-ui: "Helvetica Neue", "Noto Sans SC", Arial, sans-serif;
+}
+
+.region-board .display-type { font-family: var(--region-display); }
+.region-board .ui-type { font-family: var(--region-ui); }
+
+.dice-button {
+  border: var(--region-line) solid var(--region-ink);
+  border-radius: var(--region-radius);
+  background: var(--region-main);
+  color: #fffdf7;
+  cursor: pointer;
+  font-family: var(--region-ui);
+  font-weight: 800;
+  letter-spacing: .06em;
+  min-height: 42px;
+  padding: 0 16px;
+  transition: transform 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.dice-button:hover { background: var(--region-accent); color: var(--region-ink); transform: translateY(-2px); }
+.dice-button:focus-visible { outline: 3px solid var(--region-accent); outline-offset: 3px; }
+.dice-button:disabled { cursor: not-allowed; opacity: .46; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--tycoon-background);
+    --color-foreground: var(--tycoon-foreground);
+    --color-card: var(--tycoon-card);
+    --color-primary: var(--tycoon-primary);
+    --color-muted: var(--tycoon-muted);
+    --color-border: var(--tycoon-border);
+    --radius-sm: var(--tycoon-radius-sm);
+    --radius-md: var(--tycoon-radius-md);
+    --radius-lg: var(--tycoon-radius-lg);
+  }
+  @layer base {
+    body { background: var(--tycoon-background); color: var(--tycoon-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--tycoon-background); }
+      .text-background { color: var(--tycoon-background); }
+      .border-background { border-color: var(--tycoon-background); }
+      .ring-background { --tw-ring-color: var(--tycoon-background); }
+      .bg-foreground { background-color: var(--tycoon-foreground); }
+      .text-foreground { color: var(--tycoon-foreground); }
+      .border-foreground { border-color: var(--tycoon-foreground); }
+      .ring-foreground { --tw-ring-color: var(--tycoon-foreground); }
+      .bg-card { background-color: var(--tycoon-card); }
+      .text-card { color: var(--tycoon-card); }
+      .border-card { border-color: var(--tycoon-card); }
+      .ring-card { --tw-ring-color: var(--tycoon-card); }
+      .bg-primary { background-color: var(--tycoon-primary); }
+      .text-primary { color: var(--tycoon-primary); }
+      .border-primary { border-color: var(--tycoon-primary); }
+      .ring-primary { --tw-ring-color: var(--tycoon-primary); }
+      .bg-muted { background-color: var(--tycoon-muted); }
+      .text-muted { color: var(--tycoon-muted); }
+      .border-muted { border-color: var(--tycoon-muted); }
+      .ring-muted { --tw-ring-color: var(--tycoon-muted); }
+      .bg-border { background-color: var(--tycoon-border); }
+      .text-border { color: var(--tycoon-border); }
+      .border-border { border-color: var(--tycoon-border); }
+      .ring-border { --tw-ring-color: var(--tycoon-border); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body>
+  <main class="canvas">
+    <header><div class="eyebrow">Visual direction / 1900</div><h1>1900 美国地域设计语法</h1><p class="intro">基本设计元素的独立对比。以明快、可读、自然、有历史材料感的休闲多人游戏为目标；地域只表达地方材料、建筑与印刷语法。</p></header>
+    <hr class="rule">
+    <section><div class="eyebrow">Shared form language</div><div class="principles">
+      <article class="principle"><h2>共用形态原则：棋子</h2><p>极简旅行者／市民。圆头、短躯干、两条腿与轻微动作姿态；统一深墨色手绘轮廓，角色色只用于衣物或配件。</p><div class="pawn-row"><div class="pawn-sample"><div class="pawn"><i class="head"></i><i class="body"></i><i class="leg left"></i><i class="leg right"></i></div>站立</div><div class="pawn-sample"><div class="pawn walk"><i class="head"></i><i class="body"></i><i class="leg left"></i><i class="leg right"></i></div>行走</div><div class="pawn-sample"><div class="pawn hat"><i class="head"></i><i class="body"></i><i class="brim"></i><i class="arm"></i><i class="leg left"></i><i class="leg right"></i></div>举帽致意</div></div><span class="token-note">约 36 × 48 · 2–3px 统一轮廓</span></article>
+      <article class="principle"><h2>共用形态原则：连线</h2><p>自由单根实线、圆端与直接方向反馈。岔路是小实心圆，方向选择只使用小箭头；不以轨道、双线或装饰道路增加信息噪音。</p><div class="path-zone"><i class="path one"></i><i class="path two"></i><i class="path three"></i><i class="node"></i><i class="arrow"></i></div><div class="line-keys"><span class="line-key"><i></i>2px 地图线</span><span class="line-key current"><i></i>3px 当前路径</span><span class="line-key major"><i></i>4px 关键路径</span></div></article>
+    </div></section>
+    <section class="region-board northeast"><div class="board-head"><h2>新英格兰／东北岸</h2><p>深桃花心木、亚麻与克制的印刷庄重感。</p></div><div class="board-grid"><div class="board-block"><span class="label">四色与用途</span><div class="swatches"><span class="swatch"><b>深桃花心木</b>#4A3728 · 文字</span><span class="swatch"><b>亚麻</b>#E4D9C8 · 底材</span><span class="swatch"><b>深绯红</b>#8B2522 · 行动</span><span class="swatch"><b>暗金</b>#B59A6B · 标记</span></div></div><div class="board-block"><span class="label">字体</span><div class="type-title">港口账簿</div><div class="type-ui">清晰功能文字</div></div><div class="board-block"><span class="label">边框片段</span><div class="frame-piece"></div></div><div class="board-block"><span class="label">独立控件样本</span><div class="controls"><div class="property"><b>灯塔街</b><small>资产格 · $120</small></div><div class="tab">货运</div><div class="screen"><b>现金</b><small>$ 0480</small></div><button class="dice-button">掷骰</button></div></div></div></section>
+    <section class="region-board midwest"><div class="board-head"><h2>五大湖／中西部工业带</h2><p>铆接虚点、斜撑与切角，像清楚的工务标记。</p></div><div class="board-grid"><div class="board-block"><span class="label">四色与用途</span><div class="swatches"><span class="swatch"><b>烟灰</b>#2C2E33 · 文字</span><span class="swatch"><b>钢蓝灰</b>#5B6770 · 底材</span><span class="swatch"><b>铁锈</b>#A0522D · 行动</span><span class="swatch"><b>警示黄</b>#F5C542 · 注意</span></div></div><div class="board-block"><span class="label">字体</span><div class="type-title">厂务总站</div><div class="type-ui">仪表／功能文字</div><div class="type-numeral">19 : 00</div></div><div class="board-block"><span class="label">边框片段</span><div class="frame-piece"></div></div><div class="board-block"><span class="label">独立控件样本</span><div class="controls"><div class="property"><b>铸造厂</b><small>资产格 · $160</small></div><div class="tab">班次</div><div class="screen"><b>库存</b><small>07 / 12</small></div><button class="dice-button">掷骰</button></div></div></div></section>
+    <section class="region-board riverside"><div class="board-head"><h2>旧南部／密西西比河沿岸</h2><p>风化木、铁艺、细长柱式与潮湿纸张的中性材料感。</p></div><div class="board-grid"><div class="board-block"><span class="label">四色与用途</span><div class="swatches"><span class="swatch"><b>铁艺黑</b>#1C1C1C · 文字</span><span class="swatch"><b>亚麻白</b>#EFE8D8 · 底材</span><span class="swatch"><b>风化木棕</b>#5C4033 · 行动</span><span class="swatch"><b>褪玫瑰</b>#B76E79 · 标记</span></div></div><div class="board-block"><span class="label">字体</span><div class="type-title">河岸旅店</div><div class="type-ui">朴素功能文字</div></div><div class="board-block"><span class="label">边框片段</span><div class="frame-piece"></div></div><div class="board-block"><span class="label">独立控件样本</span><div class="controls"><div class="property"><b>河岸店铺</b><small>资产格 · $140</small></div><div class="tab">旅程</div><div class="screen"><b>票据</b><small>已登记</small></div><button class="dice-button">掷骰</button></div></div></div></section>
+    <section class="region-board pacific"><div class="board-head"><h2>西海岸／太平洋门户</h2><p>水平层叠、细尖顶与抽象回形纹；用线条透明度表现双层景深。</p></div><div class="board-grid"><div class="board-block"><span class="label">四色与用途</span><div class="swatches"><span class="swatch"><b>墨黑</b>#1A1A1A · 文字</span><span class="swatch"><b>晨雾灰蓝</b>#D8E0E5 · 底材</span><span class="swatch"><b>红杉深红</b>#6B2F24 · 行动</span><span class="swatch"><b>阳光金／中国红</b>#E8B83A · 标记</span></div></div><div class="board-block"><span class="label">字体</span><div class="type-title">海湾门户</div><div class="type-ui">清晰功能文字</div></div><div class="board-block"><span class="label">边框片段</span><div class="frame-piece"></div></div><div class="board-block"><span class="label">独立控件样本</span><div class="controls"><div class="property"><b>海湾码头</b><small>资产格 · $200</small></div><div class="tab">商路</div><div class="screen"><b>航程</b><small>03 段</small></div><button class="dice-button" disabled>掷骰</button></div></div></div></section>
+    <footer class="unified"><h2>跨地域统一规则</h2><p>棋子与地图连线永远采用共用形态原则。地区只切换色彩、材料暗示、排版和边框，不改变信息层级或交互模式；每种提示始终以同一位置、同一结构与同一直接反馈呈现。</p></footer>
+  </main>
+
+    <style>
+    :root { --page-width: 1440px; }
+    body { min-width: 1180px; }
+    .canvas { width: var(--page-width); margin: 0 auto; padding: 58px 70px 82px; }
+    .eyebrow, .label { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .eyebrow { color: var(--tycoon-primary); margin-bottom: 12px; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font: 48px/1 var(--tycoon-serif); letter-spacing: -.045em; }
+    .intro { width: 740px; margin-top: 15px; color: var(--tycoon-muted); font-size: 15px; line-height: 1.65; }
+    .rule { border: 0; border-top: 2px solid var(--tycoon-border); margin: 34px 0; }
+    .principles { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+    .principle { min-height: 208px; border: 2px solid var(--tycoon-border); border-radius: var(--tycoon-radius-md); background: var(--tycoon-card); padding: 22px 24px; }
+    .principle h2, .unified h2 { font: 25px/1.1 var(--tycoon-serif); }
+    .principle p { margin-top: 7px; color: var(--tycoon-muted); font-size: 13px; line-height: 1.5; }
+    .token-note { display: inline-block; margin-top: 11px; padding: 4px 8px; background: #ece6db; font-size: 11px; font-weight: 700; }
+    .pawn-row { display: flex; align-items: end; gap: 35px; margin: 20px 0 0 10px; }
+    .pawn-sample { text-align: center; font-size: 11px; font-weight: 700; }
+    .pawn { position: relative; width: 40px; height: 51px; margin: 0 auto 7px; color: #20201e; }
+    .pawn .head { position: absolute; left: 12px; top: 0; width: 17px; height: 17px; border: 3px solid currentColor; border-radius: 50%; background: #e87555; }
+    .pawn .body { position: absolute; left: 10px; top: 16px; width: 21px; height: 19px; border: 3px solid currentColor; border-radius: 45% 45% 30% 30%; background: #e87555; }
+    .pawn .leg { position: absolute; top: 32px; width: 3px; height: 17px; background: currentColor; transform-origin: top; }
+    .pawn .leg.left { left: 15px; transform: rotate(7deg); }.pawn .leg.right { right: 14px; transform: rotate(-7deg); }
+    .pawn.walk .body { transform: rotate(8deg); background: #4d88be; }.pawn.walk .leg.left { transform: rotate(27deg); }.pawn.walk .leg.right { transform: rotate(-27deg); }
+    .pawn.hat .head { background: #e5bb48; }.pawn.hat .body { background: #e5bb48; }.pawn.hat .brim { position:absolute; left:4px; top:-2px; width:32px; height:7px; border:3px solid currentColor; border-radius:50%; background:#e5bb48; transform: rotate(-11deg); }.pawn.hat .arm { position:absolute; right:2px; top:21px; width:3px; height:22px; background:currentColor; transform:rotate(-35deg); transform-origin:top; }
+    .path-zone { position: relative; height: 105px; margin-top: 16px; }
+    .path { position:absolute; height:0; border-top: 3px solid var(--tycoon-ink); border-radius:99px; transform-origin:left center; }.path.two { border-width:2px; width:166px; left:17px; top:72px; transform:rotate(-16deg); }.path.three { border-width:4px; width:150px; left:195px; top:58px; transform:rotate(16deg); }.path.one { width:190px; left:16px; top:30px; transform:rotate(4deg); }
+    .node { position:absolute; width:9px; height:9px; border-radius:50%; background:var(--tycoon-ink); left:193px; top:27px; }.arrow { position:absolute; left:337px; top:69px; width:0; height:0; border-top:6px solid transparent; border-bottom:6px solid transparent; border-left:10px solid var(--tycoon-ink); }
+    .line-keys { display:flex; gap:16px; font-size:11px; font-weight:700; }.line-key { display:flex; align-items:center; gap:7px; }.line-key i { display:block; width:25px; border-top:2px solid var(--tycoon-ink); border-radius:99px; }.line-key.current i{border-width:3px}.line-key.major i{border-width:4px}
+    .region-board { position: relative; margin-top: 34px; border: var(--region-line) solid var(--region-ink); padding: 0 23px 22px; overflow: hidden; }
+    .region-board::before { content:""; position:absolute; inset:0; pointer-events:none; opacity:.13; }
+    .northeast::before { background-image: repeating-linear-gradient(90deg, transparent 0 16px, var(--region-ink) 16px 17px); opacity:.055; }
+    .midwest::before { background-image: radial-gradient(var(--region-ink) 1px, transparent 1.5px); background-size:9px 9px; }
+    .riverside::before { background-image: repeating-linear-gradient(0deg, transparent 0 18px, var(--region-main) 18px 19px); opacity:.06; }
+    .pacific::before { background-image: linear-gradient(90deg, transparent 49.5%, var(--region-main) 50%, transparent 50.5%); opacity:.065; }
+    .board-head { position: relative; display:flex; align-items:baseline; justify-content:space-between; padding:19px 0 15px; border-bottom:var(--region-line) solid var(--region-ink); }
+    .board-head h2 { font: 28px/1 var(--region-display); letter-spacing:-.02em; }.board-head p { font: 12px/1.4 var(--region-ui); max-width:450px; text-align:right; }
+    .board-grid { position:relative; display:grid; grid-template-columns: 190px 182px 170px 1fr; gap:23px; padding-top:20px; align-items:start; }.board-block { min-height:143px; }.board-block + .board-block { border-left:1px solid color-mix(in srgb, var(--region-ink) 38%, transparent); padding-left:22px; }
+    .swatches { display:grid; grid-template-columns:repeat(2, 1fr); gap:7px; margin-top:10px; }.swatch { border:1px solid var(--region-ink); padding:6px; min-height:42px; font:9px/1.25 var(--region-ui); }.swatch b { display:block; font-size:10px; }.swatch:nth-child(1){background:var(--region-ink);color:var(--region-bg)}.swatch:nth-child(2){background:var(--region-bg)}.swatch:nth-child(3){background:var(--region-main);color:#fffdf7}.swatch:nth-child(4){background:var(--region-accent)}
+    .type-title { margin-top:11px; font:24px/1 var(--region-display); }.type-ui { margin-top:12px; font:12px/1.4 var(--region-ui); font-weight:700; }.type-numeral { margin-top:8px; font:18px/1 var(--region-ui); font-weight:800; letter-spacing:.08em; }
+    .frame-piece { position:relative; height:76px; margin-top:10px; border:var(--region-line) solid var(--region-ink); }.northeast .frame-piece::before,.northeast .frame-piece::after{content:"";position:absolute;width:12px;height:12px;border:2px solid var(--region-main);border-radius:50%;top:8px}.northeast .frame-piece::before{left:9px}.northeast .frame-piece::after{right:9px}.midwest .frame-piece{clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);background:repeating-linear-gradient(135deg,transparent 0 8px,var(--region-ink) 8px 9px)}.riverside .frame-piece::before{content:"";position:absolute;left:30%;top:0;height:100%;border-left:1px solid var(--region-main);box-shadow:46px 0 0 var(--region-main)}.pacific .frame-piece::before{content:"";position:absolute;inset:10px;border:1px solid var(--region-main);clip-path:polygon(0 100%,0 30%,12% 30%,18% 0,25% 30%,100% 30%,100% 100%)}
+    .controls { display:grid; grid-template-columns:104px 94px 134px 104px; gap:10px; align-items:start; }.property, .screen, .tab { min-height:86px; border:var(--region-line) solid var(--region-ink); background:var(--region-bg); padding:9px; font-family:var(--region-ui); }.property b,.screen b{display:block;font-size:11px}.property small,.screen small{display:block;margin-top:18px;font-size:10px}.tab{min-height:32px;margin-top:27px;padding:7px 8px;background:var(--region-main);color:#fffdf7;font-size:11px;font-weight:800}.screen{min-height:65px;margin-top:11px}.screen small{margin-top:8px}.controls .dice-button{margin-top:23px}
+    .unified { margin-top:36px; border-top:2px solid var(--tycoon-border); padding-top:22px; display:grid; grid-template-columns:250px 1fr; gap:25px; }.unified p { color:var(--tycoon-muted); font-size:15px; line-height:1.65; max-width:880px; }
+  </style>
+</body>
+</html>

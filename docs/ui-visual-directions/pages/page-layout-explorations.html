@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>页面布局探索：控件到页面</title>
+    <style id="theme-vars">
+/* ============================================================
+   colors_and_type.css
+   《棋子形态与 1900 地域设计语法》— 语义令牌与组件样式
+   纯 CSS，无外部资源 / SVG / Canvas / 图片 / emoji / 渐变
+   （repeating-linear-gradient 仅用于纹理）
+   ============================================================ */
+
+/* —— 全局语义令牌 —— */
+:root {
+  --tycoon-background: #ECE7DC;
+  --tycoon-foreground: #1A1A1A;
+  --tycoon-card: #FBF8F1;
+  --tycoon-primary: #1A1A1A;
+  --tycoon-border: #1A1A1A;
+  --tycoon-muted: #8A847A;
+  --tycoon-radius-sm: 2px;
+  --tycoon-radius-md: 6px;
+  --tycoon-radius-lg: 14px;
+
+  /* 棋子形态参数 */
+  --piece-ink: #1A1A1A;
+  --piece-head-diameter: 22px;
+  --piece-torso-top: 16px;
+  --piece-torso-bottom: 26px;
+  --piece-torso-height: 30px;
+  --piece-outline-width: 3px;
+
+  /* 玩家色 */
+  --player-red: #C0392B;
+  --player-blue: #2C5F8D;
+  --player-green: #4A7C3F;
+
+  /* 连线 */
+  --line-map: #B0B0B0;
+  --line-current: #1A1A1A;
+  --line-key: #D95A2B;
+
+  /* 字体栈（系统字体，无外部资源） */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-serif: Georgia, "Times New Roman", "Songti SC", serif;
+  --font-black: "Arial Black", "Helvetica Neue", Impact, "Heiti SC", sans-serif;
+  --font-mono: "SF Mono", "Menlo", "Monaco", "Consolas", "Courier New", monospace;
+  --font-italic-serif: "Snell Roundhand", "Apple Chancery", Georgia, serif;
+  --font-han: "PingFang SC", "Heiti SC", "STHeiti", "Microsoft YaHei", sans-serif;
+  --font-telegraph: "Times New Roman", Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  color: var(--tycoon-foreground);
+  background: var(--tycoon-background);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* ============================================================
+   页面骨架
+   ============================================================ */
+.canvas { max-width: 1180px; margin: 0 auto; padding: 48px 56px 80px; }
+.canvas-header { border-bottom: 3px solid var(--tycoon-border); padding-bottom: 20px; margin-bottom: 44px; }
+.canvas-title { font-family: var(--font-serif); font-weight: 900; font-size: 30px; letter-spacing: 0.04em; margin: 0 0 6px; }
+.canvas-sub { color: var(--tycoon-muted); font-size: 13px; letter-spacing: 0.02em; }
+.section { margin-bottom: 60px; }
+.section-title {
+  font-family: var(--font-serif); font-weight: 900; font-size: 20px;
+  border-left: 6px solid var(--tycoon-border); padding-left: 12px; margin: 0 0 22px;
+}
+.section-note { color: var(--tycoon-muted); font-size: 12.5px; margin: 0 0 20px; max-width: 760px; }
+
+.param-list { margin: 8px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--tycoon-muted); }
+.param-list li { padding: 1px 0; }
+.param-list b { color: var(--tycoon-foreground); font-weight: 700; }
+
+/* ============================================================
+   区域一：棋子形态规范（高梯形上接圆形，纯 CSS）
+   ============================================================ */
+.piece-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.piece-card {
+  background: var(--tycoon-card);
+  border: 2px solid var(--tycoon-border);
+  border-radius: var(--tycoon-radius-md);
+  padding: 18px 16px 16px;
+  display: flex; flex-direction: column; align-items: center;
+  min-height: 168px;
+}
+.piece-card__name { font-weight: 800; font-size: 13px; margin-bottom: 2px; letter-spacing: 0.02em; }
+.piece-card__tag { font-size: 11px; color: var(--tycoon-muted); margin-bottom: 14px; }
+
+/* 棋子本体：容器宽 32px（含轮廓） */
+.piece { position: relative; width: 32px; display: flex; flex-direction: column; align-items: center; margin-bottom: 16px; }
+.piece-head {
+  width: var(--piece-head-diameter); height: var(--piece-head-diameter);
+  border: var(--piece-outline-width) solid var(--piece-ink);
+  border-radius: 50%;
+  background: var(--piece-head-fill, #F2E9D8);
+  box-sizing: border-box; position: relative; z-index: 2;
+}
+.piece-torso { position: relative; width: 32px; height: 36px; margin-top: -3px; }
+.piece-torso::before {
+  content: ""; position: absolute; inset: 0; background: var(--piece-ink);
+  clip-path: polygon(8px 0, 24px 0, 32px 36px, 0 36px);
+}
+.piece-torso::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 26px; height: 30px;
+  background: var(--piece-torso-fill, var(--player-red));
+  clip-path: polygon(5px 0, 21px 0, 26px 30px, 0 30px);
+}
+
+/* 变体 1：基础型 */
+.piece--basic { --piece-head-fill: #F2E9D8; }
+
+/* 变体 2：纹理型 — 细斜线纹理（呢料/棉布） */
+.piece--texture .piece-torso::after {
+  background:
+    repeating-linear-gradient(48deg, rgba(0,0,0,.24) 0 1px, transparent 1px 3px),
+    var(--piece-torso-fill, var(--player-blue));
+}
+
+/* 变体 3：昼型 — 明亮配色 */
+.piece--day { --piece-head-fill: #F5E6A8; }
+
+/* 变体 4：夜型 — 深色配色 + 1px 暗金亮边（沿真实形状勾勒） */
+.piece--night { --piece-head-fill: #3A3A3A; }
+.piece--night {
+  filter:
+    drop-shadow(1px 0 0 #E8B83A)
+    drop-shadow(-1px 0 0 #E8B83A)
+    drop-shadow(0 1px 0 #E8B83A)
+    drop-shadow(0 -1px 0 #E8B83A);
+}
+
+/* 变体 5：选中态 — 外扩 2px 亮色光环 */
+.piece--selected { box-shadow: 0 0 0 2px #E8B83A; }
+
+/* 玩家色样本行 */
+.player-swatches { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+.player-swatch { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.player-swatch__chip { width: 22px; height: 22px; border: 2px solid var(--tycoon-border); border-radius: 4px; }
+
+/* ============================================================
+   连线规范
+   ============================================================ */
+.line-rail {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 22px;
+  background: var(--tycoon-card); border: 2px solid var(--tycoon-border);
+  border-radius: var(--tycoon-radius-md); padding: 18px 22px;
+}
+.line-item { display: flex; flex-direction: column; gap: 8px; }
+.line-item__label { font-size: 11px; color: var(--tycoon-muted); }
+.line-row { display: flex; align-items: center; gap: 8px; }
+.line-bar { border-radius: 99px; display: inline-block; }
+.line-bar--map { width: 96px; height: 2px; background: var(--line-map); }
+.line-bar--current { width: 96px; height: 3px; background: var(--line-current); }
+.line-bar--key { width: 96px; height: 4px; background: var(--line-key); }
+.node-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tycoon-border); display: inline-block; }
+.arrow {
+  width: 0; height: 0;
+  border-top: 6px solid transparent; border-bottom: 6px solid transparent;
+  border-left: 10px solid var(--tycoon-border); display: inline-block;
+}
+
+/* ============================================================
+   区域二：四种地域设计语法板
+   ============================================================ */
+.grammar-board {
+  position: relative;
+  border: var(--r-border-w, 2px) solid var(--r-border, var(--tycoon-border));
+  border-radius: var(--r-radius, var(--tycoon-radius-md));
+  background-color: var(--r-board-bg, var(--tycoon-card));
+  color: var(--r-fg, var(--tycoon-foreground));
+  padding: 20px 22px 24px; margin-bottom: 26px; overflow: hidden;
+}
+.grammar-board::before {
+  content: ""; position: absolute; inset: 0;
+  background-image: var(--r-texture, none);
+  background-size: var(--r-texture-size, auto);
+  pointer-events: none; z-index: 0;
+}
+.grammar-board > * { position: relative; z-index: 1; }
+
+.grammar-board__head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; padding-bottom: 12px; margin-bottom: 16px;
+  border-bottom: 1px solid var(--r-rule, rgba(0,0,0,.18));
+}
+.grammar-board__title {
+  font-family: var(--r-title-font, var(--font-serif));
+  font-weight: var(--r-title-weight, 900);
+  font-style: var(--r-title-style, normal);
+  font-size: 18px; letter-spacing: var(--r-title-spacing, 0.02em); margin: 0;
+}
+.grammar-board__motion {
+  font-family: var(--r-func-font, var(--font-sans));
+  font-size: 11px; color: var(--r-motion-fg, var(--tycoon-muted));
+  max-width: 460px; text-align: right;
+}
+
+.grammar-row {
+  display: grid; grid-template-columns: 1.5fr 1.3fr 1fr 1fr 1fr 1.1fr;
+  gap: 16px; align-items: stretch;
+}
+.grammar-cell { display: flex; flex-direction: column; gap: 6px; }
+.grammar-cell__label {
+  font-family: var(--r-func-font, var(--font-sans));
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--r-label-fg, var(--tycoon-muted));
+}
+
+/* 色样组 */
+.swatch-stack { display: flex; flex-direction: column; gap: 6px; }
+.swatch { display: flex; align-items: center; gap: 8px; font-family: var(--r-func-font, var(--font-sans)); font-size: 11px; }
+.swatch__chip {
+  width: 26px; height: 26px;
+  border: 1px solid var(--r-border, var(--tycoon-border));
+  border-radius: var(--r-chip-radius, 3px); flex-shrink: 0;
+}
+.swatch__hex { font-weight: 700; }
+.swatch__use { color: var(--r-label-fg, var(--tycoon-muted)); }
+
+/* 文字样本 */
+.text-sample { display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+.text-sample__title {
+  font-family: var(--r-title-font, var(--font-serif));
+  font-weight: var(--r-title-weight, 900);
+  font-style: var(--r-title-style, normal);
+  font-size: 16px; letter-spacing: var(--r-title-spacing, 0.02em); line-height: 1.15;
+}
+.text-sample__func {
+  font-family: var(--r-func-font, var(--font-sans));
+  font-size: 12px; letter-spacing: var(--r-func-spacing, 0); color: var(--r-fg, var(--tycoon-foreground));
+}
+
+/* 边框片段 */
+.border-frag { height: 56px; border-radius: var(--r-radius, var(--tycoon-radius-md)); background: var(--r-frag-bg, transparent); }
+
+/* 地产格 */
+.property-cell {
+  min-height: 84px; padding: 10px 12px;
+  border: var(--r-cell-border, 2px solid var(--r-border, var(--tycoon-border)));
+  border-radius: var(--r-radius, var(--tycoon-radius-md));
+  background: var(--r-cell-bg, var(--r-board-bg, var(--tycoon-card)));
+  display: flex; flex-direction: column; justify-content: space-between;
+  position: relative; overflow: hidden;
+}
+.property-cell__name {
+  font-family: var(--r-title-font, var(--font-serif));
+  font-weight: var(--r-title-weight, 800);
+  font-style: var(--r-title-style, normal);
+  font-size: 13px; line-height: 1.1;
+}
+.property-cell__price { font-family: var(--r-num-font, var(--font-mono)); font-size: 12px; color: var(--r-accent, var(--tycoon-foreground)); }
+.property-cell__bar { height: 6px; background: var(--r-accent, var(--tycoon-border)); }
+
+/* 页签 */
+.tab {
+  align-self: start; padding: 6px 14px;
+  border: var(--r-border-w, 2px) solid var(--r-border, var(--tycoon-border));
+  border-bottom: none;
+  border-radius: var(--r-radius, var(--tycoon-radius-md)) var(--r-radius, var(--tycoon-radius-md)) 0 0;
+  background: var(--r-tab-bg, var(--tycoon-card));
+  font-family: var(--r-func-font, var(--font-sans)); font-size: 12px; font-weight: 700;
+}
+.tab-row { display: flex; flex-direction: column; gap: 0; }
+.tab-row__base { height: 2px; background: var(--r-border, var(--tycoon-border)); margin-top: -1px; }
+
+/* 显示框 */
+.display-box {
+  min-height: 60px; padding: 8px 12px;
+  border: var(--r-border-w, 2px) solid var(--r-border, var(--tycoon-border));
+  border-radius: var(--r-radius, var(--tycoon-radius-md));
+  background: var(--r-box-bg, var(--tycoon-card));
+  display: flex; flex-direction: column; gap: 2px;
+}
+.display-box__cap { font-family: var(--r-func-font, var(--font-sans)); font-size: 10px; color: var(--r-label-fg, var(--tycoon-muted)); }
+.display-box__val { font-family: var(--r-num-font, var(--font-mono)); font-size: 18px; font-weight: 700; }
+
+/* 掷骰按钮 */
+.dice-btn {
+  align-self: start; margin-top: auto;
+  font-family: var(--r-func-font, var(--font-sans));
+  font-weight: 800; font-size: 13px; letter-spacing: var(--r-func-spacing, 0.02em);
+  padding: 10px 16px;
+  border: var(--r-border-w, 2px) solid var(--r-border, var(--tycoon-border));
+  border-radius: var(--r-radius, var(--tycoon-radius-md));
+  background: var(--r-accent, var(--tycoon-primary));
+  color: var(--r-btn-fg, #FBF8F1);
+  cursor: pointer; box-shadow: var(--r-btn-shadow, none);
+  transition: transform .12s ease, background-color .12s ease, box-shadow .12s ease, opacity .12s ease;
+}
+.dice-btn:hover { background: var(--r-accent-hover, var(--r-accent, var(--tycoon-primary))); transform: var(--r-btn-hover-transform, translateY(-1px)); }
+.dice-btn:focus-visible { outline: var(--r-focus-w, 3px) solid var(--r-focus, #E8B83A); outline-offset: 2px; }
+.dice-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* ============================================================
+   风格 I：东北走廊·巴别塔的蒸汽
+   ============================================================ */
+.region-northeast {
+  --r-board-bg: #2C2E33; --r-fg: #E6DCC3; --r-border: #4A2C2A; --r-border-w: 1px;
+  --r-radius: 1px; --r-chip-radius: 1px; --r-accent: #D95A2B; --r-accent-hover: #EF6A36;
+  --r-rule: rgba(230,220,195,.22); --r-label-fg: #9AA0A6; --r-motion-fg: #C9A98A;
+  --r-title-font: var(--font-serif); --r-title-weight: 900; --r-title-style: normal; --r-title-spacing: 0.06em;
+  --r-func-font: "Arial Narrow", -apple-system, sans-serif; --r-func-spacing: 0.01em; --r-num-font: var(--font-mono);
+  --r-cell-bg: #34373D; --r-cell-border: 1px solid #4A2C2A; --r-box-bg: #34373D; --r-tab-bg: #34373D; --r-frag-bg: #34373D;
+  --r-btn-fg: #FBF8F1; --r-btn-shadow: 2px 2px 0 #4A2C2A; --r-btn-hover-transform: translate(-1px,-1px);
+  --r-focus: #D95A2B; --r-focus-w: 2px;
+  --r-texture:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.20) 0 2px, transparent 2px 6px);
+}
+.region-northeast .border-frag { border: 1px solid #4A2C2A; outline: 1px solid #4A2C2A; outline-offset: 3px; }
+.region-northeast .border-frag::after {
+  content: ""; display: block; height: 100%;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(217,90,43,.35) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-45deg, rgba(79,109,94,.30) 0 1px, transparent 1px 5px);
+}
+
+/* ============================================================
+   风格 II：深南腹地·被遗忘的门廊
+   ============================================================ */
+.region-south {
+  --r-board-bg: #E6DCC3; --r-fg: #3C3326; --r-border: #7B8D7A; --r-border-w: 1px;
+  --r-radius: 16px; --r-chip-radius: 12px; --r-accent: #8C4E3A; --r-accent-hover: #A45C46;
+  --r-rule: rgba(60,51,38,.20); --r-label-fg: #6B6450; --r-motion-fg: #7B8D7A;
+  --r-title-font: var(--font-italic-serif); --r-title-weight: 700; --r-title-style: italic; --r-title-spacing: 0.01em;
+  --r-func-font: Georgia, serif; --r-func-spacing: 0.04em; --r-num-font: Georgia, serif;
+  --r-cell-bg: #F0E7D0; --r-cell-border: 1px solid #7B8D7A; --r-box-bg: #F0E7D0; --r-tab-bg: #F0E7D0; --r-frag-bg: #F0E7D0;
+  --r-btn-fg: #FBF8F1; --r-btn-shadow: 2px 2px 0 #7B8D7A; --r-btn-hover-transform: translateY(-1px);
+  --r-focus: #8C4E3A; --r-focus-w: 2px;
+  --r-texture:
+    repeating-linear-gradient(91deg, rgba(60,51,38,.06) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(0deg, rgba(60,51,38,.04) 0 1px, transparent 1px 5px);
+}
+.region-south .border-frag {
+  border: 1px solid #8C4E3A; border-radius: 14px;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(140,78,58,.30) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(0deg, rgba(140,78,58,.30) 0 1px, transparent 1px 8px);
+}
+.region-south .property-cell::before {
+  content: ""; position: absolute; right: 8px; top: 8px;
+  width: 16px; height: 16px; border: 1px solid #8C4E3A; border-radius: 50% 0 50% 0; opacity: .7;
+}
+
+/* ============================================================
+   风格 III：中西部大平原·谷仓与铁轨
+   ============================================================ */
+.region-midwest {
+  --r-board-bg: #CBB089; --r-fg: #2A241C; --r-border: #6E6A64; --r-border-w: 3px;
+  --r-radius: 0px; --r-chip-radius: 0px; --r-accent: #2F4B7A; --r-accent-hover: #3A5C90;
+  --r-rule: rgba(42,36,28,.30); --r-label-fg: #5A5246; --r-motion-fg: #6E6A64;
+  --r-title-font: var(--font-black); --r-title-weight: 900; --r-title-style: normal; --r-title-spacing: 0.02em;
+  --r-func-font: var(--font-black); --r-func-spacing: 0.01em; --r-num-font: var(--font-mono);
+  --r-cell-bg: #D9C4A0; --r-cell-border: 3px solid #6E6A64; --r-box-bg: #D9C4A0; --r-tab-bg: #D9C4A0; --r-frag-bg: #D9C4A0;
+  --r-btn-fg: #FBF8F1; --r-btn-shadow: 3px 3px 0 #6E6A64; --r-btn-hover-transform: translate(-2px,-2px);
+  --r-focus: #2F4B7A; --r-focus-w: 3px;
+  --r-texture:
+    repeating-linear-gradient(90deg, rgba(42,36,28,.10) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(0deg, rgba(42,36,28,.10) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.06) 0 1px, transparent 1px 2px);
+}
+.region-midwest .border-frag { border: 4px solid #6E6A64; border-radius: 0; }
+.region-midwest .property-cell--selected {
+  background-image:
+    repeating-linear-gradient(45deg, rgba(47,75,122,.30) 0 4px, transparent 4px 8px);
+}
+
+/* ============================================================
+   风格 IV：远西边疆·断层与香火
+   ============================================================ */
+.region-farwest {
+  --r-board-bg: #DDE0DF; --r-fg: #3A2E2C; --r-border: #6D3F3F; --r-border-w: 2px;
+  --r-radius: 2px; --r-chip-radius: 2px; --r-accent: #B52B1D; --r-accent-hover: #CF3A2A;
+  --r-rule: rgba(61,46,44,.22); --r-label-fg: #7A6A66; --r-motion-fg: #6D3F3F;
+  --r-title-font: var(--font-telegraph); --r-title-weight: 700; --r-title-style: normal; --r-title-spacing: 0.14em;
+  --r-func-font: var(--font-han); --r-func-spacing: 0.06em; --r-num-font: var(--font-mono);
+  --r-cell-bg: #ECEDEC; --r-cell-border: 2px solid #6D3F3F; --r-box-bg: #ECEDEC; --r-tab-bg: #ECEDEC; --r-frag-bg: #ECEDEC;
+  --r-btn-fg: #FBF8F1; --r-btn-shadow: 2px 2px 0 #6D3F3F; --r-btn-hover-transform: translateY(-1px);
+  --r-focus: #A1B85A; --r-focus-w: 3px;
+  --r-texture:
+    repeating-linear-gradient(90deg, rgba(61,46,44,.06) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg, rgba(61,46,44,.06) 0 1px, transparent 1px 4px);
+}
+.region-farwest .grammar-board::after {
+  content: ""; position: absolute; inset: 0; background: rgba(255,255,255,.18); pointer-events: none; z-index: 0;
+}
+.region-farwest .border-frag {
+  border: 2px solid #6D3F3F; border-radius: 2px; transform: skew(-2deg);
+  background-image:
+    repeating-linear-gradient(30deg, rgba(109,63,63,.30) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(-60deg, rgba(109,63,63,.30) 0 1px, transparent 1px 7px);
+}
+.region-farwest .property-cell::after {
+  content: ""; position: absolute; left: 50%; top: -1px; transform: translateX(-50%);
+  width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 8px solid #6D3F3F;
+}
+
+/* ============================================================
+   掷骰按钮状态展示条（通用，无地域作用域）
+   ============================================================ */
+.btn-states {
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--tycoon-card); border: 2px solid var(--tycoon-border);
+  border-radius: var(--tycoon-radius-md); padding: 16px 20px; margin-bottom: 26px;
+}
+.btn-states__row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.btn-states__note { font-size: 11.5px; color: var(--tycoon-muted); margin: 0; max-width: 760px; }
+.btn-states .dice-btn { margin-top: 0; }
+.btn-states .dice-btn--plain { background: var(--tycoon-primary); color: #FBF8F1; border-color: var(--tycoon-border); box-shadow: 2px 2px 0 var(--tycoon-border); }
+.btn-states .dice-btn--plain:hover { background: #333333; }
+
+/* ============================================================
+   底部统一规则
+   ============================================================ */
+.universal-rule {
+  margin-top: 12px; padding: 20px 24px;
+  border: 3px double var(--tycoon-border); border-radius: var(--tycoon-radius-md); background: var(--tycoon-card);
+}
+.universal-rule__title { font-family: var(--font-serif); font-weight: 900; font-size: 16px; margin: 0 0 8px; }
+.universal-rule__text { font-size: 13px; color: var(--tycoon-foreground); margin: 0; }
+.universal-rule__text b { color: var(--tycoon-primary); }
+
+/* ============================================================
+   无障碍：降低动态
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--tycoon-background);
+    --color-foreground: var(--tycoon-foreground);
+    --color-card: var(--tycoon-card);
+    --color-primary: var(--tycoon-primary);
+    --color-muted: var(--tycoon-muted);
+    --color-border: var(--tycoon-border);
+    --radius-sm: var(--tycoon-radius-sm);
+    --radius-md: var(--tycoon-radius-md);
+    --radius-lg: var(--tycoon-radius-lg);
+  }
+  @layer base {
+    body { background: var(--tycoon-background); color: var(--tycoon-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--tycoon-background); }
+      .text-background { color: var(--tycoon-background); }
+      .border-background { border-color: var(--tycoon-background); }
+      .ring-background { --tw-ring-color: var(--tycoon-background); }
+      .bg-foreground { background-color: var(--tycoon-foreground); }
+      .text-foreground { color: var(--tycoon-foreground); }
+      .border-foreground { border-color: var(--tycoon-foreground); }
+      .ring-foreground { --tw-ring-color: var(--tycoon-foreground); }
+      .bg-card { background-color: var(--tycoon-card); }
+      .text-card { color: var(--tycoon-card); }
+      .border-card { border-color: var(--tycoon-card); }
+      .ring-card { --tw-ring-color: var(--tycoon-card); }
+      .bg-primary { background-color: var(--tycoon-primary); }
+      .text-primary { color: var(--tycoon-primary); }
+      .border-primary { border-color: var(--tycoon-primary); }
+      .ring-primary { --tw-ring-color: var(--tycoon-primary); }
+      .bg-muted { background-color: var(--tycoon-muted); }
+      .text-muted { color: var(--tycoon-muted); }
+      .border-muted { border-color: var(--tycoon-muted); }
+      .ring-muted { --tw-ring-color: var(--tycoon-muted); }
+      .bg-border { background-color: var(--tycoon-border); }
+      .text-border { color: var(--tycoon-border); }
+      .border-border { border-color: var(--tycoon-border); }
+      .ring-border { --tw-ring-color: var(--tycoon-border); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body><main>
+<header class="masthead"><div><div class="kicker">大富翁.io / UI 方向板 04</div><h1>页面布局探索：<br>控件到页面</h1></div><div class="issue">低保真横屏比较页<br>主画布 1440×900 · 兼容 1280×720 / 移动横屏 1024×576</div></header>
+<section><div class="section-head"><div><div class="eyebrow">01 / 先定边界</div><h2>低耦合布局契约</h2></div><p>页面只呈现语义 ViewModel；地图由数据驱动，非环形路径由连接线定义。</p></div><div class="contract"><p class="contract-copy">服务端是唯一权威。UI 只消费 Store / ViewModel；UIUpdates 负责 DOM 更新，Canvas 负责棋盘、棋子与连线。事件流保持单向可追踪。</p><div class="flow"><div class="flow-step"><strong>Server Snapshot</strong><small>权威状态快照</small></div><div class="flow-step"><strong>ViewModel</strong><small>语义化、可呈现数据</small></div><div class="flow-step"><strong>Controls / Regions</strong><small>区域与控件编排</small></div><div class="flow-step"><strong>DOM + Canvas</strong><small>UIUpdates 与画布分工</small></div></div><div class="guardrails"><span><b>控件</b> 不读取游戏核心对象</span><span><b>页面</b> 不直接解析地图 JSON</span><span><b>主题</b> 只来自 DesignAdapter</span><span><b>事件流</b> client.rollDice / client.choosePath → server.playerMoved → Store → UI</span></div></div></section>
+<section><div class="section-head"><div><div class="eyebrow">02 / 四页一组</div><h2>三套横屏布局方案</h2></div><p>缩略框仅表达版块关系；全部为 16:10 横向宽屏，移动横屏仅作适配标注。</p></div>
+<article class="scheme a"><div class="scheme-head"><div class="scheme-title"><div class="letter">A</div><div><h3>地图舞台 <span class="recommend">推荐方案</span></h3><p class="intro">地图永远第一视觉层：顶部状态、右侧信息、底部行动覆盖地图边缘。</p></div></div><p class="scheme-note">最贴合开放地图和非环形路径的空间阅读。</p></div><div class="scheme-body"><div class="thumb-grid"><figure class="thumb"><figcaption>欢迎页</figcaption><div class="wire welcome"><i class="block"></i><i class="block"></i><i class="block"></i></div><div class="meta">1440×900 / 16:10<br>BRAND 58% / MAP 42%</div></figure><figure class="thumb"><figcaption>加载页</figcaption><div class="wire loading"><i class="block"></i><i class="block"></i><i class="block"></i></div><div class="meta">1440×900 / 16:10<br>MAP 62% / STATUS 38%</div></figure><figure class="thumb"><figcaption>游戏页</figcaption><div class="wire game-a"><i class="block top"></i><i class="block map"></i><i class="block side"></i><i class="block bottom"></i></div><div class="meta">1440×900 / 16:10<br>MAP 72% / INFO 18% / ACTION 12%</div></figure><figure class="thumb"><figcaption>游戏中止页</figcaption><div class="wire stop-a"><i class="block"></i><i class="block"></i><i class="block"></i></div><div class="meta">1440×900 / 16:10<br>RESULT 56% / DESTINATION 44%</div></figure></div><aside class="rules"><h3>控件编排规则</h3><dl><dt>Canvas 区域</dt><dd>棋子、格子、连线只在地图舞台出现。</dd><dt>DOM 区域</dt><dd>选项卡与数值框进入右侧信息带。</dd><dt>行动区域</dt><dd>掷骰按钮与路径选择进入底部行动带。</dd><dt>反馈区域</dt><dd>通知条贴近顶部状态带；事件弹窗以中央为锚点。</dd></dl></aside></div></article>
+<article class="scheme b"><div class="scheme-head"><div class="scheme-title"><div class="letter">B</div><div><h3>控制台账本 <span class="recommend" style="color:var(--blue)">备选</span></h3><p class="intro">信息与操作固定在右侧，地图保持左侧主工作区。</p></div></div><p class="scheme-note">强调持续读数与策略决策，牺牲部分漫游纵深。</p></div><div class="scheme-body"><div class="thumb-grid"><figure class="thumb"><figcaption>欢迎页</figcaption><div class="wire console"><i class="block"></i><i class="block"></i><i class="block"></i><i class="block"></i></div><div class="meta">1440×900 / 16:10<br>NARRATIVE 55% / IDENTITY 45%</div></figure><figure class="thumb"><figcaption>加载页</figcaption><div class="wire loading-b"><i class="block"></i><i class="block"></i></div><div class="meta">1440×900 / 16:10<br>MAP 58% / STATUS 42%</div></figure><figure class="thumb"><figcaption>游戏页</figcaption><div class="wire console"><i class="block"></i><i class="block"></i><i class="block"></i><i class="block"></i></div><div class="meta">1440×900 / 16:10<br>TOP 12% / MAP 64% / PANEL 36%</div></figure><figure class="thumb"><figcaption>游戏中止页</figcaption><div class="wire stop-b"><i class="block"></i><i class="block"></i></div><div class="meta">1440×900 / 16:10<br>RESULT 62% / DESTINATION 38%</div></figure></div><aside class="rules"><h3>控件编排规则</h3><dl><dt>左侧地图</dt><dd>棋子、格子、连线固定在地图工作区。</dd><dt>右侧账本</dt><dd>选项卡、数值框、事件弹窗进入信息与操作区。</dd><dt>顶部跨栏</dt><dd>通知条与全局状态集中；行动控件留在右栏。</dd><dt>页面边界</dt><dd>欢迎与中止页沿左右叙事 / 决策二分组织。</dd></dl></aside></div></article>
+<article class="scheme c"><div class="scheme-head"><div class="scheme-title"><div class="letter">C</div><div><h3>区域分屏 <span class="recommend" style="color:var(--green)">备选</span></h3><p class="intro">中央地图被左右悬浮信息区包围，顶部时代轴与底部行动轴跨栏。</p></div></div><p class="scheme-note">强化时代与时间变化，但对称栏位会分散地图焦点。</p></div><div class="scheme-body"><div class="thumb-grid"><figure class="thumb"><figcaption>欢迎页</figcaption><div class="wire stack"><i class="block"></i><i class="block"></i></div><div class="meta">1440×900 / 16:10<br>BRAND 40% / ENTRY 60%</div></figure><figure class="thumb"><figcaption>加载页</figcaption><div class="wire stack"><i class="block"></i><i class="block"></i></div><div class="meta">1440×900 / 16:10<br>CENTER HORIZONTAL STATUS</div></figure><figure class="thumb"><figcaption>游戏页</figcaption><div class="wire region"><i class="block"></i><i class="block"></i><i class="block"></i><i class="block"></i><i class="block"></i></div><div class="meta">1440×900 / 16:10<br>TOP 12% / MAP 70% / SIDES 15%+15% / ACTION 12%</div></figure><figure class="thumb"><figcaption>游戏中止页</figcaption><div class="wire stack"><i class="block"></i><i class="block"></i></div><div class="meta">1440×900 / 16:10<br>RESULT 58% / DESTINATION 42%</div></figure></div><aside class="rules"><h3>控件编排规则</h3><dl><dt>中央地图</dt><dd>棋子、格子、连线只在中央地图层出现。</dd><dt>左右状态栏</dt><dd>这里只表达悬浮信息区域，不画具体组件。</dd><dt>顶部 / 底部</dt><dd>通知条进入时代带；行动控件进入底部行动区。</dd><dt>事件反馈</dt><dd>事件弹窗位于中央地图上方，不改变地图主层。</dd></dl></aside></div></article></section>
+<section><div class="section-head"><div><div class="eyebrow">03 / 交付前检查</div><h2>低耦合核对</h2></div><p>布局是外壳；状态矩阵集中计算按钮状态，业务模块不直接写 disabled。</p></div><div class="audit"><div class="audit-item pass"><div class="rule-label">通过</div><strong>页面只依赖语义 ViewModel</strong><p>不把服务端对象泄露给展示层。</p></div><div class="audit-item pass"><div class="rule-label">通过</div><strong>控件只依赖 DesignAdapter token snapshot</strong><p>主题边界清晰且可替换。</p></div><div class="audit-item pass"><div class="rule-label">通过</div><strong>Canvas / DOM 共用同一主题快照</strong><p>棋盘与页面不会各自漂移。</p></div><div class="audit-item stop"><div class="rule-label">禁止</div><strong>页面读取地图 JSON 内部结构</strong><p>地图只通过语义 ViewModel 暴露。</p></div><div class="audit-item stop"><div class="rule-label">禁止</div><strong>组件直接调用游戏核心或 Socket</strong><p>事件经 Store 与集中式更新流转。</p></div><div class="audit-item stop"><div class="rule-label">禁止</div><strong>业务模块直接写按钮 disabled</strong><p>由集中式状态矩阵计算可用状态。</p></div></div></section>
+</main>
+    <style>
+:root{--bg:#eee8d9;--fg:#26231d;--card:#f8f4e8;--border:#37332b;--muted:#766f62;--red:#a9422d;--blue:#315564;--green:#4d6b4d;--tan:#d7cfbc;--map:#aab48f;--info:#c6b48f;--status:#b9a17c;--action:#b8935c;--shadow:7px 7px 0 rgba(55,51,43,.12);--r:6px}
+*{box-sizing:border-box}html{background:var(--bg)}body{margin:0;color:var(--fg);background:var(--bg);font-family:Georgia,"Songti SC","STSong",serif;line-height:1.45}body:before{content:"";position:fixed;inset:13px;pointer-events:none;border:1px solid rgba(55,51,43,.22);z-index:10}main{width:min(1440px,calc(100% - 84px));margin:auto;padding:60px 0 74px}.masthead{display:flex;justify-content:space-between;align-items:end;border-bottom:4px solid var(--border);padding-bottom:18px}.kicker,.eyebrow,.rule-label,.meta{font:700 11px Arial,sans-serif;letter-spacing:.12em}.kicker{color:var(--red)}h1{margin:6px 0 0;font-size:clamp(34px,4vw,58px);line-height:.98;letter-spacing:-.045em}h2{font-size:28px;line-height:1.05;margin:0 0 10px}h3{font-size:19px;margin:0 0 7px}.issue{font:12px Arial,sans-serif;color:var(--muted);text-align:right}section{margin-top:46px}.section-head{display:flex;justify-content:space-between;align-items:baseline;gap:24px;border-bottom:2px solid var(--border);padding-bottom:12px;margin-bottom:18px}.section-head p,.intro,.scheme-note{color:var(--muted);font:13px/1.45 Arial,sans-serif;max-width:620px;margin:0}.contract{background:var(--card);border:2px solid var(--border);border-radius:var(--r);padding:22px;box-shadow:var(--shadow)}.contract-copy{max-width:980px;font-size:16px}.flow{display:grid;grid-template-columns:repeat(4,1fr);margin:24px 0 18px}.flow-step{position:relative;border:2px solid var(--border);background:var(--tan);padding:17px 14px;min-height:86px}.flow-step+ .flow-step{border-left:0}.flow-step:not(:last-child):after{content:"→";position:absolute;right:-19px;top:25px;z-index:2;font:24px Arial;color:var(--red)}.flow-step:nth-child(2){background:#d9ded8}.flow-step:nth-child(3){background:#e4d7bd}.flow-step:nth-child(4){background:#ded9cc}.flow-step strong{display:block;font-size:17px}.flow-step small{display:block;color:#554f45;font:11px Arial;margin-top:5px}.guardrails{display:flex;gap:10px;flex-wrap:wrap;font:12px Arial;color:var(--muted)}.guardrails span{border-top:1px solid var(--border);padding-top:6px}.guardrails b{color:var(--fg)}.scheme{border-top:7px solid var(--border);padding-top:18px;margin-top:42px}.scheme.a{border-color:var(--red)}.scheme.b{border-color:var(--blue)}.scheme.c{border-color:var(--green)}.scheme-head{display:grid;grid-template-columns:1fr 1.25fr;gap:28px;align-items:end;margin-bottom:16px}.scheme-title{display:flex;gap:14px;align-items:start}.letter{display:grid;place-items:center;width:45px;height:45px;border:2px solid var(--border);font:700 24px Arial;background:var(--card)}.recommend{display:inline-block;margin-left:10px;border-bottom:2px solid currentColor;color:var(--red);font:700 11px Arial;letter-spacing:.08em}.scheme-body{display:grid;grid-template-columns:minmax(0,3fr) minmax(260px,1fr);gap:20px}.thumb-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.thumb{background:var(--card);border:2px solid var(--border);padding:9px;min-width:0;margin:0}.thumb figcaption{font:700 12px Arial;margin-bottom:8px;letter-spacing:.04em}.wire{height:150px;aspect-ratio:16/10;border:1px solid var(--border);padding:6px;display:grid;gap:4px;background:#e8e0cc}.block{border:1px solid var(--border);background:#c8bda4;min-height:12px;position:relative}.block:after{content:"";position:absolute;inset:4px;border:1px dashed rgba(55,51,43,.45)}.meta{font-size:9px;letter-spacing:.05em;color:var(--fg);margin-top:7px;line-height:1.2}.welcome{grid-template-columns:58fr 42fr;grid-template-rows:1fr .24fr}.welcome .block:first-child{grid-row:1/2;background:#b38e62}.welcome .block:nth-child(2){background:#d3c5a8}.welcome .block:nth-child(3){grid-column:1/-1;background:#d9d0bd}.loading{grid-template-columns:62fr 38fr;grid-template-rows:1fr .2fr}.loading .block:first-child{background:var(--map)}.loading .block:nth-child(2){background:var(--status)}.loading .block:last-child{grid-column:1/-1;background:#ddd5c4}.game-a{grid-template-columns:72fr 18fr;grid-template-rows:10fr 78fr 12fr}.game-a .top{grid-column:1/-1;background:var(--status)}.game-a .map{grid-row:2/4;background:var(--map)}.game-a .side{grid-row:2/4;background:var(--info)}.game-a .bottom{grid-column:1;background:var(--action);z-index:1}.stop-a{grid-template-columns:56fr 44fr;grid-template-rows:1fr .22fr}.stop-a .block:first-child{background:#b38e62}.stop-a .block:nth-child(2){background:#d3c5a8}.stop-a .block:last-child{grid-column:1/-1;background:#d1c5ac}.console{grid-template-columns:55fr 45fr;grid-template-rows:12fr 1fr}.console .block:first-child{grid-column:1/-1;background:var(--status)}.console .block:nth-child(2){background:var(--map)}.console .block:nth-child(3){background:var(--info)}.console .block:last-child{grid-column:1/-1;background:#d3c5a8}.loading-b,.stop-b{grid-template-columns:58fr 42fr;grid-template-rows:1fr}.loading-b .block:first-child,.stop-b .block:first-child{background:var(--map)}.loading-b .block:last-child,.stop-b .block:last-child{background:var(--info)}.stop-b{grid-template-columns:62fr 38fr}.region{grid-template-columns:15fr 70fr 15fr;grid-template-rows:12fr 76fr 12fr}.region .block:first-child{grid-column:1/-1;background:var(--status)}.region .block:nth-child(2),.region .block:nth-child(4){background:var(--info)}.region .block:nth-child(3){background:var(--map)}.region .block:last-child{grid-column:1/-1;background:var(--action)}.stack{grid-template-rows:40fr 60fr}.stack .block:first-child{background:#b38e62}.stack .block:last-child{background:#d3c5a8}.rules{border:2px solid var(--border);background:#e1d6bf;padding:15px 16px}.rules h3{border-bottom:1px solid var(--border);padding-bottom:8px}.rules dl{margin:0;font:12px/1.45 Arial}.rules dt{color:var(--red);font-weight:700;margin-top:9px}.rules dd{margin:2px 0 0;color:#514b41}.audit{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.audit-item{border:2px solid var(--border);background:var(--card);padding:14px;min-height:94px}.audit-item.pass{border-top:5px solid var(--green)}.audit-item.stop{border-top:5px solid var(--red)}.audit-item strong{display:block;font-size:14px;margin:8px 0 4px}.audit-item p{margin:0;color:var(--muted);font:12px/1.4 Arial}
+@media(max-width:1100px){.scheme-head,.scheme-body{grid-template-columns:1fr}.thumb-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){main{width:calc(100% - 42px);padding-top:40px}.masthead{display:block}.issue{text-align:left;margin-top:14px}.flow{grid-template-columns:1fr 1fr}.flow-step+ .flow-step{border-left:2px solid var(--border)}.flow-step:not(:last-child):after{display:none}.audit{grid-template-columns:1fr}.thumb-grid{grid-template-columns:1fr 1fr}.wire{height:auto;min-height:115px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+</style>
+</body></html>
