@@ -5,7 +5,7 @@
 ## 当前功能
 
 - 数据驱动地图：服务端读取 `map.json`、`map-meta.json`，客户端通过 `/api/map` 投影并渲染。
-- 服务端权威掷骰、移动、岔路、地产、投资、交通、纪念碑、银行、税收、破产、昼夜、时区、繁荣度、队伍、聊天、事件、行为引擎与时代管理。
+- 服务端权威掷骰、移动、岔路、地产、投资、交通、纪念碑、抵押、税收、破产、昼夜、时区、繁荣度、队伍、聊天、事件、行为引擎与时代管理。
 - 客户端使用原生 TypeScript/DOM、Vite 和 Canvas，页面链为 Start → Login → Loading → Game。
 - shared 提供前后端共享类型、Socket 事件契约、地图解析、i18n 与调试开关。
 
@@ -40,3 +40,5 @@ docs/player/      玩家操作指南
 ```
 
 详细内容见 [架构](docs/architecture/ARCHITECTURE.md)、[API](docs/architecture/API.md)、[文件地图](docs/architecture/FILE_MAP.md) 和 [开发者指南](docs/guides/DEVELOPER.md)。规格与历史交接文档保留历史语义，阅读时以架构文档和源码为运行时依据。
+
+地图经济参数入口为 `packages/server/map-meta.json` 的 `config.taxConfig`；税率使用小数比例，必须同时填写三个税率、两个免税阈值和 `taxInterval`。编辑器入口及字段约束见 `config_editors/map_editor_v01.01/instruction.txt`。

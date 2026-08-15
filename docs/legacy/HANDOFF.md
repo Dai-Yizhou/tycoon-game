@@ -1,6 +1,6 @@
 # 临时交接文档
 
-> Task 9 文档基线：运行时仅有 `packages/shared/server/client` 三包；无 admin；配置文件直接编辑；客户端单一 Socket 与单一事件入口；服务端银行权威。
+> Task 9 文档基线：运行时仅有 `packages/shared/server/client` 三包；无 admin；配置文件直接编辑；客户端单一 Socket 与单一事件入口；服务端经济状态权威。
 
 > 生成日期：2026-08-02
 > 工作仓库：`tycoon-game`（monorepo、pnpm workspace）
@@ -80,7 +80,7 @@
 ## 四、已知问题与风险
 
 ### 高优先级
-1. **完整联机回归**：继续覆盖登录、移动、断线重连、银行和破产流程。
+1. **完整联机回归**：继续覆盖登录、移动、断线重连、抵押和破产流程。
 2. **`main` 分支落后**：`main` 未同步 `dev-Dai` 的最新重构，发布前需按流程合并。
 
 ### 中优先级
@@ -152,7 +152,7 @@ pnpm --filter @game/client test
   - 关键文件：`packages/server/src/handlers/teamHandler.ts`
 - **客户端业务请求收敛**：`GameLogic.ts` 中所有操作只发送 `client.*` 请求，不修改本地业务状态。
   - 关键文件：`packages/client/src/game/systems/GameLogic.ts`
-- **ModalSystem 弹窗收敛**：交通枢纽、银行、道具弹窗改为只发送请求，等待服务端事件驱动状态更新。
+- **ModalSystem 弹窗收敛**：交通枢纽、道具弹窗改为只发送请求，等待服务端事件驱动状态更新。
   - 关键文件：`packages/client/src/game/systems/ModalSystem.ts`
 - **Socket 事件集中管理**：使用 `WeakSet` 防止重复注册，`unregisterSocketHandlers` 正确清理。
   - 关键文件：`packages/client/src/game/systems/SocketEventHandler.ts`
@@ -176,7 +176,7 @@ pnpm --filter @game/client test
 
 ### 4. 破产重开服务端处理器
 
-- **`client.bankruptRestart` 服务端处理器**：`HandlerRegistry.handleBankruptRestart` 调用 `Bankruptcy.revivePlayer()` 处理破产重开请求。
+- **`client.bankruptRestart` 服务端处理器**：`HandlerRegistry.handleBankruptRestart` 调用 `Bankruptcy.revivePlayer()` 处理破产重开请求；贷款、还款与利息流程不属于当前运行时。
   - 关键文件：`packages/server/src/transport/handlers.ts`
   - 注入点：`packages/server/src/app.ts` → `handlerRegistry.setBankruptcy(bankruptcy)`
 - **Socket 事件类型补充**：`shared/src/types/socket-events.ts` 新增 `client.bankruptRestart` 事件定义。

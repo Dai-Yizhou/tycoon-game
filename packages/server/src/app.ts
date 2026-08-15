@@ -23,7 +23,7 @@ import { logger } from './utils/logger.js';
 import { GameWorld } from './world/GameWorld.js';
 import { SocketManager, type TypedServer } from './transport/SocketManager.js';
 import { registerHandlers } from './transport/handlers.js';
-import { Mortgage, Taxation, Bankruptcy } from './economy/index.js';
+import { Mortgage, Taxation, Bankruptcy, type TaxConfig } from './economy/index.js';
 import { readFileSync } from 'node:fs';
 import { parseMapData, parseMapMeta } from '@game/shared';
 import { DayNightCycle, DEFAULT_DAY_NIGHT_CONFIG } from './world/DayNightCycle.js';
@@ -51,6 +51,33 @@ export interface AppDependencies {
   socketManagerOptions?: SocketManagerConfig;
   /** 客户端静态资源目录（绝对路径），可选 */
   clientDistPath?: string;
+}
+
+function readTaxConfig(mapMeta: ReturnType<typeof parseMapMeta>): TaxConfig {
+  const raw = mapMeta.config?.taxConfig;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(`地图 ${mapMeta.id} 缺少完整 config.taxConfig`);
+  }
+
+  const config = raw as Record<string, unknown>;
+  const fields: Array<keyof TaxConfig> = [
+    'wealthTaxRate',
+    'propertyTaxRate',
+    'investmentTaxRate',
+    'minWealthForTax',
+    'minPropertyValueForTax',
+    'taxInterval',
+  ];
+  for (const field of fields) {
+    const value = config[field];
+    const invalidRate = field.endsWith('Rate') && (value as number) > 1;
+    const invalidInterval = field === 'taxInterval' && (value as number) <= 0;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || invalidRate || invalidInterval) {
+      throw new Error(`地图 ${mapMeta.id} 的 config.taxConfig.${field} 非法`);
+    }
+  }
+
+  return config as unknown as TaxConfig;
 }
 
 /**
@@ -230,7 +257,11 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
 
   // 初始化经济系统
   const mortgage = new Mortgage(io, world);
-  const taxation = new Taxation(io, world);
+  const mapMeta = world.getMapMeta();
+  if (!mapMeta) {
+    throw new Error('无法启动经济系统：地图元数据未加载');
+  }
+  const taxation = new Taxation(io, world, readTaxConfig(mapMeta));
   const bankruptcy = new Bankruptcy(io, world, mortgage, taxation);
 
   // 启动经济系统定时器
@@ -247,9 +278,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   // 初始化昼夜循环（从服务器启动时开始计时）
   const dayNightCycle = new DayNightCycle(
     io,
-    world,
     DEFAULT_DAY_NIGHT_CONFIG,
-    taxation,
     handlerRegistry.getTransportHandler(),
   );
   dayNightCycle.start();

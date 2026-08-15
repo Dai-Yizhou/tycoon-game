@@ -65,6 +65,8 @@
 | GET | `/health` | 服务状态、运行时间、玩家数、当前时代和时间戳 |
 | GET | `/api/map` | `{ mapData, regions, valueFieldDefinitions }`，由服务端读取地图 JSON 返回 |
 
+计税不是客户端配置 API。地图作者在 `map-meta.json` 的 `config.taxConfig` 提供完整税率、免税阈值和 `taxInterval`；服务端启动时校验，非法配置以启动错误终止。
+
 ## 共享类型
 
 - `Player`、`ValueField`、`Cell`、`MapMeta`、`Team`、`EraInfo`、聊天和交通类型位于 `packages/shared/src/types/`。

@@ -265,7 +265,7 @@ Expected: 新增测试先失败或暴露测试桩需要的最小接口。
 
 - [ ] **Step 3: 将 GameLogic 动作改成请求适配器**
 
-`handleBuyProperty`、`handleUpgradeProperty`、投资、交通、纪念碑、银行、道具和破产重开只校验 UI 前置条件并 `gameSocket.emit`；不直接改 `currentMoney`、资产集合、等级、事件效果或玩家状态。Ack 失败只提示错误并恢复请求状态。
+`handleBuyProperty`、`handleUpgradeProperty`、投资、交通、纪念碑、道具和破产重开只校验 UI 前置条件并 `gameSocket.emit`；不直接改 `currentMoney`、资产集合、等级、事件效果或玩家状态。Ack 失败只提示错误并恢复请求状态。
 
 - [ ] **Step 4: 删除到达后的本地事件和本地租金推测**
 

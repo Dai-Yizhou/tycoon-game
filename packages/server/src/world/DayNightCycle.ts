@@ -17,8 +17,6 @@
 import { EventEmitter } from 'node:events';
 import { logger } from '../utils/logger.js';
 import type { TypedServer } from '../transport/SocketManager.js';
-import type { GameWorld } from './GameWorld.js';
-import type { Taxation } from '../economy/Taxation.js';
 import type { TransportHandler } from '../handlers/transportHandler.js';
 
 /**
@@ -50,7 +48,7 @@ export interface DayNightConfig {
   cycleMinutes: number;
   /** 白天占周期的比例（0-1） */
   dayRatio: number;
-  /** 是否启用昼夜事件（计税、交通枢纽变更等） */
+  /** 是否启用昼夜事件（交通枢纽目的地变更等） */
   enableEvents: boolean;
   /** 是否广播昼夜变化 */
   broadcastChanges: boolean;
@@ -87,9 +85,7 @@ export interface DayNightSnapshot {
  */
 export class DayNightCycle extends EventEmitter {
   private readonly io: TypedServer;
-  private readonly world: GameWorld;
   private readonly config: DayNightConfig;
-  private readonly taxation?: Taxation;
   private readonly transportHandler?: TransportHandler;
 
   private cycleTimer: NodeJS.Timeout | null = null;
@@ -100,16 +96,12 @@ export class DayNightCycle extends EventEmitter {
 
   constructor(
     io: TypedServer,
-    world: GameWorld,
     config: DayNightConfig = DEFAULT_DAY_NIGHT_CONFIG,
-    taxation?: Taxation,
     transportHandler?: TransportHandler,
   ) {
     super();
     this.io = io;
-    this.world = world;
     this.config = config;
-    this.taxation = taxation;
     this.transportHandler = transportHandler;
   }
 
@@ -266,7 +258,7 @@ export class DayNightCycle extends EventEmitter {
       this.cycleStartTime = Date.now(); // 开始新周期
       logger.debug(`进入白天阶段，第 ${this.cycleCount} 个周期`);
 
-      // 触发周期性事件（计税、交通枢纽变更）
+      // 触发周期性事件（交通枢纽变更）
       if (this.config.enableEvents) {
         this.triggerCycleEvents();
       }
@@ -283,18 +275,6 @@ export class DayNightCycle extends EventEmitter {
    * 触发周期性事件
    */
   private triggerCycleEvents(): void {
-    // 1. 计税
-    if (this.taxation) {
-      const players = this.world.getAllPlayers();
-      logger.debug(`触发计税：${players.length} 名玩家`);
-      for (const player of players) {
-        if (player.status === 'normal') {
-          this.taxation.triggerManualTax(player.id);
-        }
-      }
-    }
-
-    // 2. 交通枢纽目的地变更
     if (this.transportHandler) {
       logger.debug('触发交通枢纽目的地变更');
       this.transportHandler.updateAllHubDestinations();
@@ -375,10 +355,8 @@ export class DayNightCycle extends EventEmitter {
  */
 export function createDayNightCycle(
   io: TypedServer,
-  world: GameWorld,
   config?: DayNightConfig,
-  taxation?: Taxation,
   transportHandler?: TransportHandler,
 ): DayNightCycle {
-  return new DayNightCycle(io, world, config, taxation, transportHandler);
+  return new DayNightCycle(io, config, transportHandler);
 }

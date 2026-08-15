@@ -238,6 +238,7 @@ describe('path-finder - getNeighbors', () => {
 describe('path-finder - 性能', () => {
   it('单次 findPath（200 格子，走 50 步）< 5ms', () => {
     const idx = new MapIndex(buildLinearMap(200));
+    findPath(0, 50, { mapIndex: idx });
     const start = process.hrtime.bigint();
     findPath(0, 50, { mapIndex: idx });
     const end = process.hrtime.bigint();

@@ -34,7 +34,7 @@ packages/server/src/index.ts: bootstrap()
   -> createApp(config)
      -> Express / HTTP / Socket.IO
      -> GameWorld + 地图解析
-     -> Mortgage / Taxation / Bankruptcy
+     -> Mortgage / Taxation(map-meta taxConfig) / Bankruptcy
      -> HandlerRegistry
      -> DayNightCycle / TimeZoneManager / ProsperityManager
      -> BehaviorEngine / EraManager / PlayerStore
@@ -43,6 +43,8 @@ packages/server/src/index.ts: bootstrap()
 ```
 
 `app.ts:createApp` 是组合根：创建对象、配置依赖注入和连接注册，但不监听端口。地图从 `config.mapPath` 与 `config.mapMetaPath` 读取；缺失地图时，服务端保留 HTTP/Socket 启动，但地图相关能力可能不可用。
+
+计税配置只在组合根从实际 `MapMeta.config.taxConfig` 读取并完整传入 `Taxation`；计税模块不再持有地图元数据更新入口，昼夜循环也不负责计税。
 
 ### 客户端
 
@@ -79,7 +81,7 @@ io.on('connection', socket)
 
 ## 服务端权威流
 
-客户端只发起 `client.*` 请求或查询；handler 从 `socket.data.playerId` 获取身份，读取 `GameWorld` 和各管理器，校验权限、位置、冷却、余额和业务约束，再写入服务端状态。随机骰子、移动最终位置、地产与投资、抵押、税收、破产、队伍共享数值、繁荣度和时代状态均以服务端结果为准。
+客户端只发起 `client.*` 请求或查询；handler 从 `socket.data.playerId` 获取身份，读取 `GameWorld` 和各管理器，校验权限、位置、冷却、余额和业务约束，再写入服务端状态。随机骰子、移动最终位置、地产与投资、抵押、税收、破产、队伍共享数值、繁荣度和时代状态均以服务端结果为准。当前运行时不提供贷款、还款、利息或银行账户机制。
 
 ```mermaid
 sequenceDiagram

@@ -4,7 +4,7 @@
 
 import { Bankruptcy, DEFAULT_BANKRUPTCY_CONFIG, type BankruptcyConfig } from '../../src/economy/Bankruptcy';
 import { Mortgage, DEFAULT_MORTGAGE_CONFIG } from '../../src/economy/Mortgage';
-import { Taxation, DEFAULT_TAX_CONFIG } from '../../src/economy/Taxation';
+import { Taxation } from '../../src/economy/Taxation';
 import { GameWorld } from '../../src/world/GameWorld';
 import { PlayerManager } from '../../src/world/PlayerManager';
 import type { Player, MapData, Cell } from '@game/shared';
@@ -41,7 +41,14 @@ describe('Bankruptcy System', () => {
 
     // 创建经济系统实例
     mortgage = new Mortgage(mockIo, world, DEFAULT_MORTGAGE_CONFIG);
-    taxation = new Taxation(mockIo, world, DEFAULT_TAX_CONFIG);
+    taxation = new Taxation(mockIo, world, {
+      wealthTaxRate: 0.02,
+      propertyTaxRate: 0.01,
+      investmentTaxRate: 0.015,
+      minWealthForTax: 1000,
+      minPropertyValueForTax: 500,
+      taxInterval: 900000,
+    });
     bankruptcy = new Bankruptcy(mockIo, world, mortgage, taxation, {
       ...DEFAULT_BANKRUPTCY_CONFIG,
       bankruptcyThresholdTime: 1000, // 1 秒（测试用）

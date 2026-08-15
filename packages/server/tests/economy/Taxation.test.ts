@@ -2,7 +2,7 @@
  * 计税系统测试
  */
 
-import { Taxation, DEFAULT_TAX_CONFIG, type TaxConfig } from '../../src/economy/Taxation';
+import { Taxation, type TaxConfig } from '../../src/economy/Taxation';
 import { GameWorld } from '../../src/world/GameWorld';
 import { PlayerManager } from '../../src/world/PlayerManager';
 import type { Player, MapData, Cell } from '@game/shared';
@@ -29,10 +29,9 @@ describe('Taxation System', () => {
 
     // 创建经济系统实例
     taxation = new Taxation(mockIo, world, {
-      ...DEFAULT_TAX_CONFIG,
-      wealthTaxRate: 2, // 2%
-      propertyTaxRate: 1, // 1%
-      investmentTaxRate: 1.5, // 1.5%
+      wealthTaxRate: 0.02,
+      propertyTaxRate: 0.01,
+      investmentTaxRate: 0.015,
       minWealthForTax: 1000,
       minPropertyValueForTax: 500,
       taxInterval: 60000, // 1 分钟（测试用）

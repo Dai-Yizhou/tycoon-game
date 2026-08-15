@@ -52,7 +52,7 @@ describe('TimeZoneManager', () => {
   beforeEach(() => {
     jest.useFakeTimers();
 
-    dayNight = new DayNightCycle(mockIO, mockWorld, {
+    dayNight = new DayNightCycle(mockIO, {
       ...DEFAULT_DAY_NIGHT_CONFIG,
       cycleMinutes: 15,
       broadcastChanges: false,

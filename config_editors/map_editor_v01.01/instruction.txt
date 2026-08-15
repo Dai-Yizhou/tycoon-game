@@ -420,6 +420,10 @@ int main() {
 
 ## 七、版本兼容性
 
+## 八、地图级计税配置
+
+计税配置不属于格子属性模板，而属于导出的 `map-meta.json`。在 `config` 下维护完整的 `taxConfig` 对象：`wealthTaxRate`、`propertyTaxRate`、`investmentTaxRate` 是 0 到 1 的小数比例；`minWealthForTax`、`minPropertyValueForTax` 是非负免税阈值；`taxInterval` 是正数毫秒。服务端不会从源码补齐缺失字段，配置不完整或非法时拒绝启动。
+
 导出的 JSON 文件格式稳定，未来可能扩展的字段均会向后兼容。建议游戏开发者：
 
 1. 忽略未知字段，避免因新增字段导致解析失败。

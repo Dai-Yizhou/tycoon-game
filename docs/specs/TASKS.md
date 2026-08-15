@@ -164,7 +164,7 @@
   - `programmatic` TR-7.4: 其他玩家能看到移动动画（广播） ✓
   - `programmatic` TR-7.5: 服务端校验所有移动，防止作弊 ✓
 - **Notes**: 随机数、位置计算必须在服务端（防作弊）；冷却时间默认 5 秒（可配置）；多岔路暂时默认选择第一条路径（简化）；移动动画使用 BoardRenderer 的玩家棋子更新
-- **完成报告**: 
+  - **完成报告**:
   - 后端：创建 DiceHandler（掷骰处理、冷却管理、随机数生成）和 MovementHandler（移动路径计算、广播、多岔路处理）；更新 handlers.ts 集成新处理器；支持监狱状态冷却延长（10秒）；服务端权威校验所有掷骰和移动。
   - 前端：创建 DiceButton（掷骰按钮组件，支持冷却禁用和倒计时显示）；创建 DiceAnimation（骰子动画，1-6 点数显示）；创建 useDice hook（掷骰逻辑封装，Socket 通信）；创建 useMovement hook（移动逻辑封装，动画播放）；更新 BoardRenderer 支持单个玩家位置更新。
   - 测试：创建 10+ 个测试覆盖掷骰随机性、冷却管理、移动路径计算、组件渲染等。
@@ -410,7 +410,7 @@
 - **完成报告**:
   - 后端：创建 3 个核心模块（ItemRegistry 道具注册表、ItemEffects 道具效果处理器、itemTemplates 内置道具模板），位于 `packages/server/src/items/`；创建 ItemHandler 处理器，位于 `packages/server/src/handlers/itemHandler.ts`。
   - 内置道具：查封令（SealOrder，禁用格子操作、信用值惩罚、自动恢复）、复活令（ReviveOrder，复活破产玩家、信用值增加）。
-  - 集成：app.ts 中 `handlerRegistry.setItemHandler(bank)` 注入 Bank 实例；BehaviorEngine 注入 itemEffectsHandler；通过 Socket 事件 `client.useItem`/`client.getItems`/`client.requestItemDrop` 暴露 API。
+  - 集成：此历史规格不代表当前运行时已接入道具系统；当前运行时不注册 `client.useItem`、`client.getItems` 或 `client.requestItemDrop`。
   - 前端：创建 ItemBag（道具背包）、SealOrderModal（查封令使用弹窗）、ReviveOrderModal（复活令使用弹窗）。
   - 文件结构：
     - packages/server/src/items/ItemRegistry.ts
@@ -465,7 +465,7 @@
   - 天赋界面（起点处打开）
   - 天赋系统基础架构：天赋定义、天赋注册
   - 数值字段天赋：启用/禁用信用值、备选数值
-  - 游戏机制天赋：启用/禁用银行、道具、组队等
+  - 游戏机制天赋：启用/禁用道具、组队等
   - 天赋值消耗与获得
   - 天赋效果动态应用到游戏规则
   - **实现具体天赋选项**：
@@ -478,7 +478,7 @@
   - `programmatic` TR-17.2: 天赋值正确消耗和返还 ✓
   - `programmatic` TR-17.3: 禁用数值字段后对应UI隐藏 ✓
   - `programmatic` TR-17.4: 视野天赋正确影响玩家视野范围 ✓
-  - `programmatic` TR-17.5: 信用值/银行/备选字段开关正确启用/禁用对应系统 ✓
+  - `programmatic` TR-17.5: 信用值/备选字段开关正确启用/禁用对应系统 ✓
   - `human-judgement` TR-17.6: 天赋界面清晰易懂 ✓
 - **Notes**: 天赋系统与成就系统联动；天赋设计为可扩展的注册机制；不同天赋组合带来不同游戏体验
 - **完成报告**:
@@ -486,17 +486,17 @@
   - 天赋类型：
     - 视野天赋（3个）：基础视野(+10%)、广阔视野(+25%)、鹰眼视野(+40%)，有前置依赖关系。
     - 字段开关天赋（4个）：信用值启用/禁用、备选数值启用/禁用，互斥关系。
-    - 机制开关天赋（6个）：银行启用/禁用、道具启用/禁用、组队启用/禁用，互斥关系。
-    - 进阶天赋（3个）：探险家（视野+20%+备选数值）、经济学家（银行+信用值）、极简主义者（禁用所有扩展）。
+    - 机制开关天赋（4个）：道具启用/禁用、组队启用/禁用，互斥关系。
+    - 进阶天赋（2个）：探险家（视野+20%+备选数值）、极简主义者（禁用所有扩展）。
   - 效果处理器：
     - calculateVisionRadius：计算视野半径（考虑天赋加成，视野始终小于棋盘）。
-    - isFeatureEnabled：检查游戏机制是否启用（bank/items/team/credit/alternateField）。
+    - isFeatureEnabled：检查游戏机制是否启用（items/team/credit/alternateField）。
     - isFieldEnabled：检查数值字段是否启用。
   - 前端：创建 TalentPanel（天赋选择面板），支持分类显示、学习/取消、启用/禁用，显示天赋值、消耗、前置、互斥等信息。
   - 集成：
     - TalentHandler 集成到 HandlerRegistry，处理 client.learnTalent/unlearnTalent/toggleTalent/getTalentInfo。
     - Socket 事件：server.talentLearned/talentUnlearned/talentToggled。
-    - 与 VisionMaskRenderer 集成（视野天赋）、Bank/EventHandler 集成（机制开关）。
+    - 与 VisionMaskRenderer 集成（视野天赋）、EventHandler 集成（机制开关）。
   - 测试：创建 40+ 测试用例，覆盖天赋注册、学习、取消、启用/禁用、前置/互斥、视野计算、字段/机制开关、组合效果等。
   - 文件结构：
     - packages/server/src/talents/TalentRegistry.ts
@@ -671,7 +671,7 @@
 - **完成报告**:
   - 创建轻量级 i18n 模块（不依赖 i18next，简化实现）。
   - 提供中文（zh-CN.json）和英文（en-US.json）完整语言包。
-  - 覆盖所有 UI 文本（common/game/login/register/hud/dice/cell/property/event/item/talent/achievement/transport/monument/jail/bank/bankruptcy/tutorial/error）。
+  - 覆盖所有 UI 文本（common/game/login/register/hud/dice/cell/property/event/transport/monument/jail/bankruptcy/tutorial/error）。
   - 支持参数占位符（如 {{count}}、{{amount}}）。
   - 提供 setLocale/getLocale/t/getSupportedLocales 等函数。
   - 创建测试文件 i18n.test.ts，覆盖语言切换、翻译、参数替换等。

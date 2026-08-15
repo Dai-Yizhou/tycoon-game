@@ -20,7 +20,6 @@ export {
 export {
   Taxation,
   createTaxation,
-  DEFAULT_TAX_CONFIG,
   type TaxConfig,
   type TaxRecord,
   type TaxResult,

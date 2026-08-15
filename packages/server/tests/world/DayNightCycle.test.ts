@@ -22,7 +22,7 @@ describe('DayNightCycle', () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
-    dayNight = new DayNightCycle(mockIO, mockWorld, {
+    dayNight = new DayNightCycle(mockIO, {
       ...DEFAULT_DAY_NIGHT_CONFIG,
       cycleMinutes: 1, // 测试时使用 1 分钟周期
       broadcastChanges: false, // 禁用广播以避免 mock 调用
@@ -52,7 +52,7 @@ describe('DayNightCycle', () => {
     });
 
     it('应该正确切换昼夜阶段', () => {
-      dayNight = new DayNightCycle(mockIO, mockWorld, {
+      dayNight = new DayNightCycle(mockIO, {
         ...DEFAULT_DAY_NIGHT_CONFIG,
         cycleMinutes: 0.01, // 0.6 秒周期
         dayRatio: 0.5,
@@ -113,7 +113,7 @@ describe('DayNightCycle', () => {
     });
 
     it('应该正确计算周期计数', () => {
-      const fast = new DayNightCycle(mockIO, mockWorld, {
+      const fast = new DayNightCycle(mockIO, {
         ...DEFAULT_DAY_NIGHT_CONFIG,
         cycleMinutes: 0.01,
         dayRatio: 0.5,

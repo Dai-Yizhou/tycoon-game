@@ -98,7 +98,7 @@ export interface MapMeta {
   /**
    * 自定义配置
    *
-   * 用于承载地图特有的扩展配置（如银行利率、监狱时长等），
+   * 用于承载地图特有的扩展配置（如监狱时长等），
    * 引擎不强制解释此字段。
    */
   config: Record<string, unknown>;

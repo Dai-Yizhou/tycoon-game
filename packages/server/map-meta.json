@@ -32,10 +32,13 @@
     "era": "古典时代",
     "startBonus": 2000,
     "passBonus": 200,
-    "taxRate": {
-      "property": 0.01,
-      "money": 0.02,
-      "investment": 0.015
+    "taxConfig": {
+      "wealthTaxRate": 0.02,
+      "propertyTaxRate": 0.01,
+      "investmentTaxRate": 0.015,
+      "minWealthForTax": 1000,
+      "minPropertyValueForTax": 500,
+      "taxInterval": 900000
     },
     "diceCooldownSeconds": 5,
     "jailCooldownSeconds": 10,

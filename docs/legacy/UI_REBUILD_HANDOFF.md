@@ -123,7 +123,7 @@
 | `client.learnTalent` | `{ talentId }` | TalentHandler | 学习天赋 |
 | `client.unlearnTalent` | `{ talentId }` | TalentHandler | 取消学习天赋 |
 | `client.toggleTalent` | `{ talentId, enabled }` | TalentHandler | 启用/禁用天赋 |
-| `client.bankruptRestart` | `{}` | BankHandler | 破产重开 |
+| `client.bankruptRestart` | `{}` | Bankruptcy | 破产重开 |
 | `client.choosePath` | `{ fromCellId, toCellId }` | MovementHandler | 岔路选择 |
 
 ### 服务端 → 客户端（事件 → UI 更新）
@@ -254,7 +254,6 @@ ui/
 │   ├── AchievementPanel.ts # 成就面板
 │   └── Notifications.ts   # 通知系统
 ├── modals/
-│   ├── BankModal.ts       # 银行弹窗
 │   ├── TransportModal.ts  # 交通枢纽弹窗
 │   ├── SealItemModal.ts   # 查封令弹窗
 │   ├── ReviveItemModal.ts # 复活令弹窗

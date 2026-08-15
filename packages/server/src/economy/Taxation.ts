@@ -12,7 +12,7 @@
  * - 税收计算考虑财产、地产、投资项目等资产
  */
 
-import type { Player, MapMeta } from '@game/shared';
+import type { Player } from '@game/shared';
 import { CellTypes, getExtra, normalizeCellType, getValueCurrent } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -22,11 +22,11 @@ import type { TypedServer } from '../transport/SocketManager.js';
  * 税收配置
  */
 export interface TaxConfig {
-  /** 财产税率（百分比） */
+  /** 财产税率（小数比例） */
   wealthTaxRate: number;
-  /** 地产税率（百分比） */
+  /** 地产税率（小数比例） */
   propertyTaxRate: number;
-  /** 投资项目税率（百分比） */
+  /** 投资项目税率（小数比例） */
   investmentTaxRate: number;
   /** 最低财产（低于此值免税） */
   minWealthForTax: number;
@@ -35,18 +35,6 @@ export interface TaxConfig {
   /** 税收周期（毫秒，由昼夜周期决定） */
   taxInterval: number;
 }
-
-/**
- * 默认税收配置
- */
-export const DEFAULT_TAX_CONFIG: TaxConfig = {
-  wealthTaxRate: 2, // 财产税率 2%
-  propertyTaxRate: 1, // 地产税率 1%
-  investmentTaxRate: 1.5, // 投资项目税率 1.5%
-  minWealthForTax: 1000, // 财产低于 1000 免税
-  minPropertyValueForTax: 500, // 地产价值低于 500 免税
-  taxInterval: 900000, // 默认 15 分钟（由 dayNightCycleMinutes 决定）
-};
 
 /**
  * 税收记录
@@ -88,7 +76,7 @@ export class Taxation {
   private taxTimer: NodeJS.Timeout | null = null;
   private lastTaxTime: number = 0;
 
-  constructor(io: TypedServer, world: GameWorld, config: TaxConfig = DEFAULT_TAX_CONFIG) {
+  constructor(io: TypedServer, world: GameWorld, config: TaxConfig) {
     this.io = io;
     this.world = world;
     this.config = config;
@@ -227,7 +215,7 @@ export class Taxation {
       return 0;
     }
 
-    return Math.floor(money * (this.config.wealthTaxRate / 100));
+    return Math.floor(money * this.config.wealthTaxRate);
   }
 
   /**
@@ -269,7 +257,7 @@ export class Taxation {
       return 0;
     }
 
-    return Math.floor(totalPropertyValue * (this.config.propertyTaxRate / 100));
+    return Math.floor(totalPropertyValue * this.config.propertyTaxRate);
   }
 
   /**
@@ -295,7 +283,7 @@ export class Taxation {
       totalInvestmentValue += price;
     }
 
-    return Math.floor(totalInvestmentValue * (this.config.investmentTaxRate / 100));
+    return Math.floor(totalInvestmentValue * this.config.investmentTaxRate);
   }
 
   /**
@@ -356,21 +344,6 @@ export class Taxation {
   }
 
   /**
-   * 更新税收配置（从地图元数据）
-   */
-  updateConfigFromMapMeta(mapMeta: MapMeta): void {
-    const metaTaxConfig = mapMeta.config?.taxConfig as { wealthTaxRate?: number; propertyTaxRate?: number; investmentTaxRate?: number; minWealthForTax?: number; minPropertyValueForTax?: number } | undefined;
-    if (metaTaxConfig) {
-      this.config.wealthTaxRate = metaTaxConfig.wealthTaxRate ?? this.config.wealthTaxRate;
-      this.config.propertyTaxRate = metaTaxConfig.propertyTaxRate ?? this.config.propertyTaxRate;
-      this.config.investmentTaxRate = metaTaxConfig.investmentTaxRate ?? this.config.investmentTaxRate;
-      this.config.minWealthForTax = metaTaxConfig.minWealthForTax ?? this.config.minWealthForTax;
-      this.config.minPropertyValueForTax = metaTaxConfig.minPropertyValueForTax ?? this.config.minPropertyValueForTax;
-      logger.debug('税收配置已从地图元数据更新');
-    }
-  }
-
-  /**
    * 清除所有税收记录（破产时使用）
    */
   clearTaxRecords(playerId: string): void {
@@ -385,7 +358,7 @@ export class Taxation {
 export function createTaxation(
   io: TypedServer,
   world: GameWorld,
-  config?: TaxConfig,
+  config: TaxConfig,
 ): Taxation {
   return new Taxation(io, world, config);
 }

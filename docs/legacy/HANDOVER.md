@@ -1,6 +1,6 @@
 # 项目交接文档
 
-> 当前交接基线：主运行时为 `@game/shared`、`@game/server`、`@game/client`，无 admin 包。配置直接编辑 JSON；客户端使用单一 Socket 与 `SocketEventHandler`；银行及关键经济状态由服务端权威维护。
+> 当前交接基线：主运行时为 `@game/shared`、`@game/server`、`@game/client`，无 admin 包。配置直接编辑 JSON；客户端使用单一 Socket 与 `SocketEventHandler`；关键经济状态由服务端权威维护。
 
 > 更新时间：2026-07-12
 > 项目：大富翁.io（monopoly-io-game）

@@ -18,6 +18,8 @@ JSON -> server/app.ts 启动解析 -> GameWorld / BehaviorEngine
 
 `valueFieldDefinitions` 决定玩家或区域数值字段；客户端按服务端返回的定义投影，不要假设固定字段集合。行为事件由服务端权威选择和应用，客户端只展示结果。
 
+地图作者必须在 `map-meta.json` 的 `config.taxConfig` 中填写完整计税入口：`wealthTaxRate`、`propertyTaxRate`、`investmentTaxRate` 使用 0 到 1 的小数比例，`minWealthForTax`、`minPropertyValueForTax` 为非负免税阈值，`taxInterval` 为正数毫秒。字段缺失或非法会阻止服务端启动。
+
 ## 删除边界
 
 item、talent、achievement 不是当前内容系统。仓库中残留的同名配置、编辑器或历史/规格文档不应继续编辑为运行时功能，也不要为它们新增字段、加载器或 UI。
