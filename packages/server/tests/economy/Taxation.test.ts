@@ -275,7 +275,7 @@ describe('Taxation System', () => {
 
       const result = taxation.triggerManualTax(player.id);
 
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(false);
       expect(result.taxRecord).toBeUndefined();
     });
 
@@ -284,17 +284,20 @@ describe('Taxation System', () => {
 
       const result = taxation.triggerManualTax(player.id);
 
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(false);
       expect(result.taxRecord).toBeUndefined();
     });
 
-    it('冻结玩家不计税', () => {
+    it('冻结玩家仍计税', () => {
+      player.values['money'].current = 5000;
+      world.updatePlayer(player);
       world.getPlayerManager().updateStatus(player.id, PlayerStatus.Frozen);
 
       const result = taxation.triggerManualTax(player.id);
 
       expect(result.success).toBe(true);
-      expect(result.taxRecord).toBeUndefined();
+      expect(result.taxRecord).toBeDefined();
+      expect(result.taxRecord!.totalTax).toBeGreaterThan(0);
     });
   });
 

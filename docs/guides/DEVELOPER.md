@@ -24,7 +24,7 @@ pnpm test
 - 修改协议先看 `packages/shared/src/types/socket-events.ts`，再同步 server handler 与 client `SocketEventHandler`。
 - 修改服务端组合关系看 `packages/server/src/app.ts`；不要在测试或页面中创建第二条生产 Socket 注册链。
 - 修改客户端状态先看 `GameStore`、`GameViewModel` 和 `ClientHudBridge`，再看 `GamePage` 的组合与清理。
-- 修改地图看 `packages/server/map.json`、`map-meta.json` 和 `shared/src/map`；客户端通过 `/api/map` 获取数据。
+- 修改地图看 `packages/server/map.json`、`map-meta.json` 和 `shared/src/map`；客户端通过 `/api/map` 获取数据。地产与投资共有人统一写入 `extra.ownerships`，同时同步 `extra.owners`；合租参数配置在 `map-meta.json` 的 `config.ownership`。
 - 修改行为看 `packages/server/config/behaviors/` 和 `BehaviorEngine`。
 
 ## 权威数据流
@@ -34,8 +34,7 @@ pnpm test
 -> GameWorld 或 manager 写入 -> server.* / ack
 -> SocketEventHandler -> GameStore / ViewModel -> HUD / Canvas
 ```
-
-客户端不能预先改写余额、位置、资产、队伍成员、繁荣度或状态；ack 不是最终状态来源。所有公共协议类型从 shared 导入。
+- 客户端不能预先改写余额、位置、资产、队伍成员、繁荣度或状态；ack 不是最终状态来源。Frozen 只表示连接状态，离线玩家无主动操作入口但仍计税、收租并参与投资收益与破产检查；Jail 不参与这些经济结算；Bankrupt 保留队伍、地产和投资但不参与经济，重连仍为 Bankrupt，直到显式 `bankruptRestart`。经济状态判定从 `@game/shared` 导入，所有公共协议类型也从 shared 导入。
 
 ## 文档边界
 

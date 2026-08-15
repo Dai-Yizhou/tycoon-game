@@ -256,8 +256,8 @@ describe('InvestmentHandler', () => {
       expect(player2Amount).toBe(50);
 
       // 检查玩家财产增加
-      expect(player1.values['money'].current).toBe(950); // 900 + 50
-      expect(player2.values['money'].current).toBe(950); // 900 + 50
+      expect(player1.values['money'].current).toBe(1050);
+      expect(player2.values['money'].current).toBe(950);
     });
 
     it('事件触发损失时正确扣除所有者财产', () => {
@@ -288,8 +288,8 @@ describe('InvestmentHandler', () => {
       expect(player2Amount).toBe(25);
 
       // 检查玩家财产减少
-      expect(player1.values['money'].current).toBe(875); // 900 - 25
-      expect(player2.values['money'].current).toBe(875); // 900 - 25
+      expect(player1.values['money'].current).toBe(975);
+      expect(player2.values['money'].current).toBe(875);
     });
 
     it('无主投资项目事件触发无影响', () => {

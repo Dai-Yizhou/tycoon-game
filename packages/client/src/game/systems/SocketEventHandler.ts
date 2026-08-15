@@ -23,6 +23,7 @@ import {
   setCurrentCredit,
   setCurrentEnv,
   setIsInJail,
+  setIsBankrupt,
   setJailEndTime,
   setCanRoll,
   setIsWaitingForChoice,
@@ -53,7 +54,7 @@ const SOCKET_EVENTS = [
   'server.valueChanged', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
   'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft', 'server.teamMemberKicked',
   'server.teamUpdated', 'server.teamDisbanded', 'server.prosperityChanged', 'server.gameState',
-  'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.playerRevived',
+  'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.playerBankrupt', 'server.playerRestarted',
 ] as const;
 
 /**
@@ -103,6 +104,16 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 
   socket.on('server.notification', (payload: { id: string; type: 'info' | 'success' | 'warning' | 'error'; title: string; content: string; durationMs?: number }) => {
     options.onNotification?.(payload);
+  });
+
+  socket.on('server.playerBankrupt', (payload) => {
+    if (payload.playerId === currentPlayer?.id) setIsBankrupt(true);
+    requestHudRefresh();
+  });
+
+  socket.on('server.playerRestarted', (payload) => {
+    if (payload.playerId === currentPlayer?.id) setIsBankrupt(false);
+    requestHudRefresh();
   });
 
   // 监听聊天消息

@@ -49,7 +49,6 @@ describe('Bankruptcy System', () => {
     bankruptcy = new Bankruptcy(mockIo, world, taxation, {
       ...DEFAULT_BANKRUPTCY_CONFIG,
       bankruptcyThresholdTime: 1000, // 1 秒（测试用）
-      revivalPeriod: 5000, // 5 秒（测试用）
       bankruptcyCheckInterval: 100, // 100ms（测试用，加速破产检查）
     });
 
@@ -162,79 +161,59 @@ describe('Bankruptcy System', () => {
       const isBankrupt = bankruptcy.isPlayerBankrupt(player.id);
       expect(isBankrupt).toBe(false);
     });
+
+    it('冻结玩家仍参与破产判定', () => {
+      player.values['money'].current = 0;
+      world.updatePlayer(player);
+      world.getPlayerManager().updateStatus(player.id, PlayerStatus.Frozen);
+
+      bankruptcy.startBankruptcyCheck();
+      jest.advanceTimersByTime(1500);
+
+      expect(bankruptcy.isPlayerBankrupt(player.id)).toBe(true);
+    });
   });
 
-  describe('复活机制', () => {
-    beforeEach(async () => {
+  describe('破产重启', () => {
+    beforeEach(() => {
       bankruptcy.triggerBankruptcy(player.id, 'manual');
     });
 
-    it('TR-14.4-B: 复活后回到起点', () => {
-      const result = bankruptcy.revivePlayer(player.id, mockSocket);
-
-      expect(result.success).toBe(true);
-
-      // 检查位置
-      const updatedPlayer = world.getPlayer(player.id);
-      expect(updatedPlayer!.position.cellId).toBe(0); // 起点
-    });
-
-    it('复活后获得初始财产和信用值', () => {
-      const result = bankruptcy.revivePlayer(player.id, mockSocket);
-
-      expect(result.success).toBe(true);
-      expect(result.startingMoney).toBe(DEFAULT_BANKRUPTCY_CONFIG.revivalStartingMoney);
-      expect(result.startingCredit).toBe(DEFAULT_BANKRUPTCY_CONFIG.revivalStartingCredit);
-
-      // 检查玩家数值
-      const updatedPlayer = world.getPlayer(player.id);
-      expect(updatedPlayer!.values['money'].current).toBe(DEFAULT_BANKRUPTCY_CONFIG.revivalStartingMoney);
-      expect(updatedPlayer!.values['credit'].current).toBe(DEFAULT_BANKRUPTCY_CONFIG.revivalStartingCredit);
-    });
-
-    it('复活后恢复为正常状态', () => {
-      bankruptcy.revivePlayer(player.id, mockSocket);
-
-      const updatedPlayer = world.getPlayer(player.id);
-      expect(updatedPlayer!.status).toBe(PlayerStatus.Normal);
-    });
-
-    it('超过复活期限后无法复活', () => {
-      // 推进到超过复活期限（fake timers）
-      jest.advanceTimersByTime(6000);
-
-      const result = bankruptcy.revivePlayer(player.id, mockSocket);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('已超过复活期限');
-    });
-  });
-
-  describe('清算机制', () => {
-    beforeEach(async () => {
-      // 给玩家添加地产
+    it('破产触发后保留地产与税收记录', () => {
       const cell = mapData[1];
       cell.extra.owners = [player.id];
-      cell.extra.ownerships = [{ playerId: player.id, share: 1.0, purchasePrice: 500 }];
-      world.updatePlayer(player);
+      cell.extra.ownerships = [{ playerId: player.id, share: 1, purchasePrice: 500 }];
+      taxation.triggerManualTax(player.id);
 
       bankruptcy.triggerBankruptcy(player.id, 'manual');
+
+      expect(cell.extra.owners).toContain(player.id);
+      expect(taxation.getPlayerTaxRecords(player.id)).toHaveLength(0);
     });
 
-    it('TR-14.4: 破产超过期限后清除地产', () => {
-      // 推进到超过复活期限触发清算（fake timers）
-      jest.advanceTimersByTime(6000);
+    it('破产重启后回到地图起点并恢复地图定义的初始值', () => {
+      const result = bankruptcy.restartBankruptPlayer(player.id, mockSocket);
 
-      // 检查地产所有权已清除
-      const cell = mapData[1];
-      expect(cell.extra.owners).not.toContain(player.id);
+      expect(result.success).toBe(true);
+      expect(world.getPlayer(player.id)!.position.cellId).toBe(0);
+      expect(world.getPlayer(player.id)!.status).toBe(PlayerStatus.Normal);
     });
 
-    it('清算后清除税收记录', () => {
-      jest.advanceTimersByTime(6000);
+    it('破产重启保留 teamId', () => {
+      player.teamId = 'team-1';
+      bankruptcy.triggerBankruptcy(player.id, 'manual');
 
-      const taxRecords = taxation.getPlayerTaxRecords(player.id);
-      expect(taxRecords.length).toBe(0);
+      bankruptcy.restartBankruptPlayer(player.id, mockSocket);
+
+      expect(world.getPlayer(player.id)!.teamId).toBe('team-1');
+    });
+
+    it('破产玩家不可通过重连恢复为正常状态', () => {
+      const stored = { ...world.getPlayer(player.id)! };
+      stored.status = PlayerStatus.Bankrupt;
+      world.updatePlayer(stored);
+
+      expect(world.getPlayer(player.id)!.status).toBe(PlayerStatus.Bankrupt);
     });
   });
 
@@ -251,13 +230,6 @@ describe('Bankruptcy System', () => {
       expect(isBankrupt).toBe(true);
     });
 
-    it('获取剩余复活时间', () => {
-      bankruptcy.triggerBankruptcy(player.id, 'manual');
-
-      const remaining = bankruptcy.getRemainingRevivalTime(player.id);
-      expect(remaining).toBeGreaterThan(0);
-      expect(remaining).toBeLessThanOrEqual(DEFAULT_BANKRUPTCY_CONFIG.revivalPeriod);
-    });
   });
 
   describe('事件广播', () => {
@@ -270,22 +242,11 @@ describe('Bankruptcy System', () => {
       }));
     });
 
-    it('复活时广播复活事件', () => {
+    it('重启时广播重启事件', () => {
       bankruptcy.triggerBankruptcy(player.id, 'manual');
-      bankruptcy.revivePlayer(player.id, mockSocket);
+      bankruptcy.restartBankruptPlayer(player.id, mockSocket);
 
-      expect(mockIo.emit).toHaveBeenCalledWith('server.playerRevived', expect.objectContaining({
-        playerId: player.id,
-      }));
-    });
-
-    it('清算时广播清算事件', () => {
-      bankruptcy.triggerBankruptcy(player.id, 'manual');
-
-      // 推进到超过复活期限触发清算（fake timers）
-      jest.advanceTimersByTime(6000);
-
-      expect(mockIo.emit).toHaveBeenCalledWith('server.playerLiquidated', expect.objectContaining({
+      expect(mockIo.emit).toHaveBeenCalledWith('server.playerRestarted', expect.objectContaining({
         playerId: player.id,
       }));
     });

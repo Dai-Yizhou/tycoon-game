@@ -15,11 +15,12 @@
  */
 
 import type { AckResult, Cell, Player } from '@game/shared';
-import { getExtra, normalizeCellType, CellTypes } from '@game/shared';
+import { getExtra, normalizeCellType, CellTypes, PlayerStatus, canReceiveInvestmentImpact, participatesInEconomy } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
+import { DEFAULT_OWNERSHIP_CONFIG, addOwnership, getBuyInPrice, getOwnerships, type OwnershipConfig } from '../economy/index.js';
 import type { PropertyOwnership } from './propertyHandler.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
 
@@ -63,10 +64,12 @@ export class InvestmentHandler {
   private readonly world: GameWorld;
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
+  private readonly ownershipConfig: OwnershipConfig;
 
-  constructor(io: TypedServer, world: GameWorld) {
+  constructor(io: TypedServer, world: GameWorld, ownershipConfig: OwnershipConfig = DEFAULT_OWNERSHIP_CONFIG) {
     this.io = io;
     this.world = world;
+    this.ownershipConfig = ownershipConfig;
   }
 
   /**
@@ -126,6 +129,12 @@ export class InvestmentHandler {
         return;
       }
 
+      if (!participatesInEconomy(player.status)) {
+        emitError(socket, ErrorCodes.InvalidOperation, '当前状态不可操作投资');
+        ack?.({ ok: false, error: 'invalid_status' });
+        return;
+      }
+
       // 3. 获取地图数据
       const mapIndex = this.world.getMapIndex();
       if (!mapIndex) {
@@ -151,9 +160,8 @@ export class InvestmentHandler {
       }
 
       // 6. 验证格子是否已被购买
-      const owners = getExtra<string[]>(cell, 'owners', []) ?? [];
-      const ownerships = getExtra<PropertyOwnership[]>(cell, 'ownerships', []) ?? [];
-      const alreadyOwned = owners.includes(playerId) || ownerships.some(o => o.playerId === playerId);
+      const ownerships = getOwnerships(cell);
+      const alreadyOwned = ownerships.some(o => o.playerId === playerId && o.share > 0);
 
       if (alreadyOwned) {
         emitError(socket, ErrorCodes.InvalidPayload, '你已经拥有该投资项目');
@@ -162,7 +170,7 @@ export class InvestmentHandler {
       }
 
       // 7. 获取价格
-      const price = getExtra<number>(cell, 'price', 0) ?? 0;
+      const price = ownerships.length > 0 ? getBuyInPrice(cell, this.ownershipConfig) : (getExtra<number>(cell, 'price', 0) ?? 0);
       if (price <= 0) {
         emitError(socket, ErrorCodes.InvalidPayload, '该投资项目无价格信息');
         ack?.({ ok: false, error: 'no_price' });
@@ -255,7 +263,7 @@ export class InvestmentHandler {
       }
 
       // 4. 获取所有权信息
-      const ownerships = getExtra<PropertyOwnership[]>(cell, 'ownerships', []) ?? [];
+      const ownerships = getOwnerships(cell);
       if (ownerships.length === 0) {
         // 无主投资项目，无收益/损失
         ack?.({ ok: true, data: { investmentId: payload.investmentId, amount: 0, type: 'profit', affectedPlayers: [] } });
@@ -313,7 +321,7 @@ export class InvestmentHandler {
       }
 
       // 4. 获取所有权信息
-      const ownerships = getExtra<PropertyOwnership[]>(cell, 'ownerships', []) ?? [];
+      const ownerships = getOwnerships(cell);
       if (ownerships.length === 0) {
         return null;
       }
@@ -349,67 +357,36 @@ export class InvestmentHandler {
     price: number,
   ): { cell: Cell; ownership: PropertyOwnership } | null {
     try {
-      // 1. 扣除玩家财产
       const currentMoney = this.getPlayerMoney(player);
       this.setPlayerMoney(player, currentMoney - price);
-
-      // 2. 更新格子所有权
-      const owners = getExtra<string[]>(cell, 'owners', []) ?? [];
-      const ownerships = getExtra<PropertyOwnership[]>(cell, 'ownerships', []) ?? [];
-
-      if (owners.length === 0 && ownerships.length === 0) {
-        // 单买：第一个购买者
-        const newOwnership: PropertyOwnership = {
-          playerId: player.id,
-          share: 1.0, // 100%
-          purchasePrice: price,
-        };
-
-        cell.extra.ownerships = [newOwnership];
-        cell.extra.owners = [player.id];
-      } else {
-        // 合租：后续购买者
-        // 计算持股比例：后到玩家支付金额 / (原主人购买金额 + 后到支付)
-        const totalPreviousPrice = ownerships.reduce((sum, o) => sum + o.purchasePrice, 0);
-        const newShare = price / (totalPreviousPrice + price);
-
-        // 调整原所有者的持股比例
-        for (const ownership of ownerships) {
-          ownership.share = ownership.purchasePrice / (totalPreviousPrice + price);
-        }
-
-        // 添加新所有者
-        const newOwnership: PropertyOwnership = {
-          playerId: player.id,
-          share: newShare,
-          purchasePrice: price,
-        };
-
-        ownerships.push(newOwnership);
-        owners.push(player.id);
-
-        cell.extra.ownerships = ownerships;
-        cell.extra.owners = owners;
+      const ownership = addOwnership(cell, player.id, price, this.ownershipConfig);
+      if (!ownership || ownership.share <= 0 || ownership.share > 1) {
+        this.setPlayerMoney(player, currentMoney);
+        return null;
       }
-
-      // 3. 更新玩家数据
+      this.distributeBuyInToOwners(cell, player.id, price);
       this.world.updatePlayer(player);
-
-      // 重新读取更新后的所有权数据（避免执行前的旧数组引用导致除零/持股比例错误）
-      const finalOwners = getExtra<string[]>(cell, 'owners', []) ?? [];
-      const finalOwnerships = getExtra<PropertyOwnership[]>(cell, 'ownerships', []) ?? [];
-
-      return {
-        cell,
-        ownership: {
-          playerId: player.id,
-          share: finalOwners.length === 1 ? 1.0 : price / (finalOwnerships.reduce((sum, o) => sum + o.purchasePrice, 0)),
-          purchasePrice: price,
-        },
-      };
+      for (const current of getOwnerships(cell)) {
+        const owner = this.world.getPlayer(current.playerId);
+        if (owner) this.world.updatePlayer(owner);
+      }
+      return { cell, ownership };
     } catch (err) {
       logger.error('购买投资项目执行错误', err);
       return null;
+    }
+  }
+
+  private distributeBuyInToOwners(cell: Cell, buyerId: string, amount: number): void {
+    const buyer = getOwnerships(cell).find((ownership) => ownership.playerId === buyerId);
+    if (!buyer || buyer.share >= 1) return;
+    for (const ownership of getOwnerships(cell)) {
+      if (ownership.playerId === buyerId) continue;
+      const owner = this.world.getPlayer(ownership.playerId);
+      if (!owner || owner.status === PlayerStatus.Bankrupt) continue;
+      const payout = Math.floor(amount * (ownership.share / (1 - buyer.share)));
+      this.setPlayerMoney(owner, this.getPlayerMoney(owner) + payout);
+      this.io.emit('server.valueChanged', { playerId: owner.id, fieldId: 'money', current: this.getPlayerMoney(owner), delta: payout });
     }
   }
 
@@ -448,12 +425,12 @@ export class InvestmentHandler {
     cell: Cell,
     impact: { amount: number; type: 'profit' | 'loss' },
   ): EventTriggerResult {
-    const ownerships = getExtra<PropertyOwnership[]>(cell, 'ownerships', []) ?? [];
+    const ownerships = getOwnerships(cell);
     const affectedPlayers: Array<{ playerId: string; share: number; amount: number }> = [];
 
     for (const ownership of ownerships) {
       const player = this.world.getPlayer(ownership.playerId);
-      if (!player) {
+      if (!player || !canReceiveInvestmentImpact(player.status)) {
         continue;
       }
 
@@ -517,7 +494,7 @@ export class InvestmentHandler {
       return null;
     }
 
-    return getExtra<PropertyOwnership[]>(cell, 'ownerships', []) ?? null;
+    return getOwnerships(cell);
   }
 
   /**

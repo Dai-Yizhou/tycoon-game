@@ -20,7 +20,7 @@
 | `client.rollDice` | `DiceHandler` | 服务端随机、冷却校验并进入移动链 |
 | `client.choosePath` | `MovementHandler` | 多岔路选择合法下一格 |
 | `client.move` | `MovementHandler` | 调试/授权移动入口，普通流程不能绕过掷骰链 |
-| `client.buyInvestment` / `triggerInvestmentEvent` | `InvestmentHandler` | 投资购买与事件结算 |
+| `client.buyInvestment` / `triggerInvestmentEvent` | `InvestmentHandler` | 投资购买与事件结算；投资与地产使用同一 ownerships 产权数据 |
 | `client.useTransport` / `getTransportDestinations` | `TransportHandler` | 查询目的地与付费传送 |
 | `client.repairMonument` / `getMonumentStatus` | `MonumentHandler` | 纪念碑状态查询与修缮 |
 | `client.inviteToTeam` / `respondToTeamInvite` / `leaveTeam` / `kickTeamMember` / `getTeamState` | `TeamHandler` | 队伍邀请、成员变更和状态查询 |
@@ -40,7 +40,7 @@
 | `server.playerMoved` | 服务端确认的最终位置及移动信息 |
 | `server.diceRolled` | 其他玩家可见的骰子结果 |
 | `server.valueChanged` | 玩家或区域数值增量/新值 |
-| `server.playerStatusChanged` | 监狱、破产等玩家状态变化 |
+| `server.playerStatusChanged` | Frozen、Jail、Bankrupt 等玩家状态变化 |
 | `server.investmentBought` / `investmentEventTriggered` | 投资状态和事件变化 |
 | `server.transportDestinationsChanged` | 交通目的地变化 |
 | `server.prosperityChanged` | 区域/纪念碑繁荣度变化 |
@@ -53,6 +53,8 @@
 | `server.pong` | 无 ack 心跳回包 |
 | `server.error` | `{ code, message }` 形式的错误 |
 
+状态与经济规则：Frozen 不能发起主动操作，但继续计税、收租、投资收益和破产检查；Jail 不收租、不计税、不参与投资收益和破产检查；Bankrupt 保留队伍、地产和投资，不收租、不计税、不参与投资收益和破产检查，重连保持 Bankrupt，只有 `client.bankruptRestart` 可重开。统一判定来自 shared 的经济规则函数。
+
 移动链中，`server.askPath` 表示需要客户端选择路径；客户端选择后再次发送 `client.choosePath`，最终落点才进入一次落点结算。
 
 ## REST
@@ -63,7 +65,7 @@
 | GET | `/health` | 服务状态、运行时间、玩家数、当前时代和时间戳 |
 | GET | `/api/map` | `{ mapData, regions, valueFieldDefinitions }`，由服务端读取地图 JSON 返回 |
 
-计税不是客户端配置 API。地图作者在 `map-meta.json` 的 `config.taxConfig` 提供完整税率、免税阈值和 `taxInterval`；服务端启动时校验，非法配置以启动错误终止。
+计税不是客户端配置 API。地图作者在 `map-meta.json` 的 `config.taxConfig` 提供完整税率、免税阈值和 `taxInterval`；服务端启动时校验，非法配置以启动错误终止。`config.ownership` 配置合租买入系数与最大股东数，默认最大股东数为 8；后来者买入价格为当前累计价值乘系数。
 
 ## 共享类型
 

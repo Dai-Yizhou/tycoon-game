@@ -13,7 +13,8 @@
  */
 
 import type { Player } from '@game/shared';
-import { CellTypes, getExtra, normalizeCellType, getValueCurrent } from '@game/shared';
+import { CellTypes, normalizeCellType, getValueCurrent, participatesInEconomy } from '@game/shared';
+import { getAccumulatedValue, getOwnerships } from './Ownership.js';
 import { logger } from '../utils/logger.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { TypedServer } from '../transport/SocketManager.js';
@@ -124,8 +125,7 @@ export class Taxation {
     logger.debug(`开始计税周期，共 ${players.length} 名玩家`);
 
     for (const player of players) {
-      if (player.status !== 'normal') {
-        // 破产、监狱、冻结状态不计税
+      if (!participatesInEconomy(player.status)) {
         continue;
       }
 
@@ -148,6 +148,9 @@ export class Taxation {
     const player = this.world.getPlayer(playerId);
     if (!player) {
       return { success: false, error: '玩家不存在' };
+    }
+    if (!participatesInEconomy(player.status)) {
+      return { success: false, error: '当前状态玩家不计税' };
     }
 
     // 1. 计算财产税
@@ -236,17 +239,9 @@ export class Taxation {
       const cellType = normalizeCellType(cell);
       if (cellType !== CellTypes.Property) continue;
 
-      const owners = getExtra<string[]>(cell, 'owners', []) ?? [];
-      if (!owners.includes(playerId)) continue;
-
-      // 计算地产价值（价格 + 升级费用）
-      const price = getExtra<number>(cell, 'price', 0) ?? 0;
-      const level = getExtra<number>(cell, 'level', 0) ?? 0;
-      const upgradeCosts = getExtra<number[]>(cell, 'upgradeCost', []) ?? [];
-      const upgradeValue = upgradeCosts.slice(0, level).reduce((sum, cost) => sum + cost, 0);
-
-      const propertyValue = price + upgradeValue;
-      totalPropertyValue += propertyValue;
+      const ownership = getOwnerships(cell).find((current) => current.playerId === playerId);
+      if (!ownership) continue;
+      totalPropertyValue += getAccumulatedValue(cell) * ownership.share;
     }
 
     if (totalPropertyValue < this.config.minPropertyValueForTax) {
@@ -271,12 +266,9 @@ export class Taxation {
       const cellType = normalizeCellType(cell);
       if (cellType !== CellTypes.Investment) continue;
 
-      const owners = getExtra<string[]>(cell, 'owners', []) ?? [];
-      if (!owners.includes(playerId)) continue;
-
-      // 计算投资价值（价格）
-      const price = getExtra<number>(cell, 'price', 0) ?? 0;
-      totalInvestmentValue += price;
+      const ownership = getOwnerships(cell).find((current) => current.playerId === playerId);
+      if (!ownership) continue;
+      totalInvestmentValue += getAccumulatedValue(cell) * ownership.share;
     }
 
     return Math.floor(totalInvestmentValue * this.config.investmentTaxRate);

@@ -40,4 +40,6 @@ docs/player/      玩家操作指南
 
 详细内容见 [架构](docs/architecture/ARCHITECTURE.md)、[API](docs/architecture/API.md)、[文件地图](docs/architecture/FILE_MAP.md) 和 [开发者指南](docs/guides/DEVELOPER.md)。规格与历史交接文档保留历史语义，阅读时以架构文档和源码为运行时依据。
 
+离线与经济状态规则：Frozen 仅为连接状态；离线不能主动操作，队伍不解散，地产和投资保留并继续收租、计税、投资收益和破产检查。Bankrupt 保留队伍与经济资产，但不收租、不计税、不参与投资，只有显式 `bankruptRestart` 才重开。
+
 地图经济参数入口为 `packages/server/map-meta.json` 的 `config.taxConfig`；税率使用小数比例，必须同时填写三个税率、两个免税阈值和 `taxInterval`。编辑器入口及字段约束见 `config_editors/map_editor_v01.01/instruction.txt`。

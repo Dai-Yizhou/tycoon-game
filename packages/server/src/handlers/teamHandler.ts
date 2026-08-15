@@ -267,8 +267,6 @@ export class TeamHandler {
     }
 
     const teamId = team.id;
-    const originalMembers = team.memberIds.slice();
-
     // 调用 TeamManager 离开队伍（服务端权威）
     const result = this.teamManager.leaveTeam(playerId);
     if (!result) {

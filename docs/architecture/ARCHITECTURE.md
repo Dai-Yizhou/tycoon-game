@@ -113,11 +113,18 @@ server.*
 
 Canvas 的每帧循环只读取投影后的状态，更新移动动画、相机和棋子，再调用 `BoardRenderer.render()`。地图由 `MapLoader` 请求 `/api/map`，经 shared 的解析工具标准化为 `MapIndex` 后交给渲染器。
 
+## 经济状态决策
+
+- Frozen 是连接状态，不是经济豁免。断线玩家不获得主动操作入口，但不解散队伍、不释放地产或投资；收租、计税、投资收益和破产检查继续执行。
+- Bankrupt 是玩家领域状态。玩家保留队伍、地产、投资和持股，停止收租、计税、投资参与和主动操作；只有显式 `client.bankruptRestart` 才能重开，重连始终保持 Bankrupt。
+- `packages/shared/src/types/economy-rules.ts` 提供跨包状态判定：Normal 与 Frozen 参与经济，Jail 与 Bankrupt 不参与；客户端只消费状态，不自行结算经济。
+- 队伍只维护成员关系与只读成员视图，不设队长经济、共同钱包或团队产权。合租持股仍按玩家身份结算。
+
 ## 删除边界
 
 - item、talent、achievement 已从当前运行时的 shared 类型、Socket 契约、服务端注册链和客户端主链移除；旧历史/规格文档仍不构成运行时事实。
 - 服务端与客户端运行时配置目录不再保留 `achievements.json`；`ai-bot` 与 `ai_bot_try` 不属于本次清理边界。
-- 破产重开仍是基础 Player 状态流程，不等同于复活令或成就/天赋保留机制。
+- 破产重开仍是基础 Player 状态流程，不提供远程恢复或道具恢复机制。
 
 ## 残余技术债
 

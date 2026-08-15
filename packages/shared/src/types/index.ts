@@ -6,6 +6,7 @@
 
 export * from './cell.js';
 export * from './player.js';
+export * from './economy-rules.js';
 export * from './team.js';
 export * from './map-meta.js';
 export * from './transport.js';
