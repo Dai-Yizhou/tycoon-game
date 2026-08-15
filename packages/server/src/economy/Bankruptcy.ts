@@ -1,7 +1,8 @@
-import { PlayerStatus, isBankruptcyCheckable } from '@game/shared';
+import { CellTypes, PlayerStatus, isBankruptcyCheckable, normalizeCellType } from '@game/shared';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { Taxation } from './Taxation.js';
+import { getOwnerships, releaseOwnership } from './Ownership.js';
 
 export interface BankruptcyRecord {
   id: string;
@@ -11,20 +12,8 @@ export interface BankruptcyRecord {
   netWorthAtBankruptcy: number;
 }
 
-export interface BankruptcyConfig {
-  bankruptcyThresholdTime: number;
-  bankruptcyCheckInterval: number;
-}
-
-export const DEFAULT_BANKRUPTCY_CONFIG: BankruptcyConfig = {
-  bankruptcyThresholdTime: 300000,
-  bankruptcyCheckInterval: 60000,
-};
-
-interface BankruptcyCheckState {
-  playerId: string;
-  firstNegativeTime: number | null;
-}
+export type BankruptcyConfig = Record<string, never>;
+export const DEFAULT_BANKRUPTCY_CONFIG: BankruptcyConfig = {};
 
 export interface BankruptcyResult {
   success: boolean;
@@ -42,45 +31,19 @@ export interface BankruptcyRestartResult {
 export class Bankruptcy {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
-  private readonly config: BankruptcyConfig;
+  private readonly taxation: Taxation;
   private readonly bankruptcyRecords = new Map<string, BankruptcyRecord>();
-  private readonly checkStates = new Map<string, BankruptcyCheckState>();
-  private bankruptcyCheckTimer: NodeJS.Timeout | null = null;
+  private readonly onPlayerUpdated = ({ player }: { player: import('@game/shared').Player }): void => {
+    if (isBankruptcyCheckable(player.status) && player.values.money && player.values.money.current <= 0) {
+      this.triggerBankruptcy(player.id, 'negative_net_worth');
+    }
+  };
 
-  constructor(io: TypedServer, world: GameWorld, taxation: Taxation, config: BankruptcyConfig = DEFAULT_BANKRUPTCY_CONFIG) {
+  constructor(io: TypedServer, world: GameWorld, taxation: Taxation, _config: BankruptcyConfig = DEFAULT_BANKRUPTCY_CONFIG) {
     this.io = io;
     this.world = world;
-    void taxation;
-    this.config = config;
-  }
-
-  startBankruptcyCheck(): void {
-    if (this.bankruptcyCheckTimer) return;
-    this.bankruptcyCheckTimer = setInterval(() => this.executeBankruptcyCheck(), this.config.bankruptcyCheckInterval);
-    this.bankruptcyCheckTimer.unref();
-  }
-
-  stopBankruptcyCheck(): void {
-    if (!this.bankruptcyCheckTimer) return;
-    clearInterval(this.bankruptcyCheckTimer);
-    this.bankruptcyCheckTimer = null;
-  }
-
-  private executeBankruptcyCheck(): void {
-    for (const player of this.world.getAllPlayers()) {
-      if (!isBankruptcyCheckable(player.status)) continue;
-      const netWorth = player.values.money?.current ?? 0;
-      if (netWorth <= 0) {
-        const state = this.checkStates.get(player.id);
-        if (!state || !state.firstNegativeTime) {
-          this.checkStates.set(player.id, { playerId: player.id, firstNegativeTime: Date.now() });
-        } else if (Date.now() - state.firstNegativeTime >= this.config.bankruptcyThresholdTime) {
-          this.triggerBankruptcy(player.id, 'negative_net_worth');
-        }
-      } else {
-        this.checkStates.delete(player.id);
-      }
-    }
+    this.taxation = taxation;
+    this.world.on('playerUpdated', this.onPlayerUpdated);
   }
 
   triggerBankruptcy(playerId: string, reason: 'negative_net_worth' | 'debt_overdue' | 'manual'): BankruptcyResult {
@@ -99,8 +62,9 @@ export class Bankruptcy {
     };
 
     this.world.getPlayerManager().updateStatus(playerId, PlayerStatus.Bankrupt);
+    this.releasePlayerOwnerships(playerId);
+    this.taxation.clearTaxRecords(playerId);
     this.bankruptcyRecords.set(playerId, record);
-    this.checkStates.delete(playerId);
 
     this.io.emit('server.playerBankrupt', { playerId, bankruptcyId, bankruptcyTime, reason, netWorthAtBankruptcy: record.netWorthAtBankruptcy });
     return { success: true, bankruptcyId };
@@ -115,15 +79,15 @@ export class Bankruptcy {
     const teamId = player.teamId;
     player.values = initialValues;
     player.teamId = teamId;
-    player.status = PlayerStatus.Normal;
     const startCellId = this.world.getMapMeta()?.startCellId ?? this.findStartCellId();
     player.position = { cellId: startCellId };
+    player.status = PlayerStatus.Normal;
     this.world.updatePlayer(player);
     this.bankruptcyRecords.delete(playerId);
 
     const startingMoney = player.values.money?.current;
     const startingCredit = player.values.credit?.current;
-    this.io.emit('server.playerRestarted', { playerId, restartTime: Date.now(), startingMoney, startingCredit });
+    this.io.emit('server.playerRestarted', { playerId, restartTime: Date.now(), player: { ...player, values: { ...player.values }, position: { ...player.position } }, startingMoney, startingCredit });
     return { success: true, startingMoney, startingCredit };
   }
 
@@ -133,13 +97,22 @@ export class Bankruptcy {
 
   getBankruptcyRecord(playerId: string): BankruptcyRecord | undefined { return this.bankruptcyRecords.get(playerId); }
   isPlayerBankrupt(playerId: string): boolean { return this.world.getPlayer(playerId)?.status === PlayerStatus.Bankrupt; }
-  getConfig(): BankruptcyConfig { return this.config; }
+  getConfig(): BankruptcyConfig { return DEFAULT_BANKRUPTCY_CONFIG; }
   manualBankruptcy(playerId: string): BankruptcyResult { return this.triggerBankruptcy(playerId, 'manual'); }
 
   cleanup(): void {
-    this.stopBankruptcyCheck();
+    this.world.off('playerUpdated', this.onPlayerUpdated);
     this.bankruptcyRecords.clear();
-    this.checkStates.clear();
+  }
+
+  private releasePlayerOwnerships(playerId: string): void {
+    for (const cell of this.world.getMapData() ?? []) {
+      const cellType = normalizeCellType(cell);
+      if (cellType !== CellTypes.Property && cellType !== CellTypes.Investment) continue;
+      if (getOwnerships(cell).some((ownership) => ownership.playerId === playerId)) {
+        releaseOwnership(cell, playerId);
+      }
+    }
   }
 }
 

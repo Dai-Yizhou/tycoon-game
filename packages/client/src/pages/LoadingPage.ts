@@ -103,9 +103,9 @@ export function createLoadingPage(controller: GameController): HTMLElement {
           progressText.textContent = '100%';
           controller.setLoginResult(result.data.player, result.data.cycleStartTime, result.data.cycleMinutes, result.data.existingPlayers || []);
 
-          // 连接成功后进入游戏
+          // 连接成功后进入对应页面
           setTimeout(() => {
-            controller.nextState();
+            if (result.data?.player.status !== 'bankrupt') controller.setState('game');
           }, 500);
         } else {
           const errorMsg = result.error || t('loading.loginFailed');

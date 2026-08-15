@@ -11,7 +11,7 @@
 import type { TypedClientSocket } from '../hooks/useSocket.js';
 import type { Player } from '@game/shared';
 
-export type GameState = 'start' | 'login' | 'loading' | 'game';
+export type GameState = 'start' | 'login' | 'loading' | 'game' | 'bankruptcy';
 
 export interface GameContext {
   state: GameState;
@@ -106,6 +106,7 @@ export class GameController {
       login: 'loading',
       loading: 'game',
       game: 'start',
+      bankruptcy: 'bankruptcy',
     };
     this.setState(transitions[this.context.state]);
   }
@@ -161,7 +162,23 @@ export class GameController {
     this.context.cycleStartTime = cycleStartTime;
     this.context.cycleMinutes = cycleMinutes;
     this.context.existingPlayers = existingPlayers;
+    this.context.state = player.status === 'bankrupt' ? 'bankruptcy' : 'game';
     this.notifyListeners();
+  }
+
+  updatePlayer(player: Player): void {
+    this.context.player = player;
+    this.notifyListeners();
+  }
+
+  setBankrupt(): void {
+    if (this.context.player) this.context.player.status = 'bankrupt';
+    this.setState('bankruptcy');
+  }
+
+  setRestarted(player: Player): void {
+    this.context.player = player;
+    this.setState('game');
   }
 
   /**

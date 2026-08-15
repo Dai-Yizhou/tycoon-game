@@ -23,7 +23,7 @@ import { logger } from './utils/logger.js';
 import { GameWorld } from './world/GameWorld.js';
 import { SocketManager, type TypedServer } from './transport/SocketManager.js';
 import { registerHandlers } from './transport/handlers.js';
-import { Taxation, Bankruptcy, type TaxConfig } from './economy/index.js';
+import { Taxation, Bankruptcy, resolveOwnershipConfig, type TaxConfig, type OwnershipConfig } from './economy/index.js';
 import { readFileSync } from 'node:fs';
 import { parseMapData, parseMapMeta } from '@game/shared';
 import { DayNightCycle, DEFAULT_DAY_NIGHT_CONFIG } from './world/DayNightCycle.js';
@@ -250,17 +250,17 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   if (!mapMeta) {
     throw new Error('无法启动经济系统：地图元数据未加载');
   }
+  const ownershipConfig: OwnershipConfig = resolveOwnershipConfig(mapMeta.config?.ownership);
   const taxation = new Taxation(io, world, readTaxConfig(mapMeta));
   const bankruptcy = new Bankruptcy(io, world, taxation);
 
   // 启动经济系统定时器
   taxation.startTaxTimer();
-  bankruptcy.startBankruptcyCheck();
 
   logger.info('Economy system initialized (taxation, bankruptcy)');
 
   // 注册业务事件处理器（需要在经济系统初始化后）
-  const handlerRegistry = registerHandlers(io, world);
+  const handlerRegistry = registerHandlers(io, world, ownershipConfig);
 
   handlerRegistry.setBankruptcy(bankruptcy);
 

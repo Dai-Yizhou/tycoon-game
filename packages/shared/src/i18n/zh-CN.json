@@ -274,12 +274,10 @@
   },
   "bankruptcy": {
     "title": "破产",
-    "bankrupt": "💀 你已破产！点击\"返回起点\"重新开始",
-    "restart": "🔄 返回起点重新开始",
-    "restartTitle": "破产后返回起点重新开始游戏",
-    "restarted": "🔄 重新开始！获得启动资金 2000 元",
-    "reviveTime": "复活时间",
-    "propertiesClear": "地产已清除",
+    "bankrupt": "💀 你已破产。资产已清零，请使用地图初始值重新开始。",
+    "restart": "🔄 使用地图初始值重新开始",
+    "restartTitle": "使用地图定义的初始值回到起点",
+    "restarted": "🔄 已使用地图初始值重新开始",
     "playerNotFound": "❌ 破产玩家不存在"
   },
   "tutorial": {

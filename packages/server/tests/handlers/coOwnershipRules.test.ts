@@ -280,15 +280,15 @@ describe('confirmed co-ownership rules', () => {
       minPropertyValueForTax: 0,
       taxInterval: 60000,
     });
-    const bankruptcy = new Bankruptcy(io(), world, taxation, { bankruptcyThresholdTime: 1, bankruptcyCheckInterval: 1 });
+    const bankruptcy = new Bankruptcy(io(), world, taxation);
 
     bankruptcy.triggerBankruptcy('bankrupt', 'manual');
     jest.advanceTimersByTime(2);
 
-    expect(property.extra.owners).toEqual(['bankrupt', 'remaining']);
-    expect(property.extra.ownerships).toHaveLength(2);
-    expect(investment.extra.owners).toEqual(['bankrupt', 'remaining']);
-    expect(investment.extra.ownerships).toHaveLength(2);
+    expect(property.extra.owners).toEqual(['remaining']);
+    expect(property.extra.ownerships).toHaveLength(1);
+    expect(investment.extra.owners).toEqual(['remaining']);
+    expect(investment.extra.ownerships).toHaveLength(1);
     bankruptcy.cleanup();
   });
 });

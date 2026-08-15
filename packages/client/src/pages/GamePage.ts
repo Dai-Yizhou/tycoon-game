@@ -241,6 +241,7 @@ export function createGamePage(controller: GameController): HTMLElement {
     page.appendChild(notificationCenter.getElement());
 
     registerSocketHandlers(socket, {
+      controller,
       onEvent: () => syncViewModel(),
       onNotification: (payload) => notificationCenter?.handleNotification({ ...payload, durationMs: payload.durationMs ?? 3000, createdAt: payload.createdAt ?? Date.now() }),
     });

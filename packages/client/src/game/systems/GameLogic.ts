@@ -194,21 +194,3 @@ export function handleRestoreMonument(): void {
 }
 
 // ===== 破产重开 =====
-
-export function handleBankruptRestart(): void {
-  if (!isBankrupt || !gameSocket) return;
-
-  gameSocket.emit('client.bankruptRestart', {}, (result: { ok: boolean; error?: string }) => {
-    if (result.ok) {
-      if (rollBtn) {
-        rollBtn.disabled = false;
-        rollBtn.classList.remove('disabled');
-        rollBtn.textContent = t('dice.roll');
-      }
-
-      addChatMessage(t('bankruptcy.restarted'), 'system');
-    } else {
-      addChatMessage(t('bankruptcy.restartFailed', { error: result.error || t('common.unknown') }), 'error');
-    }
-  });
-}

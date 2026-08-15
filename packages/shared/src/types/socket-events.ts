@@ -302,30 +302,16 @@ export interface ServerToClientEvents {
     playerId: string;
     bankruptcyId?: string;
     bankruptcyTime?: number;
-    revivalDeadline?: number;
     reason?: string;
     netWorthAtBankruptcy?: number;
   }) => void;
 
-  /** 玩家清算完成（超过复活期限） */
-  'server.playerLiquidated': (payload: {
+  'server.playerRestarted': (payload: {
     playerId: string;
-    bankruptcyId: string;
-    liquidationTime: number;
-  }) => void;
-
-  /** 玩家复活 */
-  'server.playerRevived': (payload: {
-    playerId?: string;
-    cost?: number;
-    bankruptcyId?: string;
-    revivalTime?: number;
+    restartTime: number;
+    player: Player;
     startingMoney?: number;
     startingCredit?: number;
-    targetPlayerId?: string;
-    targetPlayerName?: string;
-    revivedBy?: string;
-    revivedByName?: string;
   }) => void;
 
 

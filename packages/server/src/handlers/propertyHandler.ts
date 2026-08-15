@@ -149,7 +149,6 @@ export class PropertyHandler {
         ack?.({ ok: false, error: 'player_not_found' });
         return;
       }
-
       if (player.status === PlayerStatus.Bankrupt || player.status === PlayerStatus.Frozen) {
         emitError(socket, ErrorCodes.InvalidOperation, '当前状态不可操作地产');
         ack?.({ ok: false, error: 'invalid_status' });

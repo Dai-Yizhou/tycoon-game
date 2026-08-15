@@ -46,11 +46,7 @@ describe('Bankruptcy System', () => {
       minPropertyValueForTax: 500,
       taxInterval: 900000,
     });
-    bankruptcy = new Bankruptcy(mockIo, world, taxation, {
-      ...DEFAULT_BANKRUPTCY_CONFIG,
-      bankruptcyThresholdTime: 1000, // 1 秒（测试用）
-      bankruptcyCheckInterval: 100, // 100ms（测试用，加速破产检查）
-    });
+    bankruptcy = new Bankruptcy(mockIo, world, taxation);
 
     // 创建测试地图数据
     mapData = [
@@ -110,12 +106,6 @@ describe('Bankruptcy System', () => {
       player.values['money'].current = 0;
       world.updatePlayer(player);
 
-      // 启动破产检查（加速测试）
-      bankruptcy.startBankruptcyCheck();
-
-      // 推进到超过破产判定阈值（fake timers）
-      jest.advanceTimersByTime(1500);
-
       // 检查玩家是否破产
       const isBankrupt = bankruptcy.isPlayerBankrupt(player.id);
       expect(isBankrupt).toBe(true);
@@ -125,23 +115,14 @@ describe('Bankruptcy System', () => {
       player.values['money'].current = 0;
       world.updatePlayer(player);
 
-      // 启动破产检查
-      bankruptcy.startBankruptcyCheck();
-
-      // 推进部分时间（未到判定阈值，fake timers）
-      jest.advanceTimersByTime(500);
-
       // 恢复资产
       player.values['money'].current = 2000;
       world.updatePlayer(player);
       player.values['money'].current = 2000;
 
-      // 继续推进
-      jest.advanceTimersByTime(1500);
-
-      // 检查玩家未破产
+      // 资产归零立即触发破产
       const isBankrupt = bankruptcy.isPlayerBankrupt(player.id);
-      expect(isBankrupt).toBe(false);
+      expect(isBankrupt).toBe(true);
     });
 
     it('监狱玩家不破产判定', () => {
@@ -150,12 +131,6 @@ describe('Bankruptcy System', () => {
 
       // 设置为监狱状态
       world.getPlayerManager().updateStatus(player.id, PlayerStatus.Jail);
-
-      // 启动破产检查
-      bankruptcy.startBankruptcyCheck();
-
-      // 推进到超过破产判定阈值（fake timers）
-      jest.advanceTimersByTime(1500);
 
       // 检查玩家未破产
       const isBankrupt = bankruptcy.isPlayerBankrupt(player.id);
@@ -166,9 +141,6 @@ describe('Bankruptcy System', () => {
       player.values['money'].current = 0;
       world.updatePlayer(player);
       world.getPlayerManager().updateStatus(player.id, PlayerStatus.Frozen);
-
-      bankruptcy.startBankruptcyCheck();
-      jest.advanceTimersByTime(1500);
 
       expect(bankruptcy.isPlayerBankrupt(player.id)).toBe(true);
     });

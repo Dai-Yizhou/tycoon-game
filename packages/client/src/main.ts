@@ -18,6 +18,8 @@ import {
   cleanupLoadingPage,
   createGamePage,
   cleanupGamePage,
+  createBankruptcyPage,
+  cleanupBankruptcyPage,
 } from './pages/index.js';
 import './style.css';
 
@@ -115,6 +117,9 @@ function renderPage(controller: GameController, state: string): void {
     case 'game':
       currentPage = createGamePage(controller);
       break;
+    case 'bankruptcy':
+      currentPage = createBankruptcyPage(controller);
+      break;
     default:
       console.error('[client] unknown state:', state);
   }
@@ -135,6 +140,9 @@ function cleanupCurrentPage(state: string | null): void {
       break;
     case 'game':
       cleanupGamePage(currentPage);
+      break;
+    case 'bankruptcy':
+      cleanupBankruptcyPage(currentPage);
       break;
     default:
       currentPage.remove();

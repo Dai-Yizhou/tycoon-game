@@ -274,12 +274,10 @@
   },
   "bankruptcy": {
     "title": "Bankruptcy",
-    "bankrupt": "💀 You are bankrupt! Click \"Restart\" to begin again",
-    "restart": "🔄 Restart from Start",
-    "restartTitle": "Restart from the starting point after bankruptcy",
-    "restarted": "🔄 Restarted! Got 2000 starting funds",
-    "reviveTime": "Revive Time",
-    "propertiesClear": "Properties cleared",
+    "bankrupt": "💀 You are bankrupt. Assets were cleared; restart with the map's initial values.",
+    "restart": "🔄 Restart with map initial values",
+    "restartTitle": "Return to start with values defined by the map",
+    "restarted": "🔄 Restarted with the map's initial values",
     "playerNotFound": "❌ Bankrupt player not found"
   },
   "tutorial": {
