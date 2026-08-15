@@ -56,11 +56,9 @@ describe('Taxation System', () => {
           name: '地产1',
           price: 1000,
           rent: [50, 100],
-          mortgagePrice: 500,
           level: 2,
           upgradeCost: [200, 300],
           owners: ['rich-player'],
-          isMortgaged: false,
         },
       },
       {
@@ -195,16 +193,6 @@ describe('Taxation System', () => {
 
       expect(result.success).toBe(true);
       expect(result.taxRecord!.propertyTax).toBe(15);
-    });
-
-    it('抵押地产不收税', () => {
-      // 将地产抵押
-      mapData[1].extra.isMortgaged = true;
-
-      const result = taxation.triggerManualTax(richPlayer.id);
-
-      expect(result.success).toBe(true);
-      expect(result.taxRecord!.propertyTax).toBe(0);
     });
 
     it('地产价值低于最低征税额免税', () => {

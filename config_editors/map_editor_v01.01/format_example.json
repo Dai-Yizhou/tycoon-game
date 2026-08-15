@@ -14,9 +14,7 @@
         "icon":"",
         "level":0,
         "upgradeCost":[0],
-        "owners":[],
-        "isMortgaged":0,
-        "mortgagePrice":0
+        "owners":[]
     },
     {
         "id":0,
@@ -33,8 +31,6 @@
         "icon":2,
         "level":0,
         "upgradeCost":1,
-        "owners":0,
-        "isMortgaged":0,
-        "mortgagePrice":1
+        "owners":0
     }
 ]

@@ -5,7 +5,6 @@
 ## 当前功能
 
 - 数据驱动地图：服务端读取 `map.json`、`map-meta.json`，客户端通过 `/api/map` 投影并渲染。
-- 服务端权威掷骰、移动、岔路、地产、投资、交通、纪念碑、抵押、税收、破产、昼夜、时区、繁荣度、队伍、聊天、事件、行为引擎与时代管理。
 - 客户端使用原生 TypeScript/DOM、Vite 和 Canvas，页面链为 Start → Login → Loading → Game。
 - shared 提供前后端共享类型、Socket 事件契约、地图解析、i18n 与调试开关。
 

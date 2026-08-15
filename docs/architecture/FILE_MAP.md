@@ -66,14 +66,12 @@
 |---|---|
 | `src/handlers/diceHandler.ts` | 服务端掷骰与冷却 |
 | `src/handlers/movementHandler.ts` | 权威路径、岔路选择、最终落点结算 |
-| `src/handlers/propertyHandler.ts` | 地产购买、升级、抵押、租金/持股 |
 | `src/handlers/startHandler.ts` / `jailHandler.ts` | 起点与监狱规则 |
 | `src/handlers/investmentHandler.ts` | 投资购买、持股与事件收益 |
 | `src/handlers/transportHandler.ts` | 交通目的地与传送 |
 | `src/handlers/monumentHandler.ts` | 纪念碑状态与修缮 |
 | `src/events/EventHandler.ts`、`EventRegistry.ts`、`EventEffects.ts`、`eventTemplates.ts` | 事件注册、模板和效果 |
 | `src/behavior/BehaviorEngine.ts` | 加载 `config/behaviors/*.json` 并权威执行行为 |
-| `src/economy/Mortgage.ts`、`Taxation.ts`、`Bankruptcy.ts` | 抵押、税收、破产账本和周期任务 |
 | `src/team/TeamManager.ts`、`src/handlers/teamHandler.ts` | 队伍纯数据与 Socket 协议 |
 | `src/chat/ChatManager.ts` | 聊天消息与频道状态 |
 | `src/notifications/NotificationManager.ts` | 通知管理能力；接线以具体 handler 为准 |

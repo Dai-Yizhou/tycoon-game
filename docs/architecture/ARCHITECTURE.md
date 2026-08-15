@@ -34,7 +34,6 @@ packages/server/src/index.ts: bootstrap()
   -> createApp(config)
      -> Express / HTTP / Socket.IO
      -> GameWorld + 地图解析
-     -> Mortgage / Taxation(map-meta taxConfig) / Bankruptcy
      -> HandlerRegistry
      -> DayNightCycle / TimeZoneManager / ProsperityManager
      -> BehaviorEngine / EraManager / PlayerStore
@@ -81,7 +80,6 @@ io.on('connection', socket)
 
 ## 服务端权威流
 
-客户端只发起 `client.*` 请求或查询；handler 从 `socket.data.playerId` 获取身份，读取 `GameWorld` 和各管理器，校验权限、位置、冷却、余额和业务约束，再写入服务端状态。随机骰子、移动最终位置、地产与投资、抵押、税收、破产、队伍共享数值、繁荣度和时代状态均以服务端结果为准。当前运行时不提供贷款、还款、利息或银行账户机制。
 
 ```mermaid
 sequenceDiagram

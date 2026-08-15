@@ -23,7 +23,7 @@ import { logger } from './utils/logger.js';
 import { GameWorld } from './world/GameWorld.js';
 import { SocketManager, type TypedServer } from './transport/SocketManager.js';
 import { registerHandlers } from './transport/handlers.js';
-import { Mortgage, Taxation, Bankruptcy, type TaxConfig } from './economy/index.js';
+import { Taxation, Bankruptcy, type TaxConfig } from './economy/index.js';
 import { readFileSync } from 'node:fs';
 import { parseMapData, parseMapMeta } from '@game/shared';
 import { DayNightCycle, DEFAULT_DAY_NIGHT_CONFIG } from './world/DayNightCycle.js';
@@ -96,7 +96,6 @@ export interface CreatedApp {
   httpServer: http.Server;
   /** 经济系统实例 */
   economy?: {
-    mortgage: Mortgage;
     taxation: Taxation;
     bankruptcy: Bankruptcy;
   };
@@ -256,19 +255,18 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   }
 
   // 初始化经济系统
-  const mortgage = new Mortgage(io, world);
   const mapMeta = world.getMapMeta();
   if (!mapMeta) {
     throw new Error('无法启动经济系统：地图元数据未加载');
   }
   const taxation = new Taxation(io, world, readTaxConfig(mapMeta));
-  const bankruptcy = new Bankruptcy(io, world, mortgage, taxation);
+  const bankruptcy = new Bankruptcy(io, world, taxation);
 
   // 启动经济系统定时器
   taxation.startTaxTimer();
   bankruptcy.startBankruptcyCheck();
 
-  logger.info('Economy system initialized (mortgage, taxation, bankruptcy)');
+  logger.info('Economy system initialized (taxation, bankruptcy)');
 
   // 注册业务事件处理器（需要在经济系统初始化后）
   const handlerRegistry = registerHandlers(io, world);
@@ -393,7 +391,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     world,
     socketManager,
     httpServer,
-    economy: { mortgage, taxation, bankruptcy },
+    economy: { taxation, bankruptcy },
     dayNightCycle,
     timeZoneManager,
     prosperityManager,

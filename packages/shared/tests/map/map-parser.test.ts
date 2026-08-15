@@ -34,8 +34,6 @@ const REAL_MAP_EXPORT = [
     level: 0,
     upgradeCost: [],
     owners: [],
-    isMortgaged: 0,
-    mortgagePrice: 0,
   },
   {
     id: 1,
@@ -53,8 +51,6 @@ const REAL_MAP_EXPORT = [
     level: 0,
     upgradeCost: [],
     owners: [],
-    isMortgaged: 0,
-    mortgagePrice: 0,
   },
 ];
 

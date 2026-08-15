@@ -36,8 +36,6 @@ const REAL_MAP_JSON = JSON.stringify([
     level: 0,
     upgradeCost: [],
     owners: [],
-    isMortgaged: 0,
-    mortgagePrice: 0,
   },
   {
     id: 1,
@@ -55,8 +53,6 @@ const REAL_MAP_JSON = JSON.stringify([
     level: 0,
     upgradeCost: [],
     owners: [],
-    isMortgaged: 0,
-    mortgagePrice: 0,
   },
 ]);
 

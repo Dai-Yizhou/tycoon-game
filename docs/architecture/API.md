@@ -20,7 +20,6 @@
 | `client.rollDice` | `DiceHandler` | 服务端随机、冷却校验并进入移动链 |
 | `client.choosePath` | `MovementHandler` | 多岔路选择合法下一格 |
 | `client.move` | `MovementHandler` | 调试/授权移动入口，普通流程不能绕过掷骰链 |
-| `client.buyProperty` / `upgradeProperty` / `mortgageProperty` / `redeemProperty` | `PropertyHandler` | 地产购买、升级、抵押、赎回 |
 | `client.buyInvestment` / `triggerInvestmentEvent` | `InvestmentHandler` | 投资购买与事件结算 |
 | `client.useTransport` / `getTransportDestinations` | `TransportHandler` | 查询目的地与付费传送 |
 | `client.repairMonument` / `getMonumentStatus` | `MonumentHandler` | 纪念碑状态查询与修缮 |
@@ -42,7 +41,6 @@
 | `server.diceRolled` | 其他玩家可见的骰子结果 |
 | `server.valueChanged` | 玩家或区域数值增量/新值 |
 | `server.playerStatusChanged` | 监狱、破产等玩家状态变化 |
-| `server.propertyBought` / `propertyUpgraded` / `propertyMortgaged` / `mortgageRedeemed` | 地产账本变化 |
 | `server.investmentBought` / `investmentEventTriggered` | 投资状态和事件变化 |
 | `server.transportDestinationsChanged` | 交通目的地变化 |
 | `server.prosperityChanged` | 区域/纪念碑繁荣度变化 |

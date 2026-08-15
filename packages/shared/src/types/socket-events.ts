@@ -124,18 +124,6 @@ export interface ClientToServerEvents {
     ack?: (result: AckResult<{ cell: Cell; cost: number }>) => void,
   ) => void;
 
-  /** 抵押地产 */
-  'client.mortgageProperty': (
-    payload: { cellId: number },
-    ack?: (result: AckResult<{ cell: Cell; gained: number }>) => void,
-  ) => void;
-
-  /** 赎回地产 */
-  'client.redeemProperty': (
-    payload: { cellId: number },
-    ack?: (result: AckResult<{ cell: Cell; cost: number }>) => void,
-  ) => void;
-
 
   /** 组队邀请（服务端权威：客户端仅发送请求，邀请由服务端校验并创建） */
   'client.inviteToTeam': (
@@ -302,16 +290,6 @@ export interface ServerToClientEvents {
     playerId: string;
     newLevel: number;
     cost: number;
-  }) => void;
-
-  /** 地产被抵押/赎回 */
-  'server.propertyMortgaged': (payload: {
-    cell?: Cell;
-    cellId?: number;
-    playerId: string;
-    mortgaged?: boolean;
-    mortgagePrice?: number;
-    auctionId?: string;
   }) => void;
 
   /** 玩家进入监狱 */
@@ -487,41 +465,6 @@ export interface ServerToClientEvents {
     amount: number;
     type: 'profit' | 'loss';
     affectedPlayers: Array<{ playerId: string; share: number; amount: number }>;
-  }) => void;
-
-  /** 竞拍开始 */
-  'server.auctionStarted': (payload: {
-    auctionId: string;
-    cellId: number;
-    mortgagePrice: number;
-    startTime: number;
-    endTime: number;
-    originalOwnerId: string;
-  }) => void;
-
-  /** 竞拍出价 */
-  'server.bidPlaced': (payload: {
-    auctionId: string;
-    playerId: string;
-    amount: number;
-    currentHighestBid: number;
-    endTime: number;
-  }) => void;
-
-  /** 竞拍结束 */
-  'server.auctionEnded': (payload: {
-    auctionId: string;
-    cellId: number;
-    winnerId: string | null;
-    winningBid: number | null;
-    originalOwnerId: string;
-  }) => void;
-
-  /** 抵押赎回 */
-  'server.mortgageRedeemed': (payload: {
-    cellId: number;
-    playerId: string;
-    mortgagePrice: number;
   }) => void;
 
   /** 计税周期完成 */

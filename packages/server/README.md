@@ -7,7 +7,6 @@ Node.js + Express + Socket.IO 服务端。`src/index.ts:bootstrap()` 调用 `src
 | 路径 | 职责 |
 |---|---|
 | `src/world/` | GameWorld、PlayerManager、昼夜、时区、繁荣度 |
-| `src/economy/` | Bank、Mortgage、Taxation、Bankruptcy |
 | `src/handlers/` | 掷骰、移动、地产、起点、监狱、投资、交通、纪念碑、组队和调试处理器 |
 | `src/events/` | 事件注册、模板与效果 |
 | `src/behavior/` | 从 `config/behaviors/*.json` 执行格子行为 |

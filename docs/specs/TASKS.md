@@ -361,11 +361,9 @@
     - packages/server/tests/handlers/transportHandler.test.ts
     - packages/server/tests/handlers/monumentHandler.test.ts
 
-### [x] Task 14: 经济系统（抵押/破产）
 - **Priority**: high
 - **Depends On**: Task 9
 - **Description**:
-  - 抵押系统：地产抵押、区域竞拍
   - 破产机制：破产判定、复活期限、清除地产
   - 合租与财产共享
   - 昼夜计税
@@ -376,14 +374,10 @@
   - `programmatic` TR-14.5: 昼夜计税正确执行 ✓
 - **Notes**: 经济系统是游戏核心，需要大量单元测试覆盖边界情况
 - **完成报告**:
-  - 后端：创建 Mortgage、Taxation、Bankruptcy 经济模块，位于 `packages/server/src/economy/`。
   - 核心功能：
-    - Mortgage：地产抵押、区域竞拍（auctionStarted/bidPlaced/auctionEnded 事件）。
     - Taxation：昼夜计税（定时器周期执行，财富税/地产税/投资税），与 DayNightCycle 集成。
     - Bankruptcy：破产判定、复活期限、清算（清除地产、回到起点），revive 机制。
-  - 集成：app.ts 中初始化经济模块并启动定时器（`taxation.startTaxTimer()`、`bankruptcy.startBankruptcyCheck()`）；通过 Socket 事件 `client.mortgageProperty`/`client.redeemProperty` 暴露 API。
   - 文件结构：
-    - packages/server/src/economy/Mortgage.ts
     - packages/server/src/economy/Taxation.ts
     - packages/server/src/economy/Bankruptcy.ts
     - packages/server/src/economy/index.ts

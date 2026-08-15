@@ -38,8 +38,6 @@ const REAL_MAP_EXPORT = [
     level: 0,
     upgradeCost: [],
     owners: [],
-    isMortgaged: 0,
-    mortgagePrice: 0,
   },
   {
     id: 1,
@@ -57,8 +55,6 @@ const REAL_MAP_EXPORT = [
     level: 0,
     upgradeCost: [],
     owners: [],
-    isMortgaged: 0,
-    mortgagePrice: 0,
   },
 ];
 
@@ -80,8 +76,6 @@ const REAL_TEMPLATE_FORMAT = [
     level: 0,
     upgradeCost: [0],
     owners: [],
-    isMortgaged: 0,
-    mortgagePrice: 0,
   },
 ];
 
@@ -158,8 +152,6 @@ describe('shared types', () => {
         level: 0,
         upgradeCost: [],
         owners: [],
-        isMortgaged: 0,
-        mortgagePrice: 0,
       });
     });
 
@@ -195,8 +187,6 @@ describe('shared types', () => {
         level: 0,
         upgradeCost: [50, 100, 200],
         owners: [],
-        isMortgaged: 0,
-        mortgagePrice: 0,
         description: ['起点格子'],
         // 未知字段
         weather: 'sunny',

@@ -18,7 +18,6 @@ import { PlayerStatus } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
-import type { Mortgage } from './Mortgage.js';
 import type { Taxation } from './Taxation.js';
 
 /**
@@ -103,7 +102,6 @@ export interface RevivalResult {
 export class Bankruptcy {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
-  private readonly mortgage: Mortgage;
   private readonly taxation: Taxation;
   private readonly config: BankruptcyConfig;
   private readonly bankruptcyRecords: Map<string, BankruptcyRecord> = new Map(); // playerId -> record
@@ -114,13 +112,11 @@ export class Bankruptcy {
   constructor(
     io: TypedServer,
     world: GameWorld,
-    mortgage: Mortgage,
     taxation: Taxation,
     config: BankruptcyConfig = DEFAULT_BANKRUPTCY_CONFIG,
   ) {
     this.io = io;
     this.world = world;
-    this.mortgage = mortgage;
     this.taxation = taxation;
     this.config = config;
   }
@@ -281,10 +277,7 @@ export class Bankruptcy {
     // 2. 清除税收记录
     this.taxation.clearTaxRecords(playerId);
 
-    // 3. 清理相关竞拍
-    this.mortgage.clearAllAuctions();
-
-    // 4. 更新破产记录状态
+    // 3. 更新破产记录状态
     record.status = 'completed';
     this.bankruptcyRecords.set(playerId, record);
 
@@ -328,9 +321,7 @@ export class Bankruptcy {
         cell.extra.ownerships = ownerships;
       }
 
-      // 如果地产无所有者，清除抵押状态
       if (owners.length === 0 && ownerships.length === 0) {
-        cell.extra.isMortgaged = false;
         cell.extra.level = 0;
       }
     }
@@ -361,7 +352,7 @@ export class Bankruptcy {
       return { success: false, error: '已超过复活期限' };
     }
 
-    // 4. 清除定时器（避免清算）
+    // 4. 清除复活定时器（避免清算）
     const timer = this.bankruptcyTimers.get(playerId);
     if (timer) {
       clearTimeout(timer);
@@ -510,11 +501,10 @@ export class Bankruptcy {
 export function createBankruptcy(
   io: TypedServer,
   world: GameWorld,
-  mortgage: Mortgage,
   taxation: Taxation,
   config?: BankruptcyConfig,
 ): Bankruptcy {
-  return new Bankruptcy(io, world, mortgage, taxation, config);
+  return new Bankruptcy(io, world, taxation, config);
 }
 
 // 辅助函数

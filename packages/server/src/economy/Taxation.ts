@@ -239,10 +239,6 @@ export class Taxation {
       const owners = getExtra<string[]>(cell, 'owners', []) ?? [];
       if (!owners.includes(playerId)) continue;
 
-      // 检查是否已抵押（抵押地产不收税）
-      const isMortgaged = getExtra<boolean | number>(cell, 'isMortgaged', false);
-      if (isMortgaged) continue;
-
       // 计算地产价值（价格 + 升级费用）
       const price = getExtra<number>(cell, 'price', 0) ?? 0;
       const level = getExtra<number>(cell, 'level', 0) ?? 0;

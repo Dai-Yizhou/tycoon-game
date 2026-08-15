@@ -431,21 +431,18 @@ packages/client/src/
 
 ---
 
-## Task 14: 经济系统（抵押/破产）
 
 ### 完成时间
 2026-07-09
 
 ### 实现概述
 实现了经济系统，包括：
-- 抵押系统：地产抵押、区域竞拍、赎回
 - 计税系统：昼夜计税、财产税、地产税、投资税
 - 破产机制：破产判定、复活期限、清算
 
 ### 文件结构
 ```
 packages/server/src/economy/
-├── Mortgage.ts               # 抵押系统 ✓
 ├── Taxation.ts               # 计税系统 ✓
 ├── Bankruptcy.ts             # 破产机制 ✓
 └── index.ts                  # 导出文件 ✓
@@ -454,26 +451,13 @@ packages/server/src/
 └── app.ts                    # 集成经济系统 ✓
 
 packages/server/tests/economy/
-├── Mortgage.test.ts          # 抵押测试 ✓
 ├── Taxation.test.ts          # 计税测试 ✓
 └── Bankruptcy.test.ts        # 破产测试 ✓
 ```
 
 ### 实现功能
 
-#### 1. 抵押系统 (Mortgage)
-- **地产抵押**：
-  - 抵押价格从 `cell.mortgagePrice` 读取
-  - 抵押后玩家获得抵押价格的资金
-  - 抵押后地产进入竞拍状态
-- **区域竞拍**：
-  - 其他玩家可参与竞拍
   - 出价必须高于当前最高价 + 最小增量
-  - 新出价延长竞拍时间
-  - 竞拍结束后转移所有权
-- **赎回功能**：
-  - 原所有者可支付抵押价格赎回
-  - 正在进行竞拍时无法赎回
 
 #### 3. 计税系统 (Taxation)
 - **昼夜计税**：
@@ -483,7 +467,6 @@ packages/server/tests/economy/
   - 财产税：`max(0, 财产 - minWealth) * wealthTaxRate`
   - 地产税：`Σ(地产价值 * propertyTaxRate)`
   - 投资税：`Σ(投资价值 * investmentTaxRate)`
-  - 抵押地产不收税
 - **税收记录**：保留最近 10 条记录
 
 #### 3. 破产机制 (Bankruptcy)
@@ -508,11 +491,6 @@ packages/server/tests/economy/
 
 编写了 **42 个测试用例**，覆盖：
 
-1. **抵押系统测试** (Mortgage.test.ts - 12 个测试)
-   - 地产抵押
-   - 区域竞拍
-   - 赎回抵押
-   - 竞拍状态检查
    - 事件广播
 
 2. **计税系统测试** (Taxation.test.ts - 11 个测试)
@@ -546,7 +524,6 @@ packages/server/tests/economy/
 
 1. 经济系统定时器（计税、破产检查）在服务器启动时自动运行
 3. 破产玩家需等待复活令或自动清算
-4. 抵押地产进入竞拍后，原所有者不能参与竞拍
 5. 监狱玩家不计税、不破产判定
 6. 服务器优雅关闭时会清理所有经济系统定时器
 

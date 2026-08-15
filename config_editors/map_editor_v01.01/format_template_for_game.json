@@ -15,8 +15,6 @@
     "level": 0,
     "upgradeCost": [0],
     "owners": [],
-    "isMortgaged": 0,
-    "mortgagePrice": 0,
     "transportCost": 0,
     "monumentCost": 0,
     "investmentReturn": 0
@@ -37,8 +35,6 @@
     "level": 0,
     "upgradeCost": 1,
     "owners": 0,
-    "isMortgaged": 0,
-    "mortgagePrice": 1,
     "transportCost": 1,
     "monumentCost": 1,
     "investmentReturn": 1

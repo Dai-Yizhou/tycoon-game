@@ -139,8 +139,6 @@
     "behavior": "",
     "icon": "",
     "level": 0,
-    "isMortgaged": false,
-    "mortgagePrice": 0
   },
   {
     "name": 1,
@@ -151,8 +149,6 @@
     "behavior": 2,
     "icon": 2,
     "level": 0,
-    "isMortgaged": 0,
-    "mortgagePrice": 1
   }
 ]
 ```
@@ -169,8 +165,6 @@
 | `behavior` | 文本 | 从“行为”文件夹下拉选择 |
 | `icon` | 文本 | 从“图标库”文件夹下拉选择 |
 | `level` | 数字 | 只读 |
-| `isMortgaged` | 布尔 | 只读 |
-| `mortgagePrice` | 数字 | 输入框 |
 
 ---
 
@@ -238,8 +232,6 @@ A：使用 Chrome 浏览器会弹出保存对话框，可选择保存位置；�
     "behavior": "",
     "icon": "",
     "level": 0,
-    "isMortgaged": false,
-    "mortgagePrice": 0
   },
   // ... 更多格子
 ]
@@ -287,8 +279,6 @@ A：使用 Chrome 浏览器会弹出保存对话框，可选择保存位置；�
 | `level` | `number` | 当前建筑等级 |
 | `upgradeCost` | `number` 或 `number[]` | 升级费用 |
 | `owners` | `number[]` | 持有者 ID 列表（合租支持） |
-| `isMortgaged` | `boolean` | 是否已抵押 |
-| `mortgagePrice` | `number` | 抵押价格 |
 | `bonusAmount` | `number` | 纪念碑发放金额 |
 
 ---

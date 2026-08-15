@@ -3,7 +3,6 @@
  */
 
 import { Bankruptcy, DEFAULT_BANKRUPTCY_CONFIG, type BankruptcyConfig } from '../../src/economy/Bankruptcy';
-import { Mortgage, DEFAULT_MORTGAGE_CONFIG } from '../../src/economy/Mortgage';
 import { Taxation } from '../../src/economy/Taxation';
 import { GameWorld } from '../../src/world/GameWorld';
 import { PlayerManager } from '../../src/world/PlayerManager';
@@ -14,7 +13,6 @@ import { Socket } from 'socket.io';
 
 describe('Bankruptcy System', () => {
   let world: GameWorld;
-  let mortgage: Mortgage;
   let taxation: Taxation;
   let bankruptcy: Bankruptcy;
   let playerManager: PlayerManager;
@@ -40,7 +38,6 @@ describe('Bankruptcy System', () => {
     } as any as TypedSocket;
 
     // 创建经济系统实例
-    mortgage = new Mortgage(mockIo, world, DEFAULT_MORTGAGE_CONFIG);
     taxation = new Taxation(mockIo, world, {
       wealthTaxRate: 0.02,
       propertyTaxRate: 0.01,
@@ -49,7 +46,7 @@ describe('Bankruptcy System', () => {
       minPropertyValueForTax: 500,
       taxInterval: 900000,
     });
-    bankruptcy = new Bankruptcy(mockIo, world, mortgage, taxation, {
+    bankruptcy = new Bankruptcy(mockIo, world, taxation, {
       ...DEFAULT_BANKRUPTCY_CONFIG,
       bankruptcyThresholdTime: 1000, // 1 秒（测试用）
       revivalPeriod: 5000, // 5 秒（测试用）
@@ -75,11 +72,9 @@ describe('Bankruptcy System', () => {
           name: '地产1',
           price: 500,
           rent: [10, 20],
-          mortgagePrice: 250,
           level: 0,
           upgradeCost: [100, 200],
           owners: [],
-          isMortgaged: false,
         },
       },
     ];
@@ -107,7 +102,6 @@ describe('Bankruptcy System', () => {
   afterEach(() => {
     bankruptcy.cleanup();
     taxation.stopTaxTimer();
-    mortgage.clearAllAuctions();
     playerManager.clear();
     jest.useRealTimers();
   });

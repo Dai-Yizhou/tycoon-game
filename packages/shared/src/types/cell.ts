@@ -20,9 +20,7 @@
  *     "rent": [0, 10],
  *     "level": 0,
  *     "upgradeCost": [],
- *     "owners": [],
- *     "isMortgaged": 0,
- *     "mortgagePrice": 0
+ *     "owners": []
  *   }
  * ]
  * ```
@@ -63,7 +61,7 @@ export type CellType = (typeof CellTypes)[keyof typeof CellTypes];
  * 格子自定义属性容器
  *
  * 使用 `Record<string, unknown>` 而非 `any`，以避免类型逃逸。
- * 模板驱动的字段（如 name、type、price、rent、level、owners、isMortgaged、mortgagePrice
+ * 模板驱动的字段（如 name、type、price、rent、level、owners
  * 等）均通过 `extra` 存放；游戏引擎读取时使用 {@link getExtra} 工具函数获得类型安全。
  */
 export type CellExtra = Record<string, unknown>;
@@ -97,8 +95,6 @@ export interface Cell {
    * - `level`: number - 等级
    * - `upgradeCost`: number[] - 升级费用
    * - `owners`: number[] - 持有者 ID（编辑期使用 number 编号）
-   * - `isMortgaged`: boolean | number - 是否抵押
-   * - `mortgagePrice`: number - 抵押价格
    * - `extra`: any[] - 扩展数据
    *
    * 未知字段在解析时会被忽略（向后兼容）。
