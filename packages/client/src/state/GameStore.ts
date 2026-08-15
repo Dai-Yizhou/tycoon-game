@@ -42,7 +42,7 @@ export interface BehaviorConfig {
 
 export interface TeamMember {
   id: string; username: string; money: number; credit: number;
-  env: number; status: string; isLeader: boolean;
+  env: number; status: string;
 }
 
 export interface ChatChannelDef {

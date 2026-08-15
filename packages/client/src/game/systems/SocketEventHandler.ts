@@ -319,12 +319,8 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   // 监听成员离开队伍（仅显示提示，队伍状态以 server.teamUpdated 为准）
-  socket.on('server.teamMemberLeft', (payload: { playerId: string; isLeaderTransferred?: boolean; newLeaderId?: string }) => {
+  socket.on('server.teamMemberLeft', (payload: { playerId: string }) => {
     addChatMessage(t('team.memberLeft', { name: payload.playerId }), 'system');
-    if (payload.isLeaderTransferred && payload.newLeaderId) {
-      addChatMessage(t('team.leaderChanged'), 'system');
-    }
-    // teamMembers 由 server.teamUpdated 事件权威更新
   });
 
   // 监听成员被踢出（仅显示提示，队伍状态以 server.teamUpdated 为准）
@@ -338,7 +334,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   // 监听队伍状态更新（服务端权威：完整重建本地队伍视图）
-  socket.on('server.teamUpdated', (payload: { team?: { id: string }; members?: Array<{ id: string; username: string; money: number; credit: number; env: number; status: string; isLeader: boolean }> }) => {
+  socket.on('server.teamUpdated', (payload: { team?: { id: string }; members?: Array<{ id: string; username: string; money: number; credit: number; env: number; status: string }> }) => {
     if (payload.team && currentPlayer) {
       currentPlayer.teamId = payload.team.id;
       // 用服务端推送的成员显示数据完整重建 teamMembers

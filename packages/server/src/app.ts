@@ -245,15 +245,6 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     maxHttpBufferSize: 1e6, // 1MB
   }) as TypedServer;
 
-  // 创建 SocketManager（如提供配置）
-  let socketManager: SocketManager | undefined;
-  if (deps.socketManagerOptions) {
-    socketManager = new SocketManager(io, {
-      ...deps.socketManagerOptions,
-      world,
-    });
-  }
-
   // 初始化经济系统
   const mapMeta = world.getMapMeta();
   if (!mapMeta) {
@@ -272,6 +263,15 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   const handlerRegistry = registerHandlers(io, world);
 
   handlerRegistry.setBankruptcy(bankruptcy);
+
+  let socketManager: SocketManager | undefined;
+  if (deps.socketManagerOptions) {
+    socketManager = new SocketManager(io, {
+      ...deps.socketManagerOptions,
+      world,
+      teamManager: handlerRegistry.getTeamManager(),
+    });
+  }
 
   // 初始化昼夜循环（从服务器启动时开始计时）
   const dayNightCycle = new DayNightCycle(

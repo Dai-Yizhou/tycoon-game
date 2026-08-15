@@ -3,8 +3,7 @@ import { TeamHandler } from '../../src/handlers/teamHandler.js';
 import { TeamManager } from '../../src/team/index.js';
 import { GameWorld } from '../../src/world/GameWorld.js';
 import type { TypedServer, TypedSocket } from '../../src/transport/SocketManager.js';
-import type { Player } from '@game/shared';
-import { PlayerStatus } from '@game/shared';
+import { PlayerStatus, type Player } from '@game/shared';
 
 function createPlayer(id: string): Player {
   return { id, username: `player_${id}`, teamId: null, position: { cellId: 0 }, values: {}, status: PlayerStatus.Normal, createdAt: Date.now(), lastActiveAt: Date.now() };
@@ -46,18 +45,18 @@ describe('TeamHandler', () => {
     expect(world.getPlayer('player2')?.teamId).toBe(teamId);
   });
 
-  it('离队者清除 GameWorld teamId 并收到清理事件', () => {
+  it('离队者清除 GameWorld teamId 并保留单人队伍', () => {
     const team = manager.createTeam('player1', 'player_player1');
     const invite = manager.sendInvite('player1', 'player_player1', 'player2');
     manager.respondInvite(invite!.id, 'player2', true);
     for (const playerId of team.memberIds) world.updatePlayer({ ...world.getPlayer(playerId)!, teamId: team.id });
     getRegisteredHandler(sockets.player2, 'client.leaveTeam')({});
     expect(world.getPlayer('player2')?.teamId).toBeNull();
-    expect(sockets.player2.emit).toHaveBeenCalledWith('server.teamDisbanded', { teamId: team.id });
-    expect(sockets.player1.emit).toHaveBeenCalledWith('server.teamDisbanded', { teamId: team.id });
+    expect(manager.getPlayerTeam('player1')?.id).toBe(team.id);
+    expect(sockets.player1.emit).toHaveBeenCalledWith('server.teamUpdated', expect.objectContaining({ team: expect.objectContaining({ id: team.id }) }));
   });
 
-  it('被踢者清除 GameWorld teamId 并收到清理事件', () => {
+  it('操作权限可执行踢人并清除 teamId', () => {
     const team = manager.createTeam('player1', 'player_player1');
     const invite = manager.sendInvite('player1', 'player_player1', 'player2');
     manager.respondInvite(invite!.id, 'player2', true);
@@ -66,18 +65,17 @@ describe('TeamHandler', () => {
     for (const playerId of team.memberIds) world.updatePlayer({ ...world.getPlayer(playerId)!, teamId: team.id });
     getRegisteredHandler(sockets.player1, 'client.kickTeamMember')({ targetPlayerId: 'player2' });
     expect(world.getPlayer('player2')?.teamId).toBeNull();
-    expect(sockets.player2.emit).toHaveBeenCalledWith('server.teamDisbanded', { teamId: team.id });
+    expect(sockets.player2.emit).toHaveBeenCalledWith('server.teamMemberKicked', expect.objectContaining({ teamId: team.id }));
   });
 
-  it('自动解散时清除原始所有成员并广播清理事件', () => {
+  it('离线不解散队伍，也不清除成员 teamId', () => {
     const team = manager.createTeam('player1', 'player_player1');
     const invite = manager.sendInvite('player1', 'player_player1', 'player2');
     manager.respondInvite(invite!.id, 'player2', true);
     for (const playerId of team.memberIds) world.updatePlayer({ ...world.getPlayer(playerId)!, teamId: team.id });
     manager.cleanupOfflineTeams(['player1', 'player2']);
-    expect(world.getPlayer('player1')?.teamId).toBeNull();
-    expect(world.getPlayer('player2')?.teamId).toBeNull();
-    expect(sockets.player1.emit).toHaveBeenCalledWith('server.teamDisbanded', { teamId: team.id });
-    expect(sockets.player2.emit).toHaveBeenCalledWith('server.teamDisbanded', { teamId: team.id });
+    expect(manager.getPlayerTeam('player1')?.id).toBe(team.id);
+    expect(world.getPlayer('player1')?.teamId).toBe(team.id);
+    expect(world.getPlayer('player2')?.teamId).toBe(team.id);
   });
 });

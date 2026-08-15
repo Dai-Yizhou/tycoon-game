@@ -32,6 +32,7 @@ import { logger } from '../utils/logger.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { DayNightCycle } from '../world/DayNightCycle.js';
 import type { PlayerStore } from '../storage/PlayerStore.js';
+import type { TeamManager } from '../team/TeamManager.js';
 
 /**
  * Socket.IO 类型化 Server
@@ -79,6 +80,7 @@ export interface SocketManagerOptions {
   dayNightCycle?: DayNightCycle;
   /** 玩家存储（用于账号持久化；不传则不持久化） */
   playerStore?: PlayerStore;
+  teamManager?: TeamManager;
 }
 
 /**
@@ -92,6 +94,7 @@ export class SocketManager {
   private readonly autoWireWorldEvents: boolean;
   private dayNightCycle?: DayNightCycle;
   private playerStore?: PlayerStore;
+  private teamManager?: TeamManager;
 
   /** socketId -> 已发事件计数（按时间窗口重置） */
   private readonly rateBuckets: Map<string, { count: number; windowStart: number }> = new Map();
@@ -106,6 +109,7 @@ export class SocketManager {
     this.autoWireWorldEvents = options.autoWireWorldEvents ?? true;
     this.dayNightCycle = options.dayNightCycle;
     this.playerStore = options.playerStore;
+    this.teamManager = options.teamManager;
 
     this.io.use((socket, next) => this.middleware(socket as TypedSocket, next));
 
@@ -446,6 +450,12 @@ export class SocketManager {
             ack?.({ ok: false, error: '玩家已存在' });
             return;
           }
+        }
+
+        const restoredTeam = this.teamManager?.ensurePlayerTeam(player.id, player.username);
+        if (restoredTeam && player.teamId !== restoredTeam.id) {
+          player.teamId = restoredTeam.id;
+          this.world.updatePlayer(player);
         }
 
         // 绑定 playerId 到 socket

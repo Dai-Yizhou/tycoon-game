@@ -38,7 +38,6 @@ import type { Cell } from './cell.js';
 import type { ChatChannel, ChatMessage } from './chat.js';
 import type { Player } from './player.js';
 import type { Team, TeamInvite, TeamMemberView } from './team.js';
-import type { ValueField } from './player.js';
 
 // ---------------------------------------------------------------------------
 // 共用负载（Payloads）
@@ -143,7 +142,7 @@ export interface ClientToServerEvents {
     ack?: (result: AckResult<{ teamDisbanded: boolean }>) => void,
   ) => void;
 
-  /** 踢出队伍成员（仅队长，由服务端校验权限并执行） */
+  /** 踢出队伍成员（由服务端校验权限并执行） */
   'client.kickTeamMember': (
     payload: { targetPlayerId: string },
     ack?: (result: AckResult) => void,
@@ -371,8 +370,6 @@ export interface ServerToClientEvents {
   'server.teamMemberLeft': (payload: {
     teamId: string;
     playerId: string;
-    isLeaderTransferred: boolean;
-    newLeaderId?: string;
   }) => void;
 
   /** 队伍成员被踢通知（仅提示，队伍状态以 teamUpdated 为准） */

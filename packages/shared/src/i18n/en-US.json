@@ -333,7 +333,6 @@
     "youWereKicked": "❌ You were removed from the team",
     "teamUpdated": "Team state updated",
     "teamDisbanded": "💥 Team disbanded",
-    "leaderChanged": "👑 Leader changed",
     "leaveTeam": "Leave Team",
     "leaveFailed": "❌ Leave team failed: {{error}}",
     "removeMember": "Remove",

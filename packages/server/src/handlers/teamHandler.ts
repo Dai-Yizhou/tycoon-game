@@ -11,13 +11,13 @@
  * - client.inviteToTeam       : 发送组队邀请 { targetPlayerId }
  * - client.respondToTeamInvite: 响应邀请 { inviteId, accept }
  * - client.leaveTeam           : 离开队伍 {}
- * - client.kickTeamMember      : 踢出成员 { targetPlayerId }（仅队长）
+ * - client.kickTeamMember      : 踢出成员 { targetPlayerId }（服务端校验操作权限）
  * - client.getTeamState        : 获取队伍状态 {}
  *
  * 服务端 -> 客户端：
  * - server.teamInviteReceived  : 收到邀请 { inviteId, inviterId, inviterName, teamId, expiresAt }
  * - server.teamMemberJoined    : 成员加入 { teamId, playerId, playerName }（仅提示，队伍状态以 teamUpdated 为准）
- * - server.teamMemberLeft      : 成员离开 { teamId, playerId, isLeaderTransferred, newLeaderId? }（仅提示，队伍状态以 teamUpdated 为准）
+ * - server.teamMemberLeft      : 成员离开 { teamId, playerId }（仅提示，队伍状态以 teamUpdated 为准）
  * - server.teamMemberKicked    : 成员被踢 { teamId, playerId, kickedBy }（仅提示，队伍状态以 teamUpdated 为准）
  * - server.teamUpdated         : 队伍状态更新 { team, members }（服务端权威：members 携带每个成员的实时显示数据，客户端据此完整重建本地队伍视图）
  * - server.teamDisbanded       : 队伍解散 { teamId }
@@ -29,7 +29,7 @@
  * - 错误统一通过 AckResult 返回，同时 emit server.error 便于诊断
  */
 
-import type { AckResult, Team, Player, ServerToClientEvents } from '@game/shared';
+import type { AckResult, Team, ServerToClientEvents } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -46,7 +46,6 @@ interface TeamMemberView {
   credit: number;
   env: number;
   status: string;
-  isLeader: boolean;
 }
 
 /**
@@ -163,6 +162,11 @@ export class TeamHandler {
       return;
     }
 
+    const inviterTeam = this.teamManager.getPlayerTeam(playerId);
+    if (inviterTeam) {
+      this.setWorldTeamIds(inviterTeam.memberIds, inviterTeam.id);
+    }
+
     logger.info(`组队邀请：${playerId} -> ${payload.targetPlayerId}（邀请 ID: ${invite.id}）`);
 
     // 向目标玩家推送邀请通知
@@ -222,6 +226,8 @@ export class TeamHandler {
     if (payload.accept && team) {
       logger.info(`玩家 ${playerId} 接受组队邀请，加入队伍 ${team.id}`);
 
+      this.setWorldTeamIds(team.memberIds, team.id);
+
       // 通知全队有新成员加入
       this.broadcastToTeam(team, 'server.teamMemberJoined', {
         teamId: team.id,
@@ -275,16 +281,12 @@ export class TeamHandler {
 
     logger.info(`玩家 ${playerId} 离开队伍 ${teamId}（解散: ${isDisbanded}）`);
 
-    if (isDisbanded) {
-      this.clearWorldTeamIds(originalMembers, teamId);
-    } else if (result.team) {
+    if (!isDisbanded && result.team) {
       this.clearWorldTeamIds([playerId], teamId);
       // 队伍仍存在：通知全队有成员离开
       this.broadcastToTeam(result.team, 'server.teamMemberLeft', {
         teamId: result.team.id,
         playerId,
-        isLeaderTransferred: result.team.leaderId !== playerId,
-        newLeaderId: result.team.leaderId !== playerId ? result.team.leaderId : undefined,
       });
       this.notifyTeamUpdated(result.team);
     }
@@ -293,7 +295,7 @@ export class TeamHandler {
   }
 
   /**
-   * 处理踢出成员（仅队长）
+   * 处理踢出成员
    */
   private handleKickMember(
     socket: TypedSocket,
@@ -320,10 +322,9 @@ export class TeamHandler {
       return;
     }
 
-    // 权限校验：仅队长可踢人
-    if (team.leaderId !== playerId) {
-      emitError(socket, ErrorCodes.InvalidOperation, '仅队长可踢出成员');
-      ack?.({ ok: false, error: 'not_leader' });
+    if (!this.teamManager.canOperateTeam(team.id, playerId)) {
+      emitError(socket, ErrorCodes.InvalidOperation, '无权操作该队伍');
+      ack?.({ ok: false, error: 'not_team_operator' });
       return;
     }
 
@@ -352,18 +353,15 @@ export class TeamHandler {
       return;
     }
 
-    logger.info(`玩家 ${payload.targetPlayerId} 被队长 ${playerId} 踢出队伍 ${teamId}`);
-
-    // 通知被踢玩家
-    this.emitToPlayer(payload.targetPlayerId, 'server.teamMemberKicked', {
-      teamId,
-      playerId: payload.targetPlayerId,
-      kickedBy: playerId,
-    });
+    logger.info(`玩家 ${payload.targetPlayerId} 被 ${playerId} 踢出队伍 ${teamId}`);
 
     if (result.team) {
       this.clearWorldTeamIds([payload.targetPlayerId], teamId);
-      this.emitToPlayer(payload.targetPlayerId, 'server.teamDisbanded', { teamId });
+      this.emitToPlayer(payload.targetPlayerId, 'server.teamMemberKicked', {
+        teamId,
+        playerId: payload.targetPlayerId,
+        kickedBy: playerId,
+      });
       // 通知全队有成员被踢
       this.broadcastToTeam(result.team, 'server.teamMemberKicked', {
         teamId: result.team.id,
@@ -373,6 +371,7 @@ export class TeamHandler {
       this.notifyTeamUpdated(result.team);
     } else {
       this.clearWorldTeamIds(originalMembers, teamId);
+      this.emitToPlayer(payload.targetPlayerId, 'server.teamDisbanded', { teamId });
     }
 
     ack?.({ ok: true });
@@ -453,50 +452,7 @@ export class TeamHandler {
     }
   }
 
-  /**
-   * 通知队伍状态更新（包含共享数值同步）
-   *
-   * 服务端权威：payload 携带完整的队伍对象和每个成员的显示数据，
-   * 客户端据此完整重建本地队伍视图，无需任何本地推测。
-   */
   private notifyTeamUpdated(team: Team): void {
-    // 收集队员数据
-    const players: Player[] = [];
-    for (const memberId of team.memberIds) {
-      const player = this.world.getPlayer(memberId);
-      if (player) {
-        players.push(player);
-      }
-    }
-
-    // 步骤1：计算队伍共享数值（服务端权威）
-    this.teamManager.updateTeamSharedValues(team.id, players);
-
-    // 步骤2：同步共享数值回每个队员 player.values（组队附带效果 - 服务端权威）
-    const syncedPlayers = this.teamManager.syncTeamValuesToMembers(team.id, players);
-    for (const synced of syncedPlayers) {
-      const original = this.world.getPlayer(synced.id);
-      if (original) {
-        // 检测数值差异，发送 valueChanged 广播（客户端权威同步）
-        for (const fieldId of Object.keys(synced.values)) {
-          const oldVal = original.values[fieldId]?.current;
-          const newVal = synced.values[fieldId]?.current;
-          if (oldVal !== undefined && newVal !== undefined && oldVal !== newVal) {
-            const payload: Parameters<ServerToClientEvents['server.valueChanged']>[0] = {
-              playerId: synced.id,
-              fieldId,
-              current: newVal,
-              delta: newVal - oldVal,
-            };
-            this.io.emit('server.valueChanged', payload);
-          }
-        }
-      }
-      // 保存更新后的玩家状态（含共享值同步后的 teamId 和 values）
-      this.world.updatePlayer(synced);
-    }
-
-    // 步骤3：推送最新队伍状态（含 members）给全体队员
     const updatedTeam = this.teamManager.getTeam(team.id);
     if (updatedTeam) {
       const members = this.buildMemberViews(updatedTeam);
@@ -504,6 +460,15 @@ export class TeamHandler {
         team: updatedTeam,
         members,
       });
+    }
+  }
+
+  private setWorldTeamIds(playerIds: string[], teamId: string): void {
+    for (const playerId of playerIds) {
+      const player = this.world.getPlayer(playerId);
+      if (player && player.teamId !== teamId) {
+        this.world.updatePlayer({ ...player, teamId });
+      }
     }
   }
 
@@ -532,7 +497,6 @@ export class TeamHandler {
         credit: v.credit?.current ?? 0,
         env: v.environment?.current ?? v.env?.current ?? 0,
         status: player?.status ?? 'normal',
-        isLeader: team.leaderId === id,
       };
     });
   }

@@ -23,3 +23,17 @@ export {
   type BankruptcyResult,
   type RevivalResult,
 } from './Bankruptcy.js';
+
+export {
+  DEFAULT_OWNERSHIP_CONFIG,
+  getAccumulatedValue,
+  getBuyInPrice,
+  getOwnerships,
+  getOwners,
+  addOwnership,
+  distributeByShare,
+  releaseOwnership,
+  syncOwnerships,
+  type Ownership,
+  type OwnershipConfig,
+} from './Ownership.js';

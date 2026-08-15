@@ -22,18 +22,21 @@ import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
 import type { BehaviorEngine, BehaviorExecuteResult } from '../behavior/BehaviorEngine.js';
+import {
+  DEFAULT_OWNERSHIP_CONFIG,
+  addOwnership,
+  distributeByShare,
+  getAccumulatedValue,
+  getBuyInPrice,
+  getOwnerships,
+  type Ownership,
+  type OwnershipConfig,
+} from '../economy/index.js';
 
 /**
  * 地产所有权信息
  */
-export interface PropertyOwnership {
-  /** 所有者玩家 ID */
-  playerId: string;
-  /** 持股比例（合租时使用） */
-  share: number;
-  /** 购买时支付的金额 */
-  purchasePrice: number;
-}
+export type PropertyOwnership = Ownership;
 
 /**
  * 地产处理结果
@@ -83,12 +86,14 @@ export interface RentResult {
 export class PropertyHandler {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
+  private readonly ownershipConfig: OwnershipConfig;
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
 
-  constructor(io: TypedServer, world: GameWorld) {
+  constructor(io: TypedServer, world: GameWorld, ownershipConfig: OwnershipConfig = DEFAULT_OWNERSHIP_CONFIG) {
     this.io = io;
     this.world = world;
+    this.ownershipConfig = ownershipConfig;
   }
 
   /**

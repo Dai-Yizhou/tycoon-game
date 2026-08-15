@@ -3,8 +3,6 @@
  */
 
 import { TeamManager, DEFAULT_TEAM_CONFIG } from '../../src/team/index.js';
-import { jest } from '@jest/globals';
-import type { Player } from '@game/shared';
 
 describe('TeamManager', () => {
   let manager: TeamManager;
@@ -22,7 +20,8 @@ describe('TeamManager', () => {
       const team = manager.createTeam('player1', '玩家1');
       expect(team).toBeDefined();
       expect(team.memberIds).toContain('player1');
-      expect(team.leaderId).toBe('player1');
+      expect('sharedValues' in team).toBe(false);
+      expect('leaderId' in team).toBe(false);
       expect(team.disbanded).toBe(false);
     });
 
@@ -129,91 +128,29 @@ describe('TeamManager', () => {
       expect(team?.memberIds).not.toContain('player2');
     });
 
-    test('单人队伍离开后解散', () => {
+    test('最后一名成员离开后队伍解散', () => {
       manager.createTeam('player1', '玩家1');
       manager.leaveTeam('player1');
       const team = manager.getPlayerTeam('player1');
       expect(team).toBeUndefined();
     });
-  });
 
-  describe('队伍数值共享', () => {
-    test('财产平均分配', () => {
-      const team = manager.createTeam('player1', '玩家1');
-
-      const players: Player[] = [
-        {
-          id: 'player1',
-          username: '玩家1',
-          teamId: team.id,
-          position: { cellId: 0 },
-          values: {
-            money: { id: 'money', name: '财产', current: 1000 },
-            credit: { id: 'credit', name: '信用值', current: 50 },
-          },
-          status: 'normal',
-          createdAt: Date.now(),
-          lastActiveAt: Date.now(),
-        },
-        {
-          id: 'player2',
-          username: '玩家2',
-          teamId: team.id,
-          position: { cellId: 0 },
-          values: {
-            money: { id: 'money', name: '财产', current: 2000 },
-            credit: { id: 'credit', name: '信用值', current: 80 },
-          },
-          status: 'normal',
-          createdAt: Date.now(),
-          lastActiveAt: Date.now(),
-        },
-      ];
-
-      // 模拟 player2 加入
-      team.memberIds.push('player2');
-
-      const sharedValues = manager.updateTeamSharedValues(team.id, players);
-      expect(sharedValues.money.current).toBe(1500); // (1000 + 2000) / 2
-    });
-
-    test('信用值取最低值', () => {
-      const team = manager.createTeam('player1', '玩家1');
-      team.memberIds.push('player2');
-
-      const players: Player[] = [
-        {
-          id: 'player1',
-          username: '玩家1',
-          teamId: team.id,
-          position: { cellId: 0 },
-          values: {
-            credit: { id: 'credit', name: '信用值', current: 50 },
-          },
-          status: 'normal',
-          createdAt: Date.now(),
-          lastActiveAt: Date.now(),
-        },
-        {
-          id: 'player2',
-          username: '玩家2',
-          teamId: team.id,
-          position: { cellId: 0 },
-          values: {
-            credit: { id: 'credit', name: '信用值', current: 80 },
-          },
-          status: 'normal',
-          createdAt: Date.now(),
-          lastActiveAt: Date.now(),
-        },
-      ];
-
-      const sharedValues = manager.updateTeamSharedValues(team.id, players);
-      // 最低值 50 + 组队加成 5
-      expect(sharedValues.credit.current).toBe(55);
+    test('队伍只剩一名成员时保留并继续绑定', () => {
+      manager.sendInvite('player1', '玩家1', 'player2');
+      manager.respondInvite(manager.getPlayerPendingInvites('player2')[0].id, 'player2', true);
+      manager.leaveTeam('player1');
+      expect(manager.getPlayerTeam('player2')).toBeDefined();
     });
   });
 
+  describe('队伍只读展示', () => {
+    test('不再提供经济共享或写回 API', () => {
+      const team = manager.createTeam('player1', '玩家1');
+      expect('updateTeamSharedValues' in manager).toBe(false);
+      expect('syncTeamValuesToMembers' in manager).toBe(false);
+      expect(team).not.toHaveProperty('sharedValues');
+    });
+  });
   describe('地产交易限制', () => {
     test('禁止玩家间直接交易地产', () => {
       const canTrade = manager.canTradePropertyBetweenPlayers('player1', 'player2');
@@ -246,16 +183,12 @@ describe('TeamManager', () => {
       expect(disbanded.length).toBe(0); // player2 仍在线，保留队伍
     });
 
-    test('自动解散时通知原始成员', () => {
-      const team = manager.createTeam('player1', '玩家1');
+    test('离线不会解散队伍', () => {
       const invite = manager.sendInvite('player1', '玩家1', 'player2');
       manager.respondInvite(invite!.id, 'player2', true);
-      const onDisbanded = jest.fn();
-
-      manager.onTeamDisbanded(onDisbanded);
-      manager.cleanupOfflineTeams(['player1', 'player2']);
-
-      expect(onDisbanded).toHaveBeenCalledWith(team.id, ['player1', 'player2']);
+      const team = manager.getPlayerTeam('player1');
+      expect(manager.cleanupOfflineTeams(['player1', 'player2'])).toEqual([]);
+      expect(manager.getTeam(team!.id)).toBeDefined();
     });
   });
 });

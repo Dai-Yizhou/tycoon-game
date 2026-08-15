@@ -223,7 +223,6 @@ describe('GameWorld', () => {
         id: 't1',
         name: 'Team 1',
         memberIds: [],
-        sharedValues: {},
         createdAt: Date.now(),
         disbanded: false,
       };
@@ -237,7 +236,6 @@ describe('GameWorld', () => {
         id: 't1',
         name: 'Team 1',
         memberIds: [],
-        sharedValues: {},
         createdAt: Date.now(),
         disbanded: false,
       };
@@ -254,7 +252,6 @@ describe('GameWorld', () => {
         id: 't1',
         name: 'Team 1',
         memberIds: ['p1'],
-        sharedValues: {},
         createdAt: Date.now(),
         disbanded: false,
       };
@@ -270,7 +267,6 @@ describe('GameWorld', () => {
         id: 't1',
         name: 'Team 1',
         memberIds: ['p1'],
-        sharedValues: {},
         createdAt: Date.now(),
         disbanded: false,
       };

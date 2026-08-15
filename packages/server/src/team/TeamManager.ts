@@ -4,20 +4,18 @@
  * 负责队伍生命周期管理：
  * - 组队邀请发送与接受
  * - 队伍合并与分离逻辑
- * - 队内所有数值字段共享（财产平均分配，信用值取最低）
  * - 队伍标识（棋盘上的队伍颜色）
  * - 队员离线队伍不解散
- * - 组队加成（信用值增加）
  * - 禁止玩家之间直接交易地产
  *
  * 设计原则：
  * - 不依赖 Socket.IO；纯数据层，可独立测试
  * - 同步 API；持久化由外部包装
- * - 队伍成员离线不解散，仅当所有成员都离线超过一定时间后才自动解散
+ * - 队伍成员离线不解散
  */
 
 import { randomUUID } from 'node:crypto';
-import type { Team, ValueField, Player } from '@game/shared';
+import type { Team } from '@game/shared';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -46,12 +44,8 @@ export interface TeamInvite {
 export interface TeamConfig {
   /** 组队邀请有效期（毫秒），默认 60 秒 */
   inviteExpireMs: number;
-  /** 组队加成：信用值增加量，默认 5 */
-  teamCreditBonus: number;
   /** 最大队伍人数，默认 4 */
   maxTeamSize: number;
-  /** 队伍成员全部离线后自动解散时间（毫秒），默认 30 分钟 */
-  autoDisbandAfterOfflineMs: number;
 }
 
 /**
@@ -59,9 +53,7 @@ export interface TeamConfig {
  */
 export const DEFAULT_TEAM_CONFIG: TeamConfig = {
   inviteExpireMs: 60_000,
-  teamCreditBonus: 5,
   maxTeamSize: 4,
-  autoDisbandAfterOfflineMs: 1_800_000, // 30 分钟
 };
 
 /**
@@ -86,6 +78,7 @@ export class TeamManager {
   private readonly invites: Map<string, TeamInvite> = new Map();
   private readonly playerTeamBindings: Map<string, string> = new Map();
   private readonly teamColors: Map<string, string> = new Map();
+  private readonly teamOperators: Map<string, string> = new Map();
   private readonly config: TeamConfig;
   private readonly teamDisbandedListeners: Array<(teamId: string, memberIds: string[]) => void> = [];
 
@@ -113,17 +106,16 @@ export class TeamManager {
       id: teamId,
       name: `${inviterName}的队伍`,
       memberIds: [inviterId],
-      sharedValues: {},
       createdAt: Date.now(),
       disbanded: false,
-      leaderId: inviterId,
     };
 
     this.teams.set(teamId, team);
     this.playerTeamBindings.set(inviterId, teamId);
     this.teamColors.set(teamId, color);
+    this.teamOperators.set(teamId, inviterId);
 
-    logger.info(`队伍创建成功：${teamId}，队长：${inviterId}`);
+    logger.info(`队伍创建成功：${teamId}`);
     return team;
   }
 
@@ -141,6 +133,20 @@ export class TeamManager {
     const teamId = this.playerTeamBindings.get(playerId);
     if (!teamId) return undefined;
     return this.teams.get(teamId);
+  }
+
+  ensurePlayerTeam(playerId: string, username: string): Team {
+    return this.getPlayerTeam(playerId) ?? this.createTeam(playerId, username);
+  }
+
+  canOperateTeam(teamId: string, playerId: string): boolean {
+    const team = this.getTeam(teamId);
+    return Boolean(
+      team
+      && !team.disbanded
+      && team.memberIds.includes(playerId)
+      && this.teamOperators.get(teamId) === playerId,
+    );
   }
 
   /**
@@ -188,9 +194,8 @@ export class TeamManager {
       return null;
     }
 
-    // 检查目标玩家是否已有队伍
     const targetTeam = this.getPlayerTeam(targetId);
-    if (targetTeam) {
+    if (targetTeam && (targetTeam.memberIds.length !== 1 || targetTeam.memberIds[0] !== targetId)) {
       logger.warn(`玩家 ${targetId} 已在队伍中，无法邀请`);
       return null;
     }
@@ -259,6 +264,11 @@ export class TeamManager {
       if (team.memberIds.length >= this.config.maxTeamSize) {
         logger.warn(`队伍 ${team.id} 已达人数上限`);
         return null;
+      }
+
+      const targetTeam = this.getPlayerTeam(targetId);
+      if (targetTeam && targetTeam.id !== team.id) {
+        this.leaveTeam(targetId);
       }
 
       // 加入队伍
@@ -359,6 +369,7 @@ export class TeamManager {
     // 标记源队伍为解散
     sourceTeam.disbanded = true;
     sourceTeam.disbandedAt = Date.now();
+    this.teamOperators.delete(sourceTeam.id);
 
     logger.info(`队伍合并成功：${sourceTeam.id} -> ${targetTeam.id}`);
     return targetTeam;
@@ -390,20 +401,9 @@ export class TeamManager {
 
     const remainingMembers = team.memberIds.slice();
 
-    // 检查是否需要更换队长
-    if (team.leaderId === playerId && remainingMembers.length > 0) {
-      team.leaderId = remainingMembers[0];
-      logger.info(`队伍 ${team.id} 队长变更为 ${team.leaderId}`);
-    }
-
-    // 检查是否只剩一人或空队伍
-    if (remainingMembers.length <= 1) {
-      // 队伍解散
+    if (remainingMembers.length === 0) {
       team.disbanded = true;
       team.disbandedAt = Date.now();
-      if (remainingMembers.length === 1) {
-        this.playerTeamBindings.delete(remainingMembers[0]);
-      }
       for (const listener of this.teamDisbandedListeners) {
         listener(team.id, originalMemberIds);
       }
@@ -443,134 +443,6 @@ export class TeamManager {
       playerId,
       teamId: team.id,
     };
-  }
-
-  // ---------------------------------------------------------------------------
-  // 队伍数值共享
-  // ---------------------------------------------------------------------------
-
-  /**
-   * 更新队伍共享数值
-   *
-   * 规则：
-   * - 财产类字段：平均分配
-   * - 信用值字段：取最低值
-   * - 其他字段：根据字段特性决定
-   *
-   * @param teamId 队伍 ID
-   * @param players 队员列表（包含数值）
-   * @returns 更新后的共享数值
-   */
-  updateTeamSharedValues(teamId: string, players: Player[]): Record<string, ValueField> {
-    const team = this.teams.get(teamId);
-    if (!team) {
-      logger.warn(`队伍 ${teamId} 不存在`);
-      return {};
-    }
-
-    // 获取队员的数值
-    const teamPlayers = players.filter(p => team.memberIds.includes(p.id));
-    if (teamPlayers.length === 0) {
-      return {};
-    }
-
-    const sharedValues: Record<string, ValueField> = {};
-
-    // 获取所有数值字段 ID
-    const fieldIds = new Set<string>();
-    for (const player of teamPlayers) {
-      for (const fieldId of Object.keys(player.values)) {
-        fieldIds.add(fieldId);
-      }
-    }
-
-    // 计算共享值
-    for (const fieldId of fieldIds) {
-      const values = teamPlayers
-        .map(p => p.values[fieldId])
-        .filter(v => v !== undefined);
-
-      if (values.length === 0) continue;
-
-      // 根据字段类型决定共享策略
-      let sharedValue: number;
-      let fieldDef: ValueField;
-
-      // 信用值字段：取最低值
-      if (fieldId === 'credit') {
-        sharedValue = Math.min(...values.map(v => v.current));
-        fieldDef = values[0];
-      } else {
-        // 其他字段（财产等）：平均分配
-        sharedValue = this.averageValues(values.map(v => v.current));
-        fieldDef = values[0];
-      }
-
-      // 应用组队加成（仅信用值）
-      if (fieldId === 'credit') {
-        sharedValue += this.config.teamCreditBonus;
-      }
-
-      sharedValues[fieldId] = {
-        ...fieldDef,
-        current: sharedValue,
-      };
-    }
-
-    // 更新队伍的共享数值
-    team.sharedValues = sharedValues;
-
-    logger.debug(`队伍 ${teamId} 共享数值已更新`);
-    return sharedValues;
-  }
-
-  /**
-   * 计算平均值（精确处理浮点数）
-   */
-  private averageValues(values: number[]): number {
-    if (values.length === 0) return 0;
-    const sum = values.reduce((a, b) => a + b, 0);
-    // 使用精确计算避免浮点数误差
-    return Math.round((sum / values.length) * 100) / 100;
-  }
-
-  /**
-   * 同步队伍数值到队员
-   *
-   * 将队伍共享数值同步到每个队员的 values
-   *
-   * @param teamId 队伍 ID
-   * @param players 队员列表
-   * @returns 更新后的队员列表
-   */
-  syncTeamValuesToMembers(teamId: string, players: Player[]): Player[] {
-    const team = this.teams.get(teamId);
-    if (!team || team.disbanded) {
-      return players;
-    }
-
-    const updatedPlayers: Player[] = [];
-
-    for (const player of players) {
-      if (!team.memberIds.includes(player.id)) {
-        updatedPlayers.push(player);
-        continue;
-      }
-
-      // 同步共享数值
-      const updatedValues = { ...player.values };
-      for (const [fieldId, field] of Object.entries(team.sharedValues)) {
-        updatedValues[fieldId] = { ...field };
-      }
-
-      updatedPlayers.push({
-        ...player,
-        values: updatedValues,
-        teamId: team.id,
-      });
-    }
-
-    return updatedPlayers;
   }
 
   // ---------------------------------------------------------------------------
@@ -615,6 +487,7 @@ export class TeamManager {
 
     team.disbanded = true;
     team.disbandedAt = Date.now();
+    this.teamOperators.delete(team.id);
 
     for (const listener of this.teamDisbandedListeners) {
       listener(teamId, originalMemberIds);
@@ -624,32 +497,8 @@ export class TeamManager {
     return true;
   }
 
-  /**
-   * 清理过期队伍
-   *
-   * 队员全部离线超过 autoDisbandAfterOfflineMs 后自动解散
-   *
-   * @param offlinePlayerIds 离线玩家 ID 列表
-   * @returns 清理的队伍 ID 列表
-   */
-  cleanupOfflineTeams(offlinePlayerIds: string[]): string[] {
-    const disbandedTeamIds: string[] = [];
-
-    for (const team of this.teams.values()) {
-      if (team.disbanded) continue;
-
-      // 检查是否所有队员都离线
-      const allOffline = team.memberIds.every(id => offlinePlayerIds.includes(id));
-      if (allOffline) {
-        // 检查离线时间（由外部传入）
-        // 这里简化处理：只要全部离线就解散
-        this.disbandTeam(team.id);
-        disbandedTeamIds.push(team.id);
-        logger.info(`队伍 ${team.id} 全员离线，自动解散`);
-      }
-    }
-
-    return disbandedTeamIds;
+  cleanupOfflineTeams(_offlinePlayerIds: string[]): string[] {
+    return [];
   }
 
   /**
@@ -660,5 +509,6 @@ export class TeamManager {
     this.invites.clear();
     this.playerTeamBindings.clear();
     this.teamColors.clear();
+    this.teamOperators.clear();
   }
 }

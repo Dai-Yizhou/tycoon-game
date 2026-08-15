@@ -333,7 +333,6 @@
     "youWereKicked": "❌ 你已被移出队伍",
     "teamUpdated": "队伍状态已更新",
     "teamDisbanded": "💥 队伍已解散",
-    "leaderChanged": "👑 队长已变更",
     "leaveTeam": "离开队伍",
     "leaveFailed": "❌ 离开队伍失败: {{error}}",
     "removeMember": "移除",

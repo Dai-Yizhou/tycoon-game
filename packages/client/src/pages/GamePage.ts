@@ -517,8 +517,11 @@ window.showTeamManagement = function(): void {
         <div class="team-management-list">
           ${teamMembers.filter(m => !currentPlayer || m.id !== currentPlayer.id).map(m => `
             <div class="management-item">
-              <span>${m.username}</span>
-              <button class="modal-btn btn-secondary" onclick="window.removeTeamMember('${m.id}')">${t('team.removeMember')}</button>
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <span>${m.username}</span>
+                <span style="font-size:0.75rem; color:var(--secondary);">金钱 ${m.money} · 信用 ${m.credit} · 环保 ${m.env} · ${m.status}</span>
+              </div>
+              <button type="button" class="modal-btn btn-secondary" onclick="window.removeTeamMember('${m.id}')">${t('team.removeMember')}</button>
             </div>
           `).join('')}
         </div>

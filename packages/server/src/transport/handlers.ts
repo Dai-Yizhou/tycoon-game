@@ -264,7 +264,7 @@ export class HandlerRegistry {
 
 
   /**
-   * 获取 TeamManager（用于外部调用，如离线清理、数值同步）
+   * 获取 TeamManager（用于外部调用，如登录恢复队伍）
    */
   getTeamManager(): TeamManager {
     return this.teamManager;
