@@ -44,6 +44,10 @@
     "jailCooldownSeconds": 10,
     "jailDurationTurns": 3,
     "diceMin": 1,
-    "diceMax": 3
+    "diceMax": 3,
+    "ownership": {
+      "buyInMultiplier": 1,
+      "maxShareholders": 8
+    }
   }
 }

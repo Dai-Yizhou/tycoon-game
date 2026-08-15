@@ -137,11 +137,10 @@ export const NOTIFICATION_TEMPLATES = {
     contentTemplate: '',
     durationMs: 0,
   },
-  // 玩家复活
-  playerRevived: {
+  playerRestarted: {
     type: 'success' as NotificationType,
-    title: '玩家复活',
-    contentTemplate: '{playerName} 已被复活',
+    title: '玩家重启',
+    contentTemplate: '{playerName} 已重新开始',
     durationMs: 3000,
   },
 } as const;
@@ -351,8 +350,8 @@ export class NotificationManager {
    * @param targetPlayerId 目标玩家 ID（null 表示全局）
    * @returns 通知
    */
-  createPlayerRevivedNotification(playerName: string, targetPlayerId?: string | null): Notification {
-    return this.createFromTemplate('playerRevived', { playerName }, targetPlayerId)!;
+  createPlayerRestartedNotification(playerName: string, targetPlayerId?: string | null): Notification {
+    return this.createFromTemplate('playerRestarted', { playerName }, targetPlayerId)!;
   }
 
   // ---------------------------------------------------------------------------

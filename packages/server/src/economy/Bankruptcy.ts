@@ -1,8 +1,7 @@
-import { CellTypes, PlayerStatus, isBankruptcyCheckable, normalizeCellType } from '@game/shared';
+import { PlayerStatus, isBankruptcyCheckable } from '@game/shared';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { Taxation } from './Taxation.js';
-import { getOwnerships, releaseOwnership } from './Ownership.js';
 
 export interface BankruptcyRecord {
   id: string;
@@ -62,7 +61,6 @@ export class Bankruptcy {
     };
 
     this.world.getPlayerManager().updateStatus(playerId, PlayerStatus.Bankrupt);
-    this.releasePlayerOwnerships(playerId);
     this.taxation.clearTaxRecords(playerId);
     this.bankruptcyRecords.set(playerId, record);
 
@@ -105,15 +103,6 @@ export class Bankruptcy {
     this.bankruptcyRecords.clear();
   }
 
-  private releasePlayerOwnerships(playerId: string): void {
-    for (const cell of this.world.getMapData() ?? []) {
-      const cellType = normalizeCellType(cell);
-      if (cellType !== CellTypes.Property && cellType !== CellTypes.Investment) continue;
-      if (getOwnerships(cell).some((ownership) => ownership.playerId === playerId)) {
-        releaseOwnership(cell, playerId);
-      }
-    }
-  }
 }
 
 export function createBankruptcy(io: TypedServer, world: GameWorld, taxation: Taxation, config?: BankruptcyConfig): Bankruptcy {

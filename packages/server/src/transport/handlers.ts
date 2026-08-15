@@ -21,7 +21,7 @@ import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from './SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ChatManager } from '../chat/index.js';
-import { Bankruptcy } from '../economy/index.js';
+import { Bankruptcy, resolveOwnershipConfig, type OwnershipConfig } from '../economy/index.js';
 import { DiceHandler, MovementHandler, PropertyHandler, StartHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, DebugHandler, TeamHandler } from '../handlers/index.js';
 import { TeamManager, DEFAULT_TEAM_CONFIG } from '../team/index.js';
 import { EventHandler } from '../events/index.js';
@@ -88,12 +88,13 @@ export class HandlerRegistry {
   private bankruptcy: Bankruptcy | null = null;
   private timeZoneManager: TimeZoneManager | null = null;
 
-  constructor(io: TypedServer, world: GameWorld) {
+  constructor(io: TypedServer, world: GameWorld, ownershipConfig?: OwnershipConfig) {
     this.io = io;
     this.world = world;
 
     const mapMeta = world.getMapMeta();
     const diceConfig = mapMeta?.config ?? {};
+    const resolvedOwnershipConfig = ownershipConfig ?? resolveOwnershipConfig(mapMeta?.config?.ownership);
 
     const cooldownConfig = {
       normal: ((diceConfig.diceCooldownSeconds as number) ?? 5) * 1000,
@@ -107,14 +108,14 @@ export class HandlerRegistry {
       this.handleCellEvent(playerId, cellId, socket);
     });
     // 初始化地产处理器
-    this.propertyHandler = new PropertyHandler(io, world);
+    this.propertyHandler = new PropertyHandler(io, world, resolvedOwnershipConfig);
     // 初始化起点和监狱处理器
     this.startHandler = new StartHandler(io, world, this);
     this.jailHandler = new JailHandler(io, world, this);
     // 初始化事件处理器
     this.eventHandler = new EventHandler(io, world);
     // 初始化投资项目处理器
-    this.investmentHandler = new InvestmentHandler(io, world);
+    this.investmentHandler = new InvestmentHandler(io, world, resolvedOwnershipConfig);
     // 初始化交通枢纽处理器
     this.transportHandler = new TransportHandler(io, world);
     // 初始化纪念碑处理器
@@ -422,7 +423,7 @@ export class HandlerRegistry {
           ack?.({ ok: false, error: 'bankruptcy_system_not_available' });
           return;
         }
-        const result = this.bankruptcy.revivePlayer(playerId, socket);
+        const result = this.bankruptcy.restartBankruptPlayer(playerId, socket);
         ack?.({ ok: result.success, error: result.error });
       });
     });
@@ -437,8 +438,8 @@ export class HandlerRegistry {
 /**
  * 快速注册：创建 HandlerRegistry 并注册全部事件
  */
-export function registerHandlers(io: TypedServer, world: GameWorld): HandlerRegistry {
-  const registry = new HandlerRegistry(io, world);
+export function registerHandlers(io: TypedServer, world: GameWorld, ownershipConfig?: OwnershipConfig): HandlerRegistry {
+  const registry = new HandlerRegistry(io, world, ownershipConfig);
   return registry;
 }
 

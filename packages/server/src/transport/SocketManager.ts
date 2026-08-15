@@ -420,10 +420,6 @@ export class SocketManager {
           if (existing) {
             // 恢复已有玩家状态
             player = existing;
-            // 离线冻结的玩家重连时恢复为正常状态
-            if (player.status === PlayerStatus.Frozen) {
-              player.status = PlayerStatus.Normal;
-            }
             player.lastActiveAt = now;
           } else {
             // 新玩家

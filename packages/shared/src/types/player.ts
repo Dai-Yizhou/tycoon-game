@@ -12,8 +12,8 @@
  *
  * - `normal`    : 正常，可正常操作
  * - `jail`      : 在监狱中，掷骰冷却延长、不可收租
- * - `bankrupt`  : 已破产，等待复活
- * - `frozen`    : 离线冻结，状态保留但不可操作
+ * - `bankrupt`  : 已破产，保留队伍与经济资产，等待显式重开
+ * - `frozen`    : 连接状态标记；离线期间不可主动操作，经济结算继续
  */
 export const PlayerStatus = {
   Normal: 'normal',

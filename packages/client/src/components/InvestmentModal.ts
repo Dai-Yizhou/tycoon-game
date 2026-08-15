@@ -121,7 +121,11 @@ export class InvestmentModal {
 
     const cell = this.config.cell;
     const name = getExtra<string>(cell, 'name', '未命名投资项目');
-    const price = getExtra<number>(cell, 'price', 0);
+    const basePrice = getExtra<number>(cell, 'price', 0);
+    const accumulatedValue = getExtra<number>(cell, 'accumulatedValue', basePrice);
+    const price = (getExtra<{ playerId: string; share: number; purchasePrice: number }[]>(cell, 'ownerships', []) ?? []).length > 0
+      ? accumulatedValue
+      : basePrice;
     const defaultEventImpact = getExtra<number>(cell, 'defaultEventImpact', 0);
 
     // 弹窗标题

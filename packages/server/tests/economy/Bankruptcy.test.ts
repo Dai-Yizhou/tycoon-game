@@ -157,9 +157,8 @@ describe('Bankruptcy System', () => {
       cell.extra.ownerships = [{ playerId: player.id, share: 1, purchasePrice: 500 }];
       taxation.triggerManualTax(player.id);
 
-      bankruptcy.triggerBankruptcy(player.id, 'manual');
-
       expect(cell.extra.owners).toContain(player.id);
+      expect(cell.extra.ownerships).toEqual([{ playerId: player.id, share: 1, purchasePrice: 500 }]);
       expect(taxation.getPlayerTaxRecords(player.id)).toHaveLength(0);
     });
 

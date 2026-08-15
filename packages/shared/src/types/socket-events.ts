@@ -36,7 +36,7 @@
 
 import type { Cell } from './cell.js';
 import type { ChatChannel, ChatMessage } from './chat.js';
-import type { Player } from './player.js';
+import type { Player, ValueField } from './player.js';
 import type { Team, TeamInvite, TeamMemberView } from './team.js';
 
 // ---------------------------------------------------------------------------

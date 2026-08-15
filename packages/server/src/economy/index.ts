@@ -3,7 +3,7 @@
  *
  * 包括：
  * - Taxation: 计税系统（昼夜计税、财产税、地产税）
- * - Bankruptcy: 破产机制（破产判定、复活、清算）
+ * - Bankruptcy: 破产机制（破产判定与显式重开）
  */
 
 export {
@@ -21,7 +21,6 @@ export {
   type BankruptcyConfig,
   type BankruptcyRecord,
   type BankruptcyResult,
-  type RevivalResult,
 } from './Bankruptcy.js';
 
 export {
@@ -34,6 +33,7 @@ export {
   distributeByShare,
   releaseOwnership,
   syncOwnerships,
+  resolveOwnershipConfig,
   type Ownership,
   type OwnershipConfig,
 } from './Ownership.js';

@@ -36,6 +36,7 @@ export interface ServerConfig {
   maxPlayers: number;
   /** 是否启用调试日志（默认 false） */
   debug: boolean;
+  ownership: { buyInMultiplier: number; maxShareholders: number };
 }
 
 /**
@@ -55,6 +56,7 @@ export const DEFAULT_SERVER_CONFIG: ServerConfig = {
   redisUrl: null,
   maxPlayers: 1000,
   debug: false,
+  ownership: { buyInMultiplier: 1, maxShareholders: 8 },
 };
 
 /**

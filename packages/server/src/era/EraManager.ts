@@ -7,7 +7,8 @@
  */
 
 import type { CellType, EraInfo, MapData, MapMeta, MonumentRecord, Player, ValueField } from '@game/shared';
-import { CellTypes, getExtra, normalizeCellType } from '@game/shared';
+import { CellTypes, normalizeCellType } from '@game/shared';
+import { getOwnerships } from '../economy/Ownership.js';
 import type { EraStore } from '../storage/EraStore.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { TypedServer } from '../transport/SocketManager.js';
@@ -506,13 +507,7 @@ export class EraManager {
       if (normalizeCellType(cell) !== cellType) {
         continue;
       }
-      const owners = getExtra<string[]>(cell, 'owners', []) ?? [];
-      if (owners.includes(playerId)) {
-        count++;
-        continue;
-      }
-      const ownerships = getExtra<Array<{ playerId: string }>>(cell, 'ownerships', []) ?? [];
-      if (ownerships.some((o) => o.playerId === playerId)) {
+      if (getOwnerships(cell).some((ownership) => ownership.playerId === playerId)) {
         count++;
       }
     }

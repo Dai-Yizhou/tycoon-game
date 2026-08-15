@@ -115,10 +115,14 @@ export class PropertyModal {
 
     const cell = this.config.cell;
     const name = getExtra<string>(cell, 'name', '未命名地产');
-    const price = getExtra<number>(cell, 'price', 0);
-    const rentArray = getExtra<number[]>(cell, 'rent', []);
+    const basePrice = getExtra<number>(cell, 'price', 0);
     const level = getExtra<number>(cell, 'level', 0);
     const upgradeCosts = getExtra<number[]>(cell, 'upgradeCost', []);
+    const accumulatedValue = getExtra<number>(cell, 'accumulatedValue', basePrice + upgradeCosts.slice(0, level).reduce((sum, cost) => sum + cost, 0));
+    const price = (getExtra<{ playerId: string; share: number; purchasePrice: number }[]>(cell, 'ownerships', []) ?? []).length > 0
+      ? accumulatedValue
+      : basePrice;
+    const rentArray = getExtra<number[]>(cell, 'rent', []);
     const maxLevel = upgradeCosts.length;
 
     // 弹窗标题
@@ -156,7 +160,7 @@ export class PropertyModal {
     }
 
     // 合租信息（如果有）
-    const ownerships = getExtra<{ playerId: string; share: number }[]>(cell, 'ownerships', []);
+    const ownerships = getExtra<{ playerId: string; share: number }[]>(cell, 'ownerships', []) ?? [];
     if (ownerships.length > 0) {
       const coownerEl = document.createElement('p');
       coownerEl.innerHTML = `<strong>合租：</strong>${ownerships.length} 人持有`;

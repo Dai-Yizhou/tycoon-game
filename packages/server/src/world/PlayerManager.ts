@@ -4,7 +4,7 @@
  * 负责玩家生命周期：
  * - 玩家 ID 生成（UUID v4）
  * - 玩家增删改查（内部存储）
- * - 玩家冻结/解冻（离线时保留数据但不接收事件）
+ * - 玩家连接状态跟踪（离线时保留数据，经济系统继续运行）
  * - 玩家状态变更追踪
  *
  * 设计原则：
@@ -85,6 +85,7 @@ export type PlayerEventName = (typeof PlayerEvents)[keyof typeof PlayerEvents];
 export class PlayerManager {
   private readonly players: Map<string, Player> = new Map();
   private readonly frozen: Set<string> = new Set();
+  private readonly statusBeforeFreeze: Map<string, PlayerStatus> = new Map();
   private readonly socketBindings: Map<string, string> = new Map();
   private readonly listeners: Map<PlayerEventName, Set<PlayerEventListener<unknown>>> = new Map();
 
@@ -138,6 +139,7 @@ export class PlayerManager {
     const player = this.players.get(playerId);
     if (!player) return undefined;
     this.frozen.delete(playerId);
+    this.statusBeforeFreeze.delete(playerId);
     this.socketBindings.delete(playerId);
     this.players.delete(playerId);
     this.emit(PlayerEvents.Removed, { playerId, player });
@@ -275,6 +277,7 @@ export class PlayerManager {
     const player = this.players.get(playerId);
     if (!player) return false;
     if (this.frozen.has(playerId)) return true;
+    this.statusBeforeFreeze.set(playerId, player.status);
     this.frozen.add(playerId);
     this.updateStatus(playerId, PlayerStatus.Frozen);
     this.emit(PlayerEvents.Frozen, { playerId, reason });
@@ -282,16 +285,18 @@ export class PlayerManager {
   }
 
   /**
-   * 解冻玩家（重连时）
+   * 清除玩家离线连接状态（重连时）
    *
-   * - 状态恢复为 `PlayerStatus.Normal`（前提是之前为 frozen；否则仅清除冻结标记）
+   * - 仅清除连接状态标记，不改变 normal、jail 或 bankrupt 等玩家领域状态
    */
   unfreezePlayer(playerId: string, newSocketId?: string): boolean {
     const player = this.players.get(playerId);
     if (!player) return false;
     if (!this.frozen.has(playerId)) return false;
     this.frozen.delete(playerId);
-    this.updateStatus(playerId, PlayerStatus.Normal);
+    const previousStatus = this.statusBeforeFreeze.get(playerId) ?? PlayerStatus.Normal;
+    this.statusBeforeFreeze.delete(playerId);
+    this.updateStatus(playerId, previousStatus);
     if (newSocketId) {
       this.socketBindings.set(playerId, newSocketId);
     }
@@ -404,6 +409,7 @@ export class PlayerManager {
   clear(): void {
     this.players.clear();
     this.frozen.clear();
+    this.statusBeforeFreeze.clear();
     this.socketBindings.clear();
     this.listeners.clear();
   }

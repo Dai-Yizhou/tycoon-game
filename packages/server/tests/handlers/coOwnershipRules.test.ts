@@ -254,7 +254,7 @@ describe('confirmed co-ownership rules', () => {
     expect(property.extra.accumulatedValue).toBe(0);
   });
 
-  it('releases bankrupt ownership and normalizes remaining shareholders for property and investment', () => {
+  it('retains bankrupt ownership for property and investment', () => {
     const world = new GameWorld();
     const bankrupt = player('bankrupt', 0);
     const remaining = player('remaining', 1000);
@@ -285,10 +285,10 @@ describe('confirmed co-ownership rules', () => {
     bankruptcy.triggerBankruptcy('bankrupt', 'manual');
     jest.advanceTimersByTime(2);
 
-    expect(property.extra.owners).toEqual(['remaining']);
-    expect(property.extra.ownerships).toHaveLength(1);
-    expect(investment.extra.owners).toEqual(['remaining']);
-    expect(investment.extra.ownerships).toHaveLength(1);
+    expect(property.extra.owners).toEqual(['bankrupt', 'remaining']);
+    expect(property.extra.ownerships).toHaveLength(2);
+    expect(investment.extra.owners).toEqual(['bankrupt', 'remaining']);
+    expect(investment.extra.ownerships).toHaveLength(2);
     bankruptcy.cleanup();
   });
 });
