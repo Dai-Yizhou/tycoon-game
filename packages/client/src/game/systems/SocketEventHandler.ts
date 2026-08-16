@@ -19,12 +19,6 @@ import {
   setDayNightStartTime,
   setServerTimeOffset,
   setCurrentPlayerPosition,
-  setCurrentMoney,
-  setCurrentCredit,
-  setCurrentEnv,
-  setIsInJail,
-  setJailEndTime,
-  setCanRoll,
   setIsWaitingForChoice,
   setProsperity,
   setTeamMembers,
@@ -215,7 +209,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       // 更新当前玩家：服务端权威同步
       if (isCurrentPlayer) {
         currentPlayer!.values.money.current = payload.current;
-        setCurrentMoney(payload.current);
       }
       if (otherPlayer || isCurrentPlayer) {
         updateRendererPlayers();
@@ -224,13 +217,11 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     } else if (payload.fieldId === 'credit') {
       if (isCurrentPlayer) {
         currentPlayer!.values.credit.current = payload.current;
-        setCurrentCredit(payload.current);
       }
     } else if (payload.fieldId === 'environment' || payload.fieldId === 'env') {
       if (isCurrentPlayer) {
         const env = currentPlayer!.values.environment || currentPlayer!.values.env;
         if (env) env.current = payload.current;
-        setCurrentEnv(payload.current);
       }
     }
     // 数值变更后刷新顶部面板
@@ -244,8 +235,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     // 服务端权威：监狱状态由服务端驱动
     const isCurrentPlayer = currentPlayer && payload.playerId === currentPlayer.id;
     if (isCurrentPlayer) {
-      setIsInJail(true);
-      setJailEndTime(Date.now() + payload.durationMs);
       store?.applyEvent({ sequence: Date.now(), type: 'status', playerId: payload.playerId, status: 'jail' });
       // 禁用掷骰按钮
       if (rollBtn) {
@@ -267,11 +256,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     // 服务端权威：出狱状态由服务端驱动
     const isCurrentPlayer = currentPlayer && payload.playerId === currentPlayer.id;
     if (isCurrentPlayer) {
-      setIsInJail(false);
-      setJailEndTime(0);
       store?.applyEvent({ sequence: Date.now(), type: 'status', playerId: payload.playerId, status: 'normal' });
-      // 冷却结束后恢复掷骰能力
-      setCanRoll(true);
       if (rollBtn && !rollCooldownTimer) {
         rollBtn.disabled = false;
         rollBtn.classList.remove('disabled', 'cooldown');

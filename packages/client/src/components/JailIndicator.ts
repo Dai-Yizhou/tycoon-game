@@ -3,7 +3,7 @@
  *
  * 负责：
  * - 监狱状态的视觉标识
- * - 显示剩余回合数
+ * - 显示现实时间剩余冷却
  * - 显示信用值扣除提示
  * - 出狱倒计时显示
  *
@@ -19,7 +19,7 @@ import { PlayerStatus } from '@game/shared';
  * 监狱指示器配置
  */
 export interface JailIndicatorConfig {
-  /** 紧凑模式（仅显示图标和剩余回合） */
+  /** 紧凑模式 */
   compact?: boolean;
   /** 自定义容器 ID */
   containerId?: string;
@@ -33,8 +33,8 @@ export interface JailIndicatorConfig {
 export interface JailStatusData {
   /** 玩家状态 */
   status: PlayerStatus;
-  /** 剩余回合数 */
-  remainingTurns?: number;
+  /** 到期时间 */
+  expiresAt?: number;
   /** 入狱时间 */
   jailedAt?: number;
   /** 信用值扣除 */
@@ -87,10 +87,10 @@ export class JailIndicator {
       const infoArea = document.createElement('div');
       infoArea.className = 'jail-info-area';
 
-      // 剩余回合
+      // 剩余冷却
       const turnsInfo = document.createElement('div');
       turnsInfo.className = 'jail-turns-info';
-      turnsInfo.innerHTML = `<span class="jail-turns-label">剩余回合：</span><span class="jail-turns-value">0</span>`;
+      turnsInfo.innerHTML = `<span class="jail-turns-label">剩余冷却：</span><span class="jail-turns-value">0秒</span>`;
       infoArea.appendChild(turnsInfo);
 
       // 信用值扣除
@@ -142,16 +142,16 @@ export class JailIndicator {
     // 紧凑模式：仅更新图标和回合数
     if (this.config.compact) {
       const turnsValue = this.element.querySelector('.jail-turns-value') as HTMLElement;
-      if (turnsValue && data.remainingTurns !== undefined) {
-        turnsValue.textContent = String(data.remainingTurns);
+      if (turnsValue && data.expiresAt !== undefined) {
+        turnsValue.textContent = `${Math.max(0, Math.ceil((data.expiresAt - Date.now()) / 1000))}秒`;
       }
       return;
     }
 
     // 详细模式：更新所有信息
     const turnsValue = this.element.querySelector('.jail-turns-value') as HTMLElement;
-    if (turnsValue && data.remainingTurns !== undefined) {
-      turnsValue.textContent = String(data.remainingTurns);
+    if (turnsValue && data.expiresAt !== undefined) {
+      turnsValue.textContent = `${Math.max(0, Math.ceil((data.expiresAt - Date.now()) / 1000))}秒`;
     }
 
     const creditValue = this.element.querySelector('.jail-credit-value') as HTMLElement;
@@ -242,18 +242,18 @@ export class JailIndicator {
   /**
    * 更新剩余回合数（动画效果）
    */
-  updateRemainingTurns(turns: number): void {
+  updateRemainingCooldown(expiresAt: number): void {
     if (!this.currentData) return;
 
     const turnsValue = this.element.querySelector('.jail-turns-value') as HTMLElement;
     if (turnsValue) {
-      const oldTurns = parseInt(turnsValue.textContent ?? '0', 10);
-      if (oldTurns !== turns) {
+      const seconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+      if (turnsValue.textContent !== `${seconds}秒`) {
         // 触发动画
         turnsValue.classList.add('jail-turns-change');
 
         // 更新数值
-        turnsValue.textContent = String(turns);
+        turnsValue.textContent = `${seconds}秒`;
 
         // 移除动画类（延迟）
         setTimeout(() => {
@@ -262,7 +262,7 @@ export class JailIndicator {
       }
     }
 
-    this.currentData.remainingTurns = turns;
+    this.currentData.expiresAt = expiresAt;
   }
 
   /**

@@ -151,6 +151,25 @@ describe('Bankruptcy System', () => {
     expect(taxation.triggerManualTax(player.id).taxRecord).toBeUndefined();
   });
 
+  it('clears project-only ownership metadata and all economic indexes atomically', () => {
+    const projectCell = mapData[1];
+    projectCell.extra.projectOwner = player.id;
+    projectCell.extra.projectOwnerId = player.id;
+    projectCell.extra.projectState = 'active';
+    projectCell.extra.owners = [];
+    projectCell.extra.ownerships = [];
+    projectCell.extra.level = 4;
+    projectCell.extra.accumulatedValue = 800;
+    player.extra = { projectOwner: player.id, projectState: 'active', assets: { value: 1 } };
+
+    bankruptcy.triggerBankruptcy(player.id, 'manual');
+
+    expect(projectCell.extra).not.toEqual(expect.objectContaining({ projectOwner: player.id, projectOwnerId: player.id, projectState: 'active' }));
+    expect(projectCell.extra.level).toBe(0);
+    expect(projectCell.extra.accumulatedValue).toBe(0);
+    expect(world.getPlayer(player.id)?.teamId).toBeNull();
+  });
+
   describe('破产重启', () => {
     beforeEach(() => {
       bankruptcy.triggerBankruptcy(player.id, 'manual');
