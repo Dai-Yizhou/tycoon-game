@@ -32,6 +32,7 @@ export class JWTService {
   private readonly config: JWTConfig;
 
   constructor(config: JWTConfig = DEFAULT_JWT_CONFIG) {
+    if (!config.secret.trim()) throw new Error('JWT secret is required');
     this.config = config;
   }
 
@@ -43,11 +44,13 @@ export class JWTService {
    * @param isGuest 是否为游客
    * @returns JWT token
    */
-  generateToken(userId: string, username: string, isGuest: boolean): string {
+  generateToken(userId: string, username: string, isGuest: boolean, role: 'player' | 'admin' = 'player'): string {
     const payload: JWTPayload = {
       userId,
       username,
       isGuest,
+      playerId: userId,
+      role,
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + this.config.expiresIn,
     };

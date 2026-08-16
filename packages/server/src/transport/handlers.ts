@@ -84,7 +84,7 @@ export class HandlerRegistry {
   private bankruptcy: Bankruptcy | null = null;
   private timeZoneManager: TimeZoneManager | null = null;
 
-  constructor(io: TypedServer, world: GameWorld, ownershipConfig?: OwnershipConfig) {
+  constructor(io: TypedServer, world: GameWorld, ownershipConfig?: OwnershipConfig, jailCooldownMs?: number) {
     this.io = io;
     this.world = world;
 
@@ -107,7 +107,7 @@ export class HandlerRegistry {
     this.propertyHandler = new PropertyHandler(io, world, resolvedOwnershipConfig);
     // 初始化起点和监狱处理器
     this.startHandler = new StartHandler(io, world, this);
-    this.jailHandler = new JailHandler(io, world, this);
+    this.jailHandler = new JailHandler(io, world, this, jailCooldownMs);
     // 初始化事件处理器
     this.eventHandler = new EventHandler(io, world);
     // 初始化投资项目处理器
@@ -413,8 +413,8 @@ export class HandlerRegistry {
 /**
  * 快速注册：创建 HandlerRegistry 并注册全部事件
  */
-export function registerHandlers(io: TypedServer, world: GameWorld, ownershipConfig?: OwnershipConfig): HandlerRegistry {
-  const registry = new HandlerRegistry(io, world, ownershipConfig);
+export function registerHandlers(io: TypedServer, world: GameWorld, ownershipConfig?: OwnershipConfig, jailCooldownMs?: number): HandlerRegistry {
+  const registry = new HandlerRegistry(io, world, ownershipConfig, jailCooldownMs);
   return registry;
 }
 

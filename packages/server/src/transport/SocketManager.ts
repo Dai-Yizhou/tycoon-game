@@ -33,6 +33,7 @@ import type { GameWorld } from '../world/GameWorld.js';
 import type { DayNightCycle } from '../world/DayNightCycle.js';
 import type { PlayerStore } from '../storage/PlayerStore.js';
 import type { TeamManager } from '../team/TeamManager.js';
+import type { JWTService } from '../auth/JWTService.js';
 
 /**
  * Socket.IO 类型化 Server
@@ -74,6 +75,7 @@ export interface SocketManagerOptions {
   rateLimit?: RateLimitConfig;
   /** 鉴权处理器；返回 null 表示通过，非 null 为 playerId */
   authenticate?: (socket: TypedSocket, handshake: unknown) => string | null | Promise<string | null>;
+  jwtService?: JWTService;
   /** 是否自动绑定 GameWorld 事件到广播（默认 true） */
   autoWireWorldEvents?: boolean;
   /** 昼夜循环实例（用于登录时同步时间给客户端） */
@@ -91,6 +93,7 @@ export class SocketManager {
   private readonly world: GameWorld;
   private readonly rateLimit: RateLimitConfig;
   private readonly authenticate?: SocketManagerOptions['authenticate'];
+  private readonly jwtService?: JWTService;
   private readonly autoWireWorldEvents: boolean;
   private dayNightCycle?: DayNightCycle;
   private playerStore?: PlayerStore;
@@ -106,12 +109,13 @@ export class SocketManager {
     this.world = options.world;
     this.rateLimit = options.rateLimit ?? { windowMs: 10_000, maxEvents: 100 };
     this.authenticate = options.authenticate;
+    this.jwtService = options.jwtService;
     this.autoWireWorldEvents = options.autoWireWorldEvents ?? true;
     this.dayNightCycle = options.dayNightCycle;
     this.playerStore = options.playerStore;
     this.teamManager = options.teamManager;
 
-    if (!this.authenticate && process.env.NODE_ENV === 'production') {
+    if (!this.authenticate && !this.jwtService && process.env.NODE_ENV === 'production') {
       throw new Error('JWT authentication is required in production');
     }
 
@@ -234,7 +238,18 @@ export class SocketManager {
   ): Promise<void> {
     try {
       // 1. 鉴权
-      if (this.authenticate) {
+      if (this.jwtService) {
+        const auth = socket.handshake.auth as { token?: unknown } | undefined;
+        const token = typeof auth?.token === 'string' ? auth.token : undefined;
+        const payload = token ? this.jwtService.verifyToken(token) : null;
+        if (!payload || typeof payload.playerId !== 'string' || !payload.role) {
+          next(new Error('authentication_failed'));
+          return;
+        }
+        socket.data.playerId = payload.playerId;
+        socket.data.role = payload.role;
+        socket.data.authenticated = true;
+      } else if (this.authenticate) {
         const playerId = await this.authenticate(socket, socket.handshake);
         if (typeof playerId === 'string' && playerId.length > 0) {
           socket.data.playerId = playerId;

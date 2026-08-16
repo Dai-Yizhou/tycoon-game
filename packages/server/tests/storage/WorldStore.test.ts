@@ -1,4 +1,7 @@
-import { InMemoryWorldStore, type WorldSnapshot } from '../../src/storage/WorldStore.js';
+import { FileWorldStore, InMemoryWorldStore, type WorldSnapshot } from '../../src/storage/WorldStore.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { Cell, EraInfo, Player, Team } from '@game/shared';
 
 describe('WorldStore', () => {
@@ -20,5 +23,17 @@ describe('WorldStore', () => {
     expect(restored).toEqual(snapshot);
     restored!.mapData[0].extra.owners = [];
     expect(store.load()!.mapData[0].extra.owners).toEqual(['p1']);
+  });
+
+  it('使用文件存储跨实例恢复世界快照', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'world-store-'));
+    const file = join(directory, 'world.json');
+    const snapshot = { version: 1, savedAt: 1, mapData: [], mapMeta: { id: 'map', valueFieldDefinitions: [] }, players: [], teams: [], era: null, taxRecords: {} } as WorldSnapshot;
+    try {
+      new FileWorldStore(file).save(snapshot);
+      expect(new FileWorldStore(file).load()).toEqual(snapshot);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

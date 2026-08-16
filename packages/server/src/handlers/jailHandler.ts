@@ -64,14 +64,18 @@ export class JailHandler {
 
   /** 监狱状态数据：playerId → JailStateData */
   private readonly jailStates: Map<string, JailStateData> = new Map();
+  private readonly jailTimers: Map<string, NodeJS.Timeout> = new Map();
+  private readonly configuredCooldownMs?: number;
 
   constructor(
     io: TypedServer,
     world: GameWorld,
     _registry: HandlerRegistry,
+    configuredCooldownMs?: number,
   ) {
     this.io = io;
     this.world = world;
+    this.configuredCooldownMs = configuredCooldownMs;
   }
 
   /**
@@ -148,6 +152,7 @@ export class JailHandler {
         jailCellId: cellId,
       };
       this.jailStates.set(playerId, jailData);
+      this.scheduleRelease(playerId, cooldownMs);
 
       // 检查是否有 behavior 字段（作为额外效果）
       const behaviorId = getExtra<string>(cell, 'behavior', '') ?? '';
@@ -270,6 +275,9 @@ export class JailHandler {
 
       // 清除监狱状态数据
       this.jailStates.delete(playerId);
+      const timer = this.jailTimers.get(playerId);
+      if (timer) clearTimeout(timer);
+      this.jailTimers.delete(playerId);
 
       // 广播出狱事件
       this.io.emit('server.playerReleased', { playerId });
@@ -312,6 +320,7 @@ export class JailHandler {
    * 从 MapMeta.config 中读取
    */
   getJailConfig(): JailConfig {
+    if (this.configuredCooldownMs !== undefined) return { ...DEFAULT_JAIL_CONFIG, cooldownMs: this.configuredCooldownMs };
     const mapMeta = this.world.getMapMeta();
     if (!mapMeta) return DEFAULT_JAIL_CONFIG;
 
@@ -350,7 +359,10 @@ export class JailHandler {
   restoreJailStates(states: Record<string, JailStateData> = {}): void {
     this.jailStates.clear();
     for (const [playerId, state] of Object.entries(states)) {
-      if (state.expiresAt > Date.now()) this.jailStates.set(playerId, { ...state });
+      if (state.expiresAt > Date.now()) {
+        this.jailStates.set(playerId, { ...state });
+        this.scheduleRelease(playerId, state.expiresAt - Date.now());
+      }
       else if (this.world.getPlayer(playerId)?.status === PlayerStatus.Jail) this.releasePlayer(playerId);
     }
   }
@@ -395,6 +407,25 @@ export class JailHandler {
    */
   clearJailState(playerId: string): void {
     this.jailStates.delete(playerId);
+    const timer = this.jailTimers.get(playerId);
+    if (timer) clearTimeout(timer);
+    this.jailTimers.delete(playerId);
+  }
+
+  cleanup(): void {
+    for (const timer of this.jailTimers.values()) clearTimeout(timer);
+    this.jailTimers.clear();
+  }
+
+  private scheduleRelease(playerId: string, delayMs: number): void {
+    const existing = this.jailTimers.get(playerId);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      this.jailTimers.delete(playerId);
+      this.releasePlayer(playerId);
+    }, Math.max(0, delayMs));
+    timer.unref();
+    this.jailTimers.set(playerId, timer);
   }
 
   /**

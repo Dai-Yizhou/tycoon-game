@@ -19,6 +19,7 @@ import { PlayerStatus, type Player } from '@game/shared';
 import { GameWorld } from '../src/world/GameWorld';
 import { SocketManager, type TypedServer } from '../src/transport/SocketManager';
 import { registerHandlers } from '../src/transport/handlers';
+import { JWTService } from '../src/auth/JWTService';
 
 function buildPlayer(id: string, overrides: Partial<Player> = {}): Player {
   return {
@@ -75,6 +76,26 @@ function waitFor<T>(socket: ClientSocket, event: string, timeoutMs = 1000): Prom
 
 describe('SocketManager', () => {
   describe('connection lifecycle', () => {
+    it('authenticates handshake.auth.token and stores playerId and role', async () => {
+      const env = await createTestEnv();
+      const world = new GameWorld();
+      world.addPlayer(buildPlayer('p1'));
+      const jwt = new JWTService({ secret: 'test-secret', expiresIn: 3600 });
+      const socketManager = new SocketManager(env.io, {
+        world,
+        autoWireWorldEvents: false,
+        jwtService: jwt,
+      });
+      env.io.on('connection', (socket) => {
+        expect(socket.data.playerId).toBe('p1');
+        expect(socket.data.role).toBe('admin');
+        socketManager.registerConnectionHandlers(socket);
+      });
+      const sock = await connectClient(env.port, { auth: { token: jwt.generateToken('p1', 'user-p1', false, 'admin') } });
+      expect(sock.connected).toBe(true);
+      sock.disconnect();
+      await new Promise((r) => env.http.close(r));
+    });
     it('does not register a connection listener in the constructor', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();

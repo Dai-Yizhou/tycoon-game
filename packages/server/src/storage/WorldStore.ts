@@ -1,5 +1,7 @@
 import type { Cell, EraInfo, MapMeta, Player, Team } from '@game/shared';
 import type { TaxRecord } from '../economy/Taxation.js';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 export interface WorldSnapshot {
   version: number;
@@ -35,5 +37,19 @@ export class InMemoryWorldStore implements WorldStore {
 
   save(snapshot: WorldSnapshot): void {
     this.snapshot = clone(snapshot);
+  }
+}
+
+export class FileWorldStore implements WorldStore {
+  constructor(private readonly filePath: string) {}
+
+  load(): WorldSnapshot | null {
+    if (!existsSync(this.filePath)) return null;
+    return JSON.parse(readFileSync(this.filePath, 'utf8')) as WorldSnapshot;
+  }
+
+  save(snapshot: WorldSnapshot): void {
+    mkdirSync(dirname(this.filePath), { recursive: true });
+    writeFileSync(this.filePath, JSON.stringify(snapshot), 'utf8');
   }
 }

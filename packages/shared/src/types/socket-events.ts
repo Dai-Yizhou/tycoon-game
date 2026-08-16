@@ -452,6 +452,7 @@ export interface ServerToClientEvents {
  */
 export interface SocketData {
   playerId?: string;
+  role?: 'player' | 'admin';
   teamId?: string | null;
   /** 是否已鉴权 */
   authenticated?: boolean;

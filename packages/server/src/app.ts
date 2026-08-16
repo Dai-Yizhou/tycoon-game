@@ -31,7 +31,8 @@ import { TimeZoneManager } from './world/TimeZoneManager.js';
 import { ProsperityManager, DEFAULT_PROSPERITY_CONFIG } from './world/ProsperityManager.js';
 import { BehaviorEngine } from './behavior/index.js';
 import { EraManager } from './era/index.js';
-import { InMemoryPlayerStore, MongoPlayerStore, InMemoryEraStore, InMemoryWorldStore, type PlayerStore } from './storage/index.js';
+import { InMemoryPlayerStore, MongoPlayerStore, InMemoryEraStore, InMemoryWorldStore, FileWorldStore, type PlayerStore, type WorldStore } from './storage/index.js';
+import { JWTService } from './auth/JWTService.js';
 
 /**
  * Socket 管理器配置（不包含 world，由 createApp 注入）
@@ -51,6 +52,7 @@ export interface AppDependencies {
   socketManagerOptions?: SocketManagerConfig;
   /** 客户端静态资源目录（绝对路径），可选 */
   clientDistPath?: string;
+  worldStore?: WorldStore;
 }
 
 function readTaxConfig(mapMeta: ReturnType<typeof parseMapMeta>): TaxConfig {
@@ -111,6 +113,7 @@ export interface CreatedApp {
   eraManager?: EraManager;
   /** 玩家存储实例（FR-22 账号持久化） */
   playerStore?: PlayerStore;
+  worldStore?: WorldStore;
 }
 
 /**
@@ -148,7 +151,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   });
 
   // GameWorld
-  const worldStore = new InMemoryWorldStore();
+  const worldStore = deps.worldStore ?? (config.mongoUri ? new FileWorldStore(path.resolve(process.cwd(), 'data/world.json')) : new InMemoryWorldStore());
   const world = deps.world ?? new GameWorld({ worldStore });
 
   // 加载地图数据与元数据（供 ProsperityManager、TimeZoneManager 等使用）
@@ -264,7 +267,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   logger.info('Economy system initialized (taxation, bankruptcy)');
 
   // 注册业务事件处理器（需要在经济系统初始化后）
-  const handlerRegistry = registerHandlers(io, world, ownershipConfig);
+  const handlerRegistry = registerHandlers(io, world, ownershipConfig, config.jailCooldownMs);
 
   const restoredSnapshot = world.restoreSnapshot();
   if (restoredSnapshot) taxation.restoreTaxRecords(restoredSnapshot.taxRecords);
@@ -277,6 +280,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     socketManager = new SocketManager(io, {
       ...deps.socketManagerOptions,
       world,
+      jwtService: deps.socketManagerOptions.jwtService ?? (process.env.JWT_SECRET?.trim() ? new JWTService() : undefined),
       teamManager: handlerRegistry.getTeamManager(),
     });
   }
@@ -362,6 +366,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     behaviorEngine,
     eraManager,
     playerStore,
+    worldStore,
   };
 }
 
@@ -411,8 +416,11 @@ export async function gracefulShutdown(
   prosperityManager?: ProsperityManager,
   eraManager?: EraManager,
   timeoutMs: number = 5000,
+  world?: GameWorld,
 ): Promise<void> {
   logger.info('graceful shutdown started');
+
+  world?.saveSnapshot();
 
   // 关闭时代管理器（清理定时器）
   if (eraManager) {
@@ -454,6 +462,7 @@ export async function gracefulShutdown(
       logger.error('error cleaning up economy system', err);
     }
   }
+
 
   if (socketManager) {
     try {

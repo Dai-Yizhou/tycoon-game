@@ -5,6 +5,9 @@
 import { JWTService } from '../../src/auth/JWTService.js';
 
 describe('JWTService', () => {
+  it('rejects an empty secret', () => {
+    expect(() => new JWTService({ secret: '', expiresIn: 3600 })).toThrow('JWT secret is required');
+  });
   let jwtService: JWTService;
 
   beforeEach(() => {
@@ -28,6 +31,12 @@ describe('JWTService', () => {
       const token2 = jwtService.generateToken('user2', 'testuser2', false);
 
       expect(token1).not.toBe(token2);
+    });
+
+    it('should include playerId and role in the payload', () => {
+      const token = jwtService.generateToken('player-1', 'testuser', false, 'admin');
+      const payload = jwtService.verifyToken(token);
+      expect(payload).toMatchObject({ playerId: 'player-1', role: 'admin' });
     });
   });
 

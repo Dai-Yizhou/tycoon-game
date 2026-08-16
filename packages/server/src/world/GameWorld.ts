@@ -139,21 +139,27 @@ export class GameWorld {
    * 添加玩家
    */
   addPlayer(player: Player, socketId?: string): boolean {
-    return this.playerManager.addPlayer(player, socketId);
+    const added = this.playerManager.addPlayer(player, socketId);
+    if (added) this.saveSnapshot();
+    return added;
   }
 
   /**
    * 移除玩家
    */
   removePlayer(playerId: string): boolean {
-    return this.playerManager.removePlayer(playerId) !== undefined;
+    const removed = this.playerManager.removePlayer(playerId) !== undefined;
+    if (removed) this.saveSnapshot();
+    return removed;
   }
 
   /**
    * 更新玩家
    */
   updatePlayer(player: Player): boolean {
-    return this.playerManager.updatePlayer(player);
+    const updated = this.playerManager.updatePlayer(player);
+    if (updated) this.saveSnapshot();
+    return updated;
   }
 
   /**
