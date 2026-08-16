@@ -20,11 +20,11 @@
 - Modify: `packages/server/src/config.ts`
 - Test: `packages/server/tests/SocketManager.test.ts`
 
-- [ ] 写测试证明未认证 Socket 被拒绝、缺少生产 `JWT_SECRET` 启动失败、rate limit 超限阻断后续事件。
+- [x] 写测试证明未认证 Socket 被拒绝、缺少生产 `JWT_SECRET` 启动失败、rate limit 超限阻断后续事件。
 - [x] 删除过时的客户端移动、客户端骰子预测、调试结算协议与注册链。
-- [ ] 将认证改为生产必需 JWT，开发测试只能显式传入 authenticate 或测试密钥；超限返回错误并不调用业务 handler。
-- [ ] 运行 server Socket 与认证测试并修复类型闭环。
-- [ ] 提交 `security: enforce authoritative socket boundary`。
+- [x] 将认证改为生产必需 JWT，开发测试只能显式传入 authenticate 或测试密钥；超限返回错误并不调用业务 handler。
+- [x] 运行 server Socket 与认证测试并修复类型闭环。
+- [x] 提交 `security: enforce authoritative socket boundary`。
 
 ### Task 2: 统一监狱配置与现实时间语义
 
@@ -38,11 +38,11 @@
 - Test: `packages/server/tests/handlers/jailHandler.test.ts`
 - Test: `packages/server/tests/handlers/diceHandler.test.ts`
 
-- [ ] 先增加失败测试：入狱扣信用、保存 `expiresAt`、冷却期间禁止掷骰、过期后恢复正常掷骰、重建后按时间安全恢复。
-- [ ] 将 `jailCooldownMs` 作为 shared 配置唯一来源，协议统一发送 `expiresAt` 与 `remainingMs`，不再使用剩余回合释放。
-- [ ] 使用现实时间过期判断和可恢复状态，不依赖长期单次定时器；保持客户端只读显示。
-- [ ] 增加最低免税额边界测试，明确税收计算的最小免税额规则。
-- [ ] 运行监狱、税收、掷骰测试并提交 `feat: make jail cooldown time based`。
+- [x] 先增加失败测试：入狱扣信用、保存 `expiresAt`、冷却期间禁止掷骰、过期后恢复正常掷骰、重建后按时间安全恢复。
+- [x] 将 `jailCooldownMs` 作为 shared 配置唯一来源，协议统一发送 `expiresAt` 与 `remainingMs`，不再使用剩余回合释放。
+- [x] 使用现实时间过期判断和可恢复状态，不依赖长期单次定时器；保持客户端只读显示。
+- [x] 增加最低免税额边界测试，明确税收计算的最小免税额规则。
+- [x] 运行监狱、税收、掷骰测试并提交 `feat: make jail cooldown time based`。
 
 ### Task 3: 实现破产完整清算与安全重开
 
@@ -54,10 +54,10 @@
 - Modify: `packages/server/src/world/GameWorld.ts`
 - Test: `packages/server/tests/economy/Bankruptcy.test.ts`
 
-- [ ] 写失败测试覆盖 owners、ownerships、地产等级、累计价值、投资持股、项目所有权、税收记录、Jail 和经济字段全部清除且保留 teamId。
-- [ ] 让 Bankrupt 玩家完全退出经济操作，`bankruptRestart` 只按地图初始值重开并生成新的状态版本。
-- [ ] 将清算集中到一个原子世界操作，广播完整服务端事件和重连可用快照。
-- [ ] 运行破产与地产/投资回归测试并提交 `feat: atomically clear bankrupt assets`。
+- [x] 写失败测试覆盖 owners、ownerships、地产等级、累计价值、投资持股、项目所有权、税收记录、Jail 和经济字段全部清除且保留 teamId。
+- [x] 让 Bankrupt 玩家完全退出经济操作，`bankruptRestart` 只按地图初始值重开并生成新的状态版本。
+- [x] 将清算集中到一个原子世界操作，广播完整服务端事件和重连可用快照。
+- [x] 运行破产与地产/投资回归测试并提交 `feat: atomically clear bankrupt assets`。
 
 ### Task 4: 增加可恢复 WorldStore 与经济并发保护
 
@@ -71,11 +71,11 @@
 - Test: `packages/server/tests/storage/WorldStore.test.ts`
 - Test: `packages/server/tests/handlers/economyConcurrency.test.ts`
 
-- [ ] 写失败测试证明重启恢复地产、投资、队伍、监狱、时代和税收关键状态。
-- [ ] 定义版本化 WorldSnapshot、load/save、原子更新和内存实现；没有外部存储时明确使用进程内可恢复快照边界。
+- [x] 写失败测试证明重启恢复地产、投资、队伍、监狱、时代和税收关键状态。
+- [x] 定义版本化 WorldSnapshot、load/save、原子更新和内存实现；没有外部存储时明确使用进程内可恢复快照边界。
 - [ ] 对买地、升级、投资购买增加世界版本或单元格版本检查，失败时不扣钱不广播；支持幂等请求键避免重复扣款。
-- [ ] 在组合根注入 WorldStore，关停前保存，启动时加载并校验快照。
-- [ ] 运行存储、并发和全量 server 测试并提交 `feat: persist and serialize world mutations`。
+- [x] 在组合根注入 WorldStore，关停前保存，启动时加载并校验快照。
+- [x] 运行存储、并发和全量 server 测试并提交 `feat: persist and serialize world mutations`。
 
 ### Task 5: 修复时代定时器与 Node 浏览器边界
 
@@ -103,10 +103,10 @@
 - Test: `packages/client/tests/game-store-authority.test.ts`
 - Test: `packages/client/tests/game-page-state.test.ts`
 
-- [ ] 写失败测试证明 GameStore 是唯一可写事实源，ViewModel 不写状态，Controller 只路由，GamePage 不持有业务状态。
-- [ ] 将完整 `server.gameState`、玩家事件、地产/投资/监狱/时代/税收事件全部归并到 Store；渲染层只读取 snapshot/projection。
+- [x] 写失败测试证明 GameStore 是唯一可写事实源，ViewModel 不写状态，Controller 只路由，GamePage 不持有业务状态。
+- [x] 将完整 `server.gameState`、玩家事件、地产/投资/监狱/时代/税收事件全部归并到 Store；渲染层只读取 snapshot/projection。
 - [ ] 删除客户端预测骰子、自由移动和本地经济修改路径，保留请求意图与 pending 状态。
-- [ ] 运行 client 全量测试、lint、build 并提交 `refactor: centralize client game state`。
+- [x] 运行 client 全量测试、lint、build 并提交 `refactor: centralize client game state`。
 
 ### Task 7: 完成文档、差异检查与全量验证
 
