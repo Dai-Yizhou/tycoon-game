@@ -73,7 +73,7 @@ io.on('connection', socket)
      -> TransportHandler / MonumentHandler / TeamHandler
      -> chat / bankruptcy restart
      -> debugHandler（仅调试开关满足时）
-  -> app.ts 注册 triggerSettlement 调试处理器
+  -> admin-only settlement entrypoints remain outside the player protocol
 ```
 
 协议类型集中在 `packages/shared/src/types/socket-events.ts`。客户端在 `LoadingPage` 创建 typed socket，在 `GamePage` 调用 `registerSocketHandlers`；`SocketEventHandler` 以 `WeakSet` 防止同一 socket 重复注册，离开页面调用注销函数。

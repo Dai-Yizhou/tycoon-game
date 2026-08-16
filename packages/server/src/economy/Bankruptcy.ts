@@ -62,6 +62,12 @@ export class Bankruptcy {
 
     this.world.getPlayerManager().updateStatus(playerId, PlayerStatus.Bankrupt);
     this.clearPlayerAssets(playerId);
+    const mutablePlayer = player as import('@game/shared').Player & { extra?: Record<string, unknown> };
+    if (mutablePlayer.extra) {
+      delete mutablePlayer.extra.jail;
+      delete mutablePlayer.extra.economy;
+    }
+    this.world.updatePlayer(player);
     this.taxation.clearTaxRecords(playerId);
     this.world.saveSnapshot(this.taxation.getAllTaxRecords(), {});
     this.bankruptcyRecords.set(playerId, record);
@@ -83,6 +89,9 @@ export class Bankruptcy {
         cell.extra.accumulatedValue = 0;
         delete cell.extra.projectOwnerId;
         delete cell.extra.projectState;
+      }
+      if (Array.isArray(cell.extra.investments)) {
+        cell.extra.investments = (cell.extra.investments as Array<{ playerId?: string }>).filter((investment) => investment.playerId !== playerId);
       }
     }
   }

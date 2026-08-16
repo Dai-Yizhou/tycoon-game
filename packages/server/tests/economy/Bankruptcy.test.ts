@@ -178,6 +178,16 @@ describe('Bankruptcy System', () => {
       expect(taxation.getPlayerTaxRecords(player.id)).toHaveLength(0);
     });
 
+    it('破产清算清除经济字段但保留队伍与非经济身份字段', () => {
+      bankruptcy.restartBankruptPlayer(player.id, mockSocket);
+      player.teamId = 'team-1';
+      player.extra = { jail: { expiresAt: Date.now() + 10000 }, economy: { projectOwnerId: player.id } };
+      bankruptcy.triggerBankruptcy(player.id, 'manual');
+      expect(world.getPlayer(player.id)?.teamId).toBe('team-1');
+      expect(world.getPlayer(player.id)?.extra?.jail).toBeUndefined();
+      expect(world.getPlayer(player.id)?.extra?.economy).toBeUndefined();
+    });
+
     it('破产重启后回到地图起点并恢复地图定义的初始值', () => {
       const result = bankruptcy.restartBankruptPlayer(player.id, mockSocket);
 
