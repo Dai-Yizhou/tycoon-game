@@ -261,7 +261,8 @@ export class GameWorld {
 
   getSnapshot(): WorldSnapshot | null {
     if (!this.mapData || !this.mapMeta) return null;
-    return { version: 1, savedAt: Date.now(), mapData: this.mapData, mapMeta: this.mapMeta, players: this.getAllPlayers(), teams: this.getAllTeams(), era: this.currentEra, taxRecords: {} };
+    const state = this.snapshotStateProvider?.() ?? { taxRecords: {}, jailStates: {} };
+    return { version: 1, savedAt: Date.now(), mapData: this.mapData, mapMeta: this.mapMeta, players: this.getAllPlayers(), teams: this.getAllTeams(), era: this.currentEra, taxRecords: state.taxRecords, jailStates: state.jailStates };
   }
 
   /**

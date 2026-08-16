@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Cell, EraInfo, Player, Team } from '@game/shared';
+import { GameWorld } from '../../src/world/GameWorld.js';
 
 describe('WorldStore', () => {
   it('保存并恢复世界关键快照且隔离可变引用', () => {
@@ -35,5 +36,20 @@ describe('WorldStore', () => {
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+
+  it('世界快照读取状态提供器中的税收与监狱数据', () => {
+    const store = new InMemoryWorldStore();
+    const world = new GameWorld({ worldStore: store });
+    world.loadMap([], { id: 'map', valueFieldDefinitions: [] } as never, { skipValidation: true });
+    world.setSnapshotStateProvider(() => ({
+      taxRecords: { p1: [{ id: 'tax', playerId: 'p1', wealthTax: 1, propertyTax: 0, investmentTax: 0, totalTax: 1, timestamp: 1 }] },
+      jailStates: { p1: { jailedAt: 1, expiresAt: 2, jailCellId: 3 } },
+    }));
+
+    const snapshot = world.getSnapshot();
+
+    expect(snapshot?.taxRecords.p1).toHaveLength(1);
+    expect(snapshot?.jailStates?.p1.expiresAt).toBe(2);
   });
 });
