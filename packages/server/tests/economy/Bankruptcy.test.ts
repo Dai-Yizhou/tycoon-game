@@ -170,6 +170,25 @@ describe('Bankruptcy System', () => {
     expect(world.getPlayer(player.id)?.teamId).toBeNull();
   });
 
+  it('破产后立即拒绝地产与投资操作', () => {
+    bankruptcy.triggerBankruptcy(player.id, 'manual');
+    const { PropertyHandler } = require('../../src/handlers/propertyHandler');
+    const { InvestmentHandler } = require('../../src/handlers/investmentHandler');
+    const propertyHandler = new PropertyHandler(mockIo, world, { buyInMultiplier: 1, maxShareholders: 8 });
+    const investmentHandler = new InvestmentHandler(mockIo, world, { buyInMultiplier: 1, maxShareholders: 8 });
+    const registered = new Map<string, Function>();
+    const socket = { data: { playerId: player.id }, emit: jest.fn(), on: jest.fn((event: string, handler: Function) => registered.set(event, handler)) } as any;
+    const propertyAck = jest.fn();
+    const investmentAck = jest.fn();
+    propertyHandler.register(socket);
+    investmentHandler.register(socket);
+    registered.get('client.buyProperty')?.({ cellId: 1 }, propertyAck);
+    registered.get('client.buyInvestment')?.({ cellId: 1 }, investmentAck);
+    expect(world.getPlayer(player.id)?.status).toBe(PlayerStatus.Bankrupt);
+    expect(propertyAck).toHaveBeenCalledWith(expect.objectContaining({ ok: false, error: 'invalid_status' }));
+    expect(investmentAck).toHaveBeenCalledWith(expect.objectContaining({ ok: false, error: 'invalid_status' }));
+  });
+
   describe('破产重启', () => {
     beforeEach(() => {
       bankruptcy.triggerBankruptcy(player.id, 'manual');
