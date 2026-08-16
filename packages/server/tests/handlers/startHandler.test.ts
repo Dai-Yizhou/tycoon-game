@@ -231,6 +231,18 @@ describe('JailHandler', () => {
   });
 
   describe('handleJailDiceRoll', () => {
+    it('冷却期间不允许掷骰，过期后自动恢复正常掷骰', () => {
+      const player = createTestPlayer('player1', 2);
+      world.addPlayer(player);
+      handler.handleEnterJail('player1', 2);
+
+      expect(handler.canRoll('player1')).toBe(false);
+      const jailState = handler.getJailState('player1');
+      jest.spyOn(Date, 'now').mockReturnValue(jailState!.expiresAt);
+      expect(handler.canRoll('player1')).toBe(true);
+      expect(world.getPlayer('player1')?.status).toBe(PlayerStatus.Normal);
+    });
+
     it('监狱中掷骰应该扣除信用值', () => {
       const player = createTestPlayer('player1', 2);
       world.addPlayer(player);

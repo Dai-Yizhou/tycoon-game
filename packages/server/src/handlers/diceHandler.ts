@@ -127,6 +127,12 @@ export class DiceHandler {
         return;
       }
 
+      if (player.status === PlayerStatus.Jail && !this.registry.getJailHandler().canRoll(playerId)) {
+        emitError(socket, ErrorCodes.RateLimit, '监狱冷却中');
+        ack?.({ ok: false, error: 'jail_cooldown', data: { dice: 0, steps: 0 } });
+        return;
+      }
+
       // 4. 检查冷却时间
       const cooldownMs = this.getCooldownMs(player.status);
       const lastRoll = this.cooldowns.get(playerId) ?? 0;

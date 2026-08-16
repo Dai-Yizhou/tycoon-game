@@ -61,11 +61,29 @@ export class Bankruptcy {
     };
 
     this.world.getPlayerManager().updateStatus(playerId, PlayerStatus.Bankrupt);
+    this.clearPlayerAssets(playerId);
     this.taxation.clearTaxRecords(playerId);
     this.bankruptcyRecords.set(playerId, record);
 
     this.io.emit('server.playerBankrupt', { playerId, bankruptcyId, bankruptcyTime, reason, netWorthAtBankruptcy: record.netWorthAtBankruptcy });
     return { success: true, bankruptcyId };
+  }
+
+  private clearPlayerAssets(playerId: string): void {
+    for (const cell of this.world.getMapData() ?? []) {
+      const ownerships = Array.isArray(cell.extra.ownerships) ? cell.extra.ownerships as Array<{ playerId: string }> : [];
+      const owners = Array.isArray(cell.extra.owners) ? cell.extra.owners as string[] : [];
+      if (!ownerships.some((ownership) => ownership.playerId === playerId) && !owners.includes(playerId)) continue;
+      const remaining = ownerships.filter((ownership) => ownership.playerId !== playerId);
+      cell.extra.ownerships = remaining;
+      cell.extra.owners = owners.filter((ownerId) => ownerId !== playerId);
+      if (remaining.length === 0) {
+        cell.extra.level = 0;
+        cell.extra.accumulatedValue = 0;
+        delete cell.extra.projectOwnerId;
+        delete cell.extra.projectState;
+      }
+    }
   }
 
   restartBankruptPlayer(playerId: string, _socket: TypedSocket): BankruptcyRestartResult {

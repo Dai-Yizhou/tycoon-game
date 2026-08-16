@@ -233,7 +233,15 @@ export class JailHandler {
     const player = this.world.getPlayer(playerId);
     if (!player) return false;
 
+    this.releaseIfExpired(playerId);
     return player.status !== PlayerStatus.Jail;
+  }
+
+  canRoll(playerId: string): boolean {
+    const player = this.world.getPlayer(playerId);
+    if (!player || player.status === PlayerStatus.Bankrupt || player.status === PlayerStatus.Frozen) return false;
+    this.releaseIfExpired(playerId);
+    return this.world.getPlayer(playerId)?.status !== PlayerStatus.Jail;
   }
 
   /**
@@ -320,7 +328,12 @@ export class JailHandler {
    * 获取玩家监狱状态数据
    */
   getJailState(playerId: string): JailStateData | undefined {
-    return this.jailStates.get(playerId);
+    const state = this.jailStates.get(playerId);
+    if (state && Date.now() >= state.expiresAt) {
+      this.releaseIfExpired(playerId);
+      return undefined;
+    }
+    return state;
   }
 
   /**
@@ -328,6 +341,18 @@ export class JailHandler {
    */
   getAllJailedPlayers(): string[] {
     return Array.from(this.jailStates.keys());
+  }
+
+  getJailStates(): Record<string, JailStateData> {
+    return Object.fromEntries(Array.from(this.jailStates.entries(), ([playerId, state]) => [playerId, { ...state }]));
+  }
+
+  restoreJailStates(states: Record<string, JailStateData> = {}): void {
+    this.jailStates.clear();
+    for (const [playerId, state] of Object.entries(states)) {
+      if (state.expiresAt > Date.now()) this.jailStates.set(playerId, { ...state });
+      else if (this.world.getPlayer(playerId)?.status === PlayerStatus.Jail) this.releasePlayer(playerId);
+    }
   }
 
   /**
@@ -377,6 +402,11 @@ export class JailHandler {
    */
   clearAllJailStates(): void {
     this.jailStates.clear();
+  }
+
+  private releaseIfExpired(playerId: string): void {
+    const state = this.jailStates.get(playerId);
+    if (state && Date.now() >= state.expiresAt) this.releasePlayer(playerId);
   }
 }
 

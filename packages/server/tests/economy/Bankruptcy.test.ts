@@ -151,14 +151,25 @@ describe('Bankruptcy System', () => {
       bankruptcy.triggerBankruptcy(player.id, 'manual');
     });
 
-    it('破产触发后保留地产与税收记录', () => {
+    it('破产触发后立即清除地产产权与税收记录', () => {
       const cell = mapData[1];
       cell.extra.owners = [player.id];
       cell.extra.ownerships = [{ playerId: player.id, share: 1, purchasePrice: 500 }];
+      cell.extra.level = 3;
+      cell.extra.accumulatedValue = 900;
+      cell.extra.projectOwnerId = player.id;
+      cell.extra.projectState = 'active';
+      bankruptcy.restartBankruptPlayer(player.id, mockSocket);
       taxation.triggerManualTax(player.id);
 
-      expect(cell.extra.owners).toContain(player.id);
-      expect(cell.extra.ownerships).toEqual([{ playerId: player.id, share: 1, purchasePrice: 500 }]);
+      bankruptcy.triggerBankruptcy(player.id, 'manual');
+
+      expect(cell.extra.owners).toEqual([]);
+      expect(cell.extra.ownerships).toEqual([]);
+      expect(cell.extra.level).toBe(0);
+      expect(cell.extra.accumulatedValue).toBe(0);
+      expect(cell.extra.projectOwnerId).toBeUndefined();
+      expect(cell.extra.projectState).toBeUndefined();
       expect(taxation.getPlayerTaxRecords(player.id)).toHaveLength(0);
     });
 
