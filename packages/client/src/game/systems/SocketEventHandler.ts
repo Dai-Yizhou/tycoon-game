@@ -204,11 +204,11 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       // 更新其他玩家显示数值
       const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {
-        otherPlayer.primaryValue = payload.current;
+        store?.applyEvent({ sequence: Date.now(), type: 'otherPlayerValue', playerId: payload.playerId, current: payload.current });
       }
       // 更新当前玩家：服务端权威同步
       if (isCurrentPlayer) {
-        currentPlayer!.values.money.current = payload.current;
+        store?.applyEvent({ sequence: Date.now(), type: 'value', playerId: payload.playerId, fieldId: 'money', current: payload.current });
       }
       if (otherPlayer || isCurrentPlayer) {
         updateRendererPlayers();
@@ -216,12 +216,12 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       if (isCurrentPlayer) requestHudRefresh();
     } else if (payload.fieldId === 'credit') {
       if (isCurrentPlayer) {
-        currentPlayer!.values.credit.current = payload.current;
+        store?.applyEvent({ sequence: Date.now(), type: 'value', playerId: payload.playerId, fieldId: 'credit', current: payload.current });
       }
     } else if (payload.fieldId === 'environment' || payload.fieldId === 'env') {
       if (isCurrentPlayer) {
         const env = currentPlayer!.values.environment || currentPlayer!.values.env;
-        if (env) env.current = payload.current;
+        if (env) store?.applyEvent({ sequence: Date.now(), type: 'value', playerId: payload.playerId, fieldId: payload.fieldId, current: payload.current });
       }
     }
     // 数值变更后刷新顶部面板
@@ -245,7 +245,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     } else {
       const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {
-        otherPlayer.status = 'jail';
+        store?.applyEvent({ sequence: Date.now(), type: 'otherPlayerStatus', playerId: payload.playerId, status: 'jail' });
         updateRendererPlayers();
       }
     }
@@ -268,7 +268,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     } else {
       const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {
-        otherPlayer.status = 'normal';
+        store?.applyEvent({ sequence: Date.now(), type: 'otherPlayerStatus', playerId: payload.playerId, status: 'normal' });
         updateRendererPlayers();
       }
     }
@@ -278,7 +278,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     // 更新玩家状态
     const player = otherPlayers.find(p => p.id === payload.playerId);
     if (player) {
-      player.status = payload.status as OtherPlayerInfo['status'];
+      store?.applyEvent({ sequence: Date.now(), type: 'otherPlayerStatus', playerId: payload.playerId, status: payload.status as OtherPlayerInfo['status'] });
       updateRendererPlayers();
     }
     if (payload.playerId === currentPlayer?.id) {
@@ -354,7 +354,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   // 监听队伍状态更新（服务端权威：完整重建本地队伍视图）
   socket.on('server.teamUpdated', (payload: { team?: { id: string }; members?: Array<{ id: string; username: string; money: number; credit: number; env: number; status: string }> }) => {
     if (payload.team && currentPlayer) {
-      currentPlayer.teamId = payload.team.id;
       // 用服务端推送的成员显示数据完整重建 teamMembers
       if (payload.members) {
         applyTeamMembers(payload.members);
@@ -367,7 +366,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   socket.on('server.teamDisbanded', () => {
     setTeamMembers([]);
     if (currentPlayer) {
-      currentPlayer.teamId = null;
     }
     addChatMessage(t('team.teamDisbanded'), 'system');
     requestHudRefresh();

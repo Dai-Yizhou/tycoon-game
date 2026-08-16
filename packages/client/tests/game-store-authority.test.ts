@@ -12,6 +12,18 @@ describe('GameStore authority', () => {
     expect(store.getSnapshot().currentPlayer?.id).toBe('p10');
   });
 
+  it('通过服务端数值事件更新玩家快照而不是修改外部玩家对象', () => {
+    const store = new GameStore();
+    const player = { id: 'p1', values: { money: { current: 100 } } } as never;
+
+    store.applyEvent({ sequence: 1, type: 'player', player });
+    store.applyEvent({ sequence: 2, type: 'value', playerId: 'p1', fieldId: 'money', current: 250 });
+
+    expect(player.values.money.current).toBe(100);
+    expect(store.getSnapshot().currentMoney).toBe(250);
+    expect(store.getSnapshot().currentPlayer?.values.money.current).toBe(250);
+  });
+
   it('让 GameViewModel 只投影 Store 的业务状态', () => {
     const store = new GameStore();
     const viewModel = new GameViewModel(store);

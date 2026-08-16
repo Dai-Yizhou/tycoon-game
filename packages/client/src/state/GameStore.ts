@@ -346,6 +346,8 @@ export type ClientGameEvent =
   | { sequence: number; type: 'team'; members: TeamMember[] }
   | { sequence: number; type: 'value'; playerId: string; fieldId: string; current: number }
   | { sequence: number; type: 'status'; playerId: string; status: Player['status'] }
+  | { sequence: number; type: 'otherPlayerValue'; playerId: string; current: number }
+  | { sequence: number; type: 'otherPlayerStatus'; playerId: string; status: OtherPlayerInfo['status'] }
   | { sequence: number; type: 'move'; playerId: string; cellId: number };
 
 export class GameStore {
@@ -394,6 +396,10 @@ export class GameStore {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: player, currentMoney: event.fieldId === 'money' ? event.current : this.snapshot.currentMoney, currentCredit: event.fieldId === 'credit' ? event.current : this.snapshot.currentCredit, currentEnv: event.fieldId === 'env' || event.fieldId === 'environment' ? event.current : this.snapshot.currentEnv };
     } else if (event.type === 'status' && this.snapshot.currentPlayer?.id === event.playerId) {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: { ...this.snapshot.currentPlayer, status: event.status }, isBankrupt: event.status === 'bankrupt', isInJail: event.status === 'jail', canRoll: event.status !== 'jail' && event.status !== 'bankrupt' };
+    } else if (event.type === 'otherPlayerValue') {
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, otherPlayers: this.snapshot.otherPlayers.map((player) => player.id === event.playerId ? { ...player, primaryValue: event.current } : player) };
+    } else if (event.type === 'otherPlayerStatus') {
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, otherPlayers: this.snapshot.otherPlayers.map((player) => player.id === event.playerId ? { ...player, status: event.status } : player) };
     } else if (event.type === 'move' && this.snapshot.currentPlayer?.id === event.playerId) {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: { ...this.snapshot.currentPlayer, position: { cellId: event.cellId } }, currentPlayerPosition: event.cellId };
     }
