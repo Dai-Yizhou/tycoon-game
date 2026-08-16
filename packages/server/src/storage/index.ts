@@ -14,3 +14,4 @@ export * from './EraStore.js';
 export * from './InMemoryPlayerStore.js';
 export * from './InMemoryEraStore.js';
 export * from './MongoPlayerStore.js';
+export * from './WorldStore.js';

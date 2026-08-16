@@ -43,11 +43,12 @@ import { GameHudShell } from '../components/GameHudShell.js';
 import { InteractiveMapSurface } from '../components/InteractiveMapSurface.js';
 import { NoOpEffectHooks } from '../game/GameEffects.js';
 import { GameViewModel } from '../game/GameViewModel.js';
+import { GameStore } from '../state/GameStore.js';
 
 import {
   animationFrameId,
-  currentPlayer, currentPlayerPosition, currentPlayerName, currentMoney, currentCredit, currentEnv, isBankrupt, actionUsedThisTurn,
-  isMoving, canRoll, isWaitingForChoice, isServerAnimating, isInJail, jailEndTime, dayNightStartTime, DAY_NIGHT_CYCLE, serverTimeOffset,
+  currentPlayer, currentPlayerPosition,
+  isMoving, canRoll, isWaitingForChoice, isServerAnimating, dayNightStartTime, DAY_NIGHT_CYCLE, serverTimeOffset,
   gameSocket, investmentShares,
   mapIndex,
   otherPlayers, ownedInvestments, ownedProperties,
@@ -108,6 +109,7 @@ import { getThemeTokens } from '../design/ThemeConfig.js';
 
 let notificationCenter: NotificationCenter | null = null;
 let gameViewModel: GameViewModel | null = null;
+let gameStore: GameStore | null = null;
 let gameHudShell: GameHudShell | null = null;
 let unregisterHudRefresh: (() => void) | null = null;
 
@@ -122,7 +124,8 @@ export function createGamePage(controller: GameController): HTMLElement {
   page.className = 'page game-page';
   const designSnapshot = new DesignAdapter(getThemeTokens((globalThis as { __GAME_THEME__?: string }).__GAME_THEME__ ?? 'northeast')).createSnapshot('day');
   applyGamePageThemeSnapshot(page, designSnapshot);
-  gameViewModel = new GameViewModel();
+  gameStore = new GameStore();
+  gameViewModel = new GameViewModel(gameStore);
   const effects = new NoOpEffectHooks();
 
   // Board
@@ -162,22 +165,8 @@ export function createGamePage(controller: GameController): HTMLElement {
   const playerName = context.playerName || t('game.defaultPlayerName');
   setCurrentPlayerName(playerName);
   initMockPlayer(playerName);
-  // 用登录返回的真实玩家数据更新 currentPlayer
   if (context.player && context.player.id) {
-    currentPlayer!.id = context.player.id;
-    currentPlayer!.username = context.player.username || playerName;
-    if (context.player.position?.cellId !== undefined) {
-      currentPlayer!.position.cellId = context.player.position.cellId;
-      setCurrentPlayerPosition(context.player.position.cellId);
-      (window as any).currentPlayerPosition = currentPlayerPosition;
-    }
-    if (context.player.values?.money?.current !== undefined) {
-      currentPlayer!.values.money.current = context.player.values.money.current;
-      setCurrentMoney(context.player.values.money.current);
-    }
-    if (context.player.values?.credit?.current !== undefined) {
-      currentPlayer!.values.credit.current = context.player.values.credit.current;
-    }
+    gameStore?.applyEvent({ sequence: Date.now(), type: 'player', player: context.player });
   }
   initTeam();
 
@@ -242,6 +231,7 @@ export function createGamePage(controller: GameController): HTMLElement {
 
     registerSocketHandlers(socket, {
       controller,
+      store: gameStore ?? undefined,
       onEvent: () => syncViewModel(),
       onNotification: (payload) => notificationCenter?.handleNotification({ ...payload, durationMs: payload.durationMs ?? 3000, createdAt: payload.createdAt ?? Date.now() }),
     });
@@ -309,7 +299,7 @@ function initMockPlayer(name: string): void {
     createdAt: Date.now(),
     lastActiveAt: Date.now(),
   };
-  setCurrentPlayer(_player);
+  gameStore?.applyEvent({ sequence: Date.now(), type: 'player', player: _player });
   setCurrentMoney(2000);
   setCurrentCredit(50);
   setCurrentEnv(0);
@@ -407,9 +397,6 @@ function initTeam(): void {
     gameSocket.emit('client.getTeamState', {}, (result) => {
       if (result.ok && result.data) {
         applyTeamMembers(result.data.members);
-        if (result.data.team && currentPlayer) {
-          currentPlayer.teamId = result.data.team.id;
-        }
         syncViewModel();
         gameHudShell?.update();
       }
@@ -560,10 +547,7 @@ window.showTeamManagement = function(): void {
 
 function syncViewModel(): void {
   if (!gameViewModel) return;
-  gameViewModel.setPlayer({ currentPlayer, currentPlayerPosition, currentMoney, currentCredit, currentEnv, isBankrupt, actionUsedThisTurn, ownedProperties, propertyLevels, ownedInvestments, investmentShares, currentPlayerName });
   gameViewModel.setMovement({ isMoving, canRoll, isWaitingForChoice, isServerAnimating });
-  gameViewModel.setJail({ isInJail, jailEndTime });
-  gameViewModel.setTeam({ members: teamMembers.map((member) => ({ ...member, status: member.status as 'normal' | 'bankrupt' | 'jail' })) });
   gameViewModel.setDayNight({ cycleStartTime: dayNightStartTime, cycleDuration: DAY_NIGHT_CYCLE, serverTimeOffset });
 }
 
@@ -575,6 +559,7 @@ export function cleanupGamePage(page: HTMLElement): void {
   gameHudShell?.destroy();
   gameHudShell = null;
   gameViewModel = null;
+  gameStore = null;
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
     setAnimationFrameId(null);

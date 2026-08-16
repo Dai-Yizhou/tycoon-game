@@ -15,6 +15,7 @@ import type { Player } from '@game/shared';
 import type { MapIndex } from '@game/shared';
 import type { BoardRenderer } from '../renderer/BoardRenderer.js';
 import type { TypedClientSocket } from '../hooks/useSocket.js';
+import type { GameStore, ClientGameSnapshot } from '../state/GameStore.js';
 
 // ===== 状态切片类型定义 =====
 
@@ -242,6 +243,15 @@ export type StateChangeListener = (event: StateChangeEvent) => void;
  * ```
  */
 export class GameViewModel {
+  private readonly store: GameStore | null;
+
+  constructor(store: GameStore | null = null) {
+    this.store = store;
+  }
+
+  private projectedSnapshot(): ClientGameSnapshot | null {
+    return this.store?.getSnapshot() ?? null;
+  }
   // — 状态切片 —
   private player: PlayerSlice = {
     currentPlayer: null,
@@ -356,7 +366,7 @@ export class GameViewModel {
   }
 
   // ===== Player =====
-  getPlayer(): PlayerSlice { return this.player; }
+  getPlayer(): PlayerSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { ...this.player, currentPlayer: snapshot.currentPlayer, currentPlayerPosition: snapshot.currentPlayerPosition, currentMoney: snapshot.currentMoney, currentCredit: snapshot.currentCredit, currentEnv: snapshot.currentEnv, isBankrupt: snapshot.isBankrupt } : this.player; }
   setPlayer(partial: Partial<PlayerSlice>, source = 'external'): void {
     Object.assign(this.player, partial);
     this.notify('player', source);
@@ -391,7 +401,7 @@ export class GameViewModel {
   }
 
   // ===== Jail =====
-  getJail(): JailSlice { return this.jail; }
+  getJail(): JailSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { ...this.jail, isInJail: snapshot.isInJail, jailEndTime: snapshot.jailEndTime } : this.jail; }
   setJail(partial: Partial<JailSlice>, source = 'external'): void {
     Object.assign(this.jail, partial);
     this.notify('jail', source);
@@ -419,7 +429,7 @@ export class GameViewModel {
   }
 
   // ===== Team =====
-  getTeam(): TeamSlice { return this.team; }
+  getTeam(): TeamSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { members: snapshot.teamMembers as TeamMember[] } : this.team; }
   setTeam(partial: Partial<TeamSlice>, source = 'external'): void {
     Object.assign(this.team, partial);
     this.notify('team', source);

@@ -25,6 +25,7 @@ import { EventEmitter } from 'node:events';
 import { buildPlayerValues, type EraInfo, type MapData, type MapMeta, type Player, type Team } from '@game/shared';
 import { MapIndex, type ValidationResult, validateMapData, validateMapMeta } from '@game/shared';
 import { PlayerEvents, PlayerManager, type PlayerEventName, type PlayerEventListener, type PlayerRemovedEvent } from './PlayerManager.js';
+import type { WorldSnapshot, WorldStore } from '../storage/WorldStore.js';
 
 /**
  * 游戏世界事件类型
@@ -94,6 +95,7 @@ export interface LoadMapOptions {
 export interface GameWorldOptions {
   /** 自定义 PlayerManager（测试时注入） */
   playerManager?: PlayerManager;
+  worldStore?: WorldStore;
 }
 
 /**
@@ -103,6 +105,7 @@ export class GameWorld {
   private readonly emitter: EventEmitter;
   private readonly playerManager: PlayerManager;
   private readonly teams: Map<string, Team>;
+  private readonly worldStore?: WorldStore;
 
   private mapData: MapData | null = null;
   private mapMeta: MapMeta | null = null;
@@ -114,6 +117,7 @@ export class GameWorld {
     this.emitter = new EventEmitter();
     this.playerManager = options.playerManager ?? new PlayerManager();
     this.teams = new Map();
+    this.worldStore = options.worldStore;
 
     // 透传 PlayerManager 的事件为 WorldEvent
     this.playerManager.on(PlayerEvents.Added, ({ player }: { player: Player }) => {
@@ -224,6 +228,28 @@ export class GameWorld {
       validation: result,
     });
     return result;
+  }
+
+  saveSnapshot(taxRecords: WorldSnapshot['taxRecords'] = {}, jailStates: WorldSnapshot['jailStates'] = {}): void {
+    if (!this.worldStore || !this.mapData || !this.mapMeta) return;
+    this.worldStore.save({ version: 1, savedAt: Date.now(), mapData: this.mapData, mapMeta: this.mapMeta, players: this.getAllPlayers(), teams: this.getAllTeams(), era: this.currentEra, taxRecords, jailStates });
+  }
+
+  restoreSnapshot(): WorldSnapshot | null {
+    const snapshot = this.worldStore?.load() ?? null;
+    if (!snapshot) return null;
+    this.loadMap(snapshot.mapData, snapshot.mapMeta, { skipValidation: true });
+    this.playerManager.clear();
+    for (const player of snapshot.players) this.playerManager.addPlayer(player);
+    this.teams.clear();
+    for (const team of snapshot.teams) this.teams.set(team.id, team);
+    this.currentEra = snapshot.era;
+    return snapshot;
+  }
+
+  getSnapshot(): WorldSnapshot | null {
+    if (!this.mapData || !this.mapMeta) return null;
+    return { version: 1, savedAt: Date.now(), mapData: this.mapData, mapMeta: this.mapMeta, players: this.getAllPlayers(), teams: this.getAllTeams(), era: this.currentEra, taxRecords: {} };
   }
 
   /**

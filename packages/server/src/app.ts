@@ -31,7 +31,7 @@ import { TimeZoneManager } from './world/TimeZoneManager.js';
 import { ProsperityManager, DEFAULT_PROSPERITY_CONFIG } from './world/ProsperityManager.js';
 import { BehaviorEngine } from './behavior/index.js';
 import { EraManager } from './era/index.js';
-import { InMemoryPlayerStore, MongoPlayerStore, InMemoryEraStore, type PlayerStore } from './storage/index.js';
+import { InMemoryPlayerStore, MongoPlayerStore, InMemoryEraStore, InMemoryWorldStore, type PlayerStore } from './storage/index.js';
 
 /**
  * Socket 管理器配置（不包含 world，由 createApp 注入）
@@ -148,7 +148,8 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   });
 
   // GameWorld
-  const world = deps.world ?? new GameWorld();
+  const worldStore = new InMemoryWorldStore();
+  const world = deps.world ?? new GameWorld({ worldStore });
 
   // 加载地图数据与元数据（供 ProsperityManager、TimeZoneManager 等使用）
   try {
@@ -264,6 +265,10 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
 
   // 注册业务事件处理器（需要在经济系统初始化后）
   const handlerRegistry = registerHandlers(io, world, ownershipConfig);
+
+  const restoredSnapshot = world.restoreSnapshot();
+  if (restoredSnapshot) taxation.restoreTaxRecords(restoredSnapshot.taxRecords);
+  handlerRegistry.getJailHandler().restoreJailStates(restoredSnapshot?.jailStates);
 
   handlerRegistry.setBankruptcy(bankruptcy);
 

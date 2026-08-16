@@ -236,10 +236,19 @@ export class DayNightCycle extends EventEmitter {
       nextChangeDelay = 100;
     }
 
-    this.phaseChangeTimer = setTimeout(() => {
-      this.onPhaseChange();
-    }, nextChangeDelay);
+    this.phaseChangeTimer = this.scheduleLongTimeout(nextChangeDelay);
     this.phaseChangeTimer.unref();
+  }
+
+  private scheduleLongTimeout(delayMs: number): NodeJS.Timeout {
+    const safeDelay = Math.min(delayMs, 2_147_483_647);
+    return setTimeout(() => {
+      if (delayMs > safeDelay) {
+        this.schedulePhaseChange();
+      } else {
+        this.onPhaseChange();
+      }
+    }, safeDelay);
   }
 
   /**

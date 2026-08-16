@@ -323,3 +323,80 @@ export const RARITY_COLORS: Record<string, string> = {
 export const RARITY_LABELS: Record<string, string> = {
   common: 'common', rare: 'rare', epic: 'epic', legendary: 'legendary',
 };
+
+export interface ClientGameSnapshot {
+  sequence: number;
+  currentPlayer: Player | null;
+  otherPlayers: OtherPlayerInfo[];
+  currentPlayerPosition: number;
+  currentMoney: number;
+  currentCredit: number;
+  currentEnv: number;
+  isBankrupt: boolean;
+  isInJail: boolean;
+  jailEndTime: number;
+  canRoll: boolean;
+  teamMembers: TeamMember[];
+}
+
+export type ClientGameEvent =
+  | { sequence: number; type: 'player'; player: Player }
+  | { sequence: number; type: 'players'; players: OtherPlayerInfo[] }
+  | { sequence: number; type: 'jail'; isInJail: boolean; jailEndTime: number }
+  | { sequence: number; type: 'team'; members: TeamMember[] }
+  | { sequence: number; type: 'value'; playerId: string; fieldId: string; current: number }
+  | { sequence: number; type: 'status'; playerId: string; status: Player['status'] }
+  | { sequence: number; type: 'move'; playerId: string; cellId: number };
+
+export class GameStore {
+  private snapshot: ClientGameSnapshot = {
+    sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
+    currentMoney: 2000, currentCredit: 50, currentEnv: 0, isBankrupt: false,
+    isInJail: false, jailEndTime: 0, canRoll: true, teamMembers: [],
+  };
+  private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
+
+  getSnapshot(): ClientGameSnapshot { return this.snapshot; }
+
+  subscribe(listener: (snapshot: ClientGameSnapshot) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private publish(): void {
+    for (const listener of this.listeners) listener(this.snapshot);
+  }
+
+  applySnapshot(snapshot: (Partial<ClientGameSnapshot> & Pick<ClientGameSnapshot, 'sequence'>) | { sequence: number; player: Player }): void {
+    if (snapshot.sequence < this.snapshot.sequence) return;
+    if ('player' in snapshot) {
+      this.applyEvent({ sequence: snapshot.sequence, type: 'player', player: snapshot.player });
+      return;
+    }
+    this.snapshot = { ...this.snapshot, ...snapshot };
+    this.publish();
+  }
+
+  applyEvent(event: ClientGameEvent): void {
+    if (event.sequence <= this.snapshot.sequence) return;
+    if (event.type === 'player') {
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: event.player, currentPlayerPosition: event.player.position?.cellId ?? 0, currentMoney: event.player.values?.money?.current ?? 0, currentCredit: event.player.values?.credit?.current ?? 0, currentEnv: event.player.values?.environment?.current ?? event.player.values?.env?.current ?? 0, isBankrupt: event.player.status === 'bankrupt', isInJail: event.player.status === 'jail' };
+      this.publish();
+      return;
+    } else if (event.type === 'players') {
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, otherPlayers: event.players };
+    } else if (event.type === 'jail') {
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, isInJail: event.isInJail, jailEndTime: event.jailEndTime, canRoll: !event.isInJail };
+    } else if (event.type === 'team') {
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, teamMembers: event.members };
+    } else if (event.type === 'value' && this.snapshot.currentPlayer?.id === event.playerId) {
+      const player = { ...this.snapshot.currentPlayer, values: { ...this.snapshot.currentPlayer.values, [event.fieldId]: { ...this.snapshot.currentPlayer.values[event.fieldId], current: event.current } } };
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: player, currentMoney: event.fieldId === 'money' ? event.current : this.snapshot.currentMoney, currentCredit: event.fieldId === 'credit' ? event.current : this.snapshot.currentCredit, currentEnv: event.fieldId === 'env' || event.fieldId === 'environment' ? event.current : this.snapshot.currentEnv };
+    } else if (event.type === 'status' && this.snapshot.currentPlayer?.id === event.playerId) {
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: { ...this.snapshot.currentPlayer, status: event.status }, isBankrupt: event.status === 'bankrupt', isInJail: event.status === 'jail', canRoll: event.status !== 'jail' && event.status !== 'bankrupt' };
+    } else if (event.type === 'move' && this.snapshot.currentPlayer?.id === event.playerId) {
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: { ...this.snapshot.currentPlayer, position: { cellId: event.cellId } }, currentPlayerPosition: event.cellId };
+    }
+    this.publish();
+  }
+}

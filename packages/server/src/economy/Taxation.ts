@@ -214,11 +214,11 @@ export class Taxation {
    */
   private calculateWealthTax(player: Player): number {
     const money = this.getPlayerMoney(player);
-    if (money < this.config.minWealthForTax) {
+    if (money <= this.config.minWealthForTax) {
       return 0;
     }
 
-    return Math.floor(money * this.config.wealthTaxRate);
+    return Math.floor(Math.max(0, money - this.config.minWealthForTax) * this.config.wealthTaxRate);
   }
 
   /**
@@ -244,11 +244,11 @@ export class Taxation {
       totalPropertyValue += getAccumulatedValue(cell) * ownership.share;
     }
 
-    if (totalPropertyValue < this.config.minPropertyValueForTax) {
+    if (totalPropertyValue <= this.config.minPropertyValueForTax) {
       return 0;
     }
 
-    return Math.floor(totalPropertyValue * this.config.propertyTaxRate);
+    return Math.floor(Math.max(0, totalPropertyValue - this.config.minPropertyValueForTax) * this.config.propertyTaxRate);
   }
 
   /**
@@ -278,7 +278,16 @@ export class Taxation {
    * 获取玩家的税收记录
    */
   getPlayerTaxRecords(playerId: string): TaxRecord[] {
-    return this.taxRecords.get(playerId) ?? [];
+    return [...(this.taxRecords.get(playerId) ?? [])];
+  }
+
+  getAllTaxRecords(): Record<string, TaxRecord[]> {
+    return Object.fromEntries(Array.from(this.taxRecords.entries(), ([playerId, records]) => [playerId, [...records]]));
+  }
+
+  restoreTaxRecords(records: Record<string, TaxRecord[]>): void {
+    this.taxRecords.clear();
+    for (const [playerId, playerRecords] of Object.entries(records)) this.taxRecords.set(playerId, playerRecords.slice(-10));
   }
 
   /**

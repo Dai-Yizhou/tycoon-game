@@ -146,6 +146,11 @@ describe('Bankruptcy System', () => {
     });
   });
 
+  it('最低免税额本身不产生财产税', () => {
+    player.values.money.current = 1000;
+    expect(taxation.triggerManualTax(player.id).taxRecord).toBeUndefined();
+  });
+
   describe('破产重启', () => {
     beforeEach(() => {
       bankruptcy.triggerBankruptcy(player.id, 'manual');

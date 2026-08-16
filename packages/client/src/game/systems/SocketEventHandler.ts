@@ -23,7 +23,6 @@ import {
   setCurrentCredit,
   setCurrentEnv,
   setIsInJail,
-  setIsBankrupt,
   setJailEndTime,
   setCanRoll,
   setIsWaitingForChoice,
@@ -40,11 +39,13 @@ import { updateRendererPlayers, updateBoardTheme, updateTopBarTime } from '../Cl
 import { getPlayerTimezone, getLocalDayNight } from './MapLoader.js';
 import { applyTeamMembers } from './TeamSystem.js';
 import type { GameController } from '../GameController.js';
+import { GameStore } from '../../state/GameStore.js';
 
 const registeredSockets = new WeakSet<TypedClientSocket>();
 const eventObservers = new WeakMap<TypedClientSocket, (event: string) => void>();
 
 export interface SocketHandlerOptions {
+  store?: GameStore;
   controller?: GameController;
   onEvent?: (event: string) => void;
   onNotification?: (payload: { id: string; type: 'info' | 'success' | 'warning' | 'error'; title: string; content: string; durationMs?: number; createdAt?: number }) => void;
@@ -65,6 +66,7 @@ const SOCKET_EVENTS = [
 export function registerSocketHandlers(socket: TypedClientSocket, options: SocketHandlerOptions = {}): void {
   if (registeredSockets.has(socket)) return;
   registeredSockets.add(socket);
+  const store = options.store;
   if (options.onEvent && socket.onAny) {
     const observer = (event: string) => {
       queueMicrotask(() => options.onEvent?.(event));
@@ -110,23 +112,19 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 
   socket.on('server.playerBankrupt', (payload) => {
     if (payload.playerId === currentPlayer?.id) {
-      setIsBankrupt(true);
-      currentPlayer!.status = 'bankrupt';
+      store?.applyEvent({ sequence: Date.now(), type: 'status', playerId: payload.playerId, status: 'bankrupt' });
       options.controller?.setBankrupt();
     }
     requestHudRefresh();
   });
 
+  socket.on('server.gameState', (payload) => {
+    store?.applySnapshot({ sequence: Date.now(), currentPlayer: payload.player, isBankrupt: payload.player.status === 'bankrupt', isInJail: payload.player.status === 'jail', currentPlayerPosition: payload.player.position.cellId, currentMoney: payload.player.values.money?.current ?? 0, currentCredit: payload.player.values.credit?.current ?? 0, teamMembers: payload.team ? [] : [] });
+  });
+
   socket.on('server.playerRestarted', (payload) => {
     if (payload.playerId === currentPlayer?.id) {
-      setIsBankrupt(false);
-      currentPlayer!.values = payload.player.values;
-      currentPlayer!.position = payload.player.position;
-      currentPlayer!.status = payload.player.status;
-      currentPlayer!.teamId = payload.player.teamId;
-      setCurrentPlayerPosition(payload.player.position.cellId);
-      setCurrentMoney(payload.player.values.money?.current ?? 0);
-      setCurrentCredit(payload.player.values.credit?.current ?? 0);
+      store?.applySnapshot({ sequence: Date.now(), currentPlayer: payload.player, isBankrupt: false, isInJail: false, currentPlayerPosition: payload.player.position.cellId, currentMoney: payload.player.values.money?.current ?? 0, currentCredit: payload.player.values.credit?.current ?? 0 });
       options.controller?.setRestarted(payload.player);
     }
     requestHudRefresh();
@@ -187,6 +185,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       updateRendererPlayers();
     }
     if (currentPlayer && payload.playerId === currentPlayer.id) {
+      store?.applyEvent({ sequence: Date.now(), type: 'move', playerId: payload.playerId, cellId: payload.cellId });
       if (payload.path && payload.path.length > 1 && !isServerAnimating) {
         startServerPathAnimation(payload.path);
       } else {
@@ -204,6 +203,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   socket.on('server.valueChanged', (payload: { playerId: string; fieldId: string; current: number; delta: number }) => {
+    store?.applyEvent({ sequence: Date.now(), type: 'value', playerId: payload.playerId, fieldId: payload.fieldId, current: payload.current });
     // 服务端权威：所有数值变更以服务端推送为准
     const isCurrentPlayer = currentPlayer && payload.playerId === currentPlayer.id;
     if (payload.fieldId === 'money') {
@@ -239,13 +239,14 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     }
   });
 
-  socket.on('server.playerJailed', (payload: { playerId: string; durationMs: number }) => {
+  socket.on('server.playerJailed', (payload: { playerId: string; durationMs: number; expiresAt?: number }) => {
+    if (currentPlayer && payload.playerId === currentPlayer.id) store?.applyEvent({ sequence: Date.now(), type: 'jail', isInJail: true, jailEndTime: payload.expiresAt ?? Date.now() + payload.durationMs });
     // 服务端权威：监狱状态由服务端驱动
     const isCurrentPlayer = currentPlayer && payload.playerId === currentPlayer.id;
     if (isCurrentPlayer) {
       setIsInJail(true);
       setJailEndTime(Date.now() + payload.durationMs);
-      currentPlayer!.status = 'jail';
+      store?.applyEvent({ sequence: Date.now(), type: 'status', playerId: payload.playerId, status: 'jail' });
       // 禁用掷骰按钮
       if (rollBtn) {
         rollBtn.disabled = true;
@@ -262,12 +263,13 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   socket.on('server.playerReleased', (payload: { playerId: string }) => {
+    if (currentPlayer && payload.playerId === currentPlayer.id) store?.applyEvent({ sequence: Date.now(), type: 'jail', isInJail: false, jailEndTime: 0 });
     // 服务端权威：出狱状态由服务端驱动
     const isCurrentPlayer = currentPlayer && payload.playerId === currentPlayer.id;
     if (isCurrentPlayer) {
       setIsInJail(false);
       setJailEndTime(0);
-      currentPlayer!.status = 'normal';
+      store?.applyEvent({ sequence: Date.now(), type: 'status', playerId: payload.playerId, status: 'normal' });
       // 冷却结束后恢复掷骰能力
       setCanRoll(true);
       if (rollBtn && !rollCooldownTimer) {
@@ -295,7 +297,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       updateRendererPlayers();
     }
     if (payload.playerId === currentPlayer?.id) {
-      currentPlayer.status = payload.status as typeof currentPlayer.status;
+      store?.applyEvent({ sequence: Date.now(), type: 'status', playerId: payload.playerId, status: payload.status as typeof currentPlayer.status });
       if (payload.status === 'bankrupt') options.controller?.setBankrupt();
     }
   });
