@@ -160,12 +160,12 @@ describe('Taxation System', () => {
   describe('财产税计算', () => {
     it('财产税按当前财产计算且低于最低征税额免税', () => {
       // 富玩家当前财产 5000，最低征税 1000
-      // 财产税 = floor(5000 * 2%) = 100
+      // 财产税 = floor((5000 - 1000) * 2%) = 80
 
       const result = taxation.triggerManualTax(richPlayer.id);
 
       expect(result.success).toBe(true);
-      expect(result.taxRecord!.wealthTax).toBe(100);
+      expect(result.taxRecord!.wealthTax).toBe(80);
     });
 
     it('财产低于最低征税额免税', () => {
@@ -180,19 +180,19 @@ describe('Taxation System', () => {
       const result = taxation.triggerManualTax(richPlayer.id);
 
       expect(result.success).toBe(true);
-      expect(result.taxRecord!.wealthTax).toBe(100);
+      expect(result.taxRecord!.wealthTax).toBe(80);
     });
   });
 
   describe('地产税计算', () => {
     it('地产税 = Σ(地产价值 * propertyTaxRate)', () => {
       // 富玩家拥有地产（价格 1000 + 升级 200+300 = 1500）
-      // 地产税 = 1500 * 1% = 15
+      // 地产税 = (1500 - 500) * 1% = 10
 
       const result = taxation.triggerManualTax(richPlayer.id);
 
       expect(result.success).toBe(true);
-      expect(result.taxRecord!.propertyTax).toBe(15);
+      expect(result.taxRecord!.propertyTax).toBe(10);
     });
 
     it('地产价值低于最低征税额免税', () => {
