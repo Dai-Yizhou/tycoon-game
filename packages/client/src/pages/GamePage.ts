@@ -35,7 +35,7 @@ declare global {
 }
 
 import type { GameController } from '../game/GameController.js';
-import type { MapData, Player } from '@game/shared';
+import type { MapData } from '@game/shared';
 import { MapIndex, t } from '@game/shared';
 import { BoardRenderer } from '../renderer/BoardRenderer.js';
 import { createNotificationCenter, type NotificationCenter } from '../components/NotificationCenter.js';
@@ -47,24 +47,21 @@ import { GameStore } from '../state/GameStore.js';
 
 import {
   animationFrameId,
-  currentPlayer, currentPlayerPosition,
+  currentPlayer,
   isMoving, canRoll, isWaitingForChoice, isServerAnimating, dayNightStartTime, DAY_NIGHT_CYCLE, serverTimeOffset,
-  gameSocket, investmentShares,
+  gameSocket,
   mapIndex,
-  otherPlayers, ownedInvestments, ownedProperties,
-  propertyLevels, prosperityTimer,
+  otherPlayers, prosperityTimer,
   regionProsperityMap, renderer,
   rollCooldownTimer,
-  setActionUsedThisTurn, setAnimationFrameId,
-  setCameraTarget, setCanRoll, setCanvasEl, setChatChannelContainer,
-  setCurrentCredit, setCurrentEnv, setCurrentMoney, setCurrentPlayer, setCurrentPlayerName,
-  setCurrentPlayerPosition, setDayNightCycle, setDayNightStartTime,
-  setDiceAnimating, setGameSocket, setIsBankrupt,
-  setIsInJail, setIsMoving, setIsWaitingForChoice, setLastLocalIsDay,
-  setLastPlayerTimezone, setMapIndex, setMapRegions,
-  setOtherPlayers, setPlayerDisplayPos,
-  setProsperity, setProsperityTimer, setRenderer, setRollCooldownTimer,
-  setServerTimeOffset, setTeamMembers, setTeamPanelContentEl,
+  setAnimationFrameId,
+  setCameraTarget, setCanvasEl, setChatChannelContainer,
+  setDayNightCycle, setDayNightStartTime,
+  setGameSocket,
+  setMapIndex, setMapRegions,
+  setPlayerDisplayPos,
+  setProsperityTimer, setRenderer, setRollCooldownTimer,
+  setTeamPanelContentEl,
   setTopBarProsperityEl, setTopBarProsperityFillEl, setTopBarRegionFieldsEl,
   setTopBarTimeEl, setValueFieldDefs,
   // 辅助函数
@@ -125,7 +122,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   const designSnapshot = new DesignAdapter(getThemeTokens((globalThis as { __GAME_THEME__?: string }).__GAME_THEME__ ?? 'northeast')).createSnapshot('day');
   applyGamePageThemeSnapshot(page, designSnapshot);
   gameStore = new GameStore();
-  gameViewModel = new GameViewModel(gameStore);
+  gameViewModel = new GameViewModel(gameStore, context.playerName || t('game.defaultPlayerName'));
   const effects = new NoOpEffectHooks();
 
   // Board
@@ -162,9 +159,6 @@ export function createGamePage(controller: GameController): HTMLElement {
   unregisterHudRefresh = registerHudRefresh(() => { syncViewModel(); gameHudShell?.update(); });
 
   // Init: load map data, then start game
-  const playerName = context.playerName || t('game.defaultPlayerName');
-  setCurrentPlayerName(playerName);
-  initMockPlayer(playerName);
   if (context.player && context.player.id) {
     gameStore?.applyEvent({ sequence: Date.now(), type: 'player', player: context.player });
   }
@@ -217,7 +211,7 @@ export function createGamePage(controller: GameController): HTMLElement {
       status: p.status || 'normal',
       primaryValue: p.values?.money?.current,
     }));
-    setOtherPlayers(_otherPlayers);
+    gameStore?.applyEvent({ sequence: Date.now(), type: 'players', players: _otherPlayers });
   }
 
   // 监听服务端昼夜事件，同步时间
@@ -286,31 +280,6 @@ function applyGamePageThemeSnapshot(page: HTMLElement, snapshot: ReturnType<Desi
 
 // ===== Player Init =====
 
-function initMockPlayer(name: string): void {
-  const _player: Player = {
-    id: 'player-1',
-    username: name,
-    teamId: null,
-    position: { cellId: 0 },
-    values: {
-      money: { id: 'money', name: t('hud.money'), current: 2000, min: 0 },
-      credit: { id: 'credit', name: t('hud.credit'), current: 50, min: 0, max: 100 },
-      env: { id: 'env', name: t('hud.env'), current: 0, min: 0 },
-    },
-    status: 'normal',
-    createdAt: Date.now(),
-    lastActiveAt: Date.now(),
-  };
-  gameStore?.applyEvent({ sequence: Date.now(), type: 'player', player: _player });
-  setCurrentMoney(2000);
-  setCurrentCredit(50);
-  setCurrentEnv(0);
-  setCurrentPlayerPosition(0);
-(window as any).currentPlayerPosition = currentPlayerPosition;
-  setIsBankrupt(false);
-  setIsInJail(false);
-  setActionUsedThisTurn(false);
-}
 
 // ===== Map Loading =====
 async function loadMapData(): Promise<{ mapData: MapData; regions: RegionInfo[]; valueFields: typeof valueFieldDefs } | null> {
@@ -393,7 +362,6 @@ function hideIntersectionChoice(): void {
 }
 
 function initTeam(): void {
-  setTeamMembers([]);
   // 向服务端查询当前队伍状态（若已组队则服务端返回完整成员显示数据）
   if (gameSocket) {
     gameSocket.emit('client.getTeamState', {}, (result) => {
@@ -561,6 +529,7 @@ export function cleanupGamePage(page: HTMLElement): void {
   gameHudShell?.destroy();
   gameHudShell = null;
   gameViewModel = null;
+  gameStore?.reset();
   gameStore = null;
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
@@ -585,7 +554,6 @@ export function cleanupGamePage(page: HTMLElement): void {
   }
   setRenderer(null);
   setMapIndex(null);
-  setCurrentPlayer(null);
   setCanvasEl(null);
   setRollBtn(null);
   setDiceDisplayEl(null);
@@ -597,30 +565,6 @@ export function cleanupGamePage(page: HTMLElement): void {
   setTopBarTimeEl(null);
   setTeamPanelContentEl(null);
   setChatChannelContainer(null);
-  setIsMoving(false);
-  setCanRoll(true);
-  setIsBankrupt(false);
-  setActionUsedThisTurn(false);
-  setDiceAnimating(false);
-  setIsWaitingForChoice(false);
-  setIsInJail(false);
-  setOtherPlayers([]);
-  ownedProperties.clear();
-  propertyLevels.clear();
-  ownedInvestments.clear();
-  investmentShares.clear();
-  setCurrentMoney(2000);
-  setCurrentCredit(50);
-  setCurrentEnv(0);
-  setCurrentPlayerPosition(0);
-(window as any).currentPlayerPosition = currentPlayerPosition;
-  setProsperity(100);
-  setLastPlayerTimezone('');
-  setLastLocalIsDay(null);
-  setDayNightStartTime(Date.now());
-  setServerTimeOffset(0);
-  setDayNightCycle(15 * 60 * 1000);
-  setTeamMembers([]);
   page.remove();
 }
 

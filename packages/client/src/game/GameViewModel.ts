@@ -3,12 +3,11 @@
  *
  * 作为 UI 组件与游戏逻辑之间的唯一桥梁：
  * - 持有全部游戏状态（原 GamePage.ts 中的 80+ 模块级变量）
- * - 提供读写接口，写入时通知订阅者
+ * - 提供 UI 读取接口，业务状态由 GameStore 投影
  * - UI 组件仅消费此层，不直接访问 GameController / Socket / Canvas
  *
  * 低耦合设计：ViewModel 不导入任何 UI 代码、Canvas 渲染器或 Socket 客户端，
- * 只负责状态存储与变更通知。GamePage 负责将外部事件（Socket / Canvas / 定时器）
- * 转写为 ViewModel 状态变更。
+ * 只负责 UI 投影与变更通知。业务事件统一进入 GameStore。
  */
 
 import type { Player } from '@game/shared';
@@ -234,19 +233,13 @@ export type StateChangeListener = (event: StateChangeEvent) => void;
 /**
  * 游戏视图模型
  *
- * 使用方式：
- * ```ts
- * const vm = new GameViewModel();
- * vm.subscribe('player', () => topBar.update(vm));
- * vm.setPlayer({ currentMoney: 3000 });
- * // → 触发 'player' 变更事件 → topBar.update 被调用
- * ```
  */
 export class GameViewModel {
   private readonly store: GameStore | null;
 
-  constructor(store: GameStore | null = null) {
+  constructor(store: GameStore | null = null, displayName = '玩家') {
     this.store = store;
+    this.player.currentPlayerName = displayName;
   }
 
   private projectedSnapshot(): ClientGameSnapshot | null {
@@ -371,10 +364,6 @@ export class GameViewModel {
 
   // ===== Player =====
   getPlayer(): PlayerSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { ...this.player, currentPlayer: snapshot.currentPlayer, currentPlayerPosition: snapshot.currentPlayerPosition, currentMoney: snapshot.currentMoney, currentCredit: snapshot.currentCredit, currentEnv: snapshot.currentEnv, isBankrupt: snapshot.isBankrupt, currentPlayerName: this.projectPlayerName() } : this.player; }
-  setPlayer(partial: Partial<PlayerSlice>, source = 'external'): void {
-    Object.assign(this.player, partial);
-    this.notify('player', source);
-  }
 
   // ===== Movement =====
   getMovement(): MovementSlice { return this.movement; }
@@ -406,10 +395,6 @@ export class GameViewModel {
 
   // ===== Jail =====
   getJail(): JailSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { ...this.jail, isInJail: snapshot.isInJail, jailEndTime: snapshot.jailEndTime } : this.jail; }
-  setJail(partial: Partial<JailSlice>, source = 'external'): void {
-    Object.assign(this.jail, partial);
-    this.notify('jail', source);
-  }
 
   // ===== Day/Night =====
   getDayNight(): DayNightSlice { return this.dayNight; }
@@ -434,10 +419,6 @@ export class GameViewModel {
 
   // ===== Team =====
   getTeam(): TeamSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { members: snapshot.teamMembers as TeamMember[] } : this.team; }
-  setTeam(partial: Partial<TeamSlice>, source = 'external'): void {
-    Object.assign(this.team, partial);
-    this.notify('team', source);
-  }
 
   // ===== Tutorial =====
   getTutorial(): TutorialSlice { return this.tutorial; }
@@ -447,11 +428,7 @@ export class GameViewModel {
   }
 
   // ===== Other Players =====
-  getOtherPlayers(): OtherPlayersSlice { return this.otherPlayers; }
-  setOtherPlayers(partial: Partial<OtherPlayersSlice>, source = 'external'): void {
-    Object.assign(this.otherPlayers, partial);
-    this.notify('otherPlayers', source);
-  }
+  getOtherPlayers(): OtherPlayersSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { players: snapshot.otherPlayers as OtherPlayerInfo[] } : this.otherPlayers; }
 
   // ===== Behavior =====
   getBehavior(): BehaviorSlice { return this.behavior; }

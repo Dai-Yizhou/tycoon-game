@@ -155,7 +155,7 @@ pnpm --filter @game/client test
   - 关键文件：`packages/client/src/game/systems/ModalSystem.ts`
 - **Socket 事件集中管理**：使用 `WeakSet` 防止重复注册，`unregisterSocketHandlers` 正确清理。
   - 关键文件：`packages/client/src/game/systems/SocketEventHandler.ts`
-- **`client.move` 拒绝非授权调用**：普通移动请求返回错误，必须由服务端移动流程发起。
+- **移动请求不开放给客户端**：位置只能由服务端移动流程发起并广播。
   - 关键文件：`packages/server/src/handlers/movementHandler.ts`
 
 ### 2. 新增测试

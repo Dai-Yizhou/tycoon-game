@@ -34,7 +34,7 @@
 - 客户端发送 `client.rollDice`；必须已认证且玩家存在。
 - `normal` 状态默认冷却 5 秒，`jail` 状态默认冷却 10 秒；`bankrupt` 和 `frozen` 状态不能掷骰。
 - 服务端生成骰子，正常默认范围是 1–6，但当前默认地图元数据将范围配置为 1–3，因此加载该地图时实际范围为 1–3。
-- 请求中的 `predicted` 会被服务端取整并限制到地图配置范围内；这不是客户端直接指定任意结果的通道。未使用有效值时使用 `Math.random()`。
+- 骰子结果完全由服务端生成并校验，客户端不能提交或影响结果。
 - `steps` 等于 `dice`。服务端先 ack 并广播 `server.diceRolled`，再启动服务端移动流程。
 
 ### 移动与岔路
@@ -42,7 +42,7 @@
 - 服务端从玩家当前 `position.cellId` 沿格子的 `destinations` 逐格计算路径并写回位置，广播 `server.playerMoved`。
 - 走到未访问节点且存在多个未访问邻居时暂停，向当前 socket 发送 `server.askPath`；客户端只能通过 `client.choosePath` 选择服务端列出的相邻目标。
 - `choosePath` 会校验待处理移动、起点匹配和目标是否在当前格子的 destinations 中；合法选择继续消耗剩余步数，最终才进入落点结算。
-- `client.move` 不能让客户端直接指定位置，会被拒绝并返回 `movement_not_authorized`。
+- 客户端不能直接提交位置；移动只能由服务端掷骰流程推进。
 - 客户端移动动画只表现 `server.playerMoved` 的结果；客户端不能通过修改动画、坐标或预测状态改变服务端位置。
 
 ### 落点触发

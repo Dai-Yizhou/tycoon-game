@@ -399,4 +399,22 @@ export class GameStore {
     }
     this.publish();
   }
+
+  reset(): void {
+    this.snapshot = {
+      sequence: 0,
+      currentPlayer: null,
+      otherPlayers: [],
+      currentPlayerPosition: 0,
+      currentMoney: 2000,
+      currentCredit: 50,
+      currentEnv: 0,
+      isBankrupt: false,
+      isInJail: false,
+      jailEndTime: 0,
+      canRoll: true,
+      teamMembers: [],
+    };
+    this.publish();
+  }
 }

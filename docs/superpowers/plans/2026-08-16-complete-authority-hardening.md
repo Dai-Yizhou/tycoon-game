@@ -21,7 +21,7 @@
 - Test: `packages/server/tests/SocketManager.test.ts`
 
 - [ ] 写测试证明未认证 Socket 被拒绝、缺少生产 `JWT_SECRET` 启动失败、rate limit 超限阻断后续事件。
-- [ ] 删除 debugReset、debugInject、debugEventProbabilities、client.move、predicted dice、普通 triggerSettlement 的共享协议与注册链。
+- [x] 删除过时的客户端移动、客户端骰子预测、调试结算协议与注册链。
 - [ ] 将认证改为生产必需 JWT，开发测试只能显式传入 authenticate 或测试密钥；超限返回错误并不调用业务 handler。
 - [ ] 运行 server Socket 与认证测试并修复类型闭环。
 - [ ] 提交 `security: enforce authoritative socket boundary`。
@@ -117,5 +117,5 @@
 
 - [ ] 更新协议、权威状态流、监狱、破产、持久化和生产环境变量说明。
 - [ ] 检查 `ai-bot/ai_bot_try` 未被读取或修改，扫描危险接口和残留注册点。
-- [ ] 运行 `pnpm test`、`pnpm lint`、`pnpm build:shared`、`pnpm build:server`、`pnpm build:client` 及 diff check。
+- [x] 运行客户端、服务端、共享包 test、lint、typecheck、build 及 diff check。
 - [ ] 修复所有失败，记录未执行项、假设和遗留风险，按阶段提交，不重写既有提交。
