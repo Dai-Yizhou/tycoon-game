@@ -168,6 +168,8 @@ export function createGamePage(controller: GameController): HTMLElement {
   if (context.player && context.player.id) {
     gameStore?.applyEvent({ sequence: Date.now(), type: 'player', player: context.player });
   }
+  syncViewModel();
+  gameHudShell.update();
   initTeam();
 
   Promise.all([loadMapData()]).then(

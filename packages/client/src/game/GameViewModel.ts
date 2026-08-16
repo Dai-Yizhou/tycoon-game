@@ -252,6 +252,10 @@ export class GameViewModel {
   private projectedSnapshot(): ClientGameSnapshot | null {
     return this.store?.getSnapshot() ?? null;
   }
+
+  private projectPlayerName(): string {
+    return this.projectedSnapshot()?.currentPlayer?.username ?? this.player.currentPlayerName;
+  }
   // — 状态切片 —
   private player: PlayerSlice = {
     currentPlayer: null,
@@ -366,7 +370,7 @@ export class GameViewModel {
   }
 
   // ===== Player =====
-  getPlayer(): PlayerSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { ...this.player, currentPlayer: snapshot.currentPlayer, currentPlayerPosition: snapshot.currentPlayerPosition, currentMoney: snapshot.currentMoney, currentCredit: snapshot.currentCredit, currentEnv: snapshot.currentEnv, isBankrupt: snapshot.isBankrupt } : this.player; }
+  getPlayer(): PlayerSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { ...this.player, currentPlayer: snapshot.currentPlayer, currentPlayerPosition: snapshot.currentPlayerPosition, currentMoney: snapshot.currentMoney, currentCredit: snapshot.currentCredit, currentEnv: snapshot.currentEnv, isBankrupt: snapshot.isBankrupt, currentPlayerName: this.projectPlayerName() } : this.player; }
   setPlayer(partial: Partial<PlayerSlice>, source = 'external'): void {
     Object.assign(this.player, partial);
     this.notify('player', source);
