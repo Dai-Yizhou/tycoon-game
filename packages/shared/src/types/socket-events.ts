@@ -91,7 +91,7 @@ export interface ClientToServerEvents {
 
   /** 掷骰子 */
   'client.rollDice': (
-    payload: { /** 客户端预测的骰子值，可选；不传则服务端随机 */ predicted?: number },
+    payload: Record<string, never>,
     ack?: (result: AckResult<{ dice: number; steps: number }>) => void,
   ) => void;
 
@@ -103,12 +103,6 @@ export interface ClientToServerEvents {
   'client.choosePath': (
     payload: { fromCellId: number; toCellId: number },
     ack?: (result: AckResult<{ cellId: number }>) => void,
-  ) => void;
-
-  /** 移动（用于调试 / 自由模式） */
-  'client.move': (
-    payload: { toCellId: number },
-    ack?: (result: AckResult<PositionChangedPayload>) => void,
   ) => void;
 
   /** 购买地产/项目 */
@@ -209,35 +203,6 @@ export interface ClientToServerEvents {
     payload: Record<string, never>,
     ack?: (result: AckResult) => void,
   ) => void;
-  /** 手动触发时代结算（管理员调试用） */
-  'client.triggerSettlement': (
-    payload: { /** 是否在结算后切换到新时代（需提供 newMapId/newEraName） */ switchEra?: boolean; newMapId?: string; newEraName?: string },
-    ack?: (result: AckResult<{ settled: boolean; eraId: string }>) => void,
-  ) => void;
-
-  /** 调试：快速重置玩家数据（仅调试模式可用） */
-  'client.debugReset': (
-    payload: Record<string, never>,
-    ack?: (result: AckResult) => void,
-  ) => void;
-
-  /** 调试：注入测试数据（仅调试模式可用） */
-  'client.debugInject': (
-    payload: { money?: number; credit?: number },
-    ack?: (result: AckResult) => void,
-  ) => void;
-
-  /** 调试：查询事件概率分布（仅调试模式可用） */
-  'client.debugEventProbabilities': (
-    payload: { behaviorId: string },
-    ack?: (result: AckResult) => void,
-  ) => void;
-
-
-
-
-
-
 }
 
 // ---------------------------------------------------------------------------
@@ -292,7 +257,7 @@ export interface ServerToClientEvents {
   }) => void;
 
   /** 玩家进入监狱 */
-  'server.playerJailed': (payload: { playerId: string; cellId: number; durationMs: number }) => void;
+  'server.playerJailed': (payload: { playerId: string; cellId: number; durationMs: number; expiresAt: number; remainingMs: number }) => void;
 
   /** 玩家出狱 */
   'server.playerReleased': (payload: { playerId: string }) => void;

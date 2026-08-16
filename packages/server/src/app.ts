@@ -120,6 +120,9 @@ export interface CreatedApp {
  * @param deps 可选依赖（用于测试与扩展）
  */
 export function createApp(config: ServerConfig, deps: AppDependencies = {}): CreatedApp {
+  if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET?.trim()) {
+    throw new Error('JWT_SECRET is required in production');
+  }
   const app = express();
   const httpServer = http.createServer(app);
 
@@ -313,7 +316,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     prosperityManager,
   });
   handlerRegistry.setBehaviorEngine(behaviorEngine);
-  logger.info('BehaviorEngine initialized and injected into EventHandler and DebugHandler');
+  logger.info('BehaviorEngine initialized and injected into EventHandler');
 
   // 初始化时代管理器（FR-19/FR-20）
   // 时代长度从配置读取（默认 90 天，对应现实 3-6 个月）
@@ -326,53 +329,9 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   });
   logger.info(`EraManager initialized (eraLengthDays=${config.eraLengthDays})`);
 
-  // 注册手动触发时代结算事件（管理员调试用）
-  const registerSettlementHandler = (socket: Parameters<typeof handlerRegistry.registerForSocket>[0]): void => {
-    socket.on('client.triggerSettlement', (payload, ack) => {
-      try {
-        const currentEra = eraManager.getCurrentEra();
-        if (!currentEra) {
-          ack?.({ ok: false, error: 'no_active_era' });
-          return;
-        }
-
-        if (payload?.switchEra && payload.newMapId && payload.newEraName) {
-          // 结算并切换到新时代
-          eraManager
-            .switchToNextEra({
-              newMapId: payload.newMapId,
-              newEraName: payload.newEraName,
-            })
-            .then((newEra) => {
-              ack?.({ ok: true, data: { settled: true, eraId: newEra.id } });
-            })
-            .catch((err) => {
-              logger.error('triggerSettlement switchEra error:', err);
-              ack?.({ ok: false, error: err instanceof Error ? err.message : String(err) });
-            });
-        } else {
-          // 仅结算当前时代
-          eraManager
-            .performSettlement()
-            .then((result) => {
-              ack?.({ ok: true, data: { settled: true, eraId: result.era.id } });
-            })
-            .catch((err) => {
-              logger.error('triggerSettlement error:', err);
-              ack?.({ ok: false, error: err instanceof Error ? err.message : String(err) });
-            });
-        }
-      } catch (err) {
-        logger.error('triggerSettlement handler error:', err);
-        ack?.({ ok: false, error: err instanceof Error ? err.message : String(err) });
-      }
-    });
-  };
-
   io.on('connection', (socket) => {
     socketManager?.registerConnectionHandlers(socket);
     handlerRegistry.registerForSocket(socket);
-    registerSettlementHandler(socket);
   });
 
   // 初始化玩家存储（FR-22 账号持久化）

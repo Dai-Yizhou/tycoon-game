@@ -26,11 +26,9 @@ import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
  * 监狱配置（从 MapMeta.config 读取）
  */
 export interface JailConfig {
-  /** 监狱时长（回合数），默认 3 */
-  durationTurns?: number;
-  /** 每次掷骰扣除的信用值，默认 5 */
+  /** 每次入狱扣除的信用值，默认 5 */
   creditPenalty?: number;
-  /** 冷却时间延长（毫秒），默认 10000 */
+  /** 现实时间冷却（毫秒），默认 10000 */
   cooldownMs?: number;
 }
 
@@ -38,7 +36,6 @@ export interface JailConfig {
  * 默认监狱配置
  */
 export const DEFAULT_JAIL_CONFIG: JailConfig = {
-  durationTurns: 3,
   creditPenalty: 5,
   cooldownMs: 10000,
 };
@@ -51,8 +48,7 @@ export const DEFAULT_JAIL_CONFIG: JailConfig = {
 export interface JailStateData {
   /** 入狱时间（Unix 毫秒） */
   jailedAt: number;
-  /** 剩余回合数 */
-  remainingTurns: number;
+  expiresAt: number;
   /** 入狱格子 ID */
   jailCellId: number;
 }
@@ -138,16 +134,17 @@ export class JailHandler {
 
       // 获取监狱配置
       const config = this.getJailConfig();
-      const durationTurns = config.durationTurns ?? DEFAULT_JAIL_CONFIG.durationTurns ?? 3;
+      const cooldownMs = config.cooldownMs ?? DEFAULT_JAIL_CONFIG.cooldownMs ?? 10_000;
 
       // 设置监狱状态
       player.status = PlayerStatus.Jail;
+      this.deductCredit(player, config.creditPenalty ?? DEFAULT_JAIL_CONFIG.creditPenalty ?? 5, 'jail_entry');
       this.world.updatePlayer(player);
 
       // 记录监狱状态数据
       const jailData: JailStateData = {
         jailedAt: Date.now(),
-        remainingTurns: durationTurns,
+        expiresAt: Date.now() + cooldownMs,
         jailCellId: cellId,
       };
       this.jailStates.set(playerId, jailData);
@@ -171,17 +168,19 @@ export class JailHandler {
       this.io.emit('server.playerJailed', {
         playerId,
         cellId,
-        durationMs: durationTurns * 10000, // 估算总时长
+        durationMs: cooldownMs,
+        expiresAt: jailData.expiresAt,
+        remainingMs: cooldownMs,
       });
 
-      logger.info(`玩家 ${playerId} 进入监狱，剩余回合 ${durationTurns}`);
+      logger.info(`玩家 ${playerId} 进入监狱，冷却 ${cooldownMs}ms`);
 
       // 广播通知
       this.io.emit('server.notification', {
         id: `enter-jail-${playerId}-${Date.now()}`,
         type: 'warning',
         title: '进入监狱',
-        content: `玩家 ${player.username} 进入监狱，需等待 ${durationTurns} 回合才能出狱`,
+        content: `玩家 ${player.username} 进入监狱，需等待 ${cooldownMs}ms 才能出狱`,
         durationMs: 5000,
       });
 
@@ -213,27 +212,12 @@ export class JailHandler {
         return 0;
       }
 
-      // 获取监狱配置
-      const config = this.getJailConfig();
-      const creditPenalty = config.creditPenalty ?? DEFAULT_JAIL_CONFIG.creditPenalty ?? 5;
-
-      // 扣除信用值
-      this.deductCredit(player, creditPenalty, 'jail_penalty');
-
-      // 减少剩余回合数
       const jailData = this.jailStates.get(playerId);
-      if (jailData) {
-        jailData.remainingTurns -= 1;
-
-        logger.debug(`玩家 ${playerId} 监狱掷骰，剩余回合 ${jailData.remainingTurns}`);
-
-        // 检查是否可以出狱
-        if (jailData.remainingTurns <= 0) {
-          this.releasePlayer(playerId);
-        }
+      if (jailData && Date.now() >= jailData.expiresAt) {
+        this.releasePlayer(playerId);
       }
 
-      return creditPenalty;
+      return 0;
     } catch (err) {
       logger.error('处理监狱掷骰错误', err);
       return 0;
@@ -327,9 +311,8 @@ export class JailHandler {
     if (!customConfig) return DEFAULT_JAIL_CONFIG;
 
     return {
-      durationTurns: customConfig.jailDurationTurns as number | undefined,
       creditPenalty: customConfig.jailCreditPenalty as number | undefined,
-      cooldownMs: customConfig.jailCooldownMs as number | undefined,
+      cooldownMs: customConfig.jailCooldownMs as number ?? DEFAULT_JAIL_CONFIG.cooldownMs,
     };
   }
 

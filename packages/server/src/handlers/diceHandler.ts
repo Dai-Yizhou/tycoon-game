@@ -100,7 +100,7 @@ export class DiceHandler {
    */
   private handleRollDice(
     socket: TypedSocket,
-    payload: { predicted?: number },
+    _payload: Record<string, never>,
     ack?: (result: AckResult<{ dice: number; steps: number }>) => void,
   ): void {
     try {
@@ -142,9 +142,7 @@ export class DiceHandler {
         return;
       }
 
-      // 5. 生成随机数（服务端权威）
-      // 注意：客户端可传入 predicted 值用于测试，但服务端必须校验范围
-      const dice = this.generateDice(payload.predicted);
+      const dice = this.generateDice();
       const steps = dice; // 步数等于骰子值
 
       // 6. 更新冷却记录
@@ -180,26 +178,11 @@ export class DiceHandler {
     }
   }
 
-  /**
-   * 生成骰子随机数
-   *
-   * - 正常情况：使用 Math.random() 生成 1-6
-   * - 测试情况：如果传入 predicted 且在 1-6 范围内，使用该值
-   *
-   * 注意：predicted 仅用于测试，生产环境应忽略或严格校验
-   */
-  private generateDice(predicted?: number): number {
+  private generateDice(): number {
     const mapMeta = this.world.getMapMeta();
     const config = mapMeta?.config ?? {};
     const diceMin = (config.diceMin as number) ?? this.cooldownConfig.diceMin;
     const diceMax = (config.diceMax as number) ?? this.cooldownConfig.diceMax;
-
-    if (typeof predicted === 'number' && Number.isFinite(predicted)) {
-      const clamped = Math.floor(Math.max(diceMin, Math.min(diceMax, predicted)));
-      if (clamped >= diceMin && clamped <= diceMax) {
-        return clamped;
-      }
-    }
 
     return Math.floor(Math.random() * (diceMax - diceMin + 1)) + diceMin;
   }

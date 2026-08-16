@@ -111,6 +111,10 @@ export class SocketManager {
     this.playerStore = options.playerStore;
     this.teamManager = options.teamManager;
 
+    if (!this.authenticate && process.env.NODE_ENV === 'production') {
+      throw new Error('JWT authentication is required in production');
+    }
+
     this.io.use((socket, next) => this.middleware(socket as TypedSocket, next));
 
     if (this.autoWireWorldEvents) {
@@ -236,8 +240,12 @@ export class SocketManager {
           socket.data.playerId = playerId;
           socket.data.authenticated = true;
         } else {
-          socket.data.authenticated = false;
+          next(new Error('authentication_failed'));
+          return;
         }
+      } else if (process.env.NODE_ENV === 'production') {
+        next(new Error('authentication_required'));
+        return;
       } else {
         socket.data.authenticated = true;
       }
@@ -275,8 +283,12 @@ export class SocketManager {
     this.rateBuckets.set(socket.id, { count: 0, windowStart: Date.now() });
 
     // 任意事件触发限流计数（使用 socket.onAny）
-    socket.onAny(() => {
-      this.consumeRate(socket);
+    socket.use((_, next) => {
+      if (!this.consumeRate(socket)) {
+        next(new Error('rate_limit_exceeded'));
+        return;
+      }
+      next();
     });
 
     // 业务事件：客户端不需传 socketId，使用连接级 socket
@@ -317,9 +329,9 @@ export class SocketManager {
   // 限流
   // ---------------------------------------------------------------------------
 
-  private consumeRate(socket: TypedSocket): void {
+  private consumeRate(socket: TypedSocket): boolean {
     const bucket = this.rateBuckets.get(socket.id);
-    if (!bucket) return;
+    if (!bucket) return false;
     const now = Date.now();
     if (now - bucket.windowStart >= this.rateLimit.windowMs) {
       bucket.windowStart = now;
@@ -327,9 +339,10 @@ export class SocketManager {
     }
     bucket.count += 1;
     if (bucket.count > this.rateLimit.maxEvents) {
-      // 触发限流：发送错误事件
       socket.emit('server.error', { code: 'RATE_LIMIT', message: 'Too many events' });
+      return false;
     }
+    return true;
   }
 
   // ---------------------------------------------------------------------------

@@ -3,7 +3,6 @@
  *
  * 集中注册业务事件处理器：
  * - `client.rollDice`   : 掷骰子
- * - `client.move`       : 移动（调试用）
  * - `client.choosePath` : 路径选择（多岔路）
  * - `client.chat`       : 聊天
  *
@@ -16,13 +15,12 @@
  */
 
 import { ChatChannels, type ChatChannel, type ChatMessage } from '@game/shared';
-import { DebugFeatures, isFeatureEnabled } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from './SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ChatManager } from '../chat/index.js';
 import { Bankruptcy, resolveOwnershipConfig, type OwnershipConfig } from '../economy/index.js';
-import { DiceHandler, MovementHandler, PropertyHandler, StartHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, DebugHandler, TeamHandler } from '../handlers/index.js';
+import { DiceHandler, MovementHandler, PropertyHandler, StartHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, TeamHandler } from '../handlers/index.js';
 import { TeamManager, DEFAULT_TEAM_CONFIG } from '../team/index.js';
 import { EventHandler } from '../events/index.js';
 import type { ProsperityManager } from '../world/ProsperityManager.js';
@@ -67,7 +65,6 @@ function safeHandle(socket: TypedSocket, code: ErrorCode, fn: () => void): void 
  *
  * 维护一个 io 引用以便支持后续任务（如房间管理、玩家加入游戏流程）。
  * 当前注册骰子、移动、地产、起点、监狱、事件、投资、交通、纪念碑、组队和聊天处理器。
- * DebugHandler 仅在调试模式下注册。
  */
 export class HandlerRegistry {
   private readonly io: TypedServer;
@@ -81,7 +78,6 @@ export class HandlerRegistry {
   private readonly investmentHandler: InvestmentHandler;
   private readonly transportHandler: TransportHandler;
   private readonly monumentHandler: MonumentHandler;
-  private readonly debugHandler: DebugHandler;
   private readonly teamManager: TeamManager;
   private readonly teamHandler: TeamHandler;
   private readonly chatManager: ChatManager;
@@ -98,7 +94,7 @@ export class HandlerRegistry {
 
     const cooldownConfig = {
       normal: ((diceConfig.diceCooldownSeconds as number) ?? 5) * 1000,
-      jail: ((diceConfig.jailCooldownSeconds as number) ?? 10) * 1000,
+      jail: (diceConfig.jailCooldownMs as number) ?? 10_000,
       diceMin: (diceConfig.diceMin as number) ?? 1,
       diceMax: (diceConfig.diceMax as number) ?? 6,
     };
@@ -120,9 +116,6 @@ export class HandlerRegistry {
     this.transportHandler = new TransportHandler(io, world);
     // 初始化纪念碑处理器
     this.monumentHandler = new MonumentHandler(io, world);
-    // 初始化调试处理器
-    this.debugHandler = new DebugHandler(io, world);
-    // 初始化组队系统（TeamManager 为纯数据层，TeamHandler 负责协议与 I/O）
     this.teamManager = new TeamManager(DEFAULT_TEAM_CONFIG);
     this.teamHandler = new TeamHandler(io, world, this.teamManager);
     this.chatManager = new ChatManager();
@@ -147,13 +140,6 @@ export class HandlerRegistry {
     // 使用 TransportHandler 和 MonumentHandler
     this.transportHandler.register(socket);
     this.monumentHandler.register(socket);
-    // 注册调试处理器（仅在调试功能启用时）
-    if (
-      isFeatureEnabled(DebugFeatures.QuickReset) ||
-      isFeatureEnabled(DebugFeatures.InjectTestData)
-    ) {
-      this.debugHandler.register(socket);
-    }
     // 注册组队处理器
     this.teamHandler.register(socket);
     this.handleChat(socket);
@@ -223,13 +209,10 @@ export class HandlerRegistry {
     return this.monumentHandler;
   }
 
-  /**
-   * 注入 BehaviorEngine 到 EventHandler 和 DebugHandler
-   */
+  /** 注入 BehaviorEngine 到事件处理器 */
   setBehaviorEngine(behaviorEngine: any): void {
     this.eventHandler.setBehaviorEngine(behaviorEngine);
-    this.debugHandler.setBehaviorEngine(behaviorEngine);
-    logger.info('BehaviorEngine 已注入 EventHandler 和 DebugHandler');
+    logger.info('BehaviorEngine 已注入 EventHandler');
   }
 
   /**
@@ -255,14 +238,6 @@ export class HandlerRegistry {
   getTimeZoneManager(): TimeZoneManager | null {
     return this.timeZoneManager;
   }
-
-  /**
-   * 获取 DebugHandler（用于外部调用）
-   */
-  getDebugHandler(): DebugHandler {
-    return this.debugHandler;
-  }
-
 
   /**
    * 获取 TeamManager（用于外部调用，如登录恢复队伍）

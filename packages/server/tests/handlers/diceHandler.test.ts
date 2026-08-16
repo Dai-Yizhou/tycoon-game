@@ -72,30 +72,6 @@ describe('DiceHandler', () => {
       }
     });
 
-    it('应该接受有效的 predicted 值', () => {
-      const generateDice = (handler as any).generateDice.bind(handler);
-
-      expect(generateDice(1)).toBe(1);
-      expect(generateDice(3)).toBe(3);
-      expect(generateDice(6)).toBe(6);
-    });
-
-    it('应该忽略无效的 predicted 值', () => {
-      const generateDice = (handler as any).generateDice.bind(handler);
-
-      // 负数和超出范围的值应该被忽略
-      const result1 = generateDice(-1);
-      expect(result1).toBeGreaterThanOrEqual(1);
-      expect(result1).toBeLessThanOrEqual(6);
-
-      const result2 = generateDice(7);
-      expect(result2).toBeGreaterThanOrEqual(1);
-      expect(result2).toBeLessThanOrEqual(6);
-
-      const result3 = generateDice(3.5);
-      expect(result3).toBeGreaterThanOrEqual(1);
-      expect(result3).toBeLessThanOrEqual(6);
-    });
   });
 
   describe('getRemainingCooldown', () => {

@@ -19,15 +19,12 @@
 | `client.ping` | `SocketManager` | 心跳回执；无 ack 时发送 `server.pong` |
 | `client.rollDice` | `DiceHandler` | 服务端随机、冷却校验并进入移动链 |
 | `client.choosePath` | `MovementHandler` | 多岔路选择合法下一格 |
-| `client.move` | `MovementHandler` | 调试/授权移动入口，普通流程不能绕过掷骰链 |
 | `client.buyInvestment` / `triggerInvestmentEvent` | `InvestmentHandler` | 投资购买与事件结算；投资与地产使用同一 ownerships 产权数据 |
 | `client.useTransport` / `getTransportDestinations` | `TransportHandler` | 查询目的地与付费传送 |
 | `client.repairMonument` / `getMonumentStatus` | `MonumentHandler` | 纪念碑状态查询与修缮 |
 | `client.inviteToTeam` / `respondToTeamInvite` / `leaveTeam` / `kickTeamMember` / `getTeamState` | `TeamHandler` | 队伍邀请、成员变更和状态查询 |
 | `client.chat` | `HandlerRegistry` | 聊天消息处理；频道分发以 handler 当前实现为准 |
 | `client.bankruptRestart` | `HandlerRegistry` + `Bankruptcy` | 破产玩家重开 |
-| `client.triggerSettlement` | `app.ts` | 管理员调试用时代结算/切换 |
-| `client.debugReset` / `debugInject` / `debugEventProbabilities` | `DebugHandler` | 受 debug flags 控制的调试操作 |
 
 所有业务请求都应先由服务端验证；客户端只发送意图，不发送可直接信任的余额、位置或所有权。
 

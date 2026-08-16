@@ -14,5 +14,5 @@
 export * from './map-parser.js';
 export * from './map-index.js';
 export * from './path-finder.js';
-export * from './map-loader.js';
+export * from './browser-loader.js';
 export * from './map-meta-loader.js';

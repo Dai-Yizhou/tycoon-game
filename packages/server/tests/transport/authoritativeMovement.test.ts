@@ -64,27 +64,4 @@ describe('authoritative movement settlement', () => {
     expect(settleLanding).toHaveBeenCalledWith('player1', 3, socket);
   });
 
-  it('rejects ordinary client.move requests instead of bypassing settlement', () => {
-    const world = new GameWorld();
-    world.loadMap([
-      { id: 1, x: 0, y: 0, destinations: [2], extra: {} },
-      { id: 2, x: 1, y: 0, destinations: [1], extra: {} },
-    ] as Cell[], {
-      id: 'test-map', name: 'Test Map', version: '1.0.0', templateName: 'default',
-      timezones: [], regions: [], valueFieldDefinitions: [], dayNightCycleMinutes: 15,
-      startCellId: 1, config: {},
-    });
-    world.addPlayer(createPlayer());
-
-    const registry = new HandlerRegistry(createMockIO(), world);
-    const socket = createMockSocket('player1');
-    registry.registerForSocket(socket);
-    const moveRegistration = (socket.on as jest.Mock).mock.calls.find(([event]) => event === 'client.move');
-    const ack = jest.fn();
-
-    moveRegistration[1]({ toCellId: 2 }, ack);
-
-    expect(ack).toHaveBeenCalledWith({ ok: false, error: 'movement_not_authorized' });
-    expect(world.getPlayer('player1')?.position.cellId).toBe(1);
-  });
 });

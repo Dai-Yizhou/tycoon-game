@@ -127,11 +127,6 @@ describe('MovementHandler', () => {
   });
 
   describe('register', () => {
-    it('应该注册 client.move 事件监听器', () => {
-      handler.register(mockSocket);
-      expect(mockSocket.on).toHaveBeenCalledWith('client.move', expect.any(Function));
-    });
-
     it('应该注册 client.choosePath 事件监听器', () => {
       handler.register(mockSocket);
       expect(mockSocket.on).toHaveBeenCalledWith('client.choosePath', expect.any(Function));

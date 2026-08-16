@@ -10,5 +10,4 @@ export { JailHandler, registerJailHandler, DEFAULT_JAIL_CONFIG, type JailConfig,
 export { InvestmentHandler, registerInvestmentHandler, type InvestmentResult, type EventTriggerResult } from './investmentHandler.js';
 export { TransportHandler, registerTransportHandler, type TransportResult, type TransportNetworkState } from './transportHandler.js';
 export { MonumentHandler, registerMonumentHandler, type RepairResult, type MonumentState } from './monumentHandler.js';
-export { DebugHandler, createDebugHandler, type DebugInjectPayload } from './debugHandler.js';
 export { TeamHandler } from './teamHandler.js';

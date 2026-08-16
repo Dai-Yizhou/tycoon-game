@@ -5,6 +5,7 @@
  */
 
 import type { MapData } from '@game/shared';
+import { loadMapFromObject } from '@game/shared/map/browser-loader';
 import type { RegionInfo, ValueFieldDef } from '../../state/GameStore.js';
 import {
   mapIndex, currentPlayerPosition, serverTimeOffset, dayNightStartTime,
@@ -56,7 +57,7 @@ export async function loadMapData(): Promise<{
     const response = await fetch('/api/map');
     if (response.ok) {
       const data = await response.json();
-      const mapData = normalizeClientMapData(data.mapData);
+      const mapData = normalizeClientMapData(loadMapFromObject(data.mapData));
       const regions: RegionInfo[] = (data.regions || []).map((r: Record<string, unknown>) => ({
         id: String(r['id'] || ''),
         name: String(r['name'] || ''),

@@ -211,7 +211,7 @@ describe('JailHandler', () => {
       expect(updatedPlayer?.status).toBe(PlayerStatus.Jail);
 
       const jailState = handler.getJailState('player1');
-      expect(jailState?.remainingTurns).toBe(3);
+      expect(jailState?.expiresAt).toBeGreaterThan(Date.now());
     });
 
     it('不在监狱格子时应该返回 false', () => {
@@ -232,7 +232,7 @@ describe('JailHandler', () => {
 
   describe('handleJailDiceRoll', () => {
     it('监狱中掷骰应该扣除信用值', () => {
-      const player = createTestPlayer('player1', 2, PlayerStatus.Jail);
+      const player = createTestPlayer('player1', 2);
       world.addPlayer(player);
 
       // 先进入监狱
@@ -240,7 +240,7 @@ describe('JailHandler', () => {
 
       const penalty = handler.handleJailDiceRoll('player1');
 
-      expect(penalty).toBe(5);
+      expect(penalty).toBe(0);
 
       const updatedPlayer = world.getPlayer('player1');
       expect(updatedPlayer?.values.credit.current).toBe(95);
@@ -255,15 +255,15 @@ describe('JailHandler', () => {
       expect(penalty).toBe(0);
     });
 
-    it('剩余回合减到 0 时应该自动出狱', () => {
+    it('冷却结束时自动出狱', () => {
       const player = createTestPlayer('player1', 2, PlayerStatus.Jail);
       world.addPlayer(player);
 
       handler.handleEnterJail('player1', 2);
 
-      // 模拟 3 次掷骰
-      handler.handleJailDiceRoll('player1');
-      handler.handleJailDiceRoll('player1');
+      const jailState = handler.getJailState('player1');
+      expect(jailState).toBeDefined();
+      jest.spyOn(Date, 'now').mockReturnValue(jailState!.expiresAt);
       handler.handleJailDiceRoll('player1');
 
       const updatedPlayer = world.getPlayer('player1');
@@ -330,8 +330,8 @@ describe('JailHandler', () => {
     it('应该从地图配置读取监狱配置', () => {
       const config = handler.getJailConfig();
 
-      expect(config.durationTurns).toBe(3);
       expect(config.creditPenalty).toBe(5);
+      expect(config.cooldownMs).toBe(10000);
     });
   });
 });
@@ -347,10 +347,6 @@ describe('DEFAULT_START_CONFIG', () => {
 });
 
 describe('DEFAULT_JAIL_CONFIG', () => {
-  it('监狱时长默认值应该是 3 回合', () => {
-    expect(DEFAULT_JAIL_CONFIG.durationTurns).toBe(3);
-  });
-
   it('信用值扣除默认值应该是 5', () => {
     expect(DEFAULT_JAIL_CONFIG.creditPenalty).toBe(5);
   });

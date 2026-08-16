@@ -116,6 +116,7 @@ export class EraManager {
   private settlementTimer: NodeJS.Timeout | null = null;
   private endingSoonTimer: NodeJS.Timeout | null = null;
   private checkInterval: NodeJS.Timeout | null = null;
+  private readonly maxTimerDelay = 2_147_000_000;
 
   constructor(store: EraStore, world?: GameWorld, io?: TypedServer, options?: EraManagerOptions) {
     this.store = store;
@@ -199,9 +200,7 @@ export class EraManager {
     // 时代即将结束预告
     if (settlementTime > now) {
       const endingSoonDelay = settlementTime - now;
-      this.endingSoonTimer = setTimeout(() => {
-        this.announceEraEndingSoon();
-      }, endingSoonDelay);
+      this.endingSoonTimer = this.scheduleUntil(endingSoonDelay, () => this.announceEraEndingSoon());
       this.endingSoonTimer.unref();
 
       logger.info(`Era ending-soon announcement scheduled in ${endingSoonDelay / 1000 / 60 / 60} hours`);
@@ -210,11 +209,11 @@ export class EraManager {
     // 设置结算定时器
     if (endTime > now) {
       const settlementDelay = endTime - now;
-      this.settlementTimer = setTimeout(() => {
+      this.settlementTimer = this.scheduleUntil(settlementDelay, () => {
         this.performSettlement().catch((err) => {
           logger.error('Era settlement error:', err);
         });
-      }, settlementDelay);
+      });
       this.settlementTimer.unref();
 
       logger.info(`Settlement scheduled in ${settlementDelay / 1000 / 60 / 60} hours`);
@@ -227,6 +226,18 @@ export class EraManager {
       });
     }, 60 * 60 * 1000);
     this.checkInterval.unref();
+  }
+
+  private scheduleUntil(delay: number, callback: () => void): NodeJS.Timeout {
+    const timer = setTimeout(() => {
+      if (delay > this.maxTimerDelay) {
+        this.scheduleUntil(delay - this.maxTimerDelay, callback);
+        return;
+      }
+      callback();
+    }, Math.min(delay, this.maxTimerDelay));
+    timer.unref();
+    return timer;
   }
 
   /**

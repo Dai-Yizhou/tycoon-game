@@ -85,9 +85,6 @@ export class MovementHandler {
   }
 
   register(socket: TypedSocket): void {
-    socket.on('client.move', (payload, ack) => {
-      this.handleDirectMove(socket, payload, ack);
-    });
     socket.on('client.choosePath', (payload, ack) => {
       this.handleChoosePath(socket, payload, ack);
     });
@@ -217,15 +214,6 @@ export class MovementHandler {
       if (neighbor) result.push(neighbor);
     }
     return result;
-  }
-
-  private handleDirectMove(
-    socket: TypedSocket,
-    _payload: { toCellId: number },
-    ack?: (result: AckResult<PositionChangedPayload>) => void,
-  ): void {
-    emitError(socket, ErrorCodes.InvalidOperation, '普通移动请求必须由服务端移动流程发起');
-    ack?.({ ok: false, error: 'movement_not_authorized' });
   }
 
   private handleChoosePath(

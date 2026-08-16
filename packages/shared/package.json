@@ -16,6 +16,11 @@
       "types": "./dist/cjs/debug/index.d.ts",
       "import": "./dist/esm/debug/index.js",
       "require": "./dist/cjs/debug/index.js"
+    },
+    "./map/browser-loader": {
+      "types": "./dist/cjs/map/browser-loader.d.ts",
+      "import": "./dist/esm/map/browser-loader.js",
+      "require": "./dist/cjs/map/browser-loader.js"
     }
   },
   "scripts": {

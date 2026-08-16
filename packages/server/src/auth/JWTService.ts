@@ -21,7 +21,7 @@ export interface JWTConfig {
  * 默认 JWT 配置
  */
 export const DEFAULT_JWT_CONFIG: JWTConfig = {
-  secret: process.env.JWT_SECRET ?? 'monopoly-io-dev-secret-change-in-production',
+  secret: process.env.JWT_SECRET ?? '',
   expiresIn: 7 * 24 * 60 * 60, // 7 天
 };
 
