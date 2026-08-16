@@ -365,8 +365,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   // 监听队伍解散（服务端权威）
   socket.on('server.teamDisbanded', () => {
     setTeamMembers([]);
-    if (currentPlayer) {
-    }
     addChatMessage(t('team.teamDisbanded'), 'system');
     requestHudRefresh();
   });
