@@ -119,7 +119,7 @@ export class HandlerRegistry {
     this.propertyHandler = new PropertyHandler(io, world, resolvedOwnershipConfig);
     // 初始化起点和监狱处理器
     this.startHandler = new StartHandler(io, world, this);
-    this.jailHandler = new JailHandler(io, world, this, jailCooldownMs);
+    this.jailHandler = new JailHandler(io, world, this, jailCooldownMs ?? 10_000);
     // 初始化事件处理器
     this.eventHandler = new EventHandler(io, world);
     // 初始化投资项目处理器

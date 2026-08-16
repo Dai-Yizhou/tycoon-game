@@ -65,13 +65,13 @@ export class JailHandler {
   /** 监狱状态数据：playerId → JailStateData */
   private readonly jailStates: Map<string, JailStateData> = new Map();
   private readonly jailTimers: Map<string, NodeJS.Timeout> = new Map();
-  private readonly configuredCooldownMs?: number;
+  private readonly configuredCooldownMs: number;
 
   constructor(
     io: TypedServer,
     world: GameWorld,
     _registry: HandlerRegistry,
-    configuredCooldownMs?: number,
+    configuredCooldownMs = DEFAULT_JAIL_CONFIG.cooldownMs ?? 10_000,
   ) {
     this.io = io;
     this.world = world;
@@ -320,17 +320,7 @@ export class JailHandler {
    * 从 MapMeta.config 中读取
    */
   getJailConfig(): JailConfig {
-    if (this.configuredCooldownMs !== undefined) return { ...DEFAULT_JAIL_CONFIG, cooldownMs: this.configuredCooldownMs };
-    const mapMeta = this.world.getMapMeta();
-    if (!mapMeta) return DEFAULT_JAIL_CONFIG;
-
-    const customConfig = mapMeta.config as Record<string, unknown>;
-    if (!customConfig) return DEFAULT_JAIL_CONFIG;
-
-    return {
-      creditPenalty: customConfig.jailCreditPenalty as number | undefined,
-      cooldownMs: DEFAULT_JAIL_CONFIG.cooldownMs,
-    };
+    return { ...DEFAULT_JAIL_CONFIG, cooldownMs: this.configuredCooldownMs };
   }
 
   /**
@@ -357,6 +347,7 @@ export class JailHandler {
   }
 
   restoreJailStates(states: Record<string, JailStateData> = {}): void {
+    this.cleanup();
     this.jailStates.clear();
     for (const [playerId, state] of Object.entries(states)) {
       if (state.expiresAt > Date.now()) {
@@ -414,6 +405,10 @@ export class JailHandler {
     const timer = this.jailTimers.get(playerId);
     if (timer) clearTimeout(timer);
     this.jailTimers.delete(playerId);
+  }
+
+  hasActiveTimer(playerId: string): boolean {
+    return this.jailTimers.has(playerId);
   }
 
   cleanup(): void {

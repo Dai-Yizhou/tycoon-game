@@ -228,6 +228,17 @@ describe('JailHandler', () => {
 
       expect(entered).toBe(false);
     });
+
+    it('teardown 会清理监狱释放定时器', () => {
+      const player = createTestPlayer('player1', 2);
+      world.addPlayer(player);
+      handler.handleEnterJail('player1', 2);
+
+      expect(handler.hasActiveTimer('player1')).toBe(true);
+      handler.cleanup();
+
+      expect(handler.hasActiveTimer('player1')).toBe(false);
+    });
   });
 
   describe('handleJailDiceRoll', () => {
