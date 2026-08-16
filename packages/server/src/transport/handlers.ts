@@ -48,18 +48,6 @@ function emitError(socket: TypedSocket, code: ErrorCode, message: string): void 
   socket.emit('server.error', { code, message });
 }
 
-export function adminOnly(socket: TypedSocket): boolean {
-  return socket.data.authenticated === true && socket.data.role === 'admin';
-}
-
-export function requireAdmin(socket: TypedSocket, onAuthorized: () => void): void {
-  if (!adminOnly(socket)) {
-    emitError(socket, ErrorCodes.NotAuthenticated, 'admin role required');
-    return;
-  }
-  onAuthorized();
-}
-
 /**
  * 通用 try/catch 包装
  */

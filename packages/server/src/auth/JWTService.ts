@@ -44,13 +44,12 @@ export class JWTService {
    * @param isGuest 是否为游客
    * @returns JWT token
    */
-  generateToken(userId: string, username: string, isGuest: boolean, role: 'player' | 'admin' = 'player'): string {
+  generateToken(userId: string, username: string, isGuest: boolean): string {
     const payload: JWTPayload = {
       userId,
       username,
       isGuest,
       playerId: userId,
-      role,
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + this.config.expiresIn,
     };

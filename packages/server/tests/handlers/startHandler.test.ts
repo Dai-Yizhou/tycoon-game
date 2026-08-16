@@ -198,6 +198,11 @@ describe('JailHandler', () => {
     world.loadMap(mapData, mapMeta);
   });
 
+  afterEach(() => {
+    handler.cleanup();
+    jest.useRealTimers();
+  });
+
   describe('handleEnterJail', () => {
     it('踩中监狱格子应该进入监狱', () => {
       const player = createTestPlayer('player1', 2);

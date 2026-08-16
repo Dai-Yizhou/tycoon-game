@@ -107,13 +107,13 @@ export interface ClientToServerEvents {
 
   /** 购买地产/项目 */
   'client.buyProperty': (
-    payload: { cellId: number; requestId?: string },
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number },
     ack?: (result: AckResult<{ cell: Cell }>) => void,
   ) => void;
 
   /** 升级地产 */
   'client.upgradeProperty': (
-    payload: { cellId: number; requestId?: string },
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number },
     ack?: (result: AckResult<{ cell: Cell; cost: number }>) => void,
   ) => void;
 
@@ -175,7 +175,7 @@ export interface ClientToServerEvents {
 
   /** 购买投资项目 */
   'client.buyInvestment': (
-    payload: { cellId: number; requestId?: string },
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number },
     ack?: (result: AckResult<{ cell: Cell }>) => void,
   ) => void;
 
@@ -214,6 +214,7 @@ export interface ServerToClientEvents {
   'server.gameState': (payload: {
     player: Player;
     team: Team | null;
+    members?: TeamMemberView[];
     /** 当前玩家视野内可见的格子（可选） */
     visibleCells?: Cell[];
     /** 服务端时间 */
@@ -452,7 +453,6 @@ export interface ServerToClientEvents {
  */
 export interface SocketData {
   playerId?: string;
-  role?: 'player' | 'admin';
   teamId?: string | null;
   /** 是否已鉴权 */
   authenticated?: boolean;

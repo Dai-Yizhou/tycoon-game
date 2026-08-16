@@ -400,6 +400,21 @@ describe('PropertyHandler', () => {
   });
 
   describe('Socket事件处理', () => {
+    it('拒绝过期资源版本的买地请求', () => {
+      const player = createTestPlayer('player1', 1000);
+      world.addPlayer(player);
+      const socket = createMockSocket('player1');
+      const ack = jest.fn();
+
+      handler.register(socket);
+      const buyHandler = (socket.on as jest.Mock).mock.calls.find(
+        (call: unknown[]) => call[0] === 'client.buyProperty',
+      )?.[1] as ((payload: unknown, callback: jest.Mock) => void) | undefined;
+      buyHandler?.({ cellId: 1, expectedResourceVersion: 1 }, ack);
+
+      expect(ack).toHaveBeenCalledWith({ ok: false, error: 'resource_version_conflict' });
+    });
+
     it('未登录玩家购买地产失败', () => {
       const socket = createMockSocket(); // 无 playerId
       const ack = jest.fn();

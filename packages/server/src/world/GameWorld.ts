@@ -111,6 +111,7 @@ export class GameWorld {
   private mapMeta: MapMeta | null = null;
   private mapIndex: MapIndex | null = null;
   private currentEra: EraInfo | null = null;
+  private resourceVersion = 0;
   private lastValidation: ValidationResult | null = null;
   private snapshotStateProvider: (() => Pick<WorldSnapshot, 'taxRecords' | 'jailStates'>) | null = null;
 
@@ -163,8 +164,16 @@ export class GameWorld {
    */
   updatePlayer(player: Player): boolean {
     const updated = this.playerManager.updatePlayer(player);
-    if (updated) this.saveSnapshot();
+    if (updated) { this.resourceVersion += 1; this.saveSnapshot(); }
     return updated;
+  }
+
+  getResourceVersion(): number { return this.resourceVersion; }
+
+  compareAndSwapResourceVersion(expected: number): boolean {
+    if (expected !== this.resourceVersion) return false;
+    this.resourceVersion += 1;
+    return true;
   }
 
   /**

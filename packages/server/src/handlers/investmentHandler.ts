@@ -111,7 +111,7 @@ export class InvestmentHandler {
    */
   private handleBuyInvestment(
     socket: TypedSocket,
-    payload: { cellId: number; requestId?: string },
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number },
     ack?: (result: AckResult<{ cell: Cell }>) => void,
   ): void {
     try {
@@ -192,6 +192,11 @@ export class InvestmentHandler {
       if (money < price) {
         emitError(socket, ErrorCodes.InvalidPayload, `财产不足，需要 ${price}，当前 ${money}`);
         ack?.({ ok: false, error: 'insufficient_money' });
+        return;
+      }
+
+      if (payload.expectedResourceVersion !== undefined && !this.world.compareAndSwapResourceVersion(payload.expectedResourceVersion)) {
+        ack?.({ ok: false, error: 'resource_version_conflict' });
         return;
       }
 

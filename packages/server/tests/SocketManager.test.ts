@@ -96,7 +96,7 @@ describe('SocketManager', () => {
       else process.env.NODE_ENV = previousNodeEnv;
     });
 
-    it('authenticates handshake.auth.token and stores playerId and role', async () => {
+    it('authenticates handshake.auth.token and stores playerId', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();
       world.addPlayer(buildPlayer('p1'));
@@ -108,10 +108,9 @@ describe('SocketManager', () => {
       });
       env.io.on('connection', (socket) => {
         expect(socket.data.playerId).toBe('p1');
-        expect(socket.data.role).toBe('admin');
         socketManager.registerConnectionHandlers(socket);
       });
-      const sock = await connectClient(env.port, { auth: { token: jwt.generateToken('p1', 'user-p1', false, 'admin') } });
+      const sock = await connectClient(env.port, { auth: { token: jwt.generateToken('p1', 'user-p1', false) } });
       expect(sock.connected).toBe(true);
       sock.disconnect();
       await new Promise((r) => env.http.close(r));

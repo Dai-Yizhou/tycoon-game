@@ -33,10 +33,10 @@ describe('JWTService', () => {
       expect(token1).not.toBe(token2);
     });
 
-    it('should include playerId and role in the payload', () => {
-      const token = jwtService.generateToken('player-1', 'testuser', false, 'admin');
+    it('should include playerId in the payload', () => {
+      const token = jwtService.generateToken('player-1', 'testuser', false);
       const payload = jwtService.verifyToken(token);
-      expect(payload).toMatchObject({ playerId: 'player-1', role: 'admin' });
+      expect(payload).toMatchObject({ playerId: 'player-1' });
     });
   });
 

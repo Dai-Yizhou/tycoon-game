@@ -414,6 +414,7 @@ export class JailHandler {
   cleanup(): void {
     for (const timer of this.jailTimers.values()) clearTimeout(timer);
     this.jailTimers.clear();
+    this.jailStates.clear();
   }
 
   private scheduleRelease(playerId: string, delayMs: number): void {

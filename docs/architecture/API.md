@@ -1,5 +1,7 @@
 # 当前通信 API
 
+> 当前文档以运行时代码为准；`docs/legacy/` 仅保存历史交接材料，不代表现行协议。
+
 > 本文来自 `packages/shared/src/types/socket-events.ts`、`packages/server/src/app.ts`、`packages/server/src/transport/SocketManager.ts` 与 `packages/server/src/transport/handlers.ts`。只记录当前注册或明确暴露的接口；item、talent、achievement 不属于当前运行时 API。
 
 ## 连接约束
@@ -19,7 +21,8 @@
 | `client.ping` | `SocketManager` | 心跳回执；无 ack 时发送 `server.pong` |
 | `client.rollDice` | `DiceHandler` | 服务端随机、冷却校验并进入移动链 |
 | `client.choosePath` | `MovementHandler` | 多岔路选择合法下一格 |
-| `client.buyInvestment` / `triggerInvestmentEvent` | `InvestmentHandler` | 投资购买与事件结算；投资与地产使用同一 ownerships 产权数据 |
+| `client.buyProperty` / `upgradeProperty` | `PropertyHandler` | 买地与升级；可携带 `requestId` 和 `expectedResourceVersion`，版本冲突返回 `resource_version_conflict` |
+| `client.buyInvestment` / `triggerInvestmentEvent` | `InvestmentHandler` | 投资购买与事件结算；购买可携带 `requestId` 和 `expectedResourceVersion` |
 | `client.useTransport` / `getTransportDestinations` | `TransportHandler` | 查询目的地与付费传送 |
 | `client.repairMonument` / `getMonumentStatus` | `MonumentHandler` | 纪念碑状态查询与修缮 |
 | `client.inviteToTeam` / `respondToTeamInvite` / `leaveTeam` / `kickTeamMember` / `getTeamState` | `TeamHandler` | 队伍邀请、成员变更和状态查询 |
@@ -74,3 +77,4 @@
 ## 错误与权威边界
 
 handler 失败时 ack 返回 `{ ok: false, error }`，并可发 `server.error`。成功 ack 只说明请求被处理；界面展示的余额、位置、资产、状态、队伍成员和繁荣度必须由后续 `server.*` 快照/增量事件更新。
+- 当前没有 admin 业务入口；连接身份只接受玩家运行时流程，不存在 admin-only 业务授权约定。

@@ -38,7 +38,6 @@ export interface JWTPayload {
   /** 是否为游客 */
   isGuest: boolean;
   playerId: string;
-  role: 'player' | 'admin';
   /** 发行时间（Unix 秒） */
   iat: number;
   /** 过期时间（Unix 秒） */
