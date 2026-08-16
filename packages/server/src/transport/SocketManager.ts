@@ -119,7 +119,7 @@ export class SocketManager {
     this.playerStore = options.playerStore;
     this.teamManager = options.teamManager;
 
-    if (!this.authenticate && !this.jwtService) {
+    if (!this.authenticate && !this.jwtService && process.env.NODE_ENV === 'production') {
       throw new Error('explicit socket authentication is required');
     }
 

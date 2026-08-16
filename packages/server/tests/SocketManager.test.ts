@@ -330,6 +330,30 @@ describe('SocketManager', () => {
       expect(typeof data.serverTime).toBe('number');
       c1.disconnect();
     });
+
+    it('blocks events after rate limit exhaustion', async () => {
+      const env = await createTestEnv();
+      const world = new GameWorld();
+      const socketManager = new SocketManager(env.io, {
+        world,
+        autoWireWorldEvents: false,
+        authenticate: () => 'test-player',
+        rateLimit: { windowMs: 60_000, maxEvents: 1 },
+      });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
+      const sock = await connectClient(env.port);
+      const errors: unknown[] = [];
+      sock.on('server.error', (error) => errors.push(error));
+
+      sock.emit('client.ping', { timestamp: 1 });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      sock.emit('client.ping', { timestamp: 2 });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(errors).toEqual([expect.objectContaining({ code: 'RATE_LIMIT' })]);
+      sock.disconnect();
+      await new Promise((resolve) => env.http.close(resolve));
+    });
   });
 
   describe('graceful close', () => {
