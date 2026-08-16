@@ -107,13 +107,13 @@ export interface ClientToServerEvents {
 
   /** 购买地产/项目 */
   'client.buyProperty': (
-    payload: { cellId: number },
+    payload: { cellId: number; requestId?: string },
     ack?: (result: AckResult<{ cell: Cell }>) => void,
   ) => void;
 
   /** 升级地产 */
   'client.upgradeProperty': (
-    payload: { cellId: number },
+    payload: { cellId: number; requestId?: string },
     ack?: (result: AckResult<{ cell: Cell; cost: number }>) => void,
   ) => void;
 
@@ -175,7 +175,7 @@ export interface ClientToServerEvents {
 
   /** 购买投资项目 */
   'client.buyInvestment': (
-    payload: { cellId: number },
+    payload: { cellId: number; requestId?: string },
     ack?: (result: AckResult<{ cell: Cell }>) => void,
   ) => void;
 

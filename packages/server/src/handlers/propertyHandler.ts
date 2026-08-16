@@ -31,6 +31,7 @@ import {
   type Ownership,
   type OwnershipConfig,
 } from '../economy/index.js';
+import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
 
 /**
  * 地产所有权信息
@@ -88,6 +89,7 @@ export class PropertyHandler {
   private readonly ownershipConfig: OwnershipConfig;
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
+  private readonly operationGuard = new EconomicOperationGuard<AckResult<{ cell: Cell }>>();
 
   constructor(io: TypedServer, world: GameWorld, ownershipConfig: OwnershipConfig = DEFAULT_OWNERSHIP_CONFIG) {
     this.io = io;
@@ -130,10 +132,18 @@ export class PropertyHandler {
    */
   private handleBuyProperty(
     socket: TypedSocket,
-    payload: { cellId: number },
+    payload: { cellId: number; requestId?: string },
     ack?: (result: AckResult<{ cell: Cell }>) => void,
   ): void {
     try {
+      const requestId = payload.requestId;
+      if (requestId) {
+        const previous = this.operationGuard.getResult(requestId);
+        if (previous) { ack?.(previous); return; }
+      }
+      const lockKey = `property:${payload.cellId}`;
+      if (!this.operationGuard.tryLock(lockKey)) { ack?.({ ok: false, error: 'operation_in_progress' }); return; }
+      try {
       // 1. 验证玩家身份
       const playerId = socket.data.playerId;
       if (!playerId) {
@@ -239,8 +249,11 @@ export class PropertyHandler {
       });
 
       // 13. 返回成功结果
-      ack?.({ ok: true, data: { cell: result.cell } });
+      const response = { ok: true, data: { cell: result.cell } } as AckResult<{ cell: Cell }>;
+      if (requestId) this.operationGuard.complete(requestId, response);
+      ack?.(response);
       logger.debug(`玩家 ${playerId} 购买了格子 ${payload.cellId}，价格 ${price}`);
+      } finally { this.operationGuard.unlock(lockKey); }
     } catch (err) {
       logger.error('购买地产处理错误', err);
       emitError(socket, ErrorCodes.InternalError, err instanceof Error ? err.message : String(err));
@@ -253,7 +266,7 @@ export class PropertyHandler {
    */
   private handleUpgradeProperty(
     socket: TypedSocket,
-    payload: { cellId: number },
+    payload: { cellId: number; requestId?: string },
     ack?: (result: AckResult<{ cell: Cell; cost: number }>) => void,
   ): void {
     try {

@@ -63,6 +63,7 @@ export class Bankruptcy {
     this.world.getPlayerManager().updateStatus(playerId, PlayerStatus.Bankrupt);
     this.clearPlayerAssets(playerId);
     this.taxation.clearTaxRecords(playerId);
+    this.world.saveSnapshot(this.taxation.getAllTaxRecords(), {});
     this.bankruptcyRecords.set(playerId, record);
 
     this.io.emit('server.playerBankrupt', { playerId, bankruptcyId, bankruptcyTime, reason, netWorthAtBankruptcy: record.netWorthAtBankruptcy });

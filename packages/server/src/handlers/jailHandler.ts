@@ -367,6 +367,10 @@ export class JailHandler {
     }
   }
 
+  getJailCooldownMs(): number {
+    return this.getJailConfig().cooldownMs ?? DEFAULT_JAIL_CONFIG.cooldownMs ?? 10_000;
+  }
+
   /**
    * 扣除玩家信用值
    *

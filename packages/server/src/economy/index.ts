@@ -37,3 +37,5 @@ export {
   type Ownership,
   type OwnershipConfig,
 } from './Ownership.js';
+
+export { EconomicOperationGuard } from './EconomicOperationGuard.js';
