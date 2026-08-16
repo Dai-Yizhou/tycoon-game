@@ -206,18 +206,19 @@ describe('SocketManager', () => {
       const world = new GameWorld();
       // 把 p1 提前放入 world
       world.addPlayer(buildPlayer('p1'));
+      world.addPlayer(buildPlayer('p2'));
       const sm = new SocketManager(env.io, {
         world,
         autoWireWorldEvents: false,
         // 通过 authenticate 标记 socket 属于 p1
         authenticate: (_socket, handshake) => {
           const q = (handshake as { query: Record<string, string> }).query;
-          return q['playerId'] === 'p1' ? 'p1' : null;
+          return q['playerId'] === 'p1' ? 'p1' : q['playerId'] === 'p2' ? 'p2' : null;
         },
       });
       env.io.on('connection', (socket) => sm.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port, { query: { playerId: 'p1' } });
-      const c2 = await connectClient(env.port);
+      const c2 = await connectClient(env.port, { query: { playerId: 'p2' } });
       // 等连接并完成绑定
       await new Promise((r) => setTimeout(r, 50));
 
