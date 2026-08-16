@@ -119,7 +119,7 @@ describe('SocketManager', () => {
     it('does not register a connection listener in the constructor', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();
-      new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      new SocketManager(env.io, { world, autoWireWorldEvents: false, authenticate: () => 'test-player' });
       expect(env.io.listeners('connection')).toHaveLength(0);
       await new Promise((r) => env.http.close(r));
     });
@@ -127,7 +127,7 @@ describe('SocketManager', () => {
       const env = await createTestEnv();
       const world = new GameWorld();
       // eslint-disable-next-line no-new
-      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: false, authenticate: () => 'test-player' });
       env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
       const sock = await connectClient(env.port);
       expect(sock.connected).toBe(true);
@@ -177,7 +177,7 @@ describe('SocketManager', () => {
     it('global broadcast reaches all clients', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();
-      const sm = new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      const sm = new SocketManager(env.io, { world, autoWireWorldEvents: false, authenticate: () => 'test-player' });
       env.io.on('connection', (socket) => sm.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port);
       const c2 = await connectClient(env.port);
@@ -197,7 +197,7 @@ describe('SocketManager', () => {
     it('broadcastToMap only reaches clients in that map room', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();
-      const sm = new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      const sm = new SocketManager(env.io, { world, autoWireWorldEvents: false, authenticate: () => 'test-player' });
       env.io.on('connection', (socket) => sm.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port);
       const c2 = await connectClient(env.port);
@@ -222,7 +222,7 @@ describe('SocketManager', () => {
     it('broadcastToTeam only reaches clients in that team room', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();
-      const sm = new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      const sm = new SocketManager(env.io, { world, autoWireWorldEvents: false, authenticate: () => 'test-player' });
       env.io.on('connection', (socket) => sm.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port);
       const c2 = await connectClient(env.port);
@@ -282,7 +282,7 @@ describe('SocketManager', () => {
       const env = await createTestEnv();
       const world = new GameWorld();
       // eslint-disable-next-line no-new
-      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: true });
+      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: true, authenticate: () => 'test-player' });
       env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port);
       const p1 = waitFor<{ id: string }>(c1, 'server.playerJoined');
@@ -297,7 +297,7 @@ describe('SocketManager', () => {
       const env = await createTestEnv();
       const world = new GameWorld();
       // eslint-disable-next-line no-new
-      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: true });
+      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: true, authenticate: () => 'test-player' });
       env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port);
       const p1 = waitFor<{ newEraId: string }>(c1, 'server.eraChanged');
@@ -320,7 +320,7 @@ describe('SocketManager', () => {
     it('responds to client.ping with server.pong', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();
-      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: false, authenticate: () => 'test-player' });
       env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
       registerHandlers(env.io, world);
       const c1 = await connectClient(env.port);
@@ -336,7 +336,7 @@ describe('SocketManager', () => {
     it('disconnects all clients on close()', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();
-      const sm = new SocketManager(env.io, { world, autoWireWorldEvents: false });
+      const sm = new SocketManager(env.io, { world, autoWireWorldEvents: false, authenticate: () => 'test-player' });
       env.io.on('connection', (socket) => sm.registerConnectionHandlers(socket));
       const c1 = await connectClient(env.port);
       await new Promise((r) => setTimeout(r, 50));

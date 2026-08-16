@@ -74,7 +74,11 @@ export interface SocketManagerOptions {
   /** 限流配置（默认 100 事件/10s） */
   rateLimit?: RateLimitConfig;
   /** 鉴权处理器；返回 null 表示通过，非 null 为 playerId */
-  authenticate?: (socket: TypedSocket, handshake: unknown) => string | null | Promise<string | null>;
+  authenticate?: (socket: TypedSocket, handshake: unknown) =>
+    | string
+    | { playerId: string; role?: 'player' | 'admin'; guest?: boolean }
+    | null
+    | Promise<string | { playerId: string; role?: 'player' | 'admin'; guest?: boolean } | null>;
   jwtService?: JWTService;
   /** 是否自动绑定 GameWorld 事件到广播（默认 true） */
   autoWireWorldEvents?: boolean;
@@ -115,8 +119,8 @@ export class SocketManager {
     this.playerStore = options.playerStore;
     this.teamManager = options.teamManager;
 
-    if (!this.authenticate && !this.jwtService && process.env.NODE_ENV === 'production') {
-      throw new Error('JWT authentication is required in production');
+    if (!this.authenticate && !this.jwtService) {
+      throw new Error('explicit socket authentication is required');
     }
 
     this.io.use((socket, next) => this.middleware(socket as TypedSocket, next));
@@ -250,19 +254,23 @@ export class SocketManager {
         socket.data.role = payload.role;
         socket.data.authenticated = true;
       } else if (this.authenticate) {
-        const playerId = await this.authenticate(socket, socket.handshake);
-        if (typeof playerId === 'string' && playerId.length > 0) {
-          socket.data.playerId = playerId;
+        const identity = await this.authenticate(socket, socket.handshake);
+        if (typeof identity === 'string' && identity.length > 0) {
+          socket.data.playerId = identity;
+          socket.data.authenticated = true;
+          socket.data.role = 'player';
+        } else if (typeof identity === 'object' && identity !== null && identity.playerId.length > 0) {
+          socket.data.playerId = identity.playerId;
+          socket.data.role = identity.role ?? 'player';
+          socket.data.guest = identity.guest;
           socket.data.authenticated = true;
         } else {
           next(new Error('authentication_failed'));
           return;
         }
-      } else if (process.env.NODE_ENV === 'production') {
+      } else {
         next(new Error('authentication_required'));
         return;
-      } else {
-        socket.data.authenticated = true;
       }
 
       // 2. 限流（仅在握手阶段粗粒度限制；详细速率在 onConnection 内做）
