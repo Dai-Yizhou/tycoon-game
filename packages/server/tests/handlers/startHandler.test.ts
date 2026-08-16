@@ -345,6 +345,16 @@ describe('JailHandler', () => {
       expect(config.creditPenalty).toBe(5);
       expect(config.cooldownMs).toBe(10000);
     });
+
+    it('cleans all expiry timers when clearing all jail states', () => {
+      jest.useFakeTimers();
+      world.addPlayer(createTestPlayer('player1', 2));
+      handler.handleEnterJail('player1', 2);
+      handler.clearAllJailStates();
+      expect(handler.getAllJailedPlayers()).toEqual([]);
+      expect(jest.getTimerCount()).toBe(0);
+      jest.useRealTimers();
+    });
   });
 });
 

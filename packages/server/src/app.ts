@@ -252,6 +252,8 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     maxHttpBufferSize: 1e6, // 1MB
   }) as TypedServer;
 
+  const restoredSnapshot = world.restoreSnapshot();
+
   // 初始化经济系统
   const mapMeta = world.getMapMeta();
   if (!mapMeta) {
@@ -268,10 +270,12 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
 
   // 注册业务事件处理器（需要在经济系统初始化后）
   const handlerRegistry = registerHandlers(io, world, ownershipConfig, config.jailCooldownMs);
-
-  const restoredSnapshot = world.restoreSnapshot();
   if (restoredSnapshot) taxation.restoreTaxRecords(restoredSnapshot.taxRecords);
   handlerRegistry.getJailHandler().restoreJailStates(restoredSnapshot?.jailStates);
+  world.setSnapshotStateProvider(() => ({
+    taxRecords: taxation.getAllTaxRecords(),
+    jailStates: handlerRegistry.getJailHandler().getJailStates(),
+  }));
 
   handlerRegistry.setBankruptcy(bankruptcy);
 
@@ -462,6 +466,8 @@ export async function gracefulShutdown(
       logger.error('error cleaning up economy system', err);
     }
   }
+
+  if (world) world.saveSnapshot(economy?.taxation.getAllTaxRecords(), undefined);
 
 
   if (socketManager) {

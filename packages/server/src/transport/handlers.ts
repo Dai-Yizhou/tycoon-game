@@ -94,7 +94,7 @@ export class HandlerRegistry {
 
     const cooldownConfig = {
       normal: ((diceConfig.diceCooldownSeconds as number) ?? 5) * 1000,
-      jail: (diceConfig.jailCooldownMs as number) ?? 10_000,
+      jail: jailCooldownMs ?? 10_000,
       diceMin: (diceConfig.diceMin as number) ?? 1,
       diceMax: (diceConfig.diceMax as number) ?? 6,
     };

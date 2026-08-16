@@ -329,7 +329,7 @@ export class JailHandler {
 
     return {
       creditPenalty: customConfig.jailCreditPenalty as number | undefined,
-      cooldownMs: customConfig.jailCooldownMs as number ?? DEFAULT_JAIL_CONFIG.cooldownMs,
+      cooldownMs: DEFAULT_JAIL_CONFIG.cooldownMs,
     };
   }
 
@@ -437,6 +437,8 @@ export class JailHandler {
    */
   clearAllJailStates(): void {
     this.jailStates.clear();
+    for (const timer of this.jailTimers.values()) clearTimeout(timer);
+    this.jailTimers.clear();
   }
 
   private releaseIfExpired(playerId: string): void {

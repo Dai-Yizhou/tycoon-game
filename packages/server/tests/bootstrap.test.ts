@@ -11,6 +11,8 @@ import { DEFAULT_SERVER_CONFIG, type ServerConfig } from '@game/shared';
 import { createApp, gracefulShutdown, startHttpServer } from '../src/app';
 import { GameWorld } from '../src/world/GameWorld';
 import { AddressInfo } from 'node:net';
+import { InMemoryWorldStore } from '../src/storage/WorldStore';
+import type { Player } from '@game/shared';
 
 const baseConfig: ServerConfig = {
   ...DEFAULT_SERVER_CONFIG,
@@ -40,6 +42,30 @@ async function teardownApp(result: ReturnType<typeof createApp>): Promise<void> 
 }
 
 describe('app lifecycle', () => {
+  it('restores the world snapshot before the second app becomes ready', async () => {
+    const store = new InMemoryWorldStore();
+    const first = createApp({ ...baseConfig, jailCooldownMs: 3210 }, { worldStore: store, socketManagerOptions: {} });
+    const player: Player = {
+      id: 'restart-player',
+      username: 'Restart Player',
+      teamId: 'team-1',
+      position: { cellId: 1 },
+      values: {},
+      status: 'normal',
+      createdAt: Date.now(),
+      lastActiveAt: Date.now(),
+    };
+    first.world.addPlayer(player);
+    first.world.getMapData()![1].extra.owners = [player.id];
+    first.world.saveSnapshot();
+    await teardownApp(first);
+
+    const second = createApp({ ...baseConfig, jailCooldownMs: 3210 }, { worldStore: store, socketManagerOptions: {} });
+    expect(second.world.getPlayer(player.id)).toEqual(expect.objectContaining({ teamId: 'team-1', position: { cellId: 1 } }));
+    expect(second.world.getMapData()![1].extra.owners).toEqual([player.id]);
+    await teardownApp(second);
+  });
+
   describe('startHttpServer', () => {
     it('listens on the configured port and returns the bound port', async () => {
       const config: ServerConfig = { ...baseConfig, port: 0 };

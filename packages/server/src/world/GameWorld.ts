@@ -112,6 +112,7 @@ export class GameWorld {
   private mapIndex: MapIndex | null = null;
   private currentEra: EraInfo | null = null;
   private lastValidation: ValidationResult | null = null;
+  private snapshotStateProvider: (() => Pick<WorldSnapshot, 'taxRecords' | 'jailStates'>) | null = null;
 
   constructor(options: GameWorldOptions = {}) {
     this.emitter = new EventEmitter();
@@ -129,6 +130,10 @@ export class GameWorld {
     this.playerManager.on(PlayerEvents.Updated, ({ player }: { player: Player }) => {
       this.emit(WorldEvents.PlayerUpdated, { player });
     });
+  }
+
+  setSnapshotStateProvider(provider: () => Pick<WorldSnapshot, 'taxRecords' | 'jailStates'>): void {
+    this.snapshotStateProvider = provider;
   }
 
   // ---------------------------------------------------------------------------
@@ -238,7 +243,8 @@ export class GameWorld {
 
   saveSnapshot(taxRecords: WorldSnapshot['taxRecords'] = {}, jailStates: WorldSnapshot['jailStates'] = {}): void {
     if (!this.worldStore || !this.mapData || !this.mapMeta) return;
-    this.worldStore.save({ version: 1, savedAt: Date.now(), mapData: this.mapData, mapMeta: this.mapMeta, players: this.getAllPlayers(), teams: this.getAllTeams(), era: this.currentEra, taxRecords, jailStates });
+    const state = this.snapshotStateProvider?.() ?? { taxRecords, jailStates };
+    this.worldStore.save({ version: 1, savedAt: Date.now(), mapData: this.mapData, mapMeta: this.mapMeta, players: this.getAllPlayers(), teams: this.getAllTeams(), era: this.currentEra, taxRecords: state.taxRecords, jailStates: state.jailStates });
   }
 
   restoreSnapshot(): WorldSnapshot | null {
