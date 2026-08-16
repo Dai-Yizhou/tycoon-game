@@ -76,6 +76,26 @@ function waitFor<T>(socket: ClientSocket, event: string, timeoutMs = 1000): Prom
 
 describe('SocketManager', () => {
   describe('connection lifecycle', () => {
+    it('rejects an anonymous production handshake even when JWT is configured', async () => {
+      const previousNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      const env = await createTestEnv();
+      const world = new GameWorld();
+      const jwt = new JWTService({ secret: 'test-secret', expiresIn: 3600 });
+      const socketManager = new SocketManager(env.io, {
+        world,
+        autoWireWorldEvents: false,
+        jwtService: jwt,
+      });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
+
+      await expect(connectClient(env.port)).rejects.toThrow();
+
+      await new Promise<void>((resolve) => env.http.close(() => resolve()));
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    });
+
     it('authenticates handshake.auth.token and stores playerId and role', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();
