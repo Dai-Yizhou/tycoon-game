@@ -22,7 +22,7 @@ import { isFeatureEnabled } from '@game/shared';
 import { logger } from './utils/logger.js';
 import { GameWorld } from './world/GameWorld.js';
 import { SocketManager, type TypedServer } from './transport/SocketManager.js';
-import { registerHandlers } from './transport/handlers.js';
+import { HandlerRegistry, registerHandlers } from './transport/handlers.js';
 import { Taxation, Bankruptcy, resolveOwnershipConfig, type TaxConfig, type OwnershipConfig } from './economy/index.js';
 import { readFileSync } from 'node:fs';
 import { parseMapData, parseMapMeta } from '@game/shared';
@@ -53,6 +53,7 @@ export interface AppDependencies {
   /** 客户端静态资源目录（绝对路径），可选 */
   clientDistPath?: string;
   worldStore?: WorldStore;
+  handlerRegistry?: HandlerRegistry;
 }
 
 function readTaxConfig(mapMeta: ReturnType<typeof parseMapMeta>): TaxConfig {
@@ -114,6 +115,7 @@ export interface CreatedApp {
   /** 玩家存储实例（FR-22 账号持久化） */
   playerStore?: PlayerStore;
   worldStore?: WorldStore;
+  handlerRegistry?: HandlerRegistry;
 }
 
 /**
@@ -333,7 +335,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
 
   // 初始化时代管理器（FR-19/FR-20）
   // 时代长度从配置读取（默认 90 天，对应现实 3-6 个月）
-  const eraStore = new InMemoryEraStore();
+  const eraStore = new InMemoryEraStore(restoredSnapshot?.era);
   const eraManager = new EraManager(eraStore, world, io, {
     defaultDuration: config.eraLengthDays * 24 * 60 * 60 * 1000,
   });
@@ -371,6 +373,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     eraManager,
     playerStore,
     worldStore,
+    handlerRegistry,
   };
 }
 
@@ -421,10 +424,9 @@ export async function gracefulShutdown(
   eraManager?: EraManager,
   timeoutMs: number = 5000,
   world?: GameWorld,
+  handlerRegistry?: HandlerRegistry,
 ): Promise<void> {
   logger.info('graceful shutdown started');
-
-  world?.saveSnapshot();
 
   // 关闭时代管理器（清理定时器）
   if (eraManager) {
@@ -466,6 +468,8 @@ export async function gracefulShutdown(
       logger.error('error cleaning up economy system', err);
     }
   }
+
+  handlerRegistry?.cleanup();
 
   if (world) world.saveSnapshot(economy?.taxation.getAllTaxRecords(), undefined);
 

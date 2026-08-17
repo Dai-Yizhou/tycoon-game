@@ -112,6 +112,7 @@ export class GameWorld {
   private mapIndex: MapIndex | null = null;
   private currentEra: EraInfo | null = null;
   private resourceVersion = 0;
+  private readonly cellVersions = new Map<number, number>();
   private lastValidation: ValidationResult | null = null;
   private snapshotStateProvider: (() => Pick<WorldSnapshot, 'taxRecords' | 'jailStates'>) | null = null;
 
@@ -174,6 +175,26 @@ export class GameWorld {
     if (expected !== this.resourceVersion) return false;
     this.resourceVersion += 1;
     return true;
+  }
+
+  getCellVersion(cellId: number): number {
+    return this.cellVersions.get(cellId) ?? 0;
+  }
+
+  compareAndSwapCellVersion(cellId: number, expected: number): boolean {
+    if (expected !== this.getCellVersion(cellId)) return false;
+    this.cellVersions.set(cellId, expected + 1);
+    return true;
+  }
+
+  compareAndSwapEconomicVersions(cellId: number, expectedResourceVersion?: number, expectedCellVersion?: number): boolean {
+    if (expectedResourceVersion !== undefined && expectedResourceVersion !== this.resourceVersion) return false;
+    if (expectedCellVersion !== undefined && expectedCellVersion !== this.getCellVersion(cellId)) return false;
+    return true;
+  }
+
+  markCellUpdated(cellId: number): void {
+    this.cellVersions.set(cellId, this.getCellVersion(cellId) + 1);
   }
 
   /**

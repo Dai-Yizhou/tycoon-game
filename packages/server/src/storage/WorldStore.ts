@@ -1,6 +1,6 @@
 import type { Cell, EraInfo, MapMeta, Player, Team } from '@game/shared';
 import type { TaxRecord } from '../economy/Taxation.js';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 export interface WorldSnapshot {
@@ -44,12 +44,34 @@ export class FileWorldStore implements WorldStore {
   constructor(private readonly filePath: string) {}
 
   load(): WorldSnapshot | null {
-    if (!existsSync(this.filePath)) return null;
-    return JSON.parse(readFileSync(this.filePath, 'utf8')) as WorldSnapshot;
+    for (const candidate of [this.filePath, `${this.filePath}.bak`]) {
+      if (!existsSync(candidate)) continue;
+      try {
+        const snapshot = JSON.parse(readFileSync(candidate, 'utf8')) as WorldSnapshot;
+        if (isWorldSnapshot(snapshot)) return snapshot;
+      } catch {
+        continue;
+      }
+    }
+    return null;
   }
 
   save(snapshot: WorldSnapshot): void {
+    if (!isWorldSnapshot(snapshot)) throw new Error('invalid world snapshot');
     mkdirSync(dirname(this.filePath), { recursive: true });
-    writeFileSync(this.filePath, JSON.stringify(snapshot), 'utf8');
+    const temporaryPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
+    if (existsSync(this.filePath)) copyFileSync(this.filePath, `${this.filePath}.bak`);
+    writeFileSync(temporaryPath, JSON.stringify(snapshot), { encoding: 'utf8', flag: 'wx' });
+    renameSync(temporaryPath, this.filePath);
   }
+}
+
+function isWorldSnapshot(value: unknown): value is WorldSnapshot {
+  if (!value || typeof value !== 'object') return false;
+  const snapshot = value as Partial<WorldSnapshot>;
+  return snapshot.version === 1 && typeof snapshot.savedAt === 'number'
+    && Array.isArray(snapshot.mapData) && Boolean(snapshot.mapMeta)
+    && Array.isArray(snapshot.players) && Array.isArray(snapshot.teams)
+    && (snapshot.era === null || typeof snapshot.era === 'object')
+    && Boolean(snapshot.taxRecords);
 }

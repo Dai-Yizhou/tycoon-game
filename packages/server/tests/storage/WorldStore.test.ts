@@ -1,5 +1,5 @@
 import { FileWorldStore, InMemoryWorldStore, type WorldSnapshot } from '../../src/storage/WorldStore.js';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Cell, EraInfo, Player, Team } from '@game/shared';
@@ -33,6 +33,21 @@ describe('WorldStore', () => {
     try {
       new FileWorldStore(file).save(snapshot);
       expect(new FileWorldStore(file).load()).toEqual(snapshot);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('损坏主文件时回退到备份快照', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'world-store-'));
+    const file = join(directory, 'world.json');
+    const snapshot = { version: 1, savedAt: 1, mapData: [], mapMeta: { id: 'map', valueFieldDefinitions: [] }, players: [], teams: [], era: null, taxRecords: {} } as WorldSnapshot;
+    try {
+      const store = new FileWorldStore(file);
+      store.save(snapshot);
+      store.save({ ...snapshot, savedAt: 2 });
+      writeFileSync(file, '{broken', 'utf8');
+      expect(store.load()).toEqual(snapshot);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

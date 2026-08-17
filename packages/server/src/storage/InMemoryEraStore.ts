@@ -16,6 +16,10 @@ import type { EraStore } from './EraStore.js';
 export class InMemoryEraStore implements EraStore {
   private readonly eras: Map<string, EraInfo> = new Map();
 
+  constructor(initialEra?: EraInfo | null) {
+    if (initialEra) this.eras.set(initialEra.id, { ...initialEra, monumentRecords: [...initialEra.monumentRecords] });
+  }
+
   async saveEra(era: EraInfo): Promise<void> {
     this.eras.set(era.id, { ...era, monumentRecords: [...era.monumentRecords] });
   }
