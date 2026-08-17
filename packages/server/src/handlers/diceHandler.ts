@@ -27,8 +27,6 @@ import { ErrorCodes, emitError } from '../transport/handlers.js';
 export interface CooldownConfig {
   /** 正常状态冷却时间（毫秒），默认 5000 */
   normal: number;
-  /** 监狱状态冷却时间（毫秒），默认 10000 */
-  jail: number;
   diceMin: number;
   diceMax: number;
 }
@@ -38,7 +36,6 @@ export interface CooldownConfig {
  */
 export const DEFAULT_COOLDOWN_CONFIG: CooldownConfig = {
   normal: 5000,
-  jail: 10000,
   diceMin: 1,
   diceMax: 6,
 };
@@ -80,7 +77,6 @@ export class DiceHandler {
     this.registry = registry;
     this.cooldownConfig = {
       normal: cooldownConfig?.normal ?? DEFAULT_COOLDOWN_CONFIG.normal,
-      jail: cooldownConfig?.jail ?? DEFAULT_COOLDOWN_CONFIG.jail,
       diceMin: cooldownConfig?.diceMin ?? DEFAULT_COOLDOWN_CONFIG.diceMin,
       diceMax: cooldownConfig?.diceMax ?? DEFAULT_COOLDOWN_CONFIG.diceMax,
     };
@@ -199,7 +195,7 @@ export class DiceHandler {
   private getCooldownMs(status: PlayerStatus): number {
     switch (status) {
       case PlayerStatus.Jail:
-        return this.cooldownConfig.jail;
+        return this.registry.getJailHandler().getJailConfig().cooldownMs ?? 10_000;
       default:
         return this.cooldownConfig.normal;
     }

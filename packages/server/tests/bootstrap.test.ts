@@ -80,6 +80,31 @@ describe('app lifecycle', () => {
   });
 
   describe('gracefulShutdown', () => {
+    it('saves active jail state before cleanup', async () => {
+      const store = new InMemoryWorldStore();
+      const result = createApp({ ...baseConfig, jailCooldownMs: 3210 }, { worldStore: store, socketManagerOptions: {} });
+      const player: Player = {
+        id: 'shutdown-jailed-player',
+        username: 'Shutdown Jailed Player',
+        teamId: 'team-1',
+        position: { cellId: 2 },
+        values: { credit: { id: 'credit', name: 'credit', current: 100 } },
+        status: 'normal',
+        createdAt: Date.now(),
+        lastActiveAt: Date.now(),
+      };
+      result.world.addPlayer(player);
+      const jailCell = result.world.getMapData()!.find((cell) => cell.extra.type === 'jail')!;
+      player.position = { cellId: jailCell.id };
+      result.world.updatePlayer(player);
+      result.handlerRegistry.getJailHandler().handleEnterJail(player.id, jailCell.id);
+
+      await gracefulShutdown(result.httpServer, undefined, result.economy, undefined, undefined, undefined, 5000, result.world, result.handlerRegistry);
+
+      expect(store.load()?.jailStates?.[player.id]).toEqual(expect.objectContaining({ jailCellId: jailCell.id }));
+      await teardownApp(result);
+    });
+
     it('closes http server within timeout', async () => {
       const config: ServerConfig = { ...baseConfig, port: 0 };
       const world = new GameWorld();

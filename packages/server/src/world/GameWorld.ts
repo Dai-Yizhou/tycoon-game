@@ -190,6 +190,8 @@ export class GameWorld {
   compareAndSwapEconomicVersions(cellId: number, expectedResourceVersion?: number, expectedCellVersion?: number): boolean {
     if (expectedResourceVersion !== undefined && expectedResourceVersion !== this.resourceVersion) return false;
     if (expectedCellVersion !== undefined && expectedCellVersion !== this.getCellVersion(cellId)) return false;
+    if (expectedResourceVersion !== undefined) this.resourceVersion += 1;
+    if (expectedCellVersion !== undefined) this.cellVersions.set(cellId, this.getCellVersion(cellId) + 1);
     return true;
   }
 

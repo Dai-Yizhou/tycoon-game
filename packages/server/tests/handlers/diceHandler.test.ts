@@ -131,7 +131,4 @@ describe('DEFAULT_COOLDOWN_CONFIG', () => {
     expect(DEFAULT_COOLDOWN_CONFIG.normal).toBe(5000);
   });
 
-  it('监狱状态冷却时间应该是 10000ms', () => {
-    expect(DEFAULT_COOLDOWN_CONFIG.jail).toBe(10000);
-  });
 });

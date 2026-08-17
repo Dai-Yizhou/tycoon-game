@@ -537,7 +537,6 @@ export class InvestmentHandler {
     const index = mapData.findIndex(c => c.id === cell.id);
     if (index >= 0) {
       mapData[index] = cell;
-      this.world.markCellUpdated(cell.id);
     }
   }
 

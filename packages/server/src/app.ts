@@ -427,6 +427,7 @@ export async function gracefulShutdown(
   handlerRegistry?: HandlerRegistry,
 ): Promise<void> {
   logger.info('graceful shutdown started');
+  if (world) world.saveSnapshot(economy?.taxation.getAllTaxRecords(), undefined);
 
   // 关闭时代管理器（清理定时器）
   if (eraManager) {
@@ -470,9 +471,6 @@ export async function gracefulShutdown(
   }
 
   handlerRegistry?.cleanup();
-
-  if (world) world.saveSnapshot(economy?.taxation.getAllTaxRecords(), undefined);
-
 
   if (socketManager) {
     try {

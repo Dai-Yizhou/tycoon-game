@@ -10,4 +10,11 @@ describe('EconomicOperationGuard', () => {
     guard.complete('request-1', { ok: true });
     expect(guard.getResult('request-1')).toEqual({ ok: true });
   });
+
+  it('atomically validates and advances an economic version', () => {
+    const guard = new EconomicOperationGuard();
+    expect(guard.compareAndSwapVersion('resource', 0)).toBe(true);
+    expect(guard.compareAndSwapVersion('resource', 0)).toBe(false);
+    expect(guard.compareAndSwapVersion('resource', 1)).toBe(true);
+  });
 });

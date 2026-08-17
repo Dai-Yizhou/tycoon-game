@@ -5,6 +5,7 @@ export class EconomicOperationGuard<T = unknown> {
   private readonly ttlMs: number;
   private readonly maxEntries: number;
   private readonly now: () => number;
+  private readonly versions = new Map<string, number>();
 
   constructor(options: { ttlMs?: number; maxEntries?: number; now?: () => number } = {}) {
     this.ttlMs = options.ttlMs ?? 5 * 60 * 1000;
@@ -30,6 +31,13 @@ export class EconomicOperationGuard<T = unknown> {
 
   unlock(key: string): void {
     this.locks.delete(key);
+  }
+
+  compareAndSwapVersion(key: string, expected: number): boolean {
+    const current = this.versions.get(key) ?? 0;
+    if (current !== expected) return false;
+    this.versions.set(key, current + 1);
+    return true;
   }
 
   complete(requestId: string, result: T): void {
