@@ -52,6 +52,7 @@ const SOCKET_EVENTS = [
   'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft', 'server.teamMemberKicked',
   'server.teamUpdated', 'server.teamDisbanded', 'server.prosperityChanged', 'server.gameState',
   'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.playerBankrupt', 'server.playerRestarted',
+  'server.propertyBought', 'server.propertyUpgraded', 'server.investmentBought',
 ] as const;
 
 /**
