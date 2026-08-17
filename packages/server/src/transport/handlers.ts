@@ -146,6 +146,10 @@ export class HandlerRegistry {
     this.handleBankruptRestart(socket);
   }
 
+  cleanup(): void {
+    this.jailHandler.cleanup();
+  }
+
   /**
    * 获取 DiceHandler（用于外部调用）
    */

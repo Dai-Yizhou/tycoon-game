@@ -24,6 +24,7 @@ pnpm test
 - 修改协议先看 `packages/shared/src/types/socket-events.ts`，再同步 server handler 与 client `SocketEventHandler`。
 - 修改服务端组合关系看 `packages/server/src/app.ts`；不要在测试或页面中创建第二条生产 Socket 注册链。
 - 修改客户端状态先看 `GameStore`、`GameViewModel` 和 `ClientHudBridge`，再看 `GamePage` 的组合与清理。
+- 修改 world 状态先看 `GameWorld`、`WorldStore` 和 `world-persistence.md`；经济写入必须保留版本校验、格子串行锁和请求幂等边界。
 - 修改地图看 `packages/server/map.json`、`map-meta.json` 和 `shared/src/map`；客户端通过 `/api/map` 获取数据。地产与投资共有人统一写入 `extra.ownerships`，同时同步 `extra.owners`；合租参数配置在 `map-meta.json` 的 `config.ownership`。
 - 修改行为看 `packages/server/config/behaviors/` 和 `BehaviorEngine`。
 

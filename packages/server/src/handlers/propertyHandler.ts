@@ -132,7 +132,7 @@ export class PropertyHandler {
    */
   private handleBuyProperty(
     socket: TypedSocket,
-    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number },
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
     ack?: (result: AckResult<{ cell: Cell }>) => void,
   ): void {
     try {
@@ -215,8 +215,8 @@ export class PropertyHandler {
         return;
       }
 
-      if (payload.expectedResourceVersion !== undefined && !this.world.compareAndSwapResourceVersion(payload.expectedResourceVersion)) {
-        ack?.({ ok: false, error: 'resource_version_conflict' });
+      if (!this.world.compareAndSwapEconomicVersions(payload.cellId, payload.expectedResourceVersion, payload.expectedCellVersion)) {
+        ack?.({ ok: false, error: payload.expectedCellVersion !== undefined ? 'cell_version_conflict' : 'resource_version_conflict' });
         return;
       }
 
@@ -271,10 +271,18 @@ export class PropertyHandler {
    */
   private handleUpgradeProperty(
     socket: TypedSocket,
-    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number },
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
     ack?: (result: AckResult<{ cell: Cell; cost: number }>) => void,
   ): void {
     try {
+      const requestId = payload.requestId;
+      if (requestId) {
+        const previous = this.operationGuard.getResult(requestId);
+        if (previous) { ack?.(previous as AckResult<{ cell: Cell; cost: number }>); return; }
+      }
+      const lockKey = `property-upgrade:${payload.cellId}`;
+      if (!this.operationGuard.tryLock(lockKey)) { ack?.({ ok: false, error: 'operation_in_progress' }); return; }
+      try {
       // 1. 验证玩家身份
       const playerId = socket.data.playerId;
       if (!playerId) {
@@ -353,12 +361,10 @@ export class PropertyHandler {
         return;
       }
 
-      if (payload.expectedResourceVersion !== undefined && !this.world.compareAndSwapResourceVersion(payload.expectedResourceVersion)) {
-        ack?.({ ok: false, error: 'resource_version_conflict' });
+      if (!this.world.compareAndSwapEconomicVersions(payload.cellId, payload.expectedResourceVersion, payload.expectedCellVersion)) {
+        ack?.({ ok: false, error: payload.expectedCellVersion !== undefined ? 'cell_version_conflict' : 'resource_version_conflict' });
         return;
       }
-
-      // 10. 执行升级
       const result = this.executeUpgradeProperty(player, cell, upgradeCost);
       if (!result) {
         emitError(socket, ErrorCodes.InternalError, '升级失败');
@@ -378,8 +384,11 @@ export class PropertyHandler {
       });
 
       // 13. 返回成功结果
-      ack?.({ ok: true, data: { cell: result.cell, cost: result.cost } });
+      const response = { ok: true, data: { cell: result.cell, cost: result.cost } } as AckResult<{ cell: Cell; cost: number }>;
+      if (requestId) this.operationGuard.complete(requestId, response as never);
+      ack?.(response);
       logger.debug(`玩家 ${playerId} 升级格子 ${payload.cellId} 到等级 ${result.newLevel}，费用 ${result.cost}`);
+      } finally { this.operationGuard.unlock(lockKey); }
     } catch (err) {
       logger.error('升级地产处理错误', err);
       emitError(socket, ErrorCodes.InternalError, err instanceof Error ? err.message : String(err));
@@ -593,6 +602,7 @@ export class PropertyHandler {
     const index = mapData.findIndex(c => c.id === cell.id);
     if (index >= 0) {
       mapData[index] = cell;
+      this.world.markCellUpdated(cell.id);
     }
   }
 

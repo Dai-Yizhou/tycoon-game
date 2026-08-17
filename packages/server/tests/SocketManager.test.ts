@@ -367,6 +367,8 @@ describe('SocketManager', () => {
       await sm.close();
       await new Promise((r) => setTimeout(r, 50));
       expect(c1.connected).toBe(false);
+      env.io.close();
+      await new Promise<void>((resolve) => env.http.close(() => resolve()));
     });
   });
 });

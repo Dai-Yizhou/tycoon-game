@@ -313,13 +313,14 @@ export class TeamManager {
       return;
     }
 
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       const currentInvite = this.invites.get(inviteId);
       if (currentInvite && currentInvite.status === 'pending') {
         currentInvite.status = 'expired';
         logger.debug(`邀请 ${inviteId} 已过期`);
       }
     }, timeout);
+    timer.unref();
   }
 
   // ---------------------------------------------------------------------------

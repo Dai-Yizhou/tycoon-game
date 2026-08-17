@@ -35,7 +35,7 @@
 
 | 事件 | 语义 |
 |---|---|
-| `server.gameState` | 登录/重连时的完整玩家、队伍、可见格子和服务端时间快照 |
+| `server.gameState` | 登录/重连时的完整玩家、队伍、成员只读数值、可见格子和服务端时间快照；客户端必须用该快照重建队伍状态 |
 | `server.playerJoined` / `server.playerLeft` | 在线玩家变化 |
 | `server.playerMoved` | 服务端确认的最终位置及移动信息 |
 | `server.diceRolled` | 其他玩家可见的骰子结果 |
@@ -53,7 +53,7 @@
 | `server.pong` | 无 ack 心跳回包 |
 | `server.error` | `{ code, message }` 形式的错误 |
 
-状态与经济规则：Frozen 不能发起主动操作，但继续计税、收租、投资收益和破产检查；Jail 不收租、不计税、不参与投资收益和破产检查；Bankrupt 保留队伍、地产和投资，不收租、不计税、不参与投资收益和破产检查，重连保持 Bankrupt，只有 `client.bankruptRestart` 可重开。统一判定来自 shared 的经济规则函数。
+状态与经济规则：Frozen 不能发起主动操作，但继续计税、收租、投资收益和破产检查；Jail 不收租、不计税、不参与投资收益和破产检查；Bankrupt 保留队伍、地产和投资，不收租、不计税、不参与投资收益和破产检查，重连保持 Bankrupt，只有 `client.bankruptRestart` 可重开。买地、升级和投资购买支持 `requestId`、`expectedResourceVersion`、`expectedCellVersion`，冲突时拒绝并不广播成功事件。统一判定来自 shared 的经济规则函数。
 
 移动链中，`server.askPath` 表示需要客户端选择路径；客户端选择后再次发送 `client.choosePath`，最终落点才进入一次落点结算。
 

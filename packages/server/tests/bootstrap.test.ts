@@ -33,6 +33,7 @@ async function teardownApp(result: ReturnType<typeof createApp>): Promise<void> 
   result.dayNightCycle?.stop();
   result.economy?.taxation.stopTaxTimer();
   result.economy?.bankruptcy.cleanup();
+  result.handlerRegistry?.cleanup();
   // 关闭 socket.io 引擎（探测确认 io.close() 对未监听/已监听服务器都能立即回调），
   // 否则 io 引擎句柄会让 Jest 进程无法优雅退出。
   result.io.close();
@@ -92,7 +93,7 @@ describe('app lifecycle', () => {
 
       // 主动关闭
       const start = Date.now();
-      await gracefulShutdown(httpServer);
+      await gracefulShutdown(httpServer, undefined, undefined, undefined, undefined, undefined, 5000, world, result.handlerRegistry);
       await teardownApp(result);
       expect(httpServer.listening).toBe(false);
       expect(Date.now() - start).toBeLessThan(3000);
@@ -105,7 +106,7 @@ describe('app lifecycle', () => {
       const result = createApp(config);
       const { httpServer } = result;
       await startHttpServer(httpServer, config);
-      await gracefulShutdown(httpServer);
+      await gracefulShutdown(httpServer, undefined, undefined, undefined, undefined, undefined, 5000, result.world, result.handlerRegistry);
       expect(httpServer.listening).toBe(false);
       await teardownApp(result);
     });

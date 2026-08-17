@@ -111,7 +111,7 @@ export class InvestmentHandler {
    */
   private handleBuyInvestment(
     socket: TypedSocket,
-    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number },
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
     ack?: (result: AckResult<{ cell: Cell }>) => void,
   ): void {
     try {
@@ -195,8 +195,8 @@ export class InvestmentHandler {
         return;
       }
 
-      if (payload.expectedResourceVersion !== undefined && !this.world.compareAndSwapResourceVersion(payload.expectedResourceVersion)) {
-        ack?.({ ok: false, error: 'resource_version_conflict' });
+      if (!this.world.compareAndSwapEconomicVersions(payload.cellId, payload.expectedResourceVersion, payload.expectedCellVersion)) {
+        ack?.({ ok: false, error: payload.expectedCellVersion !== undefined ? 'cell_version_conflict' : 'resource_version_conflict' });
         return;
       }
 
@@ -537,6 +537,7 @@ export class InvestmentHandler {
     const index = mapData.findIndex(c => c.id === cell.id);
     if (index >= 0) {
       mapData[index] = cell;
+      this.world.markCellUpdated(cell.id);
     }
   }
 
