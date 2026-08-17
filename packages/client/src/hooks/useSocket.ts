@@ -20,6 +20,7 @@ export interface SocketStatus {
 
 export interface SocketOptions {
   url?: string;
+  token?: string;
   onConnect?: (socketId: string) => void;
   onDisconnect?: () => void;
   onError?: (error: string) => void;
@@ -33,6 +34,7 @@ export function createSocket(options: SocketOptions = {}): TypedClientSocket {
   const url = options.url || window.location.origin;
 
   const socket: TypedClientSocket = io(url, {
+    auth: options.token ? { token: options.token } : undefined,
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionAttempts: 5,

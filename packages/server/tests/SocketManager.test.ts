@@ -170,6 +170,27 @@ describe('SocketManager', () => {
       expect(world.getPlayerManager().getSocketId('p1')).toBeDefined();
       sock.disconnect();
     });
+
+    it('accepts client.login only after an authenticated handshake', async () => {
+      const env = await createTestEnv();
+      const world = new GameWorld();
+      const jwt = new JWTService({ secret: 'test-secret', expiresIn: 3600 });
+      const socketManager = new SocketManager(env.io, {
+        world,
+        autoWireWorldEvents: false,
+        jwtService: jwt,
+      });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
+      const token = jwt.generateToken('p-login', 'login_player', false);
+      const sock = await connectClient(env.port, { auth: { token } });
+      const result = await new Promise<{ ok: boolean; data?: { player: Player } }>((resolve) => {
+        sock.emit('client.login', { username: 'login_player', guest: false }, resolve);
+      });
+      expect(result.ok).toBe(true);
+      expect(result.data?.player.id).toBe('p-login');
+      sock.disconnect();
+      await new Promise<void>((resolve) => env.http.close(() => resolve()));
+    });
   });
 
   describe('broadcast layers', () => {

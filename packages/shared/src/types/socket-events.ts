@@ -460,4 +460,5 @@ export interface SocketData {
   remoteAddress?: string;
   /** 是否为游客模式（游客不持久化） */
   guest?: boolean;
+  username?: string;
 }

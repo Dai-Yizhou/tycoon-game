@@ -251,6 +251,8 @@ export class SocketManager {
           return;
         }
         socket.data.playerId = payload.playerId;
+        socket.data.guest = payload.isGuest;
+        socket.data.username = payload.username;
         socket.data.authenticated = true;
       } else if (this.authenticate) {
         const identity = await this.authenticate(socket, socket.handshake);
@@ -428,13 +430,14 @@ export class SocketManager {
     // 登录/加入游戏
     socket.on('client.login', async (payload, ack) => {
       try {
-        const username = payload?.username?.trim();
+        const authenticatedUsername = socket.data.username;
+        const username = (authenticatedUsername || payload?.username)?.trim();
         if (!username || username.length < 2) {
           ack?.({ ok: false, error: '用户名至少需要2个字符' });
           return;
         }
 
-        const isGuest = payload?.guest === true;
+        const isGuest = socket.data.guest === true;
         const now = Date.now();
 
         let player: Player;
@@ -442,7 +445,7 @@ export class SocketManager {
 
         if (isGuest) {
           // 游客模式：创建临时玩家，不持久化
-          const playerId = `guest_${now}_${Math.random().toString(36).slice(2, 8)}`;
+          const playerId = socket.data.playerId || `guest_${now}_${Math.random().toString(36).slice(2, 8)}`;
           player = SocketManager.createDefaultPlayer(playerId, username, now);
           socket.data.guest = true;
         } else if (this.playerStore) {
@@ -456,13 +459,13 @@ export class SocketManager {
             player.lastActiveAt = now;
           } else {
             // 新玩家
-            const playerId = `p_${now}_${Math.random().toString(36).slice(2, 8)}`;
+            const playerId = socket.data.playerId || `p_${now}_${Math.random().toString(36).slice(2, 8)}`;
             player = SocketManager.createDefaultPlayer(playerId, username, now);
             isNewPlayer = true;
           }
         } else {
           // 无 PlayerStore：创建新玩家（保持原有行为）
-          const playerId = `p_${now}_${Math.random().toString(36).slice(2, 8)}`;
+          const playerId = socket.data.playerId || `p_${now}_${Math.random().toString(36).slice(2, 8)}`;
           player = SocketManager.createDefaultPlayer(playerId, username, now);
         }
 

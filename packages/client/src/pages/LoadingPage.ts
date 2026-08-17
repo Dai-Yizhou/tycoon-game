@@ -10,6 +10,7 @@
 import type { GameController } from '../game/GameController.js';
 import { createSocket, waitForConnection } from '../hooks/useSocket.js';
 import { t } from '../game/i18n.js';
+import { clearAuthToken, getAuthToken } from '../auth/authApi.js';
 
 /**
  * 创建加载界面
@@ -72,12 +73,14 @@ export function createLoadingPage(controller: GameController): HTMLElement {
 
     const socket = createSocket({
       url: window.location.origin,
+      token: getAuthToken() || undefined,
       onConnect: (socketId) => {
         progressBar.style.width = '60%';
         progressText.textContent = '60%';
         controller.setConnected(socketId);
       },
       onError: (error) => {
+        if (error === 'authentication_failed') clearAuthToken();
         controller.setError(error);
         errorText.textContent = t('loading.connectFailed', { error });
         errorContainer.style.display = 'block';
@@ -97,7 +100,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
 
       // 发送登录请求
       const playerName = controller.getContext().playerName;
-      socket.emit('client.login', { username: playerName, guest: playerName.startsWith(t('loading.guestPrefix')) }, (result) => {
+      socket.emit('client.login', { username: playerName, guest: false }, (result) => {
         if (result.ok && result.data) {
           progressBar.style.width = '100%';
           progressText.textContent = '100%';

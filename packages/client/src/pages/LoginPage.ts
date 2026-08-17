@@ -10,6 +10,7 @@
 
 import { t } from '@game/shared';
 import type { GameController } from '../game/GameController.js';
+import { authenticateAccount, authenticateGuest } from '../auth/authApi.js';
 
 /**
  * 创建登录界面
@@ -39,6 +40,13 @@ export function createLoginPage(controller: GameController): HTMLElement {
   input.minLength = 2;
   input.setAttribute('aria-label', t('login.username'));
   inputContainer.appendChild(input);
+
+  const password = document.createElement('input');
+  password.type = 'password';
+  password.className = 'password-input';
+  password.placeholder = '请输入密码';
+  password.minLength = 6;
+  inputContainer.appendChild(password);
 
   // 错误提示
   const errorText = document.createElement('div');
@@ -95,27 +103,35 @@ export function createLoginPage(controller: GameController): HTMLElement {
   };
 
   input.addEventListener('input', validateInput);
+  password.addEventListener('input', validateInput);
 
   // 确认按钮点击
+  const authenticate = async (result: Promise<{ user?: { username: string } }>): Promise<void> => {
+    try {
+      const response = await result;
+      controller.setPlayerName(response.user?.username || input.value.trim());
+      controller.nextState();
+    } catch (error) {
+      errorText.textContent = error instanceof Error ? error.message : '认证失败';
+      errorText.style.display = 'block';
+    }
+  };
+
   confirmButton.addEventListener('click', () => {
     if (validateInput()) {
-      controller.setPlayerName(input.value.trim());
-      controller.nextState();
+      void authenticate(authenticateAccount(input.value.trim(), password.value));
     }
   });
 
   // 游客模式点击
   guestButton.addEventListener('click', () => {
-    const guestName = `${t('chat.anonymous')}_${Date.now().toString().slice(-6)}`;
-    controller.setPlayerName(guestName);
-    controller.nextState();
+    void authenticate(authenticateGuest());
   });
 
   // 回车键提交
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && validateInput()) {
-      controller.setPlayerName(input.value.trim());
-      controller.nextState();
+      void authenticate(authenticateAccount(input.value.trim(), password.value));
     }
   });
 

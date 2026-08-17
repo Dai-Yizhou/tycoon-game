@@ -33,6 +33,9 @@ import { BehaviorEngine } from './behavior/index.js';
 import { EraManager } from './era/index.js';
 import { InMemoryPlayerStore, MongoPlayerStore, InMemoryEraStore, InMemoryWorldStore, FileWorldStore, type PlayerStore, type WorldStore } from './storage/index.js';
 import { JWTService } from './auth/JWTService.js';
+import { AuthService, type GameStateStore } from './auth/AuthService.js';
+import { InMemoryUserStore } from './auth/InMemoryUserStore.js';
+import { createAuthRouter } from './auth/authRoutes.js';
 
 /**
  * Socket 管理器配置（不包含 world，由 createApp 注入）
@@ -54,6 +57,7 @@ export interface AppDependencies {
   clientDistPath?: string;
   worldStore?: WorldStore;
   handlerRegistry?: HandlerRegistry;
+  authService?: AuthService;
 }
 
 function readTaxConfig(mapMeta: ReturnType<typeof parseMapMeta>): TaxConfig {
@@ -140,6 +144,16 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     }),
   );
   app.use(express.json({ limit: '1mb' }));
+  const authJwt = deps.socketManagerOptions?.jwtService ?? (process.env.JWT_SECRET?.trim()
+    ? new JWTService()
+    : new JWTService({ secret: 'development-only-secret', expiresIn: 7 * 24 * 60 * 60 }));
+  const gameStateStore: GameStateStore = {
+    saveGameState: async () => undefined,
+    loadGameState: async () => null,
+    deleteGameState: async () => undefined,
+  };
+  const authService = deps.authService ?? new AuthService(new InMemoryUserStore(), gameStateStore, authJwt);
+  app.use('/api/auth', createAuthRouter(authService));
 
   // 请求日志
   app.use((req, res, next) => {
@@ -286,7 +300,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     socketManager = new SocketManager(io, {
       ...deps.socketManagerOptions,
       world,
-      jwtService: deps.socketManagerOptions.jwtService ?? (process.env.JWT_SECRET?.trim() ? new JWTService() : undefined),
+      jwtService: deps.socketManagerOptions.jwtService ?? authJwt,
       teamManager: handlerRegistry.getTeamManager(),
     });
   }
