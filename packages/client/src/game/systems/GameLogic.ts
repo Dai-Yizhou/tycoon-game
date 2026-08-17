@@ -134,18 +134,18 @@ export function onPlayerArrived(): void {
 // ===== 地产购买 & 升级 =====
 
 export function handleBuyProperty(): void {
-  if (!mapIndex || actionUsedThisTurn || !gameSocket) return;
+  if (!mapIndex || !gameSocket) return;
   const cell = mapIndex.getById(currentPlayerPosition);
-  if (!cell || cType(cell) !== 'property' || ownedProperties.has(cell.id)) return;
+  if (!cell || cType(cell) !== 'property') return;
   gameSocket.emit('client.buyProperty', { cellId: cell.id }, (result) => {
     if (!result.ok) addChatMessage(result.error || t('common.unknownError'), 'error');
   });
 }
 
 export function handleUpgradeProperty(): void {
-  if (!mapIndex || actionUsedThisTurn || !gameSocket) return;
+  if (!mapIndex || !gameSocket) return;
   const cell = mapIndex.getById(currentPlayerPosition);
-  if (!cell || cType(cell) !== 'property' || !ownedProperties.has(cell.id)) return;
+  if (!cell || cType(cell) !== 'property') return;
   gameSocket.emit('client.upgradeProperty', { cellId: cell.id }, (result) => {
     if (!result.ok) addChatMessage(result.error || t('common.unknownError'), 'error');
   });

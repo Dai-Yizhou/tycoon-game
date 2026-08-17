@@ -116,7 +116,7 @@ Canvas 的每帧循环只读取投影后的状态，更新移动动画、相机�
 ## 经济状态决策
 
 - Frozen 是连接状态，不是经济豁免。断线玩家不获得主动操作入口，但不解散队伍、不释放地产或投资；收租、计税、投资收益和破产检查继续执行。
-- Bankrupt 是玩家领域状态。玩家保留队伍、地产、投资和持股，停止收租、计税、投资参与和主动操作；只有显式 `client.bankruptRestart` 才能重开，重连始终保持 Bankrupt。
+- Bankrupt 是玩家领域状态。触发后立即清算地产、投资和持股，保留 `teamId`；停止收租、计税、投资参与和主动操作；只有显式 `client.bankruptRestart` 才能重开，重连始终保持 Bankrupt。
 - `packages/shared/src/types/economy-rules.ts` 提供跨包状态判定：Normal 与 Frozen 参与经济，Jail 与 Bankrupt 不参与；客户端只消费状态，不自行结算经济。
 - 队伍只维护成员关系与只读成员视图，不设队长经济、共同钱包或团队产权。合租持股仍按玩家身份结算。
 
@@ -129,7 +129,7 @@ Canvas 的每帧循环只读取投影后的状态，更新移动动画、相机�
 ## 残余技术债
 
 - `GamePage` 仍承担页面组合、兼容状态和部分业务接线，`GameStore` 与 `GameViewModel` 并存。
-- `packages/client/src/state/GameStore.ts` 仍是模块级状态；部分旧 hooks/旧 HUD 文件保留但不是主链。
+- `packages/client/src/state/GameStore.ts` 是客户端业务快照源；旧模块级变量仅保留给渲染和兼容接线，不再作为经济业务状态写入口。
 - `NotificationManager`、部分认证/持久化能力和若干配置文件存在，但是否进入生产链需以 `app.ts` 与具体 handler 的注册为准。
 - `REDIS_URL` 在配置类型和文档中存在，当前 app 未建立 Redis 适配器；不能描述为已实现多实例同步。
 - 服务端存在 REST 地图读取与 Socket 状态两条输入来源，客户端地图请求失败时的回退逻辑增加了状态排查成本。

@@ -118,6 +118,23 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     setTeamMembers(teamMembers);
   });
 
+  socket.on('server.propertyBought', (payload) => {
+    store?.applyEvent({ sequence: store.nextSequence(), type: 'property', cellId: payload.cell.id, level: 0 });
+    requestHudRefresh();
+  });
+
+  socket.on('server.propertyUpgraded', (payload) => {
+    store?.applyEvent({ sequence: store.nextSequence(), type: 'property', cellId: payload.cell.id, level: payload.newLevel });
+    requestHudRefresh();
+  });
+
+  socket.on('server.investmentBought', (payload) => {
+    const ownerships = Array.isArray(payload.cell.extra?.ownerships) ? payload.cell.extra.ownerships as Array<{ playerId: string; share: number }> : [];
+    const ownership = ownerships.find((item) => item.playerId === payload.playerId);
+    if (ownership) store?.applyEvent({ sequence: store.nextSequence(), type: 'investment', cellId: payload.cell.id, share: ownership.share });
+    requestHudRefresh();
+  });
+
   socket.on('server.playerRestarted', (payload) => {
     if (payload.playerId === currentPlayer?.id) {
       store?.applySnapshot({ sequence: Date.now(), currentPlayer: payload.player, isBankrupt: false, isInJail: false, currentPlayerPosition: payload.player.position.cellId, currentMoney: payload.player.values.money?.current ?? 0, currentCredit: payload.player.values.credit?.current ?? 0 });

@@ -177,16 +177,8 @@ export function setCanvasEl(val: HTMLCanvasElement | null): void { canvasEl = va
 export function setGameSocket(val: TypedClientSocket | null): void { gameSocket = val; }
 export function setCurrentPlayer(val: Player | null): void { currentPlayer = val; }
 export function setCurrentPlayerPosition(val: number): void { currentPlayerPosition = val; (window as any).currentPlayerPosition = val; }
-export function setCurrentMoney(val: number): void { currentMoney = val; }
-export function setCurrentCredit(val: number): void { currentCredit = val; }
-export function setCurrentEnv(val: number): void { currentEnv = val; }
-export function setIsBankrupt(val: boolean): void { isBankrupt = val; }
 export function setActionUsedThisTurn(val: boolean): void { actionUsedThisTurn = val; }
 export function setCurrentPlayerName(val: string): void { currentPlayerName = val; }
-export function setOwnedProperties(val: Set<number>): void { ownedProperties = val; }
-export function setPropertyLevels(val: Map<number, number>): void { propertyLevels = val; }
-export function setOwnedInvestments(val: Set<number>): void { ownedInvestments = val; }
-export function setInvestmentShares(val: Map<number, number>): void { investmentShares = val; }
 export function setOtherPlayers(val: OtherPlayerInfo[]): void { otherPlayers = val; }
 export function setIsMoving(val: boolean): void { isMoving = val; }
 export function setCanRoll(val: boolean): void { canRoll = val; }
@@ -337,6 +329,10 @@ export interface ClientGameSnapshot {
   jailEndTime: number;
   canRoll: boolean;
   teamMembers: TeamMember[];
+  ownedProperties: Set<number>;
+  propertyLevels: Map<number, number>;
+  ownedInvestments: Set<number>;
+  investmentShares: Map<number, number>;
 }
 
 export type ClientGameEvent =
@@ -348,13 +344,15 @@ export type ClientGameEvent =
   | { sequence: number; type: 'status'; playerId: string; status: Player['status'] }
   | { sequence: number; type: 'otherPlayerValue'; playerId: string; current: number }
   | { sequence: number; type: 'otherPlayerStatus'; playerId: string; status: OtherPlayerInfo['status'] }
+  | { sequence: number; type: 'property'; cellId: number; level: number }
+  | { sequence: number; type: 'investment'; cellId: number; share: number }
   | { sequence: number; type: 'move'; playerId: string; cellId: number };
 
 export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     currentMoney: 2000, currentCredit: 50, currentEnv: 0, isBankrupt: false,
-    isInJail: false, jailEndTime: 0, canRoll: true, teamMembers: [],
+    isInJail: false, jailEndTime: 0, canRoll: true, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(),
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
 
@@ -387,6 +385,7 @@ export class GameStore {
         isBankrupt: snapshot.player.status === 'bankrupt',
         isInJail: snapshot.player.status === 'jail',
       };
+      this.projectAssets();
       this.publish();
       return;
     }
@@ -398,6 +397,7 @@ export class GameStore {
     if (event.sequence <= this.snapshot.sequence) return;
     if (event.type === 'player') {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: event.player, currentPlayerPosition: event.player.position?.cellId ?? 0, currentMoney: event.player.values?.money?.current ?? 0, currentCredit: event.player.values?.credit?.current ?? 0, currentEnv: event.player.values?.environment?.current ?? event.player.values?.env?.current ?? 0, isBankrupt: event.player.status === 'bankrupt', isInJail: event.player.status === 'jail' };
+      this.projectAssets();
       this.publish();
       return;
     } else if (event.type === 'players') {
@@ -406,6 +406,18 @@ export class GameStore {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, isInJail: event.isInJail, jailEndTime: event.jailEndTime, canRoll: !event.isInJail };
     } else if (event.type === 'team') {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, teamMembers: event.members };
+    } else if (event.type === 'property') {
+      const ownedProperties = new Set(this.snapshot.ownedProperties);
+      const propertyLevels = new Map(this.snapshot.propertyLevels);
+      ownedProperties.add(event.cellId);
+      propertyLevels.set(event.cellId, event.level);
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, ownedProperties, propertyLevels };
+    } else if (event.type === 'investment') {
+      const ownedInvestments = new Set(this.snapshot.ownedInvestments);
+      const investmentShares = new Map(this.snapshot.investmentShares);
+      ownedInvestments.add(event.cellId);
+      investmentShares.set(event.cellId, event.share);
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, ownedInvestments, investmentShares };
     } else if (event.type === 'value' && this.snapshot.currentPlayer?.id === event.playerId) {
       const player = { ...this.snapshot.currentPlayer, values: { ...this.snapshot.currentPlayer.values, [event.fieldId]: { ...this.snapshot.currentPlayer.values[event.fieldId], current: event.current } } };
       this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: player, currentMoney: event.fieldId === 'money' ? event.current : this.snapshot.currentMoney, currentCredit: event.fieldId === 'credit' ? event.current : this.snapshot.currentCredit, currentEnv: event.fieldId === 'env' || event.fieldId === 'environment' ? event.current : this.snapshot.currentEnv };
@@ -435,7 +447,17 @@ export class GameStore {
       jailEndTime: 0,
       canRoll: true,
       teamMembers: [],
+      ownedProperties: new Set(),
+      propertyLevels: new Map(),
+      ownedInvestments: new Set(),
+      investmentShares: new Map(),
     };
     this.publish();
+  }
+
+  private projectAssets(): void {
+    const properties = new Set<number>();
+    const investments = new Set<number>();
+    this.snapshot = { ...this.snapshot, ownedProperties: properties, ownedInvestments: investments };
   }
 }
