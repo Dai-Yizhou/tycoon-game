@@ -3,6 +3,25 @@ import { createApp } from '../src/app';
 import { loadConfig } from '../src/config';
 
 describe('server app', () => {
+  it.each([
+    ['development', undefined],
+    ['test', undefined],
+    ['production', 'production-secret'],
+  ])('supports the JWT environment matrix for %s', (nodeEnv, jwtSecret) => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousJwtSecret = process.env.JWT_SECRET;
+    process.env.NODE_ENV = nodeEnv;
+    if (jwtSecret) process.env.JWT_SECRET = jwtSecret;
+    else delete process.env.JWT_SECRET;
+
+    expect(() => createApp(loadConfig())).not.toThrow();
+
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+    if (previousJwtSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = previousJwtSecret;
+  });
+
   it('requires JWT_SECRET in production', () => {
     const previousNodeEnv = process.env.NODE_ENV;
     const previousJwtSecret = process.env.JWT_SECRET;

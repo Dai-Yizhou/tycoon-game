@@ -191,6 +191,23 @@ describe('SocketManager', () => {
       sock.disconnect();
       await new Promise<void>((resolve) => env.http.close(() => resolve()));
     });
+
+    it('rejects a login payload that attempts to impersonate the JWT user', async () => {
+      const env = await createTestEnv();
+      const world = new GameWorld();
+      const jwt = new JWTService({ secret: 'test-secret', expiresIn: 3600 });
+      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: false, jwtService: jwt });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
+      const token = jwt.generateToken('p-login', 'login_player', false);
+      const sock = await connectClient(env.port, { auth: { token } });
+      const result = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+        sock.emit('client.login', { username: 'other_player', guest: false }, resolve);
+      });
+      expect(result).toEqual({ ok: false, error: 'identity_mismatch' });
+      expect(world.getAllPlayers()).toHaveLength(0);
+      sock.disconnect();
+      await new Promise<void>((resolve) => env.http.close(() => resolve()));
+    });
   });
 
   describe('broadcast layers', () => {

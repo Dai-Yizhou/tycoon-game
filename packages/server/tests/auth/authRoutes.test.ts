@@ -45,6 +45,27 @@ function createTestApp() {
 }
 
 describe('auth HTTP routes', () => {
+  it('returns a client error for malformed request bodies', async () => {
+    const { app } = createTestApp();
+    const response = await request(app).post('/api/auth/login').send({ username: 123, password: null });
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ success: false, error: '用户名和密码格式不正确' });
+  });
+
+  it('returns a server error when the auth service fails unexpectedly', async () => {
+    const authService = {
+      login: jest.fn().mockRejectedValue(new Error('storage unavailable')),
+      register: jest.fn(),
+      createGuestAccount: jest.fn(),
+    } as unknown as AuthService;
+    const app = express();
+    app.use(express.json());
+    app.use('/api/auth', createAuthRouter(authService));
+    const response = await request(app).post('/api/auth/login').send({ username: 'player', password: 'password' });
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ success: false, error: '认证服务暂时不可用' });
+  });
+
   it('rejects anonymous access to the socket token endpoint', async () => {
     const { app } = createTestApp();
     const response = await request(app).post('/api/auth/login').send({ username: 'missing', password: 'password' });

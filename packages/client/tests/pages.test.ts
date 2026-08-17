@@ -103,8 +103,22 @@ describe('Pages', () => {
 
       // 输入正常
       input.value = '玩家名';
+      const password = page.querySelector('.password-input') as HTMLInputElement;
+      password.value = 'password';
       input.dispatchEvent(new Event('input'));
       expect(errorText.style.display).toBe('none');
+    });
+
+    test('密码不足时确认按钮保持禁用', () => {
+      const page = createLoginPage(controller);
+      const input = page.querySelector('.username-input') as HTMLInputElement;
+      const password = page.querySelector('.password-input') as HTMLInputElement;
+      const confirmButton = page.querySelector('.confirm-button') as HTMLButtonElement;
+      input.value = 'player_one';
+      password.value = 'short';
+      input.dispatchEvent(new Event('input'));
+      password.dispatchEvent(new Event('input'));
+      expect(confirmButton.disabled).toBe(true);
     });
 
     test('TR-6.18: cleanupLoginPage 正确清理页面', () => {
@@ -145,6 +159,17 @@ describe('Pages', () => {
       const page = createLoadingPage(controller);
       cleanupLoadingPage(page);
       expect(mockContainer.contains(page)).toBe(false);
+    });
+
+    test('清理加载页会断开 socket', async () => {
+      const page = createLoadingPage(controller);
+      await Promise.resolve();
+      const socket = controller.getSocket();
+      expect(socket).toBeTruthy();
+      const disconnect = jest.spyOn(socket!, 'disconnect');
+      cleanupLoadingPage(page);
+      expect(disconnect).toHaveBeenCalledTimes(1);
+      expect(controller.getSocket()).toBeNull();
     });
   });
 

@@ -430,8 +430,21 @@ export class SocketManager {
     // 登录/加入游戏
     socket.on('client.login', async (payload, ack) => {
       try {
+        if (!payload || typeof payload !== 'object' || typeof payload.username !== 'string') {
+          ack?.({ ok: false, error: 'invalid_payload' });
+          return;
+        }
         const authenticatedUsername = socket.data.username;
-        const username = (authenticatedUsername || payload?.username)?.trim();
+        if (socket.data.authenticated !== true || !socket.data.playerId) {
+          ack?.({ ok: false, error: 'not_authenticated' });
+          return;
+        }
+        const requestedUsername = payload.username.trim();
+        if (authenticatedUsername && requestedUsername !== authenticatedUsername) {
+          ack?.({ ok: false, error: 'identity_mismatch' });
+          return;
+        }
+        const username = (authenticatedUsername || requestedUsername).trim();
         if (!username || username.length < 2) {
           ack?.({ ok: false, error: '用户名至少需要2个字符' });
           return;

@@ -12,6 +12,8 @@ import { createSocket, waitForConnection } from '../hooks/useSocket.js';
 import { t } from '../game/i18n.js';
 import { clearAuthToken, getAuthToken } from '../auth/authApi.js';
 
+const loadingPageCleanups = new WeakMap<HTMLElement, () => void>();
+
 /**
  * 创建加载界面
  */
@@ -65,21 +67,30 @@ export function createLoadingPage(controller: GameController): HTMLElement {
   page.appendChild(errorContainer);
 
   container.appendChild(page);
+  let active = true;
+  let socket: ReturnType<typeof createSocket> | null = null;
+  loadingPageCleanups.set(page, () => {
+    active = false;
+    socket?.disconnect();
+    if (controller.getSocket() === socket) controller.setSocket(null);
+  });
 
   // 开始连接
   const startConnection = async (): Promise<void> => {
     progressBar.style.width = '20%';
     progressText.textContent = '20%';
 
-    const socket = createSocket({
+    socket = createSocket({
       url: window.location.origin,
       token: getAuthToken() || undefined,
       onConnect: (socketId) => {
+        if (!active) return;
         progressBar.style.width = '60%';
         progressText.textContent = '60%';
         controller.setConnected(socketId);
       },
       onError: (error) => {
+        if (!active) return;
         if (error === 'authentication_failed') clearAuthToken();
         controller.setError(error);
         errorText.textContent = t('loading.connectFailed', { error });
@@ -97,10 +108,12 @@ export function createLoadingPage(controller: GameController): HTMLElement {
 
     try {
       await waitForConnection(socket, 5000);
+      if (!active) return;
 
       // 发送登录请求
       const playerName = controller.getContext().playerName;
       socket.emit('client.login', { username: playerName, guest: false }, (result) => {
+        if (!active) return;
         if (result.ok && result.data) {
           progressBar.style.width = '100%';
           progressText.textContent = '100%';
@@ -108,7 +121,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
 
           // 连接成功后进入对应页面
           setTimeout(() => {
-            if (result.data?.player.status !== 'bankrupt') controller.setState('game');
+            if (active && result.data?.player.status !== 'bankrupt') controller.setState('game');
           }, 500);
         } else {
           const errorMsg = result.error || t('loading.loginFailed');
@@ -120,6 +133,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
         }
       });
     } catch (err) {
+      if (!active) return;
       const message = err instanceof Error ? err.message : t('common.unknownError');
       controller.setError(message);
       errorText.textContent = t('loading.connectFailed', { error: message });
@@ -150,5 +164,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
  * 清理加载界面
  */
 export function cleanupLoadingPage(page: HTMLElement): void {
+  loadingPageCleanups.get(page)?.();
+  loadingPageCleanups.delete(page);
   page.remove();
 }

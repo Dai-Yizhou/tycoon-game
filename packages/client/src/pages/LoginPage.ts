@@ -97,6 +97,12 @@ export function createLoginPage(controller: GameController): HTMLElement {
       confirmButton.disabled = true;
       return false;
     }
+    if (password.value.length < 6) {
+      errorText.textContent = '密码长度至少 6 位';
+      errorText.style.display = 'block';
+      confirmButton.disabled = true;
+      return false;
+    }
     errorText.style.display = 'none';
     confirmButton.disabled = false;
     return true;
