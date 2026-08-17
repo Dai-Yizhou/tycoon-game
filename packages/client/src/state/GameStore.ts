@@ -360,6 +360,10 @@ export class GameStore {
 
   getSnapshot(): ClientGameSnapshot { return this.snapshot; }
 
+  nextSequence(): number {
+    return this.snapshot.sequence + 1;
+  }
+
   subscribe(listener: (snapshot: ClientGameSnapshot) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -369,10 +373,21 @@ export class GameStore {
     for (const listener of this.listeners) listener(this.snapshot);
   }
 
-  applySnapshot(snapshot: (Partial<ClientGameSnapshot> & Pick<ClientGameSnapshot, 'sequence'>) | { sequence: number; player: Player }): void {
+  applySnapshot(snapshot: (Partial<ClientGameSnapshot> & Pick<ClientGameSnapshot, 'sequence'>) | { sequence: number; player: Player; teamMembers?: TeamMember[] }): void {
     if (snapshot.sequence < this.snapshot.sequence) return;
     if ('player' in snapshot) {
-      this.applyEvent({ sequence: snapshot.sequence, type: 'player', player: snapshot.player });
+      this.snapshot = {
+        ...this.snapshot,
+        ...snapshot,
+        currentPlayer: snapshot.player,
+        currentPlayerPosition: snapshot.player.position?.cellId ?? 0,
+        currentMoney: snapshot.player.values?.money?.current ?? 0,
+        currentCredit: snapshot.player.values?.credit?.current ?? 0,
+        currentEnv: snapshot.player.values?.environment?.current ?? snapshot.player.values?.env?.current ?? 0,
+        isBankrupt: snapshot.player.status === 'bankrupt',
+        isInJail: snapshot.player.status === 'jail',
+      };
+      this.publish();
       return;
     }
     this.snapshot = { ...this.snapshot, ...snapshot };

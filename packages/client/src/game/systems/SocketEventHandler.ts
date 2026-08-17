@@ -106,14 +106,16 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 
   socket.on('server.playerBankrupt', (payload) => {
     if (payload.playerId === currentPlayer?.id) {
-      store?.applyEvent({ sequence: Date.now(), type: 'status', playerId: payload.playerId, status: 'bankrupt' });
+      store?.applyEvent({ sequence: store.nextSequence(), type: 'status', playerId: payload.playerId, status: 'bankrupt' });
       options.controller?.setBankrupt();
     }
     requestHudRefresh();
   });
 
   socket.on('server.gameState', (payload) => {
-    store?.applySnapshot({ sequence: Date.now(), currentPlayer: payload.player, isBankrupt: payload.player.status === 'bankrupt', isInJail: payload.player.status === 'jail', currentPlayerPosition: payload.player.position.cellId, currentMoney: payload.player.values.money?.current ?? 0, currentCredit: payload.player.values.credit?.current ?? 0, teamMembers: payload.team ? [] : [] });
+    const teamMembers = payload.members ?? [];
+    store?.applySnapshot({ sequence: store.nextSequence(), player: payload.player, teamMembers });
+    setTeamMembers(teamMembers);
   });
 
   socket.on('server.playerRestarted', (payload) => {

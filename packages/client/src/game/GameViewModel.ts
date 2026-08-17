@@ -367,7 +367,7 @@ export class GameViewModel {
 
   // ===== Movement =====
   getMovement(): MovementSlice { return this.movement; }
-  setMovement(partial: Partial<MovementSlice>, source = 'external'): void {
+  updateMovement(partial: Partial<MovementSlice>, source = 'ui'): void {
     Object.assign(this.movement, partial);
     this.notify('movement', source);
   }
@@ -381,14 +381,14 @@ export class GameViewModel {
 
   // ===== Dice =====
   getDice(): DiceSlice { return this.dice; }
-  setDice(partial: Partial<DiceSlice>, source = 'external'): void {
+  updateDice(partial: Partial<DiceSlice>, source = 'ui'): void {
     Object.assign(this.dice, partial);
     this.notify('dice', source);
   }
 
   // ===== Cooldown =====
   getCooldown(): CooldownSlice { return this.cooldown; }
-  setCooldown(partial: Partial<CooldownSlice>, source = 'external'): void {
+  updateCooldown(partial: Partial<CooldownSlice>, source = 'ui'): void {
     Object.assign(this.cooldown, partial);
     this.notify('cooldown', source);
   }
@@ -398,7 +398,7 @@ export class GameViewModel {
 
   // ===== Day/Night =====
   getDayNight(): DayNightSlice { return this.dayNight; }
-  setDayNight(partial: Partial<DayNightSlice>, source = 'external'): void {
+  updateDayNight(partial: Partial<DayNightSlice>, source = 'ui'): void {
     Object.assign(this.dayNight, partial);
     this.notify('dayNight', source);
   }

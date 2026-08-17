@@ -517,8 +517,8 @@ window.showTeamManagement = function(): void {
 
 function syncViewModel(): void {
   if (!gameViewModel) return;
-  gameViewModel.setMovement({ isMoving, canRoll, isWaitingForChoice, isServerAnimating });
-  gameViewModel.setDayNight({ cycleStartTime: dayNightStartTime, cycleDuration: DAY_NIGHT_CYCLE, serverTimeOffset });
+  gameViewModel.updateMovement({ isMoving, canRoll, isWaitingForChoice, isServerAnimating });
+  gameViewModel.updateDayNight({ cycleStartTime: dayNightStartTime, cycleDuration: DAY_NIGHT_CYCLE, serverTimeOffset });
 }
 
 // ===== Tutorial System =====

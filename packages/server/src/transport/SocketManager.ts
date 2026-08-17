@@ -76,9 +76,9 @@ export interface SocketManagerOptions {
   /** 鉴权处理器；返回 null 表示通过，非 null 为 playerId */
   authenticate?: (socket: TypedSocket, handshake: unknown) =>
     | string
-    | { playerId: string; role?: 'player' | 'admin'; guest?: boolean }
+    | { playerId: string; guest?: boolean }
     | null
-    | Promise<string | { playerId: string; role?: 'player' | 'admin'; guest?: boolean } | null>;
+    | Promise<string | { playerId: string; guest?: boolean } | null>;
   jwtService?: JWTService;
   /** 是否自动绑定 GameWorld 事件到广播（默认 true） */
   autoWireWorldEvents?: boolean;
@@ -246,22 +246,19 @@ export class SocketManager {
         const auth = socket.handshake.auth as { token?: unknown } | undefined;
         const token = typeof auth?.token === 'string' ? auth.token : undefined;
         const payload = token ? this.jwtService.verifyToken(token) : null;
-        if (!payload || typeof payload.playerId !== 'string' || !payload.role) {
+        if (!payload || typeof payload.playerId !== 'string') {
           next(new Error('authentication_failed'));
           return;
         }
         socket.data.playerId = payload.playerId;
-        socket.data.role = payload.role;
         socket.data.authenticated = true;
       } else if (this.authenticate) {
         const identity = await this.authenticate(socket, socket.handshake);
         if (typeof identity === 'string' && identity.length > 0) {
           socket.data.playerId = identity;
           socket.data.authenticated = true;
-          socket.data.role = 'player';
         } else if (typeof identity === 'object' && identity !== null && identity.playerId.length > 0) {
           socket.data.playerId = identity.playerId;
-          socket.data.role = identity.role ?? 'player';
           socket.data.guest = identity.guest;
           socket.data.authenticated = true;
         } else {
@@ -524,6 +521,24 @@ export class SocketManager {
             cycleMinutes,
             existingPlayers,
           },
+        });
+
+        socket.emit('server.gameState', {
+          player,
+          team: this.teamManager?.getPlayerTeam(player.id) ?? null,
+          members: this.teamManager?.getPlayerTeam(player.id)?.memberIds.map((memberId) => {
+            const member = this.world.getPlayer(memberId);
+            const values = member?.values ?? {};
+            return {
+              id: memberId,
+              username: member?.username ?? '未知玩家',
+              money: values.money?.current ?? 0,
+              credit: values.credit?.current ?? 0,
+              env: values.environment?.current ?? values.env?.current ?? 0,
+              status: member?.status ?? 'normal',
+            };
+          }) ?? [],
+          serverTime: now,
         });
 
         // 广播玩家加入

@@ -47,6 +47,7 @@ export function updateMovement(): void {
 }
 
 export function startNextStep(): void {
+  if (!isServerAnimating) return;
   if (!mapIndex) return;
   const cell = mapIndex.getById(currentPlayerPosition);
   if (!cell) { setIsMoving(false); return; }
@@ -64,6 +65,7 @@ export function startNextStep(): void {
 }
 
 export function animateMoveTo(targetId: number): void {
+  if (!isServerAnimating) return;
   if (!mapIndex) return;
   const target = mapIndex.getById(targetId);
   if (!target) return;
