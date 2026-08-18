@@ -115,7 +115,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 
   socket.on('server.gameState', (payload) => {
     const teamMembers = payload.members ?? [];
-    store?.applySnapshot({ sequence: store.nextSequence(), player: payload.player, teamMembers });
+    store?.applySnapshot({ sequence: store.nextSequence(), player: payload.player, teamMembers, ownedProperties: payload.ownedProperties, ownedInvestments: payload.ownedInvestments });
     setTeamMembers(teamMembers);
   });
 

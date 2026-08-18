@@ -24,6 +24,26 @@ describe('GameStore authority', () => {
     expect(store.getSnapshot().currentPlayer?.values.money.current).toBe(250);
   });
 
+  it('从服务端快照恢复资产投影而不是清空地产和投资', () => {
+    const store = new GameStore();
+
+    store.applySnapshot({
+      sequence: 1,
+      player: { id: 'p1', values: {}, status: 'normal', position: { cellId: 0 } } as never,
+      ownedProperties: [
+        { cellId: 4, level: 2 },
+      ],
+      ownedInvestments: [
+        { cellId: 8, share: 0.25 },
+      ],
+    } as never);
+
+    expect(store.getSnapshot().ownedProperties.has(4)).toBe(true);
+    expect(store.getSnapshot().propertyLevels.get(4)).toBe(2);
+    expect(store.getSnapshot().ownedInvestments.has(8)).toBe(true);
+    expect(store.getSnapshot().investmentShares.get(8)).toBe(0.25);
+  });
+
   it('让 GameViewModel 只投影 Store 的业务状态', () => {
     const store = new GameStore();
     const viewModel = new GameViewModel(store);

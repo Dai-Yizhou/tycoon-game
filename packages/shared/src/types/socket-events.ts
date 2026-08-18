@@ -215,6 +215,8 @@ export interface ServerToClientEvents {
     player: Player;
     team: Team | null;
     members?: TeamMemberView[];
+    ownedProperties?: Array<{ cellId: number; level: number }>;
+    ownedInvestments?: Array<{ cellId: number; share: number }>;
     /** 当前玩家视野内可见的格子（可选） */
     visibleCells?: Cell[];
     /** 服务端时间 */

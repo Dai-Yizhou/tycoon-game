@@ -348,6 +348,14 @@ export type ClientGameEvent =
   | { sequence: number; type: 'investment'; cellId: number; share: number }
   | { sequence: number; type: 'move'; playerId: string; cellId: number };
 
+export interface ServerGameSnapshot {
+  sequence: number;
+  player: Player;
+  teamMembers?: TeamMember[];
+  ownedProperties?: Array<{ cellId: number; level: number }>;
+  ownedInvestments?: Array<{ cellId: number; share: number }>;
+}
+
 export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
@@ -371,12 +379,13 @@ export class GameStore {
     for (const listener of this.listeners) listener(this.snapshot);
   }
 
-  applySnapshot(snapshot: (Partial<ClientGameSnapshot> & Pick<ClientGameSnapshot, 'sequence'>) | { sequence: number; player: Player; teamMembers?: TeamMember[] }): void {
+  applySnapshot(snapshot: (Partial<ClientGameSnapshot> & Pick<ClientGameSnapshot, 'sequence'>) | ServerGameSnapshot): void {
     if (snapshot.sequence < this.snapshot.sequence) return;
     if ('player' in snapshot) {
+      const { ownedProperties: _ownedProperties, ownedInvestments: _ownedInvestments, ...snapshotState } = snapshot;
       this.snapshot = {
         ...this.snapshot,
-        ...snapshot,
+        ...snapshotState,
         currentPlayer: snapshot.player,
         currentPlayerPosition: snapshot.player.position?.cellId ?? 0,
         currentMoney: snapshot.player.values?.money?.current ?? 0,
@@ -385,7 +394,7 @@ export class GameStore {
         isBankrupt: snapshot.player.status === 'bankrupt',
         isInJail: snapshot.player.status === 'jail',
       };
-      this.projectAssets();
+      this.projectAssets(snapshot);
       this.publish();
       return;
     }
@@ -397,7 +406,7 @@ export class GameStore {
     if (event.sequence <= this.snapshot.sequence) return;
     if (event.type === 'player') {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: event.player, currentPlayerPosition: event.player.position?.cellId ?? 0, currentMoney: event.player.values?.money?.current ?? 0, currentCredit: event.player.values?.credit?.current ?? 0, currentEnv: event.player.values?.environment?.current ?? event.player.values?.env?.current ?? 0, isBankrupt: event.player.status === 'bankrupt', isInJail: event.player.status === 'jail' };
-      this.projectAssets();
+      this.projectAssets(event.player);
       this.publish();
       return;
     } else if (event.type === 'players') {
@@ -455,9 +464,12 @@ export class GameStore {
     this.publish();
   }
 
-  private projectAssets(): void {
-    const properties = new Set<number>();
-    const investments = new Set<number>();
-    this.snapshot = { ...this.snapshot, ownedProperties: properties, ownedInvestments: investments };
+  private projectAssets(source: unknown): void {
+    const data = source as { ownedProperties?: Array<{ cellId: number; level: number }>; ownedInvestments?: Array<{ cellId: number; share: number }> };
+    const properties = new Set(data.ownedProperties?.map((item) => item.cellId) ?? this.snapshot.ownedProperties);
+    const propertyLevels = new Map(data.ownedProperties?.map((item) => [item.cellId, item.level]) ?? this.snapshot.propertyLevels);
+    const investments = new Set(data.ownedInvestments?.map((item) => item.cellId) ?? this.snapshot.ownedInvestments);
+    const investmentShares = new Map(data.ownedInvestments?.map((item) => [item.cellId, item.share]) ?? this.snapshot.investmentShares);
+    this.snapshot = { ...this.snapshot, ownedProperties: properties, propertyLevels, ownedInvestments: investments, investmentShares };
   }
 }
