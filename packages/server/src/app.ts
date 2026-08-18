@@ -31,9 +31,9 @@ import { TimeZoneManager } from './world/TimeZoneManager.js';
 import { ProsperityManager, DEFAULT_PROSPERITY_CONFIG } from './world/ProsperityManager.js';
 import { BehaviorEngine } from './behavior/index.js';
 import { EraManager } from './era/index.js';
-import { InMemoryPlayerStore, MongoPlayerStore, InMemoryEraStore, InMemoryWorldStore, FileWorldStore, type PlayerStore, type WorldStore } from './storage/index.js';
+import { InMemoryPlayerStore, MongoPlayerStore, MongoUserStore, InMemoryEraStore, InMemoryWorldStore, FileWorldStore, type PlayerStore, type WorldStore } from './storage/index.js';
 import { JWTService } from './auth/JWTService.js';
-import { AuthService, type GameStateStore } from './auth/AuthService.js';
+import { AuthService, type GameStateStore, type UserStore } from './auth/AuthService.js';
 import { InMemoryUserStore } from './auth/InMemoryUserStore.js';
 import { createAuthRouter } from './auth/authRoutes.js';
 
@@ -57,6 +57,7 @@ export interface AppDependencies {
   clientDistPath?: string;
   worldStore?: WorldStore;
   handlerRegistry?: HandlerRegistry;
+  userStore?: UserStore;
   authService?: AuthService;
 }
 
@@ -118,6 +119,8 @@ export interface CreatedApp {
   eraManager?: EraManager;
   /** 玩家存储实例（FR-22 账号持久化） */
   playerStore?: PlayerStore;
+  /** 用户存储实例 */
+  userStore?: UserStore;
   worldStore?: WorldStore;
   handlerRegistry?: HandlerRegistry;
 }
@@ -152,7 +155,8 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     loadGameState: async () => null,
     deleteGameState: async () => undefined,
   };
-  const authService = deps.authService ?? new AuthService(new InMemoryUserStore(), gameStateStore, authJwt);
+  const userStore = deps.userStore ?? (config.mongoUri ? new MongoUserStore(config.mongoUri) : new InMemoryUserStore());
+  const authService = deps.authService ?? new AuthService(userStore, gameStateStore, authJwt);
   app.use('/api/auth', createAuthRouter(authService));
 
   // 请求日志
@@ -388,6 +392,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     playerStore,
     worldStore,
     handlerRegistry,
+    userStore,
   };
 }
 
@@ -439,6 +444,7 @@ export async function gracefulShutdown(
   timeoutMs: number = 5000,
   world?: GameWorld,
   handlerRegistry?: HandlerRegistry,
+  userStore?: { close?: () => Promise<void> },
 ): Promise<void> {
   logger.info('graceful shutdown started');
   if (world) world.saveSnapshot(economy?.taxation.getAllTaxRecords(), undefined);
@@ -491,6 +497,14 @@ export async function gracefulShutdown(
       await socketManager.close();
     } catch (err) {
       logger.error('error closing socket manager', err);
+    }
+  }
+
+  if (userStore?.close) {
+    try {
+      await userStore.close();
+    } catch (err) {
+      logger.error('error closing user store', err);
     }
   }
 

@@ -30,6 +30,7 @@ export interface UserStore {
   deleteUser(id: string): Promise<void>;
   /** 列出所有用户（可选） */
   listUsers?(): Promise<UserAccount[]>;
+  close?(): Promise<void>;
 }
 
 /**
