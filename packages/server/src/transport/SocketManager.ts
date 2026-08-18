@@ -462,13 +462,17 @@ export class SocketManager {
           player = SocketManager.createDefaultPlayer(playerId, username, now);
           socket.data.guest = true;
         } else if (this.playerStore) {
-          // 非游客模式：尝试从存储中按用户名加载已有玩家
-          const existing = this.playerStore.loadPlayerByUsername
-            ? await this.playerStore.loadPlayerByUsername(username)
+          const authenticatedPlayerId = socket.data.playerId;
+          const existingById = authenticatedPlayerId
+            ? await this.playerStore.loadPlayer(authenticatedPlayerId)
             : null;
+          const existing = existingById ?? (this.playerStore.loadPlayerByUsername
+            ? await this.playerStore.loadPlayerByUsername(username)
+            : null);
           if (existing) {
             // 恢复已有玩家状态
             player = existing;
+            player.username = username;
             player.lastActiveAt = now;
           } else {
             // 新玩家

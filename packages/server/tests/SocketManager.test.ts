@@ -20,6 +20,7 @@ import { GameWorld } from '../src/world/GameWorld';
 import { SocketManager, type TypedServer } from '../src/transport/SocketManager';
 import { registerHandlers } from '../src/transport/handlers';
 import { JWTService } from '../src/auth/JWTService';
+import { InMemoryPlayerStore } from '../src/storage/InMemoryPlayerStore';
 
 function buildPlayer(id: string, overrides: Partial<Player> = {}): Player {
   return {
@@ -188,6 +189,37 @@ describe('SocketManager', () => {
       });
       expect(result.ok).toBe(true);
       expect(result.data?.player.id).toBe('p-login');
+      sock.disconnect();
+      await new Promise<void>((resolve) => env.http.close(() => resolve()));
+    });
+
+    it('restores a persisted player by the authenticated player id', async () => {
+      const env = await createTestEnv();
+      const world = new GameWorld();
+      const jwt = new JWTService({ secret: 'test-secret', expiresIn: 3600 });
+      const persisted = buildPlayer('p-login', {
+        username: 'renamed_player',
+        values: {
+          money: { id: 'money', name: '财产', current: 777 },
+        },
+      });
+      const playerStore = new InMemoryPlayerStore([persisted]);
+      const socketManager = new SocketManager(env.io, {
+        world,
+        autoWireWorldEvents: false,
+        jwtService: jwt,
+        playerStore,
+      });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
+      const token = jwt.generateToken('p-login', 'login_player', false);
+      const sock = await connectClient(env.port, { auth: { token } });
+      const result = await new Promise<{ ok: boolean; data?: { player: Player } }>((resolve) => {
+        sock.emit('client.login', { username: 'login_player', guest: false }, resolve);
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.data?.player.id).toBe('p-login');
+      expect(result.data?.player.values.money?.current).toBe(777);
       sock.disconnect();
       await new Promise<void>((resolve) => env.http.close(() => resolve()));
     });
