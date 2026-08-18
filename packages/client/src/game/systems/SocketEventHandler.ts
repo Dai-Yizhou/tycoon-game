@@ -138,7 +138,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 
   socket.on('server.playerRestarted', (payload) => {
     if (payload.playerId === currentPlayer?.id) {
-      store?.applySnapshot({ sequence: Date.now(), currentPlayer: payload.player, isBankrupt: false, isInJail: false, currentPlayerPosition: payload.player.position.cellId, currentMoney: payload.player.values.money?.current ?? 0, currentCredit: payload.player.values.credit?.current ?? 0 });
+      store?.applySnapshot({ sequence: store.nextSequence(), currentPlayer: payload.player, isBankrupt: false, isInJail: false, currentPlayerPosition: payload.player.position.cellId, currentMoney: payload.player.values.money?.current ?? 0, currentCredit: payload.player.values.credit?.current ?? 0 });
       options.controller?.setRestarted(payload.player);
     }
     requestHudRefresh();
@@ -208,7 +208,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       updateRendererPlayers();
     }
     if (currentPlayer && payload.playerId === currentPlayer.id) {
-      store?.applyEvent({ sequence: Date.now(), type: 'move', playerId: payload.playerId, cellId: payload.cellId });
+      store?.applyEvent({ sequence: store.nextSequence(), type: 'move', playerId: payload.playerId, cellId: payload.cellId });
       if (payload.path && payload.path.length > 1 && !isServerAnimating) {
         startServerPathAnimation(payload.path);
       } else {
@@ -226,18 +226,18 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   socket.on('server.valueChanged', (payload: { playerId: string; fieldId: string; current: number; delta: number }) => {
-    store?.applyEvent({ sequence: Date.now(), type: 'value', playerId: payload.playerId, fieldId: payload.fieldId, current: payload.current });
+    store?.applyEvent({ sequence: store.nextSequence(), type: 'value', playerId: payload.playerId, fieldId: payload.fieldId, current: payload.current });
     // 服务端权威：所有数值变更以服务端推送为准
     const isCurrentPlayer = currentPlayer && payload.playerId === currentPlayer.id;
     if (payload.fieldId === 'money') {
       // 更新其他玩家显示数值
       const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {
-        store?.applyEvent({ sequence: Date.now(), type: 'otherPlayerValue', playerId: payload.playerId, current: payload.current });
+        store?.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerValue', playerId: payload.playerId, current: payload.current });
       }
       // 更新当前玩家：服务端权威同步
       if (isCurrentPlayer) {
-        store?.applyEvent({ sequence: Date.now(), type: 'value', playerId: payload.playerId, fieldId: 'money', current: payload.current });
+        store?.applyEvent({ sequence: store.nextSequence(), type: 'value', playerId: payload.playerId, fieldId: 'money', current: payload.current });
       }
       if (otherPlayer || isCurrentPlayer) {
         updateRendererPlayers();
@@ -245,12 +245,12 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       if (isCurrentPlayer) requestHudRefresh();
     } else if (payload.fieldId === 'credit') {
       if (isCurrentPlayer) {
-        store?.applyEvent({ sequence: Date.now(), type: 'value', playerId: payload.playerId, fieldId: 'credit', current: payload.current });
+        store?.applyEvent({ sequence: store.nextSequence(), type: 'value', playerId: payload.playerId, fieldId: 'credit', current: payload.current });
       }
     } else if (payload.fieldId === 'environment' || payload.fieldId === 'env') {
       if (isCurrentPlayer) {
         const env = currentPlayer!.values.environment || currentPlayer!.values.env;
-        if (env) store?.applyEvent({ sequence: Date.now(), type: 'value', playerId: payload.playerId, fieldId: payload.fieldId, current: payload.current });
+        if (env) store?.applyEvent({ sequence: store.nextSequence(), type: 'value', playerId: payload.playerId, fieldId: payload.fieldId, current: payload.current });
       }
     }
     // 数值变更后刷新顶部面板
@@ -260,11 +260,11 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   socket.on('server.playerJailed', (payload: { playerId: string; durationMs: number; expiresAt?: number }) => {
-    if (currentPlayer && payload.playerId === currentPlayer.id) store?.applyEvent({ sequence: Date.now(), type: 'jail', isInJail: true, jailEndTime: payload.expiresAt ?? Date.now() + payload.durationMs });
+    if (currentPlayer && payload.playerId === currentPlayer.id) store?.applyEvent({ sequence: store.nextSequence(), type: 'jail', isInJail: true, jailEndTime: payload.expiresAt ?? Date.now() + payload.durationMs });
     // 服务端权威：监狱状态由服务端驱动
     const isCurrentPlayer = currentPlayer && payload.playerId === currentPlayer.id;
     if (isCurrentPlayer) {
-      store?.applyEvent({ sequence: Date.now(), type: 'status', playerId: payload.playerId, status: 'jail' });
+      store?.applyEvent({ sequence: store.nextSequence(), type: 'status', playerId: payload.playerId, status: 'jail' });
       // 禁用掷骰按钮
       if (rollBtn) {
         rollBtn.disabled = true;
@@ -274,18 +274,18 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     } else {
       const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {
-        store?.applyEvent({ sequence: Date.now(), type: 'otherPlayerStatus', playerId: payload.playerId, status: 'jail' });
+        store?.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerStatus', playerId: payload.playerId, status: 'jail' });
         updateRendererPlayers();
       }
     }
   });
 
   socket.on('server.playerReleased', (payload: { playerId: string }) => {
-    if (currentPlayer && payload.playerId === currentPlayer.id) store?.applyEvent({ sequence: Date.now(), type: 'jail', isInJail: false, jailEndTime: 0 });
+    if (currentPlayer && payload.playerId === currentPlayer.id) store?.applyEvent({ sequence: store.nextSequence(), type: 'jail', isInJail: false, jailEndTime: 0 });
     // 服务端权威：出狱状态由服务端驱动
     const isCurrentPlayer = currentPlayer && payload.playerId === currentPlayer.id;
     if (isCurrentPlayer) {
-      store?.applyEvent({ sequence: Date.now(), type: 'status', playerId: payload.playerId, status: 'normal' });
+      store?.applyEvent({ sequence: store.nextSequence(), type: 'status', playerId: payload.playerId, status: 'normal' });
       if (rollBtn && !rollCooldownTimer) {
         rollBtn.disabled = false;
         rollBtn.classList.remove('disabled', 'cooldown');
@@ -297,7 +297,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     } else {
       const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {
-        store?.applyEvent({ sequence: Date.now(), type: 'otherPlayerStatus', playerId: payload.playerId, status: 'normal' });
+        store?.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerStatus', playerId: payload.playerId, status: 'normal' });
         updateRendererPlayers();
       }
     }
@@ -307,11 +307,11 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     // 更新玩家状态
     const player = otherPlayers.find(p => p.id === payload.playerId);
     if (player) {
-      store?.applyEvent({ sequence: Date.now(), type: 'otherPlayerStatus', playerId: payload.playerId, status: payload.status as OtherPlayerInfo['status'] });
+      store?.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerStatus', playerId: payload.playerId, status: payload.status as OtherPlayerInfo['status'] });
       updateRendererPlayers();
     }
     if (payload.playerId === currentPlayer?.id) {
-      store?.applyEvent({ sequence: Date.now(), type: 'status', playerId: payload.playerId, status: payload.status as typeof currentPlayer.status });
+      store?.applyEvent({ sequence: store.nextSequence(), type: 'status', playerId: payload.playerId, status: payload.status as typeof currentPlayer.status });
       if (payload.status === 'bankrupt') options.controller?.setBankrupt();
     }
   });

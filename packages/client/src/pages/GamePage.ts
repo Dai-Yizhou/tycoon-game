@@ -160,7 +160,7 @@ export function createGamePage(controller: GameController): HTMLElement {
 
   // Init: load map data, then start game
   if (context.player && context.player.id) {
-    gameStore?.applyEvent({ sequence: Date.now(), type: 'player', player: context.player });
+    gameStore?.applyEvent({ sequence: gameStore.nextSequence(), type: 'player', player: context.player });
   }
   syncViewModel();
   gameHudShell.update();
@@ -211,7 +211,7 @@ export function createGamePage(controller: GameController): HTMLElement {
       status: p.status || 'normal',
       primaryValue: p.values?.money?.current,
     }));
-    gameStore?.applyEvent({ sequence: Date.now(), type: 'players', players: _otherPlayers });
+    gameStore?.applyEvent({ sequence: gameStore.nextSequence(), type: 'players', players: _otherPlayers });
   }
 
   // 监听服务端昼夜事件，同步时间
