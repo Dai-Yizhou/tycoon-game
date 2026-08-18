@@ -358,3 +358,53 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .hud-chat-dock{z-index:32!important;bottom:128px!important}
 .cell-hover-card{z-index:40!important}
 @media(max-width:700px){.gp-topbar{height:64px!important}.gp-actionbar{height:94px!important}.hud-chat-dock{bottom:106px!important;left:10px!important;width:260px!important}.cell-hover-card{width:190px!important}}
+
+/* ===== 登录 / 加载页：1900 地域语法最小实现 ===== */
+.login-page,.loading-page{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#2C2E33;color:#E6DCC3;position:relative;overflow:hidden}
+.login-page::before,.loading-page::before{content:"";position:absolute;inset:18px;border:1px solid rgba(230,220,195,.28);pointer-events:none}
+.login-page::after,.loading-page::after{content:"";position:absolute;inset:0;opacity:.16;pointer-events:none;background:repeating-linear-gradient(90deg,rgba(255,255,255,.08) 0 1px,transparent 1px 6px),repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 2px,transparent 2px 7px)}
+.auth-eyebrow{position:relative;z-index:2;color:#D95A2B;font:700 10px "SF Mono",Menlo,monospace;letter-spacing:.16em;margin-bottom:2px}
+.login-title,.loading-title{position:relative;z-index:2;color:#E6DCC3;font:900 clamp(30px,4vw,54px) Georgia,"Songti SC",serif;letter-spacing:.06em;text-shadow:none;text-align:center;margin:0}
+.login-title::after,.loading-title::after{content:"";display:block;width:42px;height:3px;background:#D95A2B;margin:14px auto 0}
+.login-card,.loading-card{position:relative;z-index:2;width:min(420px,calc(100vw - 48px));padding:30px;background:#34373D;border:1px solid #4A2C2A;border-radius:2px;box-shadow:4px 4px 0 rgba(74,44,42,.75);animation:slideUp .4s ease-out}
+.login-card{display:flex;flex-direction:column;gap:9px}
+.auth-label{color:#9AA0A6;font:700 10px "SF Mono",Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;margin-top:5px}
+.username-input,.password-input{width:100%;height:44px;padding:0 12px;border:1px solid #6A5148;border-radius:1px;background:#2C2F35;color:#E6DCC3;outline:none;font:15px Georgia,"Songti SC",serif;transition:border-color .15s,box-shadow .15s}
+.username-input:focus,.password-input:focus{border-color:#D95A2B;box-shadow:0 0 0 2px rgba(217,90,43,.2)}
+.username-input::placeholder,.password-input::placeholder{color:#777B7C}
+.auth-helper{position:relative;z-index:2;color:#9AA0A6;font-size:11px;letter-spacing:.03em}
+.auth-actions{position:relative;z-index:2;display:flex;flex-direction:column;gap:9px;width:min(420px,calc(100vw - 48px))}
+.confirm-button,.retry-button{width:100%;background:#D95A2B;color:#FBF8F1;border:1px solid #4A2C2A;border-radius:1px;box-shadow:2px 2px 0 #4A2C2A;padding:12px 16px}
+.confirm-button:hover:not(:disabled),.retry-button:hover{background:#EF6A36;transform:translate(-1px,-1px)}
+.guest-button{width:100%;background:transparent;color:#E6DCC3;border:1px solid #6A5148;border-radius:1px;padding:11px 16px}
+.guest-button:hover{color:#D95A2B;border-color:#D95A2B;background:rgba(217,90,43,.08)}
+.error-container{margin-top:12px;padding:10px;border:1px solid #8C4E3A;background:rgba(140,78,58,.16);color:#E6DCC3;font-size:12px}
+.loading-card{text-align:center;display:flex;flex-direction:column;align-items:center;gap:18px}
+.loading-card .loading-title{font-size:28px}
+.spinner,.loading-spinner{width:46px;height:46px;border:3px solid #4A2C2A;border-top-color:#D95A2B;border-radius:50%;animation:spin 1s linear infinite}
+.progress-container{width:100%;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+.progress-bar{grid-column:1/-1;width:100%;height:7px;background:#25282E;border:1px solid #4A2C2A;border-radius:0;overflow:hidden}
+.progress-bar::after{content:"";display:block;width:var(--progress,0%);height:100%;background:#D95A2B;transition:width .25s ease}
+.progress-text{color:#D95A2B;font:700 12px "SF Mono",Menlo,monospace;justify-self:end}
+@media(max-width:600px){.login-page::before,.loading-page::before{inset:10px}.login-card,.loading-card{padding:24px}.login-title{font-size:34px}.loading-card .loading-title{font-size:24px}}
+
+/* Auth page semantic tokens: page components consume names, not raw visual values. */
+:root{--auth-bg:#2C2E33;--auth-fg:#E6DCC3;--auth-card:#34373D;--auth-surface:#2C2F35;--auth-muted:#9AA0A6;--auth-accent:#D95A2B;--auth-accent-hover:#EF6A36;--auth-border:#4A2C2A;--auth-border-soft:#6A5148;--auth-error:#8C4E3A;--auth-track:#25282E;--auth-paper:#FBF8F1;--auth-radius:2px;--auth-card-width:420px;--auth-field-height:44px;--auth-frame-padding:30px;--auth-shadow:4px 4px 0 rgba(74,44,42,.75)}
+.login-page,.loading-page{background:var(--auth-bg);color:var(--auth-fg)}
+.login-page::before,.loading-page::before{border-color:color-mix(in srgb,var(--auth-fg) 28%,transparent)}
+.auth-eyebrow{color:var(--auth-accent)}
+.login-title,.loading-title{color:var(--auth-fg)}
+.login-title::after,.loading-title::after{background:var(--auth-accent)}
+.login-card,.loading-card{width:min(var(--auth-card-width),calc(100vw - 48px));padding:var(--auth-frame-padding);background:var(--auth-card);border-color:var(--auth-border);border-radius:var(--auth-radius);box-shadow:var(--auth-shadow)}
+.auth-label,.auth-helper{color:var(--auth-muted)}
+.username-input,.password-input{height:var(--auth-field-height);border-color:var(--auth-border-soft);border-radius:var(--auth-radius);background:var(--auth-surface);color:var(--auth-fg)}
+.username-input:focus,.password-input:focus{border-color:var(--auth-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--auth-accent) 20%,transparent)}
+.confirm-button,.retry-button{background:var(--auth-accent);color:var(--auth-paper);border-color:var(--auth-border);border-radius:var(--auth-radius);box-shadow:2px 2px 0 var(--auth-border)}
+.confirm-button:hover:not(:disabled),.retry-button:hover{background:var(--auth-accent-hover)}
+.guest-button{background:transparent;color:var(--auth-fg);border-color:var(--auth-border-soft);border-radius:var(--auth-radius)}
+.guest-button:hover{color:var(--auth-accent);border-color:var(--auth-accent);background:color-mix(in srgb,var(--auth-accent) 8%,transparent)}
+.error-container{border-color:var(--auth-error);background:color-mix(in srgb,var(--auth-error) 16%,transparent);color:var(--auth-fg)}
+.spinner,.loading-spinner{border-color:var(--auth-border);border-top-color:var(--auth-accent)}
+.progress-bar{background:var(--auth-track);border-color:var(--auth-border)}
+.progress-bar::after{background:var(--auth-accent)}
+.progress-text{color:var(--auth-accent)!important}

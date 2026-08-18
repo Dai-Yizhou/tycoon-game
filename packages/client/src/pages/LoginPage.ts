@@ -20,16 +20,22 @@ export function createLoginPage(controller: GameController): HTMLElement {
 
   const page = document.createElement('div');
   page.className = 'page login-page';
+  page.dataset.ui = 'login-page';
 
   // 标题
   const title = document.createElement('h2');
   title.className = 'login-title';
+  title.dataset.ui = 'login-title';
   title.textContent = t('game.loginButton');
+  const eyebrow = document.createElement('div');
+  eyebrow.className = 'auth-eyebrow';
+  eyebrow.textContent = t('login.eyebrow');
+  page.appendChild(eyebrow);
   page.appendChild(title);
 
   // 输入容器
   const inputContainer = document.createElement('div');
-  inputContainer.className = 'input-container';
+  inputContainer.className = 'input-container login-card';
 
   // 用户名输入框
   const input = document.createElement('input');
@@ -39,13 +45,23 @@ export function createLoginPage(controller: GameController): HTMLElement {
   input.maxLength = 20;
   input.minLength = 2;
   input.setAttribute('aria-label', t('login.username'));
+  const userLabel = document.createElement('label');
+  userLabel.className = 'auth-label';
+  userLabel.textContent = t('login.username');
+  userLabel.htmlFor = input.id = 'login-username';
+  inputContainer.appendChild(userLabel);
   inputContainer.appendChild(input);
 
   const password = document.createElement('input');
   password.type = 'password';
   password.className = 'password-input';
-  password.placeholder = '请输入密码';
+  password.placeholder = t('login.passwordPlaceholder');
   password.minLength = 6;
+  const passwordLabel = document.createElement('label');
+  passwordLabel.className = 'auth-label';
+  passwordLabel.textContent = t('login.password');
+  passwordLabel.htmlFor = password.id = 'login-password';
+  inputContainer.appendChild(passwordLabel);
   inputContainer.appendChild(password);
 
   // 错误提示
@@ -58,7 +74,7 @@ export function createLoginPage(controller: GameController): HTMLElement {
 
   // 按钮容器
   const buttonContainer = document.createElement('div');
-  buttonContainer.className = 'button-container';
+  buttonContainer.className = 'button-container auth-actions';
 
   // 确认按钮
   const confirmButton = document.createElement('button');
@@ -73,6 +89,10 @@ export function createLoginPage(controller: GameController): HTMLElement {
 
   buttonContainer.appendChild(confirmButton);
   buttonContainer.appendChild(guestButton);
+  const helper = document.createElement('div');
+  helper.className = 'auth-helper';
+  helper.textContent = t('login.helper');
+  page.appendChild(helper);
   page.appendChild(buttonContainer);
 
   // 输入验证
@@ -98,7 +118,7 @@ export function createLoginPage(controller: GameController): HTMLElement {
       return false;
     }
     if (password.value.length < 6) {
-      errorText.textContent = '密码长度至少 6 位';
+      errorText.textContent = t('register.passwordTooShort');
       errorText.style.display = 'block';
       confirmButton.disabled = true;
       return false;
@@ -118,7 +138,7 @@ export function createLoginPage(controller: GameController): HTMLElement {
       controller.setPlayerName(response.user?.username || input.value.trim());
       controller.nextState();
     } catch (error) {
-      errorText.textContent = error instanceof Error ? error.message : '认证失败';
+      errorText.textContent = error instanceof Error ? error.message : t('login.loginFailed');
       errorText.style.display = 'block';
     }
   };

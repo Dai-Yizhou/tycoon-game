@@ -92,7 +92,9 @@
     "invalidCredentials": "Invalid username or password",
     "usernameTooShort": "Username must be at least 2 characters",
     "usernameTooLong": "Username cannot exceed 20 characters",
-    "usernameInvalidChars": "Username can only contain Chinese characters, letters, numbers, and underscores"
+    "usernameInvalidChars": "Username can only contain Chinese characters, letters, numbers, and underscores",
+    "eyebrow": "MONOPOLY.IO / PLAYER ACCESS",
+    "helper": "Enter your city map and asset panel after login"
   },
   "register": {
     "title": "Register",
@@ -443,7 +445,8 @@
     "connectFailed": "Connection failed: {{error}}",
     "loginFailed": "Login failed",
     "loginFailedWithMsg": "Login failed: {{msg}}",
-    "guestPrefix": "Guest_"
+    "guestPrefix": "Guest_",
+    "networkEyebrow": "MONOPOLY.IO / NETWORK LINK"
   },
   "panel": {
     "details": "Details",

@@ -22,12 +22,22 @@ export function createLoadingPage(controller: GameController): HTMLElement {
 
   const page = document.createElement('div');
   page.className = 'page loading-page';
+  page.dataset.ui = 'loading-page';
+
+  const eyebrow = document.createElement('div');
+  eyebrow.className = 'auth-eyebrow';
+  eyebrow.textContent = t('loading.networkEyebrow');
+  page.appendChild(eyebrow);
+
+  const loadingCard = document.createElement('div');
+  loadingCard.className = 'loading-card';
+  page.appendChild(loadingCard);
 
   // 加载提示
   const title = document.createElement('h2');
   title.className = 'loading-title';
   title.textContent = t('loading.connecting');
-  page.appendChild(title);
+  loadingCard.appendChild(title);
 
   // 进度条容器
   const progressContainer = document.createElement('div');
@@ -42,12 +52,12 @@ export function createLoadingPage(controller: GameController): HTMLElement {
   progressText.textContent = '0%';
   progressContainer.appendChild(progressText);
 
-  page.appendChild(progressContainer);
+  loadingCard.appendChild(progressContainer);
 
   // 加载动画（旋转圆圈）
   const spinner = document.createElement('div');
   spinner.className = 'spinner';
-  page.appendChild(spinner);
+  loadingCard.appendChild(spinner);
 
   // 错误提示
   const errorContainer = document.createElement('div');
@@ -64,7 +74,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
   retryButton.style.display = 'none';
   errorContainer.appendChild(retryButton);
 
-  page.appendChild(errorContainer);
+  loadingCard.appendChild(errorContainer);
 
   container.appendChild(page);
   let active = true;
