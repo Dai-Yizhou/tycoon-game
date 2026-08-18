@@ -80,6 +80,16 @@ describe('app lifecycle', () => {
   });
 
   describe('gracefulShutdown', () => {
+    it('closes the player store during shutdown', async () => {
+      const result = createApp(baseConfig, { socketManagerOptions: {} });
+      const close = jest.spyOn(result.playerStore!, 'close').mockResolvedValue(undefined);
+
+      await gracefulShutdown(result.httpServer, undefined, undefined, undefined, undefined, undefined, 5000, result.world, result.handlerRegistry, result.playerStore);
+
+      expect(close).toHaveBeenCalled();
+      close.mockRestore();
+    });
+
     it('saves active jail state before cleanup', async () => {
       const store = new InMemoryWorldStore();
       const result = createApp({ ...baseConfig, jailCooldownMs: 3210 }, { worldStore: store, socketManagerOptions: {} });

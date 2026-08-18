@@ -52,6 +52,8 @@ export class InMemoryPlayerStore implements PlayerStore {
     this.players.delete(id);
   }
 
+  async close(): Promise<void> {}
+
   /**
    * 同步访问（仅用于测试/内部）
    *

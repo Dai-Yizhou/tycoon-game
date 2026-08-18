@@ -30,4 +30,5 @@ export interface PlayerStore {
   loadAllPlayers?(): Promise<Player[]>;
   /** 删除玩家（幂等） */
   deletePlayer(id: string): Promise<void>;
+  close?(): Promise<void>;
 }

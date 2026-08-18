@@ -445,6 +445,7 @@ export async function gracefulShutdown(
   world?: GameWorld,
   handlerRegistry?: HandlerRegistry,
   userStore?: { close?: () => Promise<void> },
+  playerStore?: PlayerStore,
 ): Promise<void> {
   logger.info('graceful shutdown started');
   if (world) world.saveSnapshot(economy?.taxation.getAllTaxRecords(), undefined);
@@ -505,6 +506,14 @@ export async function gracefulShutdown(
       await userStore.close();
     } catch (err) {
       logger.error('error closing user store', err);
+    }
+  }
+
+  if (playerStore?.close) {
+    try {
+      await playerStore.close();
+    } catch (err) {
+      logger.error('error closing player store', err);
     }
   }
 
