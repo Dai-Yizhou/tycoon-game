@@ -193,6 +193,38 @@ describe('SocketManager', () => {
       await new Promise<void>((resolve) => env.http.close(() => resolve()));
     });
 
+    it('broadcasts playerJoined once when login adds a new player', async () => {
+      const env = await createTestEnv();
+      const world = new GameWorld();
+      const jwt = new JWTService({ secret: 'test-secret', expiresIn: 3600 });
+      const socketManager = new SocketManager(env.io, {
+        world,
+        jwtService: jwt,
+        autoWireWorldEvents: true,
+      });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
+      const observer = await connectClient(env.port, {
+        auth: { token: jwt.generateToken('observer', 'observer', false) },
+      });
+      const loginSocket = await connectClient(env.port, {
+        auth: { token: jwt.generateToken('p-login', 'login_player', false) },
+      });
+      let joinedCount = 0;
+      observer.on('server.playerJoined', () => {
+        joinedCount += 1;
+      });
+
+      await new Promise<{ ok: boolean }>((resolve) => {
+        loginSocket.emit('client.login', { username: 'login_player', guest: false }, resolve);
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(joinedCount).toBe(1);
+      observer.disconnect();
+      loginSocket.disconnect();
+      await new Promise<void>((resolve) => env.http.close(() => resolve()));
+    });
+
     it('restores a persisted player by the authenticated player id', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();

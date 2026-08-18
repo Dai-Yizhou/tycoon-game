@@ -561,8 +561,6 @@ export class SocketManager {
           serverTime: now,
         });
 
-        // 广播玩家加入
-        this.io.emit('server.playerJoined', player);
       } catch (err) {
         logger.error('login error', err);
         ack?.({ ok: false, error: '登录失败' });
