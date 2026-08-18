@@ -344,6 +344,7 @@ export type ClientGameEvent =
   | { sequence: number; type: 'status'; playerId: string; status: Player['status'] }
   | { sequence: number; type: 'otherPlayerValue'; playerId: string; current: number }
   | { sequence: number; type: 'otherPlayerStatus'; playerId: string; status: OtherPlayerInfo['status'] }
+  | { sequence: number; type: 'otherPlayerMove'; playerId: string; cellId: number }
   | { sequence: number; type: 'property'; cellId: number; level: number }
   | { sequence: number; type: 'investment'; cellId: number; share: number }
   | { sequence: number; type: 'move'; playerId: string; cellId: number };
@@ -436,6 +437,8 @@ export class GameStore {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, otherPlayers: this.snapshot.otherPlayers.map((player) => player.id === event.playerId ? { ...player, primaryValue: event.current } : player) };
     } else if (event.type === 'otherPlayerStatus') {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, otherPlayers: this.snapshot.otherPlayers.map((player) => player.id === event.playerId ? { ...player, status: event.status } : player) };
+    } else if (event.type === 'otherPlayerMove') {
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, otherPlayers: this.snapshot.otherPlayers.map((player) => player.id === event.playerId ? { ...player, position: { cellId: event.cellId } } : player) };
     } else if (event.type === 'move' && this.snapshot.currentPlayer?.id === event.playerId) {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: { ...this.snapshot.currentPlayer, position: { cellId: event.cellId } }, currentPlayerPosition: event.cellId };
     }

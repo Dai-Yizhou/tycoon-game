@@ -157,7 +157,8 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   // 监听其他玩家事件
   socket.on('server.playerJoined', (payload: { id: string; username: string; position?: { cellId: number }; status?: string; values?: { money?: { current?: number } } }) => {
     // 添加新玩家或更新已有玩家（重连场景）
-    const existingIndex = otherPlayers.findIndex(p => p.id === payload.id);
+    const currentPlayers = store?.getSnapshot().otherPlayers ?? otherPlayers;
+    const existingIndex = currentPlayers.findIndex(p => p.id === payload.id);
     const playerMoney = payload.values?.money?.current ?? 2000;
     const playerData: OtherPlayerInfo = {
       id: payload.id,
@@ -166,20 +167,26 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       status: (payload.status as OtherPlayerInfo['status']) || 'normal',
       primaryValue: playerMoney,
     };
+    const nextPlayers = [...currentPlayers];
     if (existingIndex === -1) {
-      otherPlayers.push(playerData);
+      nextPlayers.push(playerData);
       addChatMessage(t('player.joined', { name: payload.username }), 'system');
     } else {
-      otherPlayers[existingIndex] = playerData;
+      nextPlayers[existingIndex] = playerData;
     }
+    store?.applyEvent({ sequence: store.nextSequence(), type: 'players', players: nextPlayers });
+    if (!store) otherPlayers.splice(0, otherPlayers.length, ...nextPlayers);
     updateRendererPlayers();
   });
 
   socket.on('server.playerLeft', (payload: { playerId: string }) => {
     // 从列表移除玩家
-    const player = otherPlayers.find(p => p.id === payload.playerId);
+    const currentPlayers = store?.getSnapshot().otherPlayers ?? otherPlayers;
+    const player = currentPlayers.find(p => p.id === payload.playerId);
     if (player) {
-      setOtherPlayers(otherPlayers.filter(p => p.id !== payload.playerId));
+      const nextPlayers = currentPlayers.filter(p => p.id !== payload.playerId);
+      store?.applyEvent({ sequence: store.nextSequence(), type: 'players', players: nextPlayers });
+      if (!store) setOtherPlayers(nextPlayers);
       addChatMessage(t('player.left', { name: player.username }), 'system');
       updateRendererPlayers();
     }
@@ -193,9 +200,11 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   socket.on('server.playerMoved', (payload: { playerId: string; cellId: number; path?: number[] }) => {
-    const player = otherPlayers.find(p => p.id === payload.playerId);
+    const currentPlayers = store?.getSnapshot().otherPlayers ?? otherPlayers;
+    const player = currentPlayers.find(p => p.id === payload.playerId);
     if (player) {
-      player.position.cellId = payload.cellId;
+      store?.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerMove', playerId: payload.playerId, cellId: payload.cellId });
+      if (!store) player.position.cellId = payload.cellId;
       updateRendererPlayers();
     }
     if (currentPlayer && payload.playerId === currentPlayer.id) {

@@ -73,4 +73,16 @@ describe('GameStore authority', () => {
       currentPlayerName: '权威玩家',
     });
   });
+
+  it('通过 Store 更新其他玩家的位置', () => {
+    const store = new GameStore();
+    store.applyEvent({
+      sequence: 1,
+      type: 'players',
+      players: [{ id: 'other', username: '其他', position: { cellId: 1 }, status: 'normal', primaryValue: 100 }],
+    });
+    store.applyEvent({ sequence: 2, type: 'otherPlayerMove', playerId: 'other', cellId: 9 });
+
+    expect(store.getSnapshot().otherPlayers[0].position.cellId).toBe(9);
+  });
 });
