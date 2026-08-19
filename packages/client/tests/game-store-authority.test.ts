@@ -160,4 +160,27 @@ describe('GameStore authority', () => {
     store.applyEvent({ sequence: 3, type: 'move', playerId: 'p1', cellId: 5 });
     expect(store.getSnapshot().actionUsedThisTurn).toBe(false);
   });
+
+  it('冻结玩家从其他玩家投影中移除', () => {
+    const store = new GameStore();
+    store.applyEvent({
+      sequence: 1,
+      type: 'players',
+      players: [{ id: 'offline', username: '离线玩家', position: { cellId: 2 }, status: 'normal', primaryValue: 100 }],
+    });
+
+    store.applyEvent({ sequence: 2, type: 'players', players: [] });
+
+    expect(store.getSnapshot().otherPlayers).toEqual([]);
+  });
+
+  it('现金事件按服务端 current 投影，不根据 delta 重复扣款', () => {
+    const store = new GameStore();
+    store.applyEvent({ sequence: 1, type: 'player', player: { id: 'p1', values: { money: { current: 1000 } } } as never });
+
+    store.applyEvent({ sequence: 2, type: 'value', playerId: 'p1', fieldId: 'money', current: 700 });
+    store.applyEvent({ sequence: 3, type: 'value', playerId: 'p1', fieldId: 'money', current: 700 });
+
+    expect(store.getSnapshot().currentMoney).toBe(700);
+  });
 });

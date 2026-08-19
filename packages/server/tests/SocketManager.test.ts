@@ -394,6 +394,22 @@ describe('SocketManager', () => {
       c1.disconnect();
     });
 
+    it('emits server.playerStatusChanged when a player becomes frozen', async () => {
+      const env = await createTestEnv();
+      const world = new GameWorld();
+      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: true, authenticate: () => 'test-player' });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
+      const c1 = await connectClient(env.port);
+      world.addPlayer(buildPlayer('p1'));
+
+      const statusChanged = waitFor<{ playerId: string; status: string }>(c1, 'server.playerStatusChanged');
+      world.getPlayerManager().freezePlayer('p1', 'disconnect');
+
+      await expect(statusChanged).resolves.toEqual({ playerId: 'p1', status: 'frozen' });
+      c1.disconnect();
+      await new Promise<void>((resolve) => env.http.close(() => resolve()));
+    });
+
     it('emits server.eraChanged when era changes', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();

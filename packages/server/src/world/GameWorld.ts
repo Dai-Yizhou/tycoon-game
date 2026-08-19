@@ -34,6 +34,7 @@ export const WorldEvents = {
   PlayerAdded: 'playerAdded',
   PlayerRemoved: 'playerRemoved',
   PlayerUpdated: 'playerUpdated',
+  PlayerStatusChanged: 'playerStatusChanged',
   EraChanged: 'eraChanged',
   TeamChanged: 'teamChanged',
   MapLoaded: 'mapLoaded',
@@ -56,6 +57,11 @@ export interface PlayerRemovedPayload {
 
 export interface PlayerUpdatedPayload {
   player: Player;
+}
+
+export interface PlayerStatusChangedPayload {
+  playerId: string;
+  status: Player['status'];
 }
 
 export interface EraChangedPayload {
@@ -131,6 +137,9 @@ export class GameWorld {
     });
     this.playerManager.on(PlayerEvents.Updated, ({ player }: { player: Player }) => {
       this.emit(WorldEvents.PlayerUpdated, { player });
+    });
+    this.playerManager.on(PlayerEvents.StatusChanged, ({ playerId, status }: PlayerStatusChangedPayload) => {
+      this.emit(WorldEvents.PlayerStatusChanged, { playerId, status });
     });
   }
 

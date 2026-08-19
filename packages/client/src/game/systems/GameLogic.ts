@@ -188,12 +188,13 @@ export function handleCoInvest(): void {
 
 // ===== 交通枢纽 =====
 
-export function handleTransport(): void {
+export function handleTransport(store?: GameStore): void {
   if (!mapIndex || actionUsedThisTurn || !gameSocket) return;
   const cell = mapIndex.getById(currentPlayerPosition);
   if (!cell || cType(cell) !== 'transport') return;
   const cost = cTransportCost(cell);
-  if (currentMoney < cost) { addChatMessage(t('transport.insufficientMoney'), 'system'); return; }
+  const money = store?.getSnapshot().currentMoney ?? currentMoney;
+  if (money < cost) { addChatMessage(t('transport.insufficientMoney'), 'system'); return; }
 
   gameSocket.emit('client.getTransportDestinations', { hubCellId: cell.id }, (result) => {
     if (!result.ok) {

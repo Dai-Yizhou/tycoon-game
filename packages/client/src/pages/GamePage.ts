@@ -145,7 +145,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   unsubscribeGameStore = gameStore.subscribe((snapshot) => {
     syncLegacyStateFromStore();
     const players = snapshot.currentPlayer
-      ? [snapshot.currentPlayer, ...snapshot.otherPlayers.map(p => ({
+      ? [snapshot.currentPlayer, ...snapshot.otherPlayers.filter(p => p.status !== 'frozen').map(p => ({
         ...p,
         values: { money: { current: p.primaryValue ?? 0 } },
       } as any))]
@@ -177,7 +177,7 @@ export function createGamePage(controller: GameController): HTMLElement {
         'upgrade-property': handleUpgradeProperty,
         'buy-investment': handleBuyInvestment,
         'co-invest': handleCoInvest,
-        transport: handleTransport,
+        transport: () => handleTransport(gameStore ?? undefined),
         'restore-monument': handleRestoreMonument,
       };
       actions[actionId]?.();
@@ -220,7 +220,7 @@ export function createGamePage(controller: GameController): HTMLElement {
       renderer.loadMap(mapData);
       const snapshot = gameStore!.getSnapshot();
       if (snapshot.currentPlayer) {
-        interactiveMap.render(mapData, [snapshot.currentPlayer, ...snapshot.otherPlayers.map(p => ({ ...p, values: { money: { current: p.primaryValue ?? 0 } } } as any))]);
+        interactiveMap.render(mapData, [snapshot.currentPlayer, ...snapshot.otherPlayers.filter(p => p.status !== 'frozen').map(p => ({ ...p, values: { money: { current: p.primaryValue ?? 0 } } } as any))]);
         interactiveMap.followPlayer(snapshot.currentPlayerPosition);
       }
       const startCell = mapIndex!.getById(0);

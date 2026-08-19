@@ -171,6 +171,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     const currentPlayers = store?.getSnapshot().otherPlayers ?? otherPlayers;
     const existingIndex = currentPlayers.findIndex(p => p.id === payload.id);
     const playerMoney = payload.values?.money?.current ?? 2000;
+    if (payload.status === 'frozen') return;
     const playerData: OtherPlayerInfo = {
       id: payload.id,
       username: payload.username,
@@ -295,6 +296,13 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   socket.on('server.playerStatusChanged', (payload: { playerId: string; status: string }) => {
+    if (payload.status === 'frozen') {
+      const currentPlayers = store?.getSnapshot().otherPlayers ?? otherPlayers;
+      const nextPlayers = currentPlayers.filter(player => player.id !== payload.playerId);
+      store?.applyEvent({ sequence: store.nextSequence(), type: 'players', players: nextPlayers });
+      updateRendererPlayers(store);
+      return;
+    }
     // 更新玩家状态
     const player = otherPlayers.find(p => p.id === payload.playerId);
     if (player) {

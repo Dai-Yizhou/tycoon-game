@@ -17,7 +17,7 @@ export function updateRendererPlayers(store?: GameStore): void {
   const playersState = snapshot?.otherPlayers ?? otherPlayers;
   if (!renderer || !player || !mapIndex) return;
   const renderPlayer = { ...player, position: { ...player.position, cellId: position } };
-  const players: Player[] = [renderPlayer, ...playersState.map(player => ({
+  const players: Player[] = [renderPlayer, ...playersState.filter(player => player.status !== 'frozen').map(player => ({
     id: player.id, username: player.username, position: player.position,
     status: player.status as Player['status'],
     values: { money: { id: 'money', name: t('hud.money'), current: player.primaryValue, min: 0 } },

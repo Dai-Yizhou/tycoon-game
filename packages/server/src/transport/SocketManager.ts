@@ -625,6 +625,10 @@ export class SocketManager {
       this.broadcast('server.playerMoved', { playerId: player.id, cellId: player.position.cellId });
     });
 
+    this.world.on('playerStatusChanged', ({ playerId, status }: { playerId: string; status: Player['status'] }) => {
+      this.broadcast('server.playerStatusChanged', { playerId, status });
+    });
+
     this.world.on('eraChanged', ({ previousEraId, newEra }: { previousEraId: string | null; newEra: import('@game/shared').EraInfo }) => {
       this.broadcast('server.eraChanged', {
         previousEraId,

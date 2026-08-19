@@ -231,6 +231,12 @@ export class InvestmentHandler {
         cell: result.cell,
         playerId,
       });
+      this.io.emit('server.valueChanged', {
+        playerId,
+        fieldId: 'money',
+        current: this.getPlayerMoney(player),
+        delta: -price,
+      });
 
       // 13. 返回成功结果
       const response = { ok: true, data: { cell: result.cell } } as AckResult<{ cell: Cell }>;

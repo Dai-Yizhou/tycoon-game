@@ -321,5 +321,16 @@ describe('GameWorld', () => {
       pm.freezePlayer('p1', 'disconnect');
       expect(handler).toHaveBeenCalledWith({ playerId: 'p1', reason: 'disconnect' });
     });
+
+    it('透传玩家状态变更事件', () => {
+      const world = new GameWorld();
+      const handler = jest.fn();
+      world.on(WorldEvents.PlayerStatusChanged, handler);
+      world.addPlayer(buildPlayer('p1'));
+
+      world.getPlayerManager().freezePlayer('p1', 'disconnect');
+
+      expect(handler).toHaveBeenCalledWith({ playerId: 'p1', status: PlayerStatus.Frozen });
+    });
   });
 });
