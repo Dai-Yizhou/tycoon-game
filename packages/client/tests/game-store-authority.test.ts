@@ -183,4 +183,28 @@ describe('GameStore authority', () => {
 
     expect(store.getSnapshot().currentMoney).toBe(700);
   });
+
+  it('保存客户端交互状态而不依赖模块级变量', () => {
+    const store = new GameStore();
+
+    store.updateMovement({ isMoving: true, remainingSteps: 2 });
+    store.setCamera({ cameraTargetX: 120, cameraTargetY: 240 });
+    store.updateDice({ diceValue: 6, diceAnimStart: 10 });
+    store.updateCooldown({ rollCooldownEnd: 500 });
+    store.updateDayNight({ dayNightStartTime: 20, serverTimeOffset: 30 });
+    store.setPathChoice([{ cellId: 3, label: '北方' }]);
+
+    expect(store.getSnapshot()).toMatchObject({
+      isMoving: true,
+      remainingSteps: 2,
+      cameraTargetX: 120,
+      cameraTargetY: 240,
+      diceValue: 6,
+      diceAnimStart: 10,
+      rollCooldownEnd: 500,
+      dayNightStartTime: 20,
+      serverTimeOffset: 30,
+      pathChoice: { active: true, options: [{ cellId: 3, label: '北方' }] },
+    });
+  });
 });

@@ -337,6 +337,16 @@ export interface ClientGameSnapshot {
   investmentShares: Map<number, number>;
   chatHistory: ClientChatMessage[];
   cells: Map<number, Cell>;
+  isMoving: boolean;
+  remainingSteps: number;
+  cameraTargetX: number;
+  cameraTargetY: number;
+  diceValue: number;
+  diceAnimStart: number;
+  rollCooldownEnd: number;
+  dayNightStartTime: number;
+  serverTimeOffset: number;
+  pathChoice: { active: boolean; options: Array<{ cellId: number; label: string }> };
 }
 
 export type ClientGameEvent =
@@ -371,7 +381,7 @@ export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     currentMoney: 2000, currentCredit: 50, currentEnv: 0, isBankrupt: false,
-    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(),
+    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, pathChoice: { active: false, options: [] },
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
 
@@ -388,6 +398,36 @@ export class GameStore {
 
   setDiceAnimating(value: boolean): void {
     this.snapshot = { ...this.snapshot, diceAnimating: value };
+    this.publish();
+  }
+
+  updateMovement(partial: Partial<Pick<ClientGameSnapshot, 'isMoving' | 'remainingSteps'>>): void {
+    this.snapshot = { ...this.snapshot, ...partial };
+    this.publish();
+  }
+
+  setCamera(partial: Partial<Pick<ClientGameSnapshot, 'cameraTargetX' | 'cameraTargetY'>>): void {
+    this.snapshot = { ...this.snapshot, ...partial };
+    this.publish();
+  }
+
+  updateDice(partial: Partial<Pick<ClientGameSnapshot, 'diceValue' | 'diceAnimStart'>>): void {
+    this.snapshot = { ...this.snapshot, ...partial };
+    this.publish();
+  }
+
+  updateCooldown(partial: Partial<Pick<ClientGameSnapshot, 'rollCooldownEnd'>>): void {
+    this.snapshot = { ...this.snapshot, ...partial };
+    this.publish();
+  }
+
+  updateDayNight(partial: Partial<Pick<ClientGameSnapshot, 'dayNightStartTime' | 'serverTimeOffset'>>): void {
+    this.snapshot = { ...this.snapshot, ...partial };
+    this.publish();
+  }
+
+  setPathChoice(options: Array<{ cellId: number; label: string }>): void {
+    this.snapshot = { ...this.snapshot, pathChoice: { active: options.length > 0, options: [...options] } };
     this.publish();
   }
 
@@ -513,6 +553,16 @@ export class GameStore {
       investmentShares: new Map(),
       chatHistory: [],
       cells: new Map(),
+      isMoving: false,
+      remainingSteps: 0,
+      cameraTargetX: 0,
+      cameraTargetY: 0,
+      diceValue: 0,
+      diceAnimStart: 0,
+      rollCooldownEnd: 0,
+      dayNightStartTime: Date.now(),
+      serverTimeOffset: 0,
+      pathChoice: { active: false, options: [] },
     };
     this.publish();
   }
