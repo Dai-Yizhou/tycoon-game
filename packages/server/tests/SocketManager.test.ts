@@ -410,6 +410,25 @@ describe('SocketManager', () => {
       await new Promise<void>((resolve) => env.http.close(() => resolve()));
     });
 
+    it('不会把非位置更新广播成 server.playerMoved', async () => {
+      const env = await createTestEnv();
+      const world = new GameWorld();
+      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: true, authenticate: () => 'test-player' });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
+      const c1 = await connectClient(env.port);
+      const player = buildPlayer('p1', { values: { money: { id: 'money', name: '财产', current: 100 } } });
+      world.addPlayer(player);
+
+      const moved: unknown[] = [];
+      c1.on('server.playerMoved', (payload) => moved.push(payload));
+      world.updatePlayer({ ...player, values: { money: { id: 'money', name: '财产', current: 50 } } });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(moved).toEqual([]);
+      c1.disconnect();
+      await new Promise<void>((resolve) => env.http.close(() => resolve()));
+    });
+
     it('emits server.eraChanged when era changes', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();

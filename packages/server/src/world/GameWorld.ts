@@ -34,6 +34,7 @@ export const WorldEvents = {
   PlayerAdded: 'playerAdded',
   PlayerRemoved: 'playerRemoved',
   PlayerUpdated: 'playerUpdated',
+  PlayerPositionChanged: 'playerPositionChanged',
   PlayerStatusChanged: 'playerStatusChanged',
   EraChanged: 'eraChanged',
   TeamChanged: 'teamChanged',
@@ -119,6 +120,7 @@ export class GameWorld {
   private currentEra: EraInfo | null = null;
   private resourceVersion = 0;
   private readonly cellVersions = new Map<number, number>();
+  private readonly playerPositions = new Map<string, number>();
   private lastValidation: ValidationResult | null = null;
   private snapshotStateProvider: (() => Pick<WorldSnapshot, 'taxRecords' | 'jailStates'>) | null = null;
 
@@ -130,12 +132,19 @@ export class GameWorld {
 
     // 透传 PlayerManager 的事件为 WorldEvent
     this.playerManager.on(PlayerEvents.Added, ({ player }: { player: Player }) => {
+      this.playerPositions.set(player.id, player.position.cellId);
       this.emit(WorldEvents.PlayerAdded, { player });
     });
     this.playerManager.on(PlayerEvents.Removed, ({ playerId, player }: PlayerRemovedEvent) => {
+      this.playerPositions.delete(playerId);
       this.emit(WorldEvents.PlayerRemoved, { playerId, player });
     });
     this.playerManager.on(PlayerEvents.Updated, ({ player }: { player: Player }) => {
+      const previousCellId = this.playerPositions.get(player.id);
+      if (previousCellId !== player.position.cellId) {
+        this.playerPositions.set(player.id, player.position.cellId);
+        this.emit(WorldEvents.PlayerPositionChanged, { player });
+      }
       this.emit(WorldEvents.PlayerUpdated, { player });
     });
     this.playerManager.on(PlayerEvents.StatusChanged, ({ playerId, status }: PlayerStatusChangedPayload) => {

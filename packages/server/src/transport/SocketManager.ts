@@ -621,7 +621,7 @@ export class SocketManager {
       this.broadcast('server.playerLeft', { playerId });
     });
 
-    this.world.on('playerUpdated', ({ player }: { player: import('@game/shared').Player }) => {
+    this.world.on('playerPositionChanged', ({ player }: { player: import('@game/shared').Player }) => {
       this.broadcast('server.playerMoved', { playerId: player.id, cellId: player.position.cellId });
     });
 

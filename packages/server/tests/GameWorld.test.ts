@@ -332,5 +332,19 @@ describe('GameWorld', () => {
 
       expect(handler).toHaveBeenCalledWith({ playerId: 'p1', status: PlayerStatus.Frozen });
     });
+
+    it('仅在玩家位置变化时发出位置事件', () => {
+      const world = new GameWorld();
+      const handler = jest.fn();
+      world.on(WorldEvents.PlayerPositionChanged, handler);
+      const player = buildPlayer('p1');
+      world.addPlayer(player);
+
+      world.updatePlayer({ ...player, values: { money: { id: 'money', name: '财产', current: 50 } } });
+      expect(handler).not.toHaveBeenCalled();
+
+      world.updatePlayer({ ...player, position: { cellId: 2 } });
+      expect(handler).toHaveBeenCalledWith({ player: expect.objectContaining({ id: 'p1', position: { cellId: 2 } }) });
+    });
   });
 });
