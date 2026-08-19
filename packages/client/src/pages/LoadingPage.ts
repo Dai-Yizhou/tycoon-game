@@ -81,8 +81,10 @@ export function createLoadingPage(controller: GameController): HTMLElement {
   let socket: ReturnType<typeof createSocket> | null = null;
   loadingPageCleanups.set(page, () => {
     active = false;
-    socket?.disconnect();
-    if (controller.getSocket() === socket) controller.setSocket(null);
+    if (controller.getState() !== 'game' && controller.getState() !== 'bankruptcy') {
+      socket?.disconnect();
+      if (controller.getSocket() === socket) controller.setSocket(null);
+    }
   });
 
   // 开始连接

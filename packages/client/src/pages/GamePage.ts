@@ -87,7 +87,7 @@ import {
 } from '../game/systems/TutorialSystem.js';
 
 import {
-  addChatMessage,
+  addChatMessage, setChatStore,
 } from '../game/systems/ChatSystem.js';
 
 import { startRenderLoop, centerCameraOnCell, handleMouseMove, handleClick, handleMouseLeave, handleResize } from '../game/ClientRenderLoop.js';
@@ -122,6 +122,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   const designSnapshot = new DesignAdapter(getThemeTokens((globalThis as { __GAME_THEME__?: string }).__GAME_THEME__ ?? 'northeast')).createSnapshot('day');
   applyGamePageThemeSnapshot(page, designSnapshot);
   gameStore = new GameStore();
+  setChatStore(gameStore);
   gameViewModel = new GameViewModel(gameStore, context.playerName || t('game.defaultPlayerName'));
   const effects = new NoOpEffectHooks();
 
@@ -148,10 +149,15 @@ export function createGamePage(controller: GameController): HTMLElement {
   backButton.addEventListener('click', () => controller.setState('start'));
   page.appendChild(backButton);
   gameHudShell = new GameHudShell(gameViewModel, effects, {
-    onRoll: handleRollDice,
+    onRoll: () => handleRollDice(gameStore!, gameSocket),
     onChatSend: (message, channel) => {
-      if (gameSocket) gameSocket.emit('client.chat', { channel, content: message });
-      else addChatMessage(t('chat.you') + message, channel);
+      if (!gameSocket) {
+        gameStore?.appendChatMessage({ text: t('chat.noConnection'), channel: 'error', timestamp: Date.now() });
+        return;
+      }
+      gameSocket.emit('client.chat', { channel, content: message }, (result) => {
+        if (!result.ok) gameStore?.appendChatMessage({ text: t('chat.sendFailed'), channel: 'error', timestamp: Date.now() });
+      });
     },
   });
   page.appendChild(gameHudShell.getElement());
@@ -178,14 +184,17 @@ export function createGamePage(controller: GameController): HTMLElement {
       }
       setMapIndex(new MapIndex(mapData));
       renderer.loadMap(mapData);
-      interactiveMap.render(mapData, [currentPlayer!, ...otherPlayers.map(p => ({ ...p, values: { money: { current: p.primaryValue ?? 0 } } } as any))]);
+      const snapshot = gameStore!.getSnapshot();
+      if (snapshot.currentPlayer) {
+        interactiveMap.render(mapData, [snapshot.currentPlayer, ...snapshot.otherPlayers.map(p => ({ ...p, values: { money: { current: p.primaryValue ?? 0 } } } as any))]);
+      }
       const startCell = mapIndex!.getById(0);
       if (startCell) {
         setPlayerDisplayPos(startCell.x, startCell.y);
         setCameraTarget(startCell.x, startCell.y);
       }
-      centerCameraOnCell(0);
-      startRenderLoop();
+      centerCameraOnCell(snapshot.currentPlayerPosition || 0);
+      startRenderLoop(gameStore!);
       syncViewModel();
       gameHudShell?.update();
       addChatMessage(t('game.welcomeMessage'), 'system');
@@ -529,6 +538,7 @@ export function cleanupGamePage(page: HTMLElement): void {
   gameHudShell?.destroy();
   gameHudShell = null;
   gameViewModel = null;
+  setChatStore(null);
   gameStore?.reset();
   gameStore = null;
   if (animationFrameId) {

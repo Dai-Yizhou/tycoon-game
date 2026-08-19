@@ -20,8 +20,10 @@ import { addChatMessage } from './ChatSystem.js';
 import { requestHudRefresh } from '../ClientHudBridge.js';
 import { onPlayerArrived } from './GameLogic.js';
 import { t } from '@game/shared';
+import type { GameStore } from '../../state/GameStore.js';
 
-export function updateMovement(): void {
+export function updateMovement(store?: GameStore): void {
+  void store;
   if (!isMoving) return;
   const elapsed = performance.now() - moveStartTime;
   const progress = Math.min(elapsed / moveStepDuration, 1);

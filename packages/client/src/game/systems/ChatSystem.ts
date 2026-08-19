@@ -7,20 +7,17 @@
 import {
   chatBoxEl, activeChatChannels, chatChannelDefs,
 } from '../../state/GameStore.js';
+import type { GameStore } from '../../state/GameStore.js';
 import { t } from '../i18n.js';
 
-export interface ChatMessage {
-  text: string;
-  channel: string;
-  timestamp: number;
+let chatStore: GameStore | null = null;
+
+export function setChatStore(store: GameStore | null): void {
+  chatStore = store;
 }
 
-// Global chat history (shared across systems)
-export const chatHistory: ChatMessage[] = [];
-
 export function addChatMessage(msg: string, channel: string = 'system'): void {
-  chatHistory.push({ text: msg, channel, timestamp: Date.now() });
-  while (chatHistory.length > 100) chatHistory.shift();
+  chatStore?.appendChatMessage({ text: msg, channel, timestamp: Date.now() });
   if (!chatBoxEl) return;
   if (!activeChatChannels.has(channel)) return;
   const el = document.createElement('div');
@@ -47,7 +44,7 @@ export function addChatMessage(msg: string, channel: string = 'system'): void {
 export function refreshChatMessages(): void {
   if (!chatBoxEl) return;
   chatBoxEl.innerHTML = '';
-  for (const m of chatHistory) {
+  for (const m of chatStore?.getSnapshot().chatHistory ?? []) {
     if (!activeChatChannels.has(m.channel)) continue;
     const el = document.createElement('div');
     el.className = 'chat-message';

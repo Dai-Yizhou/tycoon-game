@@ -148,9 +148,14 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   socket.on('server.chat', (payload: { message: { content: string; senderName?: string; channel?: string } }) => {
     const { message } = payload;
     if (message && message.content) {
-      const senderName = message.senderName || t('chat.anonymous');
-      const channel = message.channel || 'system';
-      addChatMessage(`${senderName}: ${message.content}`, channel);
+      store?.appendChatMessage({
+        id: `server-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        channel: message.channel || 'system',
+        senderId: null,
+        senderName: message.senderName || t('chat.anonymous'),
+        content: message.content,
+        timestamp: Date.now(),
+      });
     }
   });
 
@@ -176,7 +181,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     }
     store?.applyEvent({ sequence: store.nextSequence(), type: 'players', players: nextPlayers });
     if (!store) otherPlayers.splice(0, otherPlayers.length, ...nextPlayers);
-    updateRendererPlayers();
+    updateRendererPlayers(store);
   });
 
   socket.on('server.playerLeft', (payload: { playerId: string }) => {
@@ -188,7 +193,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       store?.applyEvent({ sequence: store.nextSequence(), type: 'players', players: nextPlayers });
       if (!store) setOtherPlayers(nextPlayers);
       addChatMessage(t('player.left', { name: player.username }), 'system');
-      updateRendererPlayers();
+      updateRendererPlayers(store);
     }
     // 队伍成员状态由 server.teamUpdated / server.teamDisbanded 事件权威维护，此处不本地修改 teamMembers
     // 仅清理邀请面板中对应条目
@@ -205,9 +210,10 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     if (player) {
       store?.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerMove', playerId: payload.playerId, cellId: payload.cellId });
       if (!store) player.position.cellId = payload.cellId;
-      updateRendererPlayers();
+      updateRendererPlayers(store);
     }
-    if (currentPlayer && payload.playerId === currentPlayer.id) {
+    const activePlayer = store?.getSnapshot().currentPlayer ?? currentPlayer;
+    if (activePlayer && payload.playerId === activePlayer.id) {
       store?.applyEvent({ sequence: store.nextSequence(), type: 'move', playerId: payload.playerId, cellId: payload.cellId });
       if (payload.path && payload.path.length > 1 && !isServerAnimating) {
         startServerPathAnimation(payload.path);
@@ -240,7 +246,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
         store?.applyEvent({ sequence: store.nextSequence(), type: 'value', playerId: payload.playerId, fieldId: 'money', current: payload.current });
       }
       if (otherPlayer || isCurrentPlayer) {
-        updateRendererPlayers();
+        updateRendererPlayers(store);
       }
       if (isCurrentPlayer) requestHudRefresh();
     } else if (payload.fieldId === 'credit') {
@@ -275,7 +281,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {
         store?.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerStatus', playerId: payload.playerId, status: 'jail' });
-        updateRendererPlayers();
+        updateRendererPlayers(store);
       }
     }
   });
@@ -298,7 +304,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {
         store?.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerStatus', playerId: payload.playerId, status: 'normal' });
-        updateRendererPlayers();
+      updateRendererPlayers(store);
       }
     }
   });
@@ -308,7 +314,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     const player = otherPlayers.find(p => p.id === payload.playerId);
     if (player) {
       store?.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerStatus', playerId: payload.playerId, status: payload.status as OtherPlayerInfo['status'] });
-      updateRendererPlayers();
+      updateRendererPlayers(store);
     }
     if (payload.playerId === currentPlayer?.id) {
       store?.applyEvent({ sequence: store.nextSequence(), type: 'status', playerId: payload.playerId, status: payload.status as typeof currentPlayer.status });

@@ -4,15 +4,20 @@ import {
   animationFrameId, cameraTargetX, cameraTargetY, currentPlayer, currentPlayerPosition,
   isMoving, mapIndex, otherPlayers, renderer, setAnimationFrameId, setCameraTarget,
 } from '../state/GameStore.js';
+import type { GameStore } from '../state/GameStore.js';
 import { updateMovement } from './systems/MovementSystem.js';
 import { getPlayerTimezone, getLocalDayNight } from './systems/MapLoader.js';
 
 let stopped = false;
 
-export function updateRendererPlayers(): void {
-  if (!renderer || !currentPlayer || !mapIndex) return;
-  currentPlayer.position.cellId = currentPlayerPosition;
-  const players: Player[] = [currentPlayer, ...otherPlayers.map(player => ({
+export function updateRendererPlayers(store?: GameStore): void {
+  const snapshot = store?.getSnapshot();
+  const player = snapshot?.currentPlayer ?? currentPlayer;
+  const position = snapshot?.currentPlayerPosition ?? currentPlayerPosition;
+  const playersState = snapshot?.otherPlayers ?? otherPlayers;
+  if (!renderer || !player || !mapIndex) return;
+  const renderPlayer = { ...player, position: { ...player.position, cellId: position } };
+  const players: Player[] = [renderPlayer, ...playersState.map(player => ({
     id: player.id, username: player.username, position: player.position,
     status: player.status as Player['status'],
     values: { money: { id: 'money', name: t('hud.money'), current: player.primaryValue, min: 0 } },
@@ -55,18 +60,24 @@ export function handleClick(event: MouseEvent): void {
   }
 }
 
-export function startRenderLoop(): void {
+export function startRenderLoop(store?: GameStore): void {
   stopped = false;
   const animate = () => {
     if (stopped || !renderer) return;
-    updateMovement();
+    updateMovement(store);
+    const snapshot = store?.getSnapshot();
+    const followedCell = snapshot?.currentPlayerPosition;
+    if (followedCell !== undefined && mapIndex) {
+      const cell = mapIndex.getById(followedCell);
+      if (cell) setCameraTarget(cell.x, cell.y);
+    }
     const camera = renderer.getCamera();
     const state = camera.getState();
     const targetX = state.viewportWidth / 2 - cameraTargetX * state.zoom;
     const targetY = state.viewportHeight / 2 - cameraTargetY * state.zoom;
     const follow = isMoving ? 0.3 : 0.15;
     camera.panTo(state.offsetX + (targetX - state.offsetX) * follow, state.offsetY + (targetY - state.offsetY) * follow);
-    updateRendererPlayers();
+    updateRendererPlayers(store);
     renderer.render();
     setAnimationFrameId(requestAnimationFrame(animate));
   };

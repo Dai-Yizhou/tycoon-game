@@ -5,7 +5,7 @@
  * 所有状态读取/修改通过此模块，便于追踪、测试和后续迁移到响应式框架。
  */
 
-import type { Cell, Player, MapIndex } from '@game/shared';
+import type { Cell, Player, MapIndex, ChatMessage as ServerChatMessage } from '@game/shared';
 import { getExtra } from '@game/shared';
 import type { BoardRenderer } from '../renderer/BoardRenderer.js';
 import type { TypedClientSocket } from '../hooks/useSocket.js';
@@ -333,6 +333,7 @@ export interface ClientGameSnapshot {
   propertyLevels: Map<number, number>;
   ownedInvestments: Set<number>;
   investmentShares: Map<number, number>;
+  chatHistory: ClientChatMessage[];
 }
 
 export type ClientGameEvent =
@@ -357,11 +358,17 @@ export interface ServerGameSnapshot {
   ownedInvestments?: Array<{ cellId: number; share: number }>;
 }
 
+export interface ClientChatMessage {
+  text: string;
+  channel: string;
+  timestamp: number;
+}
+
 export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     currentMoney: 2000, currentCredit: 50, currentEnv: 0, isBankrupt: false,
-    isInJail: false, jailEndTime: 0, canRoll: true, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(),
+    isInJail: false, jailEndTime: 0, canRoll: true, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [],
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
 
@@ -369,6 +376,11 @@ export class GameStore {
 
   nextSequence(): number {
     return this.snapshot.sequence + 1;
+  }
+
+  setCanRoll(value: boolean): void {
+    this.snapshot = { ...this.snapshot, canRoll: value };
+    this.publish();
   }
 
   subscribe(listener: (snapshot: ClientGameSnapshot) => void): () => void {
@@ -445,6 +457,14 @@ export class GameStore {
     this.publish();
   }
 
+  appendChatMessage(message: ServerChatMessage | ClientChatMessage): void {
+    const chatMessage: ClientChatMessage = 'content' in message
+      ? { text: `${message.senderName || '匿名'}: ${message.content}`, channel: message.channel, timestamp: message.timestamp }
+      : message;
+    this.snapshot = { ...this.snapshot, chatHistory: [...this.snapshot.chatHistory, chatMessage].slice(-100) };
+    this.publish();
+  }
+
   reset(): void {
     this.snapshot = {
       sequence: 0,
@@ -463,6 +483,7 @@ export class GameStore {
       propertyLevels: new Map(),
       ownedInvestments: new Set(),
       investmentShares: new Map(),
+      chatHistory: [],
     };
     this.publish();
   }

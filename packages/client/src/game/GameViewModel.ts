@@ -14,7 +14,7 @@ import type { Player } from '@game/shared';
 import type { MapIndex } from '@game/shared';
 import type { BoardRenderer } from '../renderer/BoardRenderer.js';
 import type { TypedClientSocket } from '../hooks/useSocket.js';
-import type { GameStore, ClientGameSnapshot } from '../state/GameStore.js';
+import type { GameStore, ClientGameSnapshot, ClientChatMessage } from '../state/GameStore.js';
 
 // ===== 状态切片类型定义 =====
 
@@ -127,11 +127,7 @@ export interface BehaviorConfig {
 }
 
 /** 聊天消息 */
-export interface ChatMessage {
-  text: string;
-  channel: string;
-  timestamp: number;
-}
+export type ChatMessage = ClientChatMessage;
 
 export interface ChatChannelDef {
   id: string;
@@ -236,9 +232,11 @@ export type StateChangeListener = (event: StateChangeEvent) => void;
  */
 export class GameViewModel {
   private readonly store: GameStore | null;
+  private readonly unsubscribeStore: (() => void) | null;
 
   constructor(store: GameStore | null = null, displayName = '玩家') {
     this.store = store;
+    this.unsubscribeStore = store?.subscribe(() => this.notify('chat', 'store')) ?? null;
     this.player.currentPlayerName = displayName;
   }
 
@@ -411,7 +409,10 @@ export class GameViewModel {
   }
 
   // ===== Chat =====
-  getChat(): ChatSlice { return this.chat; }
+  getChat(): ChatSlice {
+    const snapshot = this.projectedSnapshot();
+    return snapshot ? { ...this.chat, history: snapshot.chatHistory } : this.chat;
+  }
   setChat(partial: Partial<ChatSlice>, source = 'external'): void {
     Object.assign(this.chat, partial);
     this.notify('chat', source);
@@ -504,6 +505,7 @@ export class GameViewModel {
     this.detailPanelUpdateTimer = null;
     this.lastPlayerTimezone = '';
     this.lastLocalIsDay = null;
+    this.unsubscribeStore?.();
     this.notify('all', 'reset');
   }
 }

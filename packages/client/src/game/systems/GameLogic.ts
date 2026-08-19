@@ -21,24 +21,34 @@ import {
 } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
 import { requestHudRefresh } from '../ClientHudBridge.js';
+import type { GameStore } from '../../state/GameStore.js';
+import type { TypedClientSocket } from '../../hooks/useSocket.js';
 
 // ===== 辅助函数 =====
 
 // ===== 掷骰 & 冷却 =====
 
-export function handleRollDice(): void {
-  if (!canRoll || isMoving || diceAnimating || isBankrupt || isWaitingForChoice) return;
-  if (isInJail) {
+export function handleRollDice(store?: GameStore, socket?: TypedClientSocket | null): void {
+  const snapshot = store?.getSnapshot();
+  const available = snapshot?.canRoll ?? canRoll;
+  const moving = snapshot ? false : isMoving;
+  const bankrupt = snapshot?.isBankrupt ?? isBankrupt;
+  const waitingForChoice = snapshot ? false : isWaitingForChoice;
+  const jailed = snapshot?.isInJail ?? isInJail;
+  if (!available || moving || diceAnimating || bankrupt || waitingForChoice) return;
+  if (jailed) {
     addChatMessage(t('jail.stillInJail'), 'system');
     return;
   }
   const now = Date.now();
   if (now < rollCooldownEnd) return;
 
-  setCanRoll(false);
+  if (store) store.setCanRoll(false);
+  else setCanRoll(false);
 
-  if (gameSocket) {
-    gameSocket.emit('client.rollDice', {}, (result: { ok: boolean; data?: { dice: number }; error?: string }) => {
+  const activeSocket = socket ?? gameSocket;
+  if (activeSocket) {
+    activeSocket.emit('client.rollDice', {}, (result: { ok: boolean; data?: { dice: number }; error?: string }) => {
       if (result.ok && result.data) {
         setDiceValue(result.data.dice);
         setDiceAnimating(true);
@@ -48,9 +58,14 @@ export function handleRollDice(): void {
         startRollCooldownTimer();
       } else {
         addChatMessage(t('dice.rollFailed', { error: result.error || t('dice.unknownError') }), 'error');
-        setCanRoll(true);
+        if (store) store.setCanRoll(true);
+        else setCanRoll(true);
       }
     });
+  } else {
+    if (store) store.setCanRoll(true);
+    else setCanRoll(true);
+    addChatMessage(t('chat.noConnection'), 'error');
   }
 }
 

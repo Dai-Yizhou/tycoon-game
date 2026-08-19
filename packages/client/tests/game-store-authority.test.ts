@@ -85,4 +85,24 @@ describe('GameStore authority', () => {
 
     expect(store.getSnapshot().otherPlayers[0].position.cellId).toBe(9);
   });
+
+  it('将服务端聊天消息写入 Store 并投影到 GameViewModel', () => {
+    const store = new GameStore();
+    const viewModel = new GameViewModel(store);
+
+    store.appendChatMessage({
+      id: 'message-1',
+      channel: 'global',
+      senderId: 'player-2',
+      senderName: '玩家二',
+      content: '你好',
+      timestamp: 100,
+    });
+
+    expect(viewModel.getChat().history).toEqual([{
+      text: '玩家二: 你好',
+      channel: 'global',
+      timestamp: 100,
+    }]);
+  });
 });

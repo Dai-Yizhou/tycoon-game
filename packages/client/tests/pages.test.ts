@@ -171,6 +171,20 @@ describe('Pages', () => {
       expect(disconnect).toHaveBeenCalledTimes(1);
       expect(controller.getSocket()).toBeNull();
     });
+
+    test('切换到游戏页时清理加载页不会断开已认证 socket', async () => {
+      const page = createLoadingPage(controller);
+      await Promise.resolve();
+      const socket = controller.getSocket();
+      expect(socket).toBeTruthy();
+      const disconnect = jest.spyOn(socket!, 'disconnect');
+      controller.setState('game');
+      cleanupLoadingPage(page);
+      expect(disconnect).not.toHaveBeenCalled();
+      expect(controller.getSocket()).toBe(socket);
+      socket?.disconnect();
+      controller.setSocket(null);
+    });
   });
 
   describe('GamePage', () => {
@@ -185,6 +199,21 @@ describe('Pages', () => {
       const page = createGamePage(controller);
 
       expect(page.querySelector('.notification-center')).toBeTruthy();
+    });
+
+    test('GamePage 的掷骰按钮使用控制器中的已认证 socket', () => {
+      controller.setPlayerName('测试玩家');
+      const emit = jest.fn();
+      controller.setSocket({
+        on: jest.fn(),
+        off: jest.fn(),
+        emit,
+      } as any);
+
+      const page = createGamePage(controller);
+      (page.querySelector('[data-action="roll"]') as HTMLButtonElement).click();
+
+      expect(emit).toHaveBeenCalledWith('client.rollDice', {}, expect.any(Function));
     });
     test('TR-6.21: createGamePage 创建正确的 DOM 结构', () => {
       controller.setPlayerName('测试玩家');

@@ -355,6 +355,8 @@
     "noTeamMembers": "无队伍"
   },
   "chat": {
+    "noConnection": "连接断开时无法发送聊天消息",
+    "sendFailed": "消息发送失败",
     "title": "聊天",
     "inputPlaceholder": "输入消息...",
     "send": "发送",
