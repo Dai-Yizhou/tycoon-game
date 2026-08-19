@@ -167,8 +167,8 @@ export function createGamePage(controller: GameController): HTMLElement {
   page.appendChild(backButton);
   gameHudShell = new GameHudShell(gameViewModel, effects, {
     onRoll: () => handleRollDice(gameStore!, gameSocket),
-    onPathChoice: (cellId) => {
-      onIntersectionChoice(cellId);
+      onPathChoice: (cellId) => {
+      if (gameStore && gameSocket) onIntersectionChoice(gameStore, gameSocket, cellId);
       gameViewModel?.clearPathChoice('path-choice');
     },
     onCellAction: (actionId) => {
@@ -273,6 +273,7 @@ export function createGamePage(controller: GameController): HTMLElement {
     registerSocketHandlers(socket, {
       controller,
       store: gameStore ?? undefined,
+      mapIndex: mapIndex ?? undefined,
       onPathChoiceOptions: (options) => gameViewModel?.setPathChoice(options, 'server.askPath'),
       onPathChoiceCleared: () => gameViewModel?.clearPathChoice('server'),
       onEvent: () => syncViewModel(),

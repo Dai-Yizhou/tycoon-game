@@ -11,7 +11,6 @@ import {
   currentPlayer,
   currentPlayerPosition,
   otherPlayers,
-  isServerAnimating,
   regionProsperityMap,
   rollBtn,
   rollCooldownTimer,
@@ -34,12 +33,14 @@ import { getPlayerTimezone, getLocalDayNight } from './MapLoader.js';
 import { applyTeamMembers } from './TeamSystem.js';
 import type { GameController } from '../GameController.js';
 import { GameStore } from '../../state/GameStore.js';
+import type { MapIndex } from '@game/shared';
 
 const registeredSockets = new WeakSet<TypedClientSocket>();
 const eventObservers = new WeakMap<TypedClientSocket, (event: string) => void>();
 
 export interface SocketHandlerOptions {
   store?: GameStore;
+  mapIndex?: MapIndex;
   controller?: GameController;
   onEvent?: (event: string) => void;
   onNotification?: (payload: { id: string; type: 'info' | 'success' | 'warning' | 'error'; title: string; content: string; durationMs?: number; createdAt?: number }) => void;
@@ -223,8 +224,9 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     if (activePlayer && payload.playerId === activePlayer.id) {
       store?.applyEvent({ sequence: store.nextSequence(), type: 'move', playerId: payload.playerId, cellId: payload.cellId });
       setCurrentPlayerPosition(payload.cellId);
-      if (payload.path && payload.path.length > 1 && !isServerAnimating) {
-        startServerPathAnimation(payload.path);
+      const snapshot = store?.getSnapshot();
+      if (store && options.mapIndex && payload.path && payload.path.length > 1 && !snapshot?.isServerAnimating) {
+        startServerPathAnimation(store, options.mapIndex, payload.path, () => requestHudRefresh());
       } else {
         requestHudRefresh();
       }

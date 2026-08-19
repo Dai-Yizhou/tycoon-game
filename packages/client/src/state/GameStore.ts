@@ -347,6 +347,18 @@ export interface ClientGameSnapshot {
   dayNightStartTime: number;
   serverTimeOffset: number;
   pathChoice: { active: boolean; options: Array<{ cellId: number; label: string }> };
+  previousCellId: number;
+  playerDisplayX: number;
+  playerDisplayY: number;
+  moveFromX: number;
+  moveFromY: number;
+  moveToX: number;
+  moveToY: number;
+  moveStartTime: number;
+  serverPath: number[];
+  serverPathIndex: number;
+  isWaitingForChoice: boolean;
+  isServerAnimating: boolean;
 }
 
 export type ClientGameEvent =
@@ -381,7 +393,7 @@ export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     currentMoney: 2000, currentCredit: 50, currentEnv: 0, isBankrupt: false,
-    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, pathChoice: { active: false, options: [] },
+    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false,
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
 
@@ -563,6 +575,18 @@ export class GameStore {
       dayNightStartTime: Date.now(),
       serverTimeOffset: 0,
       pathChoice: { active: false, options: [] },
+      previousCellId: -1,
+      playerDisplayX: 600,
+      playerDisplayY: 500,
+      moveFromX: 0,
+      moveFromY: 0,
+      moveToX: 0,
+      moveToY: 0,
+      moveStartTime: 0,
+      serverPath: [],
+      serverPathIndex: 0,
+      isWaitingForChoice: false,
+      isServerAnimating: false,
     };
     this.publish();
   }

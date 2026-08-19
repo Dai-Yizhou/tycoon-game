@@ -64,7 +64,7 @@ export function startRenderLoop(store?: GameStore): void {
   stopped = false;
   const animate = () => {
     if (stopped || !renderer) return;
-    updateMovement(store);
+    if (store && mapIndex) updateMovement(store, mapIndex, () => undefined);
     const snapshot = store?.getSnapshot();
     const followedCell = snapshot?.currentPlayerPosition;
     if (followedCell !== undefined && mapIndex) {
