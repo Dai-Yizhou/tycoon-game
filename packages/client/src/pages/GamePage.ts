@@ -99,6 +99,7 @@ import {
 } from '../game/systems/GameLogic.js';
 
 import {
+  onIntersectionChoice,
 } from '../game/systems/MovementSystem.js';
 
 import { registerSocketHandlers, unregisterSocketHandlers } from '../game/systems/SocketEventHandler.js';
@@ -153,6 +154,10 @@ export function createGamePage(controller: GameController): HTMLElement {
   page.appendChild(backButton);
   gameHudShell = new GameHudShell(gameViewModel, effects, {
     onRoll: () => handleRollDice(gameStore!, gameSocket),
+    onPathChoice: (cellId) => {
+      onIntersectionChoice(cellId);
+      gameViewModel?.clearPathChoice('path-choice');
+    },
     onChatSend: (message, channel) => {
       if (!gameSocket) {
         gameStore?.appendChatMessage({ text: t('chat.noConnection'), channel: 'error', timestamp: Date.now() });
@@ -240,6 +245,8 @@ export function createGamePage(controller: GameController): HTMLElement {
     registerSocketHandlers(socket, {
       controller,
       store: gameStore ?? undefined,
+      onPathChoiceOptions: (options) => gameViewModel?.setPathChoice(options, 'server.askPath'),
+      onPathChoiceCleared: () => gameViewModel?.clearPathChoice('server'),
       onEvent: () => syncViewModel(),
       onNotification: (payload) => notificationCenter?.handleNotification({ ...payload, durationMs: payload.durationMs ?? 3000, createdAt: payload.createdAt ?? Date.now() }),
     });

@@ -141,6 +141,16 @@ export interface ChatSlice {
   history: ChatMessage[];
 }
 
+export interface PathChoiceOption {
+  cellId: number;
+  label: string;
+}
+
+export interface PathChoiceSlice {
+  active: boolean;
+  options: PathChoiceOption[];
+}
+
 /** 队伍成员 */
 export interface TeamMember {
   id: string;
@@ -215,7 +225,7 @@ export type StateChangeKey =
   | 'player' | 'movement' | 'camera' | 'dice' | 'cooldown' | 'jail'
   | 'dayNight'
   | 'regions' | 'chat' | 'team' | 'tutorial' | 'otherPlayers' | 'behavior'
-  | 'all';
+  | 'pathChoice' | 'all';
 
 export interface StateChangeEvent {
   key: StateChangeKey;
@@ -305,6 +315,7 @@ export class GameViewModel {
     activeChannels: new Set(['system']),
     history: [],
   };
+  private pathChoice: PathChoiceSlice = { active: false, options: [] };
 
   private team: TeamSlice = { members: [] };
   private tutorial: TutorialSlice = { step: 0, active: false };
@@ -425,6 +436,15 @@ export class GameViewModel {
     this.notify('chat', source);
   }
 
+  getPathChoice(): PathChoiceSlice { return this.pathChoice; }
+  setPathChoice(options: PathChoiceOption[], source = 'external'): void {
+    this.pathChoice = { active: options.length > 0, options: [...options] };
+    this.notify('pathChoice', source);
+  }
+  clearPathChoice(source = 'external'): void {
+    this.setPathChoice([], source);
+  }
+
   // ===== Team =====
   getTeam(): TeamSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { members: snapshot.teamMembers as TeamMember[] } : this.team; }
 
@@ -499,6 +519,7 @@ export class GameViewModel {
     this.dayNight = { cycleDuration: 15 * 60 * 1000, cycleStartTime: Date.now(), serverTimeOffset: 0, prosperity: 100 };
     this.regions = { mapRegions: [], valueFieldDefs: [], regionProsperityMap: new Map() };
     this.chat = { activeChannels: new Set(['system']), history: [] };
+    this.pathChoice = { active: false, options: [] };
     this.team = { members: [] };
     this.tutorial = { step: 0, active: false };
     this.otherPlayers = { players: [] };

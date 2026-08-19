@@ -23,4 +23,18 @@ describe("GameHudShell", () => {
     expect(onChatSend).toHaveBeenCalledWith("测试消息", "team");
     shell.destroy();
   });
+
+  it('在路径选择状态渲染底部行动组并触发路径回调', () => {
+    const vm = new GameViewModel();
+    const onPathChoice = jest.fn();
+    vm.setPathChoice([{ cellId: 4, label: '华尔街' }, { cellId: 8, label: '纪念碑' }]);
+    const shell = new GameHudShell(vm, new NoOpEffectHooks(), { onPathChoice });
+    const root = shell.getElement();
+
+    expect(root.querySelectorAll('[data-action="path-choice"]')).toHaveLength(2);
+    expect(root.querySelector('[data-action="path-choice"][data-cell-id="4"]')?.textContent).toContain('华尔街');
+    (root.querySelector('[data-action="path-choice"][data-cell-id="4"]') as HTMLButtonElement).click();
+    expect(onPathChoice).toHaveBeenCalledWith(4);
+    shell.destroy();
+  });
 });

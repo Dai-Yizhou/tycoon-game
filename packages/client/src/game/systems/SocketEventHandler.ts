@@ -27,7 +27,7 @@ import {
 } from '../../state/GameStore.js';
 import type { OtherPlayerInfo } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
-import { startServerPathAnimation, showIntersectionChoice } from './MovementSystem.js';
+import { startServerPathAnimation } from './MovementSystem.js';
 import { requestHudRefresh } from '../ClientHudBridge.js';
 import { updateRendererPlayers, updateBoardTheme, updateTopBarTime } from '../ClientRenderLoop.js';
 import { getPlayerTimezone, getLocalDayNight } from './MapLoader.js';
@@ -43,6 +43,8 @@ export interface SocketHandlerOptions {
   controller?: GameController;
   onEvent?: (event: string) => void;
   onNotification?: (payload: { id: string; type: 'info' | 'success' | 'warning' | 'error'; title: string; content: string; durationMs?: number; createdAt?: number }) => void;
+  onPathChoiceOptions?: (options: Array<{ cellId: number; label: string }>) => void;
+  onPathChoiceCleared?: () => void;
 }
 
 const SOCKET_EVENTS = [
@@ -225,10 +227,9 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   socket.on('server.askPath', (payload: { fromCellId: number; options: Array<{ cellId: number; label?: string }> }) => {
-    if (!currentPlayer) return;
+    if (!(store?.getSnapshot().currentPlayer ?? currentPlayer)) return;
     setIsWaitingForChoice(true);
-    const optionIds = payload.options.map(opt => opt.cellId);
-    showIntersectionChoice(optionIds);
+    options.onPathChoiceOptions?.(payload.options.map(opt => ({ cellId: opt.cellId, label: opt.label || `格子 ${opt.cellId}` })));
     addChatMessage(t('intersection.chooseDirection', { options: payload.options.map(o => o.label).join(' / ') }), 'system');
   });
 

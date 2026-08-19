@@ -4,6 +4,7 @@ import type { GameViewModel } from "../game/GameViewModel.js";
 export interface GameHudShellConfig {
   onRoll?: () => void;
   onChatSend?: (message: string, channel: string) => void;
+  onPathChoice?: (cellId: number) => void;
   onCellHover?: (cell: any, x: number, y: number) => void;
   onCellLeave?: () => void;
 }
@@ -89,7 +90,7 @@ export class GameHudShell {
             <button class="dice-btn" data-action="roll">掷骰</button>
             <span class="dice-status" data-ui="dice-status">就绪</span>
           </div>
-          <div class="action-cluster">
+          <div class="action-cluster" data-ui="action-cluster">
           </div>
           <div class="actionbar-spacer"></div>
         </footer>
@@ -110,6 +111,7 @@ export class GameHudShell {
       this.vm.subscribe("team", () => this.update()),
       this.vm.subscribe("dayNight", () => this.update()),
       this.vm.subscribe("chat", () => this.update()),
+      this.vm.subscribe("pathChoice", () => this.update()),
     );
     this.update();
   }
@@ -129,6 +131,7 @@ export class GameHudShell {
     const movement = this.vm.getMovement();
     const team = this.vm.getTeam();
     const chat = this.vm.getChat();
+    const pathChoice = this.vm.getPathChoice();
 
     // Player badge
     const nameEl = this.root.querySelector("[data-ui=player-name]")!;
@@ -154,6 +157,21 @@ export class GameHudShell {
     rollBtn.disabled = !canRoll;
     const statusEl = this.root.querySelector("[data-ui=dice-status]")!;
     statusEl.textContent = movement.isMoving ? "移动中" : canRoll ? "就绪" : "冷却中";
+
+    const actionCluster = this.root.querySelector('[data-ui="action-cluster"]')!;
+    actionCluster.replaceChildren(...(pathChoice.active ? pathChoice.options.map((option, index) => {
+      const button = document.createElement('button');
+      button.className = 'act-btn act-btn--accent';
+      button.dataset.action = 'path-choice';
+      button.dataset.cellId = String(option.cellId);
+      button.textContent = `选择路径 ${String.fromCharCode(65 + index)}`;
+      const detail = document.createElement('span');
+      detail.className = 'act-btn__price';
+      detail.textContent = `→ ${option.label}`;
+      button.appendChild(detail);
+      button.addEventListener('click', () => this.config.onPathChoice?.(option.cellId));
+      return button;
+    }) : []));
 
     // Chat messages (last 10)
     const msgsEl = this.root.querySelector("[data-ui=chat-messages]")!;
