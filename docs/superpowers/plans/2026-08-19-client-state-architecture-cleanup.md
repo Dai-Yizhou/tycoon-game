@@ -65,6 +65,14 @@
 ### 阶段五：架构守卫和最终验证
 
 - 增加架构边界测试，检查旧模块级业务导出、`window` 业务状态、Socket 重复注册和旧 fallback 不再存在。
+- 增加依赖方向守卫：UI 组件不得导入 `GameStore`、`TypedClientSocket` 或 `gameSocket`；服务端事件不得在 `GamePage`、HUD 和地图组件中注册。
+- 增加生产代码静态扫描：排除测试、构建产物和文档后，确认旧状态符号、`syncLegacyStateFromStore`、`syncViewModel`、`window.currentPlayerPosition`、`snapshot ?? oldState` 和无 Store 的玩法入口均为零。
+- 检查所有 `registerSocketHandlers` / `unregisterSocketHandlers` 成对出现，并确认页面销毁后不残留 Store、ViewModel、Socket、定时器和动画帧订阅。
+- 检查每个新增 selector、presentation builder 和 Store 更新入口都有生产调用者，删除仅被测试调用的死代码。
+- 检查 `GameController`、`GamePage`、`GameViewModel` 的初始化和销毁顺序，确保登录初始化数据只写入 Store 一次，页面重建不会复用旧 Store 状态。
+- 检查 `packages/shared/src/types/socket-events.ts` 中每个客户端事件和服务端事件都有唯一注册/消费闭环，避免留下未消费协议。
+- 将现有 lint warning 分类为必须修复、需要架构拆分和明确允许三类；本阶段修复前两类中不涉及服务端经济重构的项目，并在报告中列出允许保留项及原因。
+- 检查 Jest worker、Socket、定时器和 Mongo mock 的 teardown；若全量测试仍提示 open handles，必须定位并修复，不以强制退出作为通过依据。
 - 更新 `docs/architecture/GAMEPLAY_UI_HANDOFF.md`，明确最终状态边界和服务端经济服务 backlog。
 - 执行：
 
@@ -78,6 +86,7 @@ git diff --check
 ```
 
 - 修复所有 error；warning 必须逐项记录原因，能安全消除的必须消除。
+- 运行一次生产源码架构扫描，并将扫描命令和零命中结果记录到交付报告。
 - 最终检查工作区、提交记录和未提交文件，提交：`chore: enforce client state architecture boundaries`。
 
 ## 测试要求
@@ -96,4 +105,3 @@ git diff --check
 - 服务端事件只有一个客户端消费入口。
 - 现金、位置、资产、状态和动态格子没有第二份长期业务状态。
 - 全量测试、类型检查、lint、构建和 diff 检查通过。
-
