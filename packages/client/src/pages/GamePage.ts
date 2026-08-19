@@ -64,6 +64,7 @@ import {
   setTeamPanelContentEl,
   setTopBarProsperityEl, setTopBarProsperityFillEl, setTopBarRegionFieldsEl,
   setTopBarTimeEl, setValueFieldDefs,
+  setCurrentPlayer, setCurrentPlayerPosition, setOtherPlayers, setCanRoll,
   // 辅助函数
   // 类型
   type RegionInfo,
@@ -109,6 +110,7 @@ let gameViewModel: GameViewModel | null = null;
 let gameStore: GameStore | null = null;
 let gameHudShell: GameHudShell | null = null;
 let unregisterHudRefresh: (() => void) | null = null;
+let unsubscribeGameStore: (() => void) | null = null;
 
 // ===== 入口函数 =====
 
@@ -122,6 +124,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   const designSnapshot = new DesignAdapter(getThemeTokens((globalThis as { __GAME_THEME__?: string }).__GAME_THEME__ ?? 'northeast')).createSnapshot('day');
   applyGamePageThemeSnapshot(page, designSnapshot);
   gameStore = new GameStore();
+  unsubscribeGameStore = gameStore.subscribe(() => syncLegacyStateFromStore());
   setChatStore(gameStore);
   gameViewModel = new GameViewModel(gameStore, context.playerName || t('game.defaultPlayerName'));
   const effects = new NoOpEffectHooks();
@@ -530,6 +533,15 @@ function syncViewModel(): void {
   gameViewModel.updateDayNight({ cycleStartTime: dayNightStartTime, cycleDuration: DAY_NIGHT_CYCLE, serverTimeOffset });
 }
 
+function syncLegacyStateFromStore(): void {
+  if (!gameStore) return;
+  const snapshot = gameStore.getSnapshot();
+  setCurrentPlayer(snapshot.currentPlayer);
+  setCurrentPlayerPosition(snapshot.currentPlayerPosition);
+  setOtherPlayers(snapshot.otherPlayers);
+  setCanRoll(snapshot.canRoll);
+}
+
 // ===== Tutorial System =====
 
 export function cleanupGamePage(page: HTMLElement): void {
@@ -538,6 +550,8 @@ export function cleanupGamePage(page: HTMLElement): void {
   gameHudShell?.destroy();
   gameHudShell = null;
   gameViewModel = null;
+  unsubscribeGameStore?.();
+  unsubscribeGameStore = null;
   setChatStore(null);
   gameStore?.reset();
   gameStore = null;

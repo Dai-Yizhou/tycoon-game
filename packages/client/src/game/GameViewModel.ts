@@ -236,7 +236,11 @@ export class GameViewModel {
 
   constructor(store: GameStore | null = null, displayName = '玩家') {
     this.store = store;
-    this.unsubscribeStore = store?.subscribe(() => this.notify('chat', 'store')) ?? null;
+    this.unsubscribeStore = store?.subscribe(() => {
+      this.notify('player', 'store');
+      this.notify('movement', 'store');
+      this.notify('chat', 'store');
+    }) ?? null;
     this.player.currentPlayerName = displayName;
   }
 
@@ -364,7 +368,10 @@ export class GameViewModel {
   getPlayer(): PlayerSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { ...this.player, currentPlayer: snapshot.currentPlayer, currentPlayerPosition: snapshot.currentPlayerPosition, currentMoney: snapshot.currentMoney, currentCredit: snapshot.currentCredit, currentEnv: snapshot.currentEnv, isBankrupt: snapshot.isBankrupt, currentPlayerName: this.projectPlayerName() } : this.player; }
 
   // ===== Movement =====
-  getMovement(): MovementSlice { return this.movement; }
+  getMovement(): MovementSlice {
+    const snapshot = this.projectedSnapshot();
+    return snapshot ? { ...this.movement, canRoll: snapshot.canRoll } : this.movement;
+  }
   updateMovement(partial: Partial<MovementSlice>, source = 'ui'): void {
     Object.assign(this.movement, partial);
     this.notify('movement', source);

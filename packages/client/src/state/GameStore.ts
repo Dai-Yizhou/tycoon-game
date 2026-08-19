@@ -328,6 +328,7 @@ export interface ClientGameSnapshot {
   isInJail: boolean;
   jailEndTime: number;
   canRoll: boolean;
+  diceAnimating: boolean;
   teamMembers: TeamMember[];
   ownedProperties: Set<number>;
   propertyLevels: Map<number, number>;
@@ -368,7 +369,7 @@ export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     currentMoney: 2000, currentCredit: 50, currentEnv: 0, isBankrupt: false,
-    isInJail: false, jailEndTime: 0, canRoll: true, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [],
+    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [],
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
 
@@ -380,6 +381,11 @@ export class GameStore {
 
   setCanRoll(value: boolean): void {
     this.snapshot = { ...this.snapshot, canRoll: value };
+    this.publish();
+  }
+
+  setDiceAnimating(value: boolean): void {
+    this.snapshot = { ...this.snapshot, diceAnimating: value };
     this.publish();
   }
 
@@ -478,6 +484,7 @@ export class GameStore {
       isInJail: false,
       jailEndTime: 0,
       canRoll: true,
+      diceAnimating: false,
       teamMembers: [],
       ownedProperties: new Set(),
       propertyLevels: new Map(),

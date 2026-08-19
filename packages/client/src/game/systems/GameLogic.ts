@@ -35,7 +35,8 @@ export function handleRollDice(store?: GameStore, socket?: TypedClientSocket | n
   const bankrupt = snapshot?.isBankrupt ?? isBankrupt;
   const waitingForChoice = snapshot ? false : isWaitingForChoice;
   const jailed = snapshot?.isInJail ?? isInJail;
-  if (!available || moving || diceAnimating || bankrupt || waitingForChoice) return;
+  const animating = snapshot?.diceAnimating ?? diceAnimating;
+  if (!available || moving || animating || bankrupt || waitingForChoice) return;
   if (jailed) {
     addChatMessage(t('jail.stillInJail'), 'system');
     return;
@@ -51,11 +52,12 @@ export function handleRollDice(store?: GameStore, socket?: TypedClientSocket | n
     activeSocket.emit('client.rollDice', {}, (result: { ok: boolean; data?: { dice: number }; error?: string }) => {
       if (result.ok && result.data) {
         setDiceValue(result.data.dice);
-        setDiceAnimating(true);
+        if (store) store.setDiceAnimating(true);
+        else setDiceAnimating(true);
         setDiceAnimStart(performance.now());
         setRollCooldownEnd(Date.now() + rollCooldown);
         addChatMessage(t('dice.rolled', { value: result.data.dice }), 'system');
-        startRollCooldownTimer();
+        startRollCooldownTimer(store);
       } else {
         addChatMessage(t('dice.rollFailed', { error: result.error || t('dice.unknownError') }), 'error');
         if (store) store.setCanRoll(true);
@@ -69,13 +71,16 @@ export function handleRollDice(store?: GameStore, socket?: TypedClientSocket | n
   }
 }
 
-export function startRollCooldownTimer(): void {
+export function startRollCooldownTimer(store?: GameStore): void {
   if (rollCooldownTimer) clearInterval(rollCooldownTimer);
   const update = () => {
     const remaining = rollCooldownEnd - Date.now();
     if (remaining <= 0) {
       if (rollCooldownTimer) { clearInterval(rollCooldownTimer); setRollCooldownTimer(null); }
-      setCanRoll(true);
+      if (store) store.setCanRoll(true);
+      else setCanRoll(true);
+      if (store) store.setDiceAnimating(false);
+      else setDiceAnimating(false);
       if (rollBtn) {
         rollBtn.disabled = false;
         rollBtn.classList.remove('disabled', 'cooldown');

@@ -105,4 +105,28 @@ describe('GameStore authority', () => {
       timestamp: 100,
     }]);
   });
+
+  it('在掷骰完成后允许下一次操作并结束骰子动画状态', () => {
+    const store = new GameStore();
+
+    store.setCanRoll(false);
+    store.setDiceAnimating(true);
+    store.setCanRoll(true);
+    store.setDiceAnimating(false);
+
+    expect(store.getSnapshot().canRoll).toBe(true);
+    expect(store.getSnapshot().diceAnimating).toBe(false);
+  });
+
+  it('让 GameViewModel 在 Store 掷骰状态变化后刷新移动切片', () => {
+    const store = new GameStore();
+    const viewModel = new GameViewModel(store);
+    const listener = jest.fn();
+    viewModel.subscribe('movement', listener);
+
+    store.setCanRoll(false);
+
+    expect(viewModel.getMovement().canRoll).toBe(false);
+    expect(listener).toHaveBeenCalled();
+  });
 });

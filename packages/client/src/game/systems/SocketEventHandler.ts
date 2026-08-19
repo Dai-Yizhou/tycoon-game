@@ -215,10 +215,11 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     const activePlayer = store?.getSnapshot().currentPlayer ?? currentPlayer;
     if (activePlayer && payload.playerId === activePlayer.id) {
       store?.applyEvent({ sequence: store.nextSequence(), type: 'move', playerId: payload.playerId, cellId: payload.cellId });
+      setCurrentPlayerPosition(payload.cellId);
       if (payload.path && payload.path.length > 1 && !isServerAnimating) {
         startServerPathAnimation(payload.path);
       } else {
-        setCurrentPlayerPosition(payload.cellId);
+        requestHudRefresh();
       }
     }
   });
