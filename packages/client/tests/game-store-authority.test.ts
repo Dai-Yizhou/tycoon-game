@@ -151,4 +151,13 @@ describe('GameStore authority', () => {
     expect(store.getCell(4)).toEqual(cell);
     expect(store.getSnapshot().cells.get(4)).toEqual(cell);
   });
+
+  it('地产升级事件标记本次停留已使用行动，移动后恢复', () => {
+    const store = new GameStore();
+    store.applyEvent({ sequence: 1, type: 'player', player: { id: 'p1', position: { cellId: 4 }, values: {} } as never });
+    store.applyEvent({ sequence: 2, type: 'property', playerId: 'p1', cellId: 4, level: 1 });
+    expect(store.getSnapshot().actionUsedThisTurn).toBe(true);
+    store.applyEvent({ sequence: 3, type: 'move', playerId: 'p1', cellId: 5 });
+    expect(store.getSnapshot().actionUsedThisTurn).toBe(false);
+  });
 });

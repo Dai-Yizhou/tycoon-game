@@ -64,7 +64,7 @@ import {
   setTeamPanelContentEl,
   setTopBarProsperityEl, setTopBarProsperityFillEl, setTopBarRegionFieldsEl,
   setTopBarTimeEl, setValueFieldDefs,
-  setCurrentPlayer, setCurrentPlayerPosition, setOtherPlayers, setCanRoll,
+  setCurrentPlayer, setCurrentPlayerPosition, setOtherPlayers, setCanRoll, setActionUsedThisTurn,
   // 辅助函数
   // 类型
   type RegionInfo,
@@ -569,7 +569,7 @@ function syncViewModel(): void {
 function syncCellActions(cellId: number): void {
   if (!gameViewModel || !mapIndex) return;
   const snapshot = gameStore?.getSnapshot();
-  const cell = mapIndex.getById(cellId);
+  const cell = gameStore?.getCell(cellId) ?? mapIndex.getById(cellId);
   if (!cell || !snapshot) {
     gameViewModel.setCellActions([], 'store');
     return;
@@ -577,16 +577,23 @@ function syncCellActions(cellId: number): void {
   const extra = cell.extra;
   const type = String(extra.type ?? 'empty');
   const price = Number(extra.price ?? 0);
-  const owned = snapshot.ownedProperties.has(cellId);
+  const ownerships = Array.isArray(extra.ownerships) ? extra.ownerships as Array<{ playerId: string; share: number }> : [];
+  const currentPlayerId = snapshot.currentPlayer?.id;
+  const owned = Boolean(currentPlayerId && ownerships.some(ownership => ownership.playerId === currentPlayerId && ownership.share > 0));
   const level = snapshot.propertyLevels.get(cellId) ?? 0;
+  const canAfford = snapshot.currentMoney >= price;
   const actions = type === 'property'
     ? owned
-      ? [{ id: 'upgrade-property', label: '升级', detail: `$${Number((extra.upgradeCost as number[] | undefined)?.[level] ?? 0)}`, enabled: !snapshot.isBankrupt }]
-      : [{ id: 'buy-property', label: '购买', detail: `$${price}`, enabled: !snapshot.isBankrupt }]
+      ? snapshot.actionUsedThisTurn
+        ? []
+        : Number((extra.upgradeCost as number[] | undefined)?.[level] ?? 0) > 0
+          ? [{ id: 'upgrade-property', label: '升级', detail: `$${Number((extra.upgradeCost as number[] | undefined)?.[level] ?? 0)}`, enabled: !snapshot.isBankrupt }]
+          : []
+      : [{ id: 'buy-property', label: '购买', detail: `$${price}`, enabled: !snapshot.isBankrupt && canAfford }]
     : type === 'investment'
       ? snapshot.ownedInvestments.has(cellId)
         ? []
-        : [{ id: 'buy-investment', label: '全额投资', detail: `$${price}`, enabled: !snapshot.isBankrupt }, { id: 'co-invest', label: '合租投资', detail: '共享份额', enabled: !snapshot.isBankrupt }]
+        : [{ id: 'buy-investment', label: '全额投资', detail: `$${price}`, enabled: !snapshot.isBankrupt && canAfford }, { id: 'co-invest', label: '合租投资', detail: '共享份额', enabled: !snapshot.isBankrupt && canAfford }]
       : type === 'transport'
         ? [{ id: 'transport', label: '传送', detail: `$${Number(extra.transportCost ?? 0)}`, enabled: !snapshot.isBankrupt }]
         : type === 'monument'
@@ -602,6 +609,7 @@ function syncLegacyStateFromStore(): void {
   setCurrentPlayerPosition(snapshot.currentPlayerPosition);
   setOtherPlayers(snapshot.otherPlayers);
   setCanRoll(snapshot.canRoll);
+  setActionUsedThisTurn(snapshot.actionUsedThisTurn);
 }
 
 // ===== Tutorial System =====

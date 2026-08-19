@@ -25,9 +25,9 @@ describe('GameStore server sequence', () => {
 
   it('projects property and investment events into the snapshot', () => {
     const store = new GameStore();
-    store.applyEvent({ sequence: 1, type: 'property', cellId: 4, level: 0 });
-    store.applyEvent({ sequence: 2, type: 'property', cellId: 4, level: 2 });
-    store.applyEvent({ sequence: 3, type: 'investment', cellId: 8, share: 0.5 });
+    store.applyEvent({ sequence: 1, type: 'property', playerId: 'p1', cellId: 4, level: 0 });
+    store.applyEvent({ sequence: 2, type: 'property', playerId: 'p1', cellId: 4, level: 2 });
+    store.applyEvent({ sequence: 3, type: 'investment', playerId: 'p1', cellId: 8, share: 0.5 });
     expect(store.getSnapshot().ownedProperties).toEqual(new Set([4]));
     expect(store.getSnapshot().propertyLevels.get(4)).toBe(2);
     expect(store.getSnapshot().investmentShares.get(8)).toBe(0.5);

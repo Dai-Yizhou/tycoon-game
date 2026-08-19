@@ -163,7 +163,7 @@ export function handleBuyProperty(): void {
 }
 
 export function handleUpgradeProperty(): void {
-  if (!mapIndex || !gameSocket) return;
+  if (!mapIndex || actionUsedThisTurn || !gameSocket) return;
   const cell = mapIndex.getById(currentPlayerPosition);
   if (!cell || cType(cell) !== 'property') return;
   gameSocket.emit('client.upgradeProperty', { cellId: cell.id }, (result) => {

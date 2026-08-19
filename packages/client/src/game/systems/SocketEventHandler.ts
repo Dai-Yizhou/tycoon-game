@@ -124,13 +124,13 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 
   socket.on('server.propertyBought', (payload) => {
     store?.setCell(payload.cell);
-    store?.applyEvent({ sequence: store.nextSequence(), type: 'property', cellId: payload.cell.id, level: 0 });
+    store?.applyEvent({ sequence: store.nextSequence(), type: 'property', playerId: payload.playerId, cellId: payload.cell.id, level: 0 });
     requestHudRefresh();
   });
 
   socket.on('server.propertyUpgraded', (payload) => {
     store?.setCell(payload.cell);
-    store?.applyEvent({ sequence: store.nextSequence(), type: 'property', cellId: payload.cell.id, level: payload.newLevel });
+    store?.applyEvent({ sequence: store.nextSequence(), type: 'property', playerId: payload.playerId, cellId: payload.cell.id, level: payload.newLevel });
     requestHudRefresh();
   });
 
@@ -138,7 +138,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     store?.setCell(payload.cell);
     const ownerships = Array.isArray(payload.cell.extra?.ownerships) ? payload.cell.extra.ownerships as Array<{ playerId: string; share: number }> : [];
     const ownership = ownerships.find((item) => item.playerId === payload.playerId);
-    if (ownership) store?.applyEvent({ sequence: store.nextSequence(), type: 'investment', cellId: payload.cell.id, share: ownership.share });
+    if (ownership) store?.applyEvent({ sequence: store.nextSequence(), type: 'investment', playerId: payload.playerId, cellId: payload.cell.id, share: ownership.share });
     requestHudRefresh();
   });
 

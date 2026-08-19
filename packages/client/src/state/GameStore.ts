@@ -329,6 +329,7 @@ export interface ClientGameSnapshot {
   jailEndTime: number;
   canRoll: boolean;
   diceAnimating: boolean;
+  actionUsedThisTurn: boolean;
   teamMembers: TeamMember[];
   ownedProperties: Set<number>;
   propertyLevels: Map<number, number>;
@@ -348,8 +349,8 @@ export type ClientGameEvent =
   | { sequence: number; type: 'otherPlayerValue'; playerId: string; current: number }
   | { sequence: number; type: 'otherPlayerStatus'; playerId: string; status: OtherPlayerInfo['status'] }
   | { sequence: number; type: 'otherPlayerMove'; playerId: string; cellId: number }
-  | { sequence: number; type: 'property'; cellId: number; level: number }
-  | { sequence: number; type: 'investment'; cellId: number; share: number }
+  | { sequence: number; type: 'property'; playerId: string; cellId: number; level: number }
+  | { sequence: number; type: 'investment'; playerId: string; cellId: number; share: number }
   | { sequence: number; type: 'move'; playerId: string; cellId: number };
 
 export interface ServerGameSnapshot {
@@ -370,7 +371,7 @@ export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     currentMoney: 2000, currentCredit: 50, currentEnv: 0, isBankrupt: false,
-    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(),
+    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(),
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
 
@@ -456,13 +457,13 @@ export class GameStore {
       const propertyLevels = new Map(this.snapshot.propertyLevels);
       ownedProperties.add(event.cellId);
       propertyLevels.set(event.cellId, event.level);
-      this.snapshot = { ...this.snapshot, sequence: event.sequence, ownedProperties, propertyLevels };
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, ownedProperties, propertyLevels, actionUsedThisTurn: event.playerId === this.snapshot.currentPlayer?.id ? true : this.snapshot.actionUsedThisTurn };
     } else if (event.type === 'investment') {
       const ownedInvestments = new Set(this.snapshot.ownedInvestments);
       const investmentShares = new Map(this.snapshot.investmentShares);
       ownedInvestments.add(event.cellId);
       investmentShares.set(event.cellId, event.share);
-      this.snapshot = { ...this.snapshot, sequence: event.sequence, ownedInvestments, investmentShares };
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, ownedInvestments, investmentShares, actionUsedThisTurn: event.playerId === this.snapshot.currentPlayer?.id ? true : this.snapshot.actionUsedThisTurn };
     } else if (event.type === 'value' && this.snapshot.currentPlayer?.id === event.playerId) {
       const player = { ...this.snapshot.currentPlayer, values: { ...this.snapshot.currentPlayer.values, [event.fieldId]: { ...this.snapshot.currentPlayer.values[event.fieldId], current: event.current } } };
       this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: player, currentMoney: event.fieldId === 'money' ? event.current : this.snapshot.currentMoney, currentCredit: event.fieldId === 'credit' ? event.current : this.snapshot.currentCredit, currentEnv: event.fieldId === 'env' || event.fieldId === 'environment' ? event.current : this.snapshot.currentEnv };
@@ -477,7 +478,7 @@ export class GameStore {
     } else if (event.type === 'otherPlayerMove') {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, otherPlayers: this.snapshot.otherPlayers.map((player) => player.id === event.playerId ? { ...player, position: { cellId: event.cellId } } : player) };
     } else if (event.type === 'move' && this.snapshot.currentPlayer?.id === event.playerId) {
-      this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: { ...this.snapshot.currentPlayer, position: { cellId: event.cellId } }, currentPlayerPosition: event.cellId };
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: { ...this.snapshot.currentPlayer, position: { cellId: event.cellId } }, currentPlayerPosition: event.cellId, actionUsedThisTurn: false };
     }
     this.publish();
   }
@@ -504,6 +505,7 @@ export class GameStore {
       jailEndTime: 0,
       canRoll: true,
       diceAnimating: false,
+      actionUsedThisTurn: false,
       teamMembers: [],
       ownedProperties: new Set(),
       propertyLevels: new Map(),

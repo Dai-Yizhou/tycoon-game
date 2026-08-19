@@ -387,7 +387,7 @@ export class GameViewModel {
   }
 
   // ===== Player =====
-  getPlayer(): PlayerSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { ...this.player, currentPlayer: snapshot.currentPlayer, currentPlayerPosition: snapshot.currentPlayerPosition, currentMoney: snapshot.currentMoney, currentCredit: snapshot.currentCredit, currentEnv: snapshot.currentEnv, isBankrupt: snapshot.isBankrupt, ownedProperties: snapshot.ownedProperties, propertyLevels: snapshot.propertyLevels, ownedInvestments: snapshot.ownedInvestments, investmentShares: snapshot.investmentShares, currentPlayerName: this.projectPlayerName() } : this.player; }
+  getPlayer(): PlayerSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { ...this.player, currentPlayer: snapshot.currentPlayer, currentPlayerPosition: snapshot.currentPlayerPosition, currentMoney: snapshot.currentMoney, currentCredit: snapshot.currentCredit, currentEnv: snapshot.currentEnv, isBankrupt: snapshot.isBankrupt, actionUsedThisTurn: snapshot.actionUsedThisTurn, ownedProperties: snapshot.ownedProperties, propertyLevels: snapshot.propertyLevels, ownedInvestments: snapshot.ownedInvestments, investmentShares: snapshot.investmentShares, currentPlayerName: this.projectPlayerName() } : this.player; }
 
   // ===== Movement =====
   getMovement(): MovementSlice {
