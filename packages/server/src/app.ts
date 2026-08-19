@@ -33,7 +33,7 @@ import { BehaviorEngine } from './behavior/index.js';
 import { EraManager } from './era/index.js';
 import { InMemoryPlayerStore, MongoPlayerStore, MongoUserStore, InMemoryEraStore, InMemoryWorldStore, FileWorldStore, type PlayerStore, type WorldStore } from './storage/index.js';
 import { JWTService } from './auth/JWTService.js';
-import { AuthService, type GameStateStore, type UserStore } from './auth/AuthService.js';
+import { AuthService, type UserStore } from './auth/AuthService.js';
 import { InMemoryUserStore } from './auth/InMemoryUserStore.js';
 import { createAuthRouter } from './auth/authRoutes.js';
 
@@ -150,13 +150,8 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   const authJwt = deps.socketManagerOptions?.jwtService ?? (process.env.JWT_SECRET?.trim()
     ? new JWTService()
     : new JWTService({ secret: 'development-only-secret', expiresIn: 7 * 24 * 60 * 60 }));
-  const gameStateStore: GameStateStore = {
-    saveGameState: async () => undefined,
-    loadGameState: async () => null,
-    deleteGameState: async () => undefined,
-  };
   const userStore = deps.userStore ?? (config.mongoUri ? new MongoUserStore(config.mongoUri) : new InMemoryUserStore());
-  const authService = deps.authService ?? new AuthService(userStore, gameStateStore, authJwt);
+  const authService = deps.authService ?? new AuthService(userStore, authJwt);
   app.use('/api/auth', createAuthRouter(authService));
 
   // 请求日志

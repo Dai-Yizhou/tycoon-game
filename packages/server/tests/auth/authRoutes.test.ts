@@ -1,9 +1,9 @@
 import express from 'express';
 import request from 'supertest';
-import { AuthService, type GameStateStore, type UserStore } from '../../src/auth/AuthService';
+import { AuthService, type UserStore } from '../../src/auth/AuthService';
 import { JWTService } from '../../src/auth/JWTService';
 import { createAuthRouter } from '../../src/auth/authRoutes';
-import type { PlayerGameState, UserAccount } from '@game/shared';
+import type { UserAccount } from '@game/shared';
 
 class TestUserStore implements UserStore {
   private readonly users = new Map<string, UserAccount>();
@@ -25,17 +25,10 @@ class TestUserStore implements UserStore {
   }
 }
 
-class TestGameStateStore implements GameStateStore {
-  async saveGameState(_state: PlayerGameState): Promise<void> {}
-  async loadGameState(_userId: string): Promise<PlayerGameState | null> { return null; }
-  async deleteGameState(_userId: string): Promise<void> {}
-}
-
 function createTestApp() {
   const userStore = new TestUserStore();
   const authService = new AuthService(
     userStore,
-    new TestGameStateStore(),
     new JWTService({ secret: 'test-secret', expiresIn: 3600 }),
   );
   const app = express();

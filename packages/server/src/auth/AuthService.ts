@@ -11,7 +11,6 @@ import type {
   RegisterRequest,
   LoginRequest,
   GuestMigrationRequest,
-  PlayerGameState,
 } from '@game/shared';
 import { JWTService } from './JWTService.js';
 import { logger } from '../utils/logger.js';
@@ -31,18 +30,6 @@ export interface UserStore {
   /** 列出所有用户（可选） */
   listUsers?(): Promise<UserAccount[]>;
   close?(): Promise<void>;
-}
-
-/**
- * 游戏状态存储接口
- */
-export interface GameStateStore {
-  /** 保存游戏状态 */
-  saveGameState(state: PlayerGameState): Promise<void>;
-  /** 加载游戏状态 */
-  loadGameState(userId: string): Promise<PlayerGameState | null>;
-  /** 删除游戏状态 */
-  deleteGameState(userId: string): Promise<void>;
 }
 
 /**
@@ -76,18 +63,15 @@ export const DEFAULT_AUTH_CONFIG: Omit<AuthConfig, 'jwt'> = {
  */
 export class AuthService {
   private readonly userStore: UserStore;
-  private readonly gameStateStore: GameStateStore;
   private readonly jwtService: JWTService;
   private readonly config: Omit<AuthConfig, 'jwt'>;
 
   constructor(
     userStore: UserStore,
-    gameStateStore: GameStateStore,
     jwtService: JWTService = new JWTService(),
     config: Omit<AuthConfig, 'jwt'> = DEFAULT_AUTH_CONFIG,
   ) {
     this.userStore = userStore;
-    this.gameStateStore = gameStateStore;
     this.jwtService = jwtService;
     this.config = config;
   }
@@ -365,39 +349,4 @@ export class AuthService {
     return user;
   }
 
-  /**
-   * 保存游戏状态（离线冻结）
-   *
-   * @param userId 用户 ID
-   * @param state 游戏状态
-   */
-  async saveGameState(userId: string, state: PlayerGameState): Promise<void> {
-    state.savedAt = Date.now();
-    await this.gameStateStore.saveGameState(state);
-    logger.debug(`Game state saved for user: ${userId}`);
-  }
-
-  /**
-   * 加载游戏状态（上线恢复）
-   *
-   * @param userId 用户 ID
-   * @returns 游戏状态，不存在返回 null
-   */
-  async loadGameState(userId: string): Promise<PlayerGameState | null> {
-    const state = await this.gameStateStore.loadGameState(userId);
-    if (state) {
-      logger.debug(`Game state loaded for user: ${userId}`);
-    }
-    return state;
-  }
-
-  /**
-   * 清除游戏状态
-   *
-   * @param userId 用户 ID
-   */
-  async clearGameState(userId: string): Promise<void> {
-    await this.gameStateStore.deleteGameState(userId);
-    logger.debug(`Game state cleared for user: ${userId}`);
-  }
 }

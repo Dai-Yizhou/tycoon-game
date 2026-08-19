@@ -4,7 +4,7 @@
 
 import { AuthService } from '../../src/auth/AuthService.js';
 import { JWTService } from '../../src/auth/JWTService.js';
-import type { UserAccount, PlayerGameState } from '@game/shared';
+import type { UserAccount } from '@game/shared';
 
 // 模拟存储
 class MockUserStore {
@@ -32,36 +32,18 @@ class MockUserStore {
   }
 }
 
-class MockGameStateStore {
-  private states: Map<string, PlayerGameState> = new Map();
-
-  async saveGameState(state: PlayerGameState): Promise<void> {
-    this.states.set(state.userId, state);
-  }
-
-  async loadGameState(userId: string): Promise<PlayerGameState | null> {
-    return this.states.get(userId) ?? null;
-  }
-
-  async deleteGameState(userId: string): Promise<void> {
-    this.states.delete(userId);
-  }
-}
-
 describe('AuthService', () => {
   let authService: AuthService;
   let userStore: MockUserStore;
-  let gameStateStore: MockGameStateStore;
   let jwtService: JWTService;
 
   beforeEach(() => {
     userStore = new MockUserStore();
-    gameStateStore = new MockGameStateStore();
     jwtService = new JWTService({
       secret: 'test-secret',
       expiresIn: 3600,
     });
-    authService = new AuthService(userStore as any, gameStateStore as any, jwtService);
+    authService = new AuthService(userStore as any, jwtService);
   });
 
   describe('validateUsername', () => {
