@@ -96,6 +96,8 @@ import { registerHudRefresh } from '../game/ClientHudBridge.js';
 
 import {
   handleRollDice,
+  handleBuyProperty, handleUpgradeProperty, handleBuyInvestment, handleCoInvest,
+  handleTransport, handleRestoreMonument,
 } from '../game/systems/GameLogic.js';
 
 import {
@@ -125,7 +127,6 @@ export function createGamePage(controller: GameController): HTMLElement {
   const designSnapshot = new DesignAdapter(getThemeTokens((globalThis as { __GAME_THEME__?: string }).__GAME_THEME__ ?? 'northeast')).createSnapshot('day');
   applyGamePageThemeSnapshot(page, designSnapshot);
   gameStore = new GameStore();
-  unsubscribeGameStore = gameStore.subscribe(() => syncLegacyStateFromStore());
   setChatStore(gameStore);
   gameViewModel = new GameViewModel(gameStore, context.playerName || t('game.defaultPlayerName'));
   const effects = new NoOpEffectHooks();
@@ -141,6 +142,18 @@ export function createGamePage(controller: GameController): HTMLElement {
   boardContainer.appendChild(canvas);
   const interactiveMap = new InteractiveMapSurface();
   boardContainer.appendChild(interactiveMap.getElement());
+  unsubscribeGameStore = gameStore.subscribe((snapshot) => {
+    syncLegacyStateFromStore();
+    const players = snapshot.currentPlayer
+      ? [snapshot.currentPlayer, ...snapshot.otherPlayers.map(p => ({
+        ...p,
+        values: { money: { current: p.primaryValue ?? 0 } },
+      } as any))]
+      : [];
+    interactiveMap.updatePlayers(players);
+    interactiveMap.followPlayer(snapshot.currentPlayerPosition);
+    syncCellActions(snapshot.currentPlayerPosition);
+  });
   setCanvasEl(canvas);
   page.appendChild(boardContainer);
 
@@ -157,6 +170,17 @@ export function createGamePage(controller: GameController): HTMLElement {
     onPathChoice: (cellId) => {
       onIntersectionChoice(cellId);
       gameViewModel?.clearPathChoice('path-choice');
+    },
+    onCellAction: (actionId) => {
+      const actions: Record<string, () => void> = {
+        'buy-property': handleBuyProperty,
+        'upgrade-property': handleUpgradeProperty,
+        'buy-investment': handleBuyInvestment,
+        'co-invest': handleCoInvest,
+        transport: handleTransport,
+        'restore-monument': handleRestoreMonument,
+      };
+      actions[actionId]?.();
     },
     onChatSend: (message, channel) => {
       if (!gameSocket) {
@@ -195,12 +219,14 @@ export function createGamePage(controller: GameController): HTMLElement {
       const snapshot = gameStore!.getSnapshot();
       if (snapshot.currentPlayer) {
         interactiveMap.render(mapData, [snapshot.currentPlayer, ...snapshot.otherPlayers.map(p => ({ ...p, values: { money: { current: p.primaryValue ?? 0 } } } as any))]);
+        interactiveMap.followPlayer(snapshot.currentPlayerPosition);
       }
       const startCell = mapIndex!.getById(0);
       if (startCell) {
         setPlayerDisplayPos(startCell.x, startCell.y);
         setCameraTarget(startCell.x, startCell.y);
       }
+      syncCellActions(snapshot.currentPlayerPosition);
       centerCameraOnCell(snapshot.currentPlayerPosition || 0);
       startRenderLoop(gameStore!);
       syncViewModel();
@@ -376,10 +402,6 @@ function getFallbackMapData(): unknown[] {
 
 // ===== Render Loop =====
 
-function hideIntersectionChoice(): void {
-  document.getElementById('intersection-choice')?.remove();
-}
-
 function initTeam(): void {
   // 向服务端查询当前队伍状态（若已组队则服务端返回完整成员显示数据）
   if (gameSocket) {
@@ -540,6 +562,35 @@ function syncViewModel(): void {
   gameViewModel.updateDayNight({ cycleStartTime: dayNightStartTime, cycleDuration: DAY_NIGHT_CYCLE, serverTimeOffset });
 }
 
+function syncCellActions(cellId: number): void {
+  if (!gameViewModel || !mapIndex) return;
+  const snapshot = gameStore?.getSnapshot();
+  const cell = mapIndex.getById(cellId);
+  if (!cell || !snapshot) {
+    gameViewModel.setCellActions([], 'store');
+    return;
+  }
+  const extra = cell.extra;
+  const type = String(extra.type ?? 'empty');
+  const price = Number(extra.price ?? 0);
+  const owned = snapshot.ownedProperties.has(cellId);
+  const level = snapshot.propertyLevels.get(cellId) ?? 0;
+  const actions = type === 'property'
+    ? owned
+      ? [{ id: 'upgrade-property', label: '升级', detail: `$${Number((extra.upgradeCost as number[] | undefined)?.[level] ?? 0)}`, enabled: !snapshot.isBankrupt }]
+      : [{ id: 'buy-property', label: '购买', detail: `$${price}`, enabled: !snapshot.isBankrupt }]
+    : type === 'investment'
+      ? snapshot.ownedInvestments.has(cellId)
+        ? []
+        : [{ id: 'buy-investment', label: '全额投资', detail: `$${price}`, enabled: !snapshot.isBankrupt }, { id: 'co-invest', label: '合租投资', detail: '共享份额', enabled: !snapshot.isBankrupt }]
+      : type === 'transport'
+        ? [{ id: 'transport', label: '传送', detail: `$${Number(extra.transportCost ?? 0)}`, enabled: !snapshot.isBankrupt }]
+        : type === 'monument'
+          ? [{ id: 'restore-monument', label: '修缮', detail: `$${Number(extra.monumentCost ?? 0)}`, enabled: !snapshot.isBankrupt }]
+          : [];
+  gameViewModel.setCellActions(actions, 'store');
+}
+
 function syncLegacyStateFromStore(): void {
   if (!gameStore) return;
   const snapshot = gameStore.getSnapshot();
@@ -574,7 +625,6 @@ export function cleanupGamePage(page: HTMLElement): void {
     clearInterval(prosperityTimer);
     setProsperityTimer(null);
   }
-  hideIntersectionChoice();
   if (notificationCenter) {
     notificationCenter.destroy();
     notificationCenter = null;

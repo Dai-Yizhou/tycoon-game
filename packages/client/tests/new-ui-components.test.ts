@@ -1,4 +1,5 @@
 import { GameHudShell } from "../src/components/GameHudShell.js";
+import { InteractiveMapSurface } from "../src/components/InteractiveMapSurface.js";
 import { GameViewModel } from "../src/game/GameViewModel.js";
 import { NoOpEffectHooks } from "../src/game/GameEffects.js";
 
@@ -36,5 +37,26 @@ describe("GameHudShell", () => {
     (root.querySelector('[data-action="path-choice"][data-cell-id="4"]') as HTMLButtonElement).click();
     expect(onPathChoice).toHaveBeenCalledWith(4);
     shell.destroy();
+  });
+
+  it('更新玩家后在可见 SVG 地图中渲染棋子并跟随位置改变视图', () => {
+    const surface = new InteractiveMapSurface();
+    const map = [
+      { id: 1, x: 0, y: 0, destinations: [2], extra: { type: 'start', name: '起点' } },
+      { id: 2, x: 1000, y: 0, destinations: [1], extra: { type: 'property', name: '终点' } },
+    ];
+    const player = {
+      id: 'p1', username: '玩家', position: { cellId: 1 }, status: 'normal',
+      values: { money: { current: 100 } },
+    } as never;
+
+    surface.render(map, []);
+    surface.updatePlayers([player]);
+    expect(surface.getElement().querySelector('[data-player-id="p1"]')).not.toBeNull();
+    const initialViewBox = surface.getElement().querySelector('svg')?.getAttribute('viewBox');
+    surface.followPlayer(2);
+
+    expect(surface.getElement().querySelector('[data-player-id="p1"]')).not.toBeNull();
+    expect(surface.getElement().querySelector('svg')?.getAttribute('viewBox')).not.toBe(initialViewBox);
   });
 });

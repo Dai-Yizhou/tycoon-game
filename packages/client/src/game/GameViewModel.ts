@@ -151,6 +151,13 @@ export interface PathChoiceSlice {
   options: PathChoiceOption[];
 }
 
+export interface CellActionOption {
+  id: string;
+  label: string;
+  detail?: string;
+  enabled: boolean;
+}
+
 /** 队伍成员 */
 export interface TeamMember {
   id: string;
@@ -225,7 +232,7 @@ export type StateChangeKey =
   | 'player' | 'movement' | 'camera' | 'dice' | 'cooldown' | 'jail'
   | 'dayNight'
   | 'regions' | 'chat' | 'team' | 'tutorial' | 'otherPlayers' | 'behavior'
-  | 'pathChoice' | 'all';
+  | 'pathChoice' | 'cellActions' | 'all';
 
 export interface StateChangeEvent {
   key: StateChangeKey;
@@ -316,6 +323,7 @@ export class GameViewModel {
     history: [],
   };
   private pathChoice: PathChoiceSlice = { active: false, options: [] };
+  private cellActions: CellActionOption[] = [];
 
   private team: TeamSlice = { members: [] };
   private tutorial: TutorialSlice = { step: 0, active: false };
@@ -445,6 +453,12 @@ export class GameViewModel {
     this.setPathChoice([], source);
   }
 
+  getCellActions(): CellActionOption[] { return [...this.cellActions]; }
+  setCellActions(actions: CellActionOption[], source = 'external'): void {
+    this.cellActions = actions.map(action => ({ ...action }));
+    this.notify('cellActions', source);
+  }
+
   // ===== Team =====
   getTeam(): TeamSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { members: snapshot.teamMembers as TeamMember[] } : this.team; }
 
@@ -520,6 +534,7 @@ export class GameViewModel {
     this.regions = { mapRegions: [], valueFieldDefs: [], regionProsperityMap: new Map() };
     this.chat = { activeChannels: new Set(['system']), history: [] };
     this.pathChoice = { active: false, options: [] };
+    this.cellActions = [];
     this.team = { members: [] };
     this.tutorial = { step: 0, active: false };
     this.otherPlayers = { players: [] };

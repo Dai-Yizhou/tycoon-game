@@ -5,6 +5,7 @@ export interface GameHudShellConfig {
   onRoll?: () => void;
   onChatSend?: (message: string, channel: string) => void;
   onPathChoice?: (cellId: number) => void;
+  onCellAction?: (actionId: string) => void;
   onCellHover?: (cell: any, x: number, y: number) => void;
   onCellLeave?: () => void;
 }
@@ -112,6 +113,7 @@ export class GameHudShell {
       this.vm.subscribe("dayNight", () => this.update()),
       this.vm.subscribe("chat", () => this.update()),
       this.vm.subscribe("pathChoice", () => this.update()),
+      this.vm.subscribe("cellActions", () => this.update()),
     );
     this.update();
   }
@@ -132,6 +134,7 @@ export class GameHudShell {
     const team = this.vm.getTeam();
     const chat = this.vm.getChat();
     const pathChoice = this.vm.getPathChoice();
+    const cellActions = this.vm.getCellActions();
 
     // Player badge
     const nameEl = this.root.querySelector("[data-ui=player-name]")!;
@@ -159,7 +162,7 @@ export class GameHudShell {
     statusEl.textContent = movement.isMoving ? "移动中" : canRoll ? "就绪" : "冷却中";
 
     const actionCluster = this.root.querySelector('[data-ui="action-cluster"]')!;
-    actionCluster.replaceChildren(...(pathChoice.active ? pathChoice.options.map((option, index) => {
+    const actionButtons = pathChoice.active ? pathChoice.options.map((option, index) => {
       const button = document.createElement('button');
       button.className = 'act-btn act-btn--accent';
       button.dataset.action = 'path-choice';
@@ -171,7 +174,22 @@ export class GameHudShell {
       button.appendChild(detail);
       button.addEventListener('click', () => this.config.onPathChoice?.(option.cellId));
       return button;
-    }) : []));
+    }) : cellActions.map(action => {
+      const button = document.createElement('button');
+      button.className = `act-btn${action.enabled ? ' act-btn--accent' : ''}`;
+      button.dataset.action = action.id;
+      button.disabled = !action.enabled;
+      button.textContent = action.label;
+      if (action.detail) {
+        const detail = document.createElement('span');
+        detail.className = 'act-btn__price';
+        detail.textContent = action.detail;
+        button.appendChild(detail);
+      }
+      button.addEventListener('click', () => this.config.onCellAction?.(action.id));
+      return button;
+    });
+    actionCluster.replaceChildren(...actionButtons);
 
     // Chat messages (last 10)
     const msgsEl = this.root.querySelector("[data-ui=chat-messages]")!;

@@ -61,7 +61,6 @@ export function startNextStep(): void {
     animateMoveTo(available[0]);
   } else {
     setIsWaitingForChoice(true);
-    setIsWaitingForChoice(true);
   }
 }
 

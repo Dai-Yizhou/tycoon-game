@@ -345,7 +345,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .game-page .board-container{z-index:1;background:#1A1C1F}.game-page #game-canvas{opacity:0;pointer-events:none}
 .interactive-map-surface__svg{width:100%;height:100%;display:block;overflow:visible}.map-link{stroke:#555;stroke-width:8;stroke-linecap:round}.map-node{cursor:pointer}.map-node__shape{fill:#2C2F35;stroke:#4A2C2A;stroke-width:3}.map-node:hover .map-node__shape{fill:#34373D;stroke:#D95A2B;stroke-width:5}.map-node__type{fill:#9AA0A6;font:700 13px "SF Mono",monospace;letter-spacing:.08em}.map-node__name{fill:#E6DCC3;font:900 19px Georgia,"Songti SC",serif}.map-node__price{fill:#D95A2B;font:700 15px "SF Mono",monospace}.map-node--event .map-node__shape{stroke:#8C4E3A}.map-node--transport .map-node__shape{stroke:#2F4B7A}.map-node--start .map-node__shape{stroke:#4A7C3F}.map-node--monument .map-node__shape{stroke:#E8C84A}
 
-.map-player{pointer-events:none;filter:drop-shadow(0 3px 2px rgba(0,0,0,.45))}.map-player__head{stroke:#1A1A1A;stroke-width:4}.map-player__body{stroke:#1A1A1A;stroke-width:4;stroke-linejoin:round}
+.map-player{pointer-events:none;filter:drop-shadow(0 3px 2px var(--gp-shadow-color,rgba(0,0,0,.45)))}.map-player__head{fill:var(--gp-player-head,#F2E9D8);stroke:var(--gp-player-outline,#1A1A1A);stroke-width:4}.map-player__body{fill:var(--gp-player-color,var(--gp-accent,#C0392B));stroke:var(--gp-player-outline,#1A1A1A);stroke-width:4;stroke-linejoin:round}
 
 /* 严格全屏地图覆盖层布局 */
 .game-page{position:relative;overflow:hidden;background:var(--gp-map-bg)}
