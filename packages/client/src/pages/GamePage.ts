@@ -94,10 +94,9 @@ import {
 import { startRenderLoop, centerCameraOnCell, handleMouseMove, handleClick, handleMouseLeave, handleResize } from '../game/ClientRenderLoop.js';
 import { registerHudRefresh } from '../game/ClientHudBridge.js';
 
-import {
-  handleRollDice,
+import { handleRollDice,
   handleBuyProperty, handleUpgradeProperty, handleBuyInvestment, handleCoInvest,
-  handleTransport, handleRestoreMonument,
+  handleTransport, handleRestoreMonument, type GameRuntime,
 } from '../game/systems/GameLogic.js';
 
 import {
@@ -114,6 +113,14 @@ let gameStore: GameStore | null = null;
 let gameHudShell: GameHudShell | null = null;
 let unregisterHudRefresh: (() => void) | null = null;
 let unsubscribeGameStore: (() => void) | null = null;
+
+function createGameRuntime(store: GameStore, socket: NonNullable<typeof gameSocket>, index: NonNullable<typeof mapIndex>): GameRuntime {
+  return { store, socket, mapIndex: index, cooldownTimer: null };
+}
+
+function invokeGameAction(action: (runtime: GameRuntime) => void): void {
+  if (gameStore && gameSocket && mapIndex) action(createGameRuntime(gameStore, gameSocket, mapIndex));
+}
 
 // ===== 入口函数 =====
 
@@ -166,19 +173,19 @@ export function createGamePage(controller: GameController): HTMLElement {
   backButton.addEventListener('click', () => controller.setState('start'));
   page.appendChild(backButton);
   gameHudShell = new GameHudShell(gameViewModel, effects, {
-    onRoll: () => handleRollDice(gameStore!, gameSocket),
+    onRoll: () => { if (gameStore && gameSocket && mapIndex) handleRollDice(createGameRuntime(gameStore, gameSocket, mapIndex)); },
       onPathChoice: (cellId) => {
       if (gameStore && gameSocket) onIntersectionChoice(gameStore, gameSocket, cellId);
       gameViewModel?.clearPathChoice('path-choice');
     },
     onCellAction: (actionId) => {
       const actions: Record<string, () => void> = {
-        'buy-property': handleBuyProperty,
-        'upgrade-property': handleUpgradeProperty,
-        'buy-investment': handleBuyInvestment,
-        'co-invest': handleCoInvest,
-        transport: () => handleTransport(gameStore ?? undefined),
-        'restore-monument': handleRestoreMonument,
+        'buy-property': () => invokeGameAction(handleBuyProperty),
+        'upgrade-property': () => invokeGameAction(handleUpgradeProperty),
+        'buy-investment': () => invokeGameAction(handleBuyInvestment),
+        'co-invest': () => invokeGameAction(handleCoInvest),
+        transport: () => invokeGameAction(handleTransport),
+        'restore-monument': () => invokeGameAction(handleRestoreMonument),
       };
       actions[actionId]?.();
     },
@@ -296,7 +303,9 @@ export function createGamePage(controller: GameController): HTMLElement {
   });
   window.addEventListener('game:cell-leave', () => gameHudShell?.hideCellHover());
   canvas.addEventListener('mousemove', handleMouseMove);
-  canvas.addEventListener('click', handleClick);
+  canvas.addEventListener('click', (event) => {
+    if (gameStore && gameSocket && mapIndex) handleClick(event, createGameRuntime(gameStore, gameSocket, mapIndex));
+  });
   canvas.addEventListener('mouseleave', handleMouseLeave);
   window.addEventListener('resize', handleResize);
 

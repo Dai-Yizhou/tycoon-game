@@ -5,6 +5,7 @@ import {
   isMoving, mapIndex, otherPlayers, renderer, setAnimationFrameId, setCameraTarget,
 } from '../state/GameStore.js';
 import type { GameStore } from '../state/GameStore.js';
+import type { GameRuntime } from './systems/GameLogic.js';
 import { updateMovement } from './systems/MovementSystem.js';
 import { getPlayerTimezone, getLocalDayNight } from './systems/MapLoader.js';
 
@@ -50,13 +51,13 @@ export function handleMouseLeave(): void {
   window.dispatchEvent(new CustomEvent('game:cell-leave'));
 }
 
-export function handleClick(event: MouseEvent): void {
+export function handleClick(event: MouseEvent, runtime?: GameRuntime): void {
   if (!renderer || !mapIndex) return;
   const rect = renderer.getCanvas().getBoundingClientRect();
   const cellId = renderer.hitTest(event.clientX - rect.left, event.clientY - rect.top);
   const cell = cellId === null ? null : mapIndex.getById(cellId);
   if (cell && String(cell.extra?.type ?? '') === 'transport') {
-    import('./systems/GameLogic.js').then(module => module.handleTransport());
+    if (runtime) runtime.socket.emit('client.getTransportDestinations', { hubCellId: cell.id });
   }
 }
 
