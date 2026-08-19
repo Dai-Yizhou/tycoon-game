@@ -6,7 +6,7 @@ export interface GameHudShellConfig {
   onChatSend?: (message: string, channel: string) => void;
   onPathChoice?: (cellId: number) => void;
   onCellAction?: (actionId: string) => void;
-  onCellHover?: (cell: any, x: number, y: number) => void;
+  onCellHover?: (cellId: number, x: number, y: number) => void;
   onCellLeave?: () => void;
 }
 
@@ -30,6 +30,7 @@ export class GameHudShell {
   private readonly channel: HTMLSelectElement;
   private readonly unsubscribers: Array<() => void> = [];
   private destroyed = false;
+  private hoveredCell: { id: number; x: number; y: number } | null = null;
 
   constructor(
     private readonly vm: GameViewModel,
@@ -120,12 +121,34 @@ export class GameHudShell {
 
   getElement(): HTMLElement { return this.root; }
 
-  showCellHover(cell: any, x: number, y: number): void {
+  showCellHover(cellId: number, x: number, y: number): void {
+    this.hoveredCell = { id: cellId, x, y };
+    this.renderCellHover();
+  }
+
+  private renderCellHover(): void {
+    if (!this.hoveredCell) return;
+    const { id: cellId, x, y } = this.hoveredCell;
+    const cell = this.vm.getCell(cellId);
     const card = this.root.querySelector("[data-ui=hover-card]") as HTMLElement;
-    card.innerHTML = `<div class="cell-hover-card__type">${String(cell.type).toUpperCase()} · 当前格</div><div class="cell-hover-card__title">${this.escapeHtml(String(cell.name))}</div><div class="cell-hover-card__rows"><span>价格</span><b>${cell.price ? `$${cell.price}` : "—"}</b><span>等级</span><b>Lv.${cell.level ?? 0}</b><span>归属</span><b>${cell.owners?.length ? "已归属" : "无主"}</b></div>`;
+    if (!cell) {
+      card.innerHTML = '<div class="cell-hover-card__type">同步中</div><div class="cell-hover-card__title">正在获取格子状态</div>';
+      card.style.display = "block";
+      return;
+    }
+    const extra = cell.extra as Record<string, unknown>;
+    const ownerships = Array.isArray(extra.ownerships) ? extra.ownerships as Array<{ playerId: string; share: number }> : [];
+    const type = String(extra.type ?? 'empty');
+    const name = String(extra.name ?? `格子 ${cell.id}`);
+    const price = Number(extra.price ?? 0);
+    const level = Number(extra.level ?? 0);
+    card.innerHTML = `<div class="cell-hover-card__type">${this.escapeHtml(type.toUpperCase())} · 当前格</div><div class="cell-hover-card__title">${this.escapeHtml(name)}</div><div class="cell-hover-card__rows"><span>价格</span><b>${price ? `$${price}` : "—"}</b><span>等级</span><b>Lv.${level}</b><span>持有人</span><b>${ownerships.length ? `${ownerships.length} 人` : "无主"}</b></div>`;
     card.style.display="block"; card.style.left=`${Math.min(x+18,window.innerWidth-240)}px`; card.style.top=`${Math.max(76,y-12)}px`;
   }
-  hideCellHover(): void { (this.root.querySelector("[data-ui=hover-card]") as HTMLElement).style.display="none"; }
+  hideCellHover(): void {
+    this.hoveredCell = null;
+    (this.root.querySelector("[data-ui=hover-card]") as HTMLElement).style.display="none";
+  }
 
   update(): void {
     if (this.destroyed) return;
@@ -190,6 +213,7 @@ export class GameHudShell {
       return button;
     });
     actionCluster.replaceChildren(...actionButtons);
+    this.renderCellHover();
 
     // Chat messages (last 10)
     const msgsEl = this.root.querySelector("[data-ui=chat-messages]")!;

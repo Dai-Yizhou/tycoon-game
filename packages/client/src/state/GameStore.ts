@@ -335,6 +335,7 @@ export interface ClientGameSnapshot {
   ownedInvestments: Set<number>;
   investmentShares: Map<number, number>;
   chatHistory: ClientChatMessage[];
+  cells: Map<number, Cell>;
 }
 
 export type ClientGameEvent =
@@ -369,7 +370,7 @@ export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     currentMoney: 2000, currentCredit: 50, currentEnv: 0, isBankrupt: false,
-    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [],
+    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(),
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
 
@@ -387,6 +388,22 @@ export class GameStore {
   setDiceAnimating(value: boolean): void {
     this.snapshot = { ...this.snapshot, diceAnimating: value };
     this.publish();
+  }
+
+  setCell(cell: Cell): void {
+    const cells = new Map(this.snapshot.cells);
+    cells.set(cell.id, cell);
+    this.snapshot = { ...this.snapshot, cells };
+    this.publish();
+  }
+
+  setCells(cells: Cell[]): void {
+    this.snapshot = { ...this.snapshot, cells: new Map(cells.map(cell => [cell.id, cell])) };
+    this.publish();
+  }
+
+  getCell(cellId: number): Cell | null {
+    return this.snapshot.cells.get(cellId) ?? null;
   }
 
   subscribe(listener: (snapshot: ClientGameSnapshot) => void): () => void {
@@ -453,6 +470,8 @@ export class GameStore {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: { ...this.snapshot.currentPlayer, status: event.status }, isBankrupt: event.status === 'bankrupt', isInJail: event.status === 'jail', canRoll: event.status !== 'jail' && event.status !== 'bankrupt' };
     } else if (event.type === 'otherPlayerValue') {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, otherPlayers: this.snapshot.otherPlayers.map((player) => player.id === event.playerId ? { ...player, primaryValue: event.current } : player) };
+    } else if (event.type === 'value' && this.snapshot.otherPlayers.some((player) => player.id === event.playerId)) {
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, otherPlayers: this.snapshot.otherPlayers.map((player) => player.id === event.playerId && event.fieldId === 'money' ? { ...player, primaryValue: event.current } : player) };
     } else if (event.type === 'otherPlayerStatus') {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, otherPlayers: this.snapshot.otherPlayers.map((player) => player.id === event.playerId ? { ...player, status: event.status } : player) };
     } else if (event.type === 'otherPlayerMove') {
@@ -491,6 +510,7 @@ export class GameStore {
       ownedInvestments: new Set(),
       investmentShares: new Map(),
       chatHistory: [],
+      cells: new Map(),
     };
     this.publish();
   }

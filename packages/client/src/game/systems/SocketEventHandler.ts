@@ -117,21 +117,25 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 
   socket.on('server.gameState', (payload) => {
     const teamMembers = payload.members ?? [];
+    if (payload.visibleCells?.length) store?.setCells(payload.visibleCells);
     store?.applySnapshot({ sequence: store.nextSequence(), player: payload.player, teamMembers, ownedProperties: payload.ownedProperties, ownedInvestments: payload.ownedInvestments });
     setTeamMembers(teamMembers);
   });
 
   socket.on('server.propertyBought', (payload) => {
+    store?.setCell(payload.cell);
     store?.applyEvent({ sequence: store.nextSequence(), type: 'property', cellId: payload.cell.id, level: 0 });
     requestHudRefresh();
   });
 
   socket.on('server.propertyUpgraded', (payload) => {
+    store?.setCell(payload.cell);
     store?.applyEvent({ sequence: store.nextSequence(), type: 'property', cellId: payload.cell.id, level: payload.newLevel });
     requestHudRefresh();
   });
 
   socket.on('server.investmentBought', (payload) => {
+    store?.setCell(payload.cell);
     const ownerships = Array.isArray(payload.cell.extra?.ownerships) ? payload.cell.extra.ownerships as Array<{ playerId: string; share: number }> : [];
     const ownership = ownerships.find((item) => item.playerId === payload.playerId);
     if (ownership) store?.applyEvent({ sequence: store.nextSequence(), type: 'investment', cellId: payload.cell.id, share: ownership.share });
@@ -234,34 +238,13 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   socket.on('server.valueChanged', (payload: { playerId: string; fieldId: string; current: number; delta: number }) => {
-    store?.applyEvent({ sequence: store.nextSequence(), type: 'value', playerId: payload.playerId, fieldId: payload.fieldId, current: payload.current });
-    // 服务端权威：所有数值变更以服务端推送为准
-    const isCurrentPlayer = currentPlayer && payload.playerId === currentPlayer.id;
-    if (payload.fieldId === 'money') {
-      // 更新其他玩家显示数值
-      const otherPlayer = otherPlayers.find(p => p.id === payload.playerId);
-      if (otherPlayer) {
-        store?.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerValue', playerId: payload.playerId, current: payload.current });
-      }
-      // 更新当前玩家：服务端权威同步
-      if (isCurrentPlayer) {
-        store?.applyEvent({ sequence: store.nextSequence(), type: 'value', playerId: payload.playerId, fieldId: 'money', current: payload.current });
-      }
-      if (otherPlayer || isCurrentPlayer) {
-        updateRendererPlayers(store);
-      }
-      if (isCurrentPlayer) requestHudRefresh();
-    } else if (payload.fieldId === 'credit') {
-      if (isCurrentPlayer) {
-        store?.applyEvent({ sequence: store.nextSequence(), type: 'value', playerId: payload.playerId, fieldId: 'credit', current: payload.current });
-      }
-    } else if (payload.fieldId === 'environment' || payload.fieldId === 'env') {
-      if (isCurrentPlayer) {
-        const env = currentPlayer!.values.environment || currentPlayer!.values.env;
-        if (env) store?.applyEvent({ sequence: store.nextSequence(), type: 'value', playerId: payload.playerId, fieldId: payload.fieldId, current: payload.current });
-      }
-    }
-    // 数值变更后刷新顶部面板
+    if (!store) return;
+    const snapshot = store.getSnapshot();
+    const isCurrentPlayer = snapshot.currentPlayer?.id === payload.playerId;
+    const isOtherPlayer = snapshot.otherPlayers.some(player => player.id === payload.playerId);
+    if (!isCurrentPlayer && !isOtherPlayer) return;
+    store.applyEvent({ sequence: store.nextSequence(), type: 'value', playerId: payload.playerId, fieldId: payload.fieldId, current: payload.current });
+    if (isCurrentPlayer || isOtherPlayer) updateRendererPlayers(store);
     if (isCurrentPlayer) {
       requestHudRefresh();
     }

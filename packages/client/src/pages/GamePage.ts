@@ -215,6 +215,8 @@ export function createGamePage(controller: GameController): HTMLElement {
         regionProsperityMap.set(r.id, r.prosperity);
       }
       setMapIndex(new MapIndex(mapData));
+      gameStore?.setCells(mapData);
+      gameViewModel?.setCells(gameStore?.getSnapshot().cells ?? new Map(), 'map');
       renderer.loadMap(mapData);
       const snapshot = gameStore!.getSnapshot();
       if (snapshot.currentPlayer) {
@@ -281,12 +283,14 @@ export function createGamePage(controller: GameController): HTMLElement {
   // Canvas events - no drag/zoom, only hover and click
   interactiveMap.getElement().addEventListener('map:hover', (event) => {
     const detail = (event as CustomEvent).detail;
-    if (detail?.cell && gameHudShell) gameHudShell.showCellHover(detail.cell, detail.clientX, detail.clientY);
+    const cellId = typeof detail?.cellId === 'number' ? detail.cellId : detail?.cell?.id;
+    if (typeof cellId === 'number' && gameHudShell) gameHudShell.showCellHover(cellId, detail.clientX, detail.clientY);
   });
   interactiveMap.getElement().addEventListener('map:leave', () => gameHudShell?.hideCellHover());
   window.addEventListener('game:cell-hover', (event) => {
     const detail = (event as CustomEvent).detail;
-    if (detail?.cell && gameHudShell) gameHudShell.showCellHover(detail.cell, detail.clientX, detail.clientY);
+    const cellId = typeof detail?.cellId === 'number' ? detail.cellId : detail?.cell?.id;
+    if (typeof cellId === 'number' && gameHudShell) gameHudShell.showCellHover(cellId, detail.clientX, detail.clientY);
     else gameHudShell?.hideCellHover();
   });
   window.addEventListener('game:cell-leave', () => gameHudShell?.hideCellHover());

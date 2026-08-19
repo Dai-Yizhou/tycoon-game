@@ -129,4 +129,26 @@ describe('GameStore authority', () => {
     expect(viewModel.getMovement().canRoll).toBe(false);
     expect(listener).toHaveBeenCalled();
   });
+
+  it('将数值事件统一投影到当前玩家和其他玩家快照', () => {
+    const store = new GameStore();
+    store.applyEvent({ sequence: 1, type: 'player', player: { id: 'self', values: { money: { current: 100 } } } as never });
+    store.applyEvent({ sequence: 2, type: 'players', players: [{ id: 'other', username: '其他', position: { cellId: 1 }, status: 'normal', primaryValue: 80 }] });
+
+    store.applyEvent({ sequence: 3, type: 'value', playerId: 'self', fieldId: 'money', current: 250 });
+    store.applyEvent({ sequence: 4, type: 'value', playerId: 'other', fieldId: 'money', current: 120 });
+
+    expect(store.getSnapshot().currentMoney).toBe(250);
+    expect(store.getSnapshot().otherPlayers[0].primaryValue).toBe(120);
+  });
+
+  it('保存服务端返回的动态格子快照供信息卡片读取', () => {
+    const store = new GameStore();
+    const cell = { id: 4, x: 0, y: 0, destinations: [], extra: { type: 'property', level: 2, ownerships: [{ playerId: 'p1', share: 1 }] } } as never;
+
+    store.setCell(cell);
+
+    expect(store.getCell(4)).toEqual(cell);
+    expect(store.getSnapshot().cells.get(4)).toEqual(cell);
+  });
 });

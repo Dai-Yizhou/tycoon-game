@@ -257,6 +257,8 @@ export class GameViewModel {
       this.notify('player', 'store');
       this.notify('movement', 'store');
       this.notify('chat', 'store');
+      this.cells = new Map(store.getSnapshot().cells);
+      this.notify('all', 'store');
     }) ?? null;
     this.player.currentPlayerName = displayName;
   }
@@ -324,6 +326,7 @@ export class GameViewModel {
   };
   private pathChoice: PathChoiceSlice = { active: false, options: [] };
   private cellActions: CellActionOption[] = [];
+  private cells = new Map<number, import('@game/shared').Cell>();
 
   private team: TeamSlice = { members: [] };
   private tutorial: TutorialSlice = { step: 0, active: false };
@@ -384,7 +387,7 @@ export class GameViewModel {
   }
 
   // ===== Player =====
-  getPlayer(): PlayerSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { ...this.player, currentPlayer: snapshot.currentPlayer, currentPlayerPosition: snapshot.currentPlayerPosition, currentMoney: snapshot.currentMoney, currentCredit: snapshot.currentCredit, currentEnv: snapshot.currentEnv, isBankrupt: snapshot.isBankrupt, currentPlayerName: this.projectPlayerName() } : this.player; }
+  getPlayer(): PlayerSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { ...this.player, currentPlayer: snapshot.currentPlayer, currentPlayerPosition: snapshot.currentPlayerPosition, currentMoney: snapshot.currentMoney, currentCredit: snapshot.currentCredit, currentEnv: snapshot.currentEnv, isBankrupt: snapshot.isBankrupt, ownedProperties: snapshot.ownedProperties, propertyLevels: snapshot.propertyLevels, ownedInvestments: snapshot.ownedInvestments, investmentShares: snapshot.investmentShares, currentPlayerName: this.projectPlayerName() } : this.player; }
 
   // ===== Movement =====
   getMovement(): MovementSlice {
@@ -451,6 +454,15 @@ export class GameViewModel {
   }
   clearPathChoice(source = 'external'): void {
     this.setPathChoice([], source);
+  }
+
+  setCells(cells: Map<number, import('@game/shared').Cell>, source = 'external'): void {
+    this.cells = new Map(cells);
+    this.notify('all', source);
+  }
+
+  getCell(cellId: number): import('@game/shared').Cell | null {
+    return this.cells.get(cellId) ?? null;
   }
 
   getCellActions(): CellActionOption[] { return [...this.cellActions]; }
@@ -535,6 +547,7 @@ export class GameViewModel {
     this.chat = { activeChannels: new Set(['system']), history: [] };
     this.pathChoice = { active: false, options: [] };
     this.cellActions = [];
+    this.cells = new Map();
     this.team = { members: [] };
     this.tutorial = { step: 0, active: false };
     this.otherPlayers = { players: [] };
