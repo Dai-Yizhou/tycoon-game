@@ -89,7 +89,7 @@ import {
   addChatMessage, setChatStore,
 } from '../game/systems/ChatSystem.js';
 
-import { startRenderLoop, centerCameraOnCell, handleMouseMove, handleClick, handleMouseLeave, handleResize } from '../game/ClientRenderLoop.js';
+import { startRenderLoop, centerCameraOnCell, handleMouseMove, handleClick, handleMouseLeave, handleResize, configureRenderContext, clearRenderContext, updateRendererPlayers } from '../game/ClientRenderLoop.js';
 import { registerHudRefresh } from '../game/ClientHudBridge.js';
 
 import { handleRollDice,
@@ -219,11 +219,13 @@ export function createGamePage(controller: GameController): HTMLElement {
       setMapIndex(new MapIndex(mapData));
       gameStore?.setCells(mapData);
       renderer.loadMap(mapData);
+      configureRenderContext(renderer, mapIndex!);
       const snapshot = gameStore!.getSnapshot();
       if (snapshot.currentPlayer) {
         interactiveMap.render(mapData, [snapshot.currentPlayer, ...snapshot.otherPlayers.filter(p => p.status !== 'frozen').map(p => ({ ...p, values: { money: { current: p.primaryValue ?? 0 } } } as any))]);
         interactiveMap.followPlayer(snapshot.currentPlayerPosition);
       }
+      updateRendererPlayers(gameStore!);
       const startCell = mapIndex!.getById(0);
       if (startCell) {
         setPlayerDisplayPos(startCell.x, startCell.y);
@@ -614,6 +616,7 @@ export function cleanupGamePage(page: HTMLElement): void {
   gameViewModel = null;
   unsubscribeGameStore?.();
   unsubscribeGameStore = null;
+  clearRenderContext();
   setChatStore(null);
   gameStore?.reset();
   gameStore = null;
