@@ -10,5 +10,5 @@
     "noEmit": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "coverage", "**/*.test.ts", "**/*.spec.ts", "src/components", "src/hud", "src/hooks/useMovement.ts", "src/hooks/usePlayerState.ts", "src/hooks/useDice.ts"]
+  "exclude": ["node_modules", "dist", "coverage", "**/*.test.ts", "**/*.spec.ts"]
 }
