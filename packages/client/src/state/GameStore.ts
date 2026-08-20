@@ -359,6 +359,7 @@ export interface ClientGameSnapshot {
   serverPathIndex: number;
   isWaitingForChoice: boolean;
   isServerAnimating: boolean;
+  cellActions: Array<{ id: string; label: string; detail?: string; enabled: boolean }>;
 }
 
 export type ClientGameEvent =
@@ -393,7 +394,7 @@ export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     currentMoney: 2000, currentCredit: 50, currentEnv: 0, isBankrupt: false,
-    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false,
+    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [],
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
 
@@ -441,6 +442,15 @@ export class GameStore {
   setPathChoice(options: Array<{ cellId: number; label: string }>): void {
     this.snapshot = { ...this.snapshot, pathChoice: { active: options.length > 0, options: [...options] } };
     this.publish();
+  }
+
+  setCellActions(actions: Array<{ id: string; label: string; detail?: string; enabled: boolean }>): void {
+    this.snapshot = { ...this.snapshot, cellActions: actions.map(action => ({ ...action })) };
+    this.publish();
+  }
+
+  clearPathChoice(): void {
+    this.setPathChoice([]);
   }
 
   setCell(cell: Cell): void {
@@ -587,6 +597,7 @@ export class GameStore {
       serverPathIndex: 0,
       isWaitingForChoice: false,
       isServerAnimating: false,
+      cellActions: [],
     };
     this.publish();
   }

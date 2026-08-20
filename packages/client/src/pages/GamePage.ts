@@ -48,7 +48,6 @@ import { GameStore } from '../state/GameStore.js';
 import {
   animationFrameId,
   currentPlayer,
-  isMoving, canRoll, isWaitingForChoice, isServerAnimating, dayNightStartTime, DAY_NIGHT_CYCLE, serverTimeOffset,
   gameSocket,
   mapIndex,
   otherPlayers, prosperityTimer,
@@ -64,7 +63,6 @@ import {
   setTeamPanelContentEl,
   setTopBarProsperityEl, setTopBarProsperityFillEl, setTopBarRegionFieldsEl,
   setTopBarTimeEl, setValueFieldDefs,
-  setCurrentPlayer, setCurrentPlayerPosition, setOtherPlayers, setCanRoll, setActionUsedThisTurn,
   // 辅助函数
   // 类型
   type RegionInfo,
@@ -150,7 +148,6 @@ export function createGamePage(controller: GameController): HTMLElement {
   const interactiveMap = new InteractiveMapSurface();
   boardContainer.appendChild(interactiveMap.getElement());
   unsubscribeGameStore = gameStore.subscribe((snapshot) => {
-    syncLegacyStateFromStore();
     const players = snapshot.currentPlayer
       ? [snapshot.currentPlayer, ...snapshot.otherPlayers.filter(p => p.status !== 'frozen').map(p => ({
         ...p,
@@ -176,7 +173,7 @@ export function createGamePage(controller: GameController): HTMLElement {
     onRoll: () => { if (gameStore && gameSocket && mapIndex) handleRollDice(createGameRuntime(gameStore, gameSocket, mapIndex)); },
       onPathChoice: (cellId) => {
       if (gameStore && gameSocket) onIntersectionChoice(gameStore, gameSocket, cellId);
-      gameViewModel?.clearPathChoice('path-choice');
+      gameStore?.clearPathChoice();
     },
     onCellAction: (actionId) => {
       const actions: Record<string, () => void> = {
@@ -200,14 +197,12 @@ export function createGamePage(controller: GameController): HTMLElement {
     },
   });
   page.appendChild(gameHudShell.getElement());
-  syncViewModel();
-  unregisterHudRefresh = registerHudRefresh(() => { syncViewModel(); gameHudShell?.update(); });
+  unregisterHudRefresh = registerHudRefresh(() => { gameHudShell?.update(); });
 
   // Init: load map data, then start game
   if (context.player && context.player.id) {
     gameStore?.applyEvent({ sequence: gameStore.nextSequence(), type: 'player', player: context.player });
   }
-  syncViewModel();
   gameHudShell.update();
   initTeam();
 
@@ -223,7 +218,6 @@ export function createGamePage(controller: GameController): HTMLElement {
       }
       setMapIndex(new MapIndex(mapData));
       gameStore?.setCells(mapData);
-      gameViewModel?.setCells(gameStore?.getSnapshot().cells ?? new Map(), 'map');
       renderer.loadMap(mapData);
       const snapshot = gameStore!.getSnapshot();
       if (snapshot.currentPlayer) {
@@ -238,7 +232,6 @@ export function createGamePage(controller: GameController): HTMLElement {
       syncCellActions(snapshot.currentPlayerPosition);
       centerCameraOnCell(snapshot.currentPlayerPosition || 0);
       startRenderLoop(gameStore!);
-      syncViewModel();
       gameHudShell?.update();
       addChatMessage(t('game.welcomeMessage'), 'system');
       startTutorial();
@@ -281,9 +274,9 @@ export function createGamePage(controller: GameController): HTMLElement {
       controller,
       store: gameStore ?? undefined,
       mapIndex: mapIndex ?? undefined,
-      onPathChoiceOptions: (options) => gameViewModel?.setPathChoice(options, 'server.askPath'),
-      onPathChoiceCleared: () => gameViewModel?.clearPathChoice('server'),
-      onEvent: () => syncViewModel(),
+      onPathChoiceOptions: (options) => gameStore?.setPathChoice(options),
+      onPathChoiceCleared: () => gameStore?.clearPathChoice(),
+      onEvent: () => gameHudShell?.update(),
       onNotification: (payload) => notificationCenter?.handleNotification({ ...payload, durationMs: payload.durationMs ?? 3000, createdAt: payload.createdAt ?? Date.now() }),
     });
   }
@@ -422,7 +415,6 @@ function initTeam(): void {
     gameSocket.emit('client.getTeamState', {}, (result) => {
       if (result.ok && result.data) {
         applyTeamMembers(result.data.members);
-        syncViewModel();
         gameHudShell?.update();
       }
     });
@@ -570,18 +562,12 @@ window.showTeamManagement = function(): void {
 }
 
 
-function syncViewModel(): void {
-  if (!gameViewModel) return;
-  gameViewModel.updateMovement({ isMoving, canRoll, isWaitingForChoice, isServerAnimating });
-  gameViewModel.updateDayNight({ cycleStartTime: dayNightStartTime, cycleDuration: DAY_NIGHT_CYCLE, serverTimeOffset });
-}
-
 function syncCellActions(cellId: number): void {
-  if (!gameViewModel || !mapIndex) return;
+  if (!gameStore || !mapIndex) return;
   const snapshot = gameStore?.getSnapshot();
   const cell = gameStore?.getCell(cellId) ?? mapIndex.getById(cellId);
   if (!cell || !snapshot) {
-    gameViewModel.setCellActions([], 'store');
+    gameStore.setCellActions([]);
     return;
   }
   const extra = cell.extra;
@@ -609,17 +595,12 @@ function syncCellActions(cellId: number): void {
         : type === 'monument'
           ? [{ id: 'restore-monument', label: '修缮', detail: `$${Number(extra.monumentCost ?? 0)}`, enabled: !snapshot.isBankrupt }]
           : [];
-  gameViewModel.setCellActions(actions, 'store');
-}
-
-function syncLegacyStateFromStore(): void {
-  if (!gameStore) return;
-  const snapshot = gameStore.getSnapshot();
-  setCurrentPlayer(snapshot.currentPlayer);
-  setCurrentPlayerPosition(snapshot.currentPlayerPosition);
-  setOtherPlayers(snapshot.otherPlayers);
-  setCanRoll(snapshot.canRoll);
-  setActionUsedThisTurn(snapshot.actionUsedThisTurn);
+  const currentActions = snapshot.cellActions;
+  const unchanged = currentActions.length === actions.length && actions.every((action, index) => {
+    const current = currentActions[index];
+    return current.id === action.id && current.label === action.label && current.detail === action.detail && current.enabled === action.enabled;
+  });
+  if (!unchanged) gameStore.setCellActions(actions);
 }
 
 // ===== Tutorial System =====
@@ -629,6 +610,7 @@ export function cleanupGamePage(page: HTMLElement): void {
   unregisterHudRefresh = null;
   gameHudShell?.destroy();
   gameHudShell = null;
+  gameViewModel?.destroy();
   gameViewModel = null;
   unsubscribeGameStore?.();
   unsubscribeGameStore = null;

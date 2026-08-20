@@ -13,7 +13,6 @@ import {
   createGamePage,
   cleanupGamePage,
 } from '../src/pages/index.js';
-import * as gameState from '../src/state/GameStore.js';
 
 describe('Pages', () => {
   let controller: GameController;
@@ -217,7 +216,7 @@ describe('Pages', () => {
       expect(emit).toHaveBeenCalledWith('client.rollDice', {}, expect.any(Function));
     });
 
-    test('GamePage 初始化时同步当前玩家到渲染状态桥', () => {
+    test('GamePage 初始化时将当前玩家投影到 HUD', () => {
       controller.setPlayerName('测试玩家');
       controller.setLoginResult({
         id: 'player-1',
@@ -227,10 +226,9 @@ describe('Pages', () => {
         status: 'normal',
       } as any, Date.now(), 15);
 
-      createGamePage(controller);
+      const page = createGamePage(controller);
 
-      expect(gameState.currentPlayer?.id).toBe('player-1');
-      expect(gameState.currentPlayerPosition).toBe(3);
+      expect(page.querySelector('[data-ui="player-name"]')?.textContent).toBe('测试玩家');
     });
     test('TR-6.21: createGamePage 创建正确的 DOM 结构', () => {
       controller.setPlayerName('测试玩家');

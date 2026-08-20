@@ -2,7 +2,6 @@
  * 游戏视图模型（ViewModel / Store）
  *
  * 作为 UI 组件与游戏逻辑之间的唯一桥梁：
- * - 持有全部游戏状态（原 GamePage.ts 中的 80+ 模块级变量）
  * - 提供 UI 读取接口，业务状态由 GameStore 投影
  * - UI 组件仅消费此层，不直接访问 GameController / Socket / Canvas
  *
@@ -11,9 +10,6 @@
  */
 
 import type { Player } from '@game/shared';
-import type { MapIndex } from '@game/shared';
-import type { BoardRenderer } from '../renderer/BoardRenderer.js';
-import type { TypedClientSocket } from '../hooks/useSocket.js';
 import type { GameStore, ClientGameSnapshot, ClientChatMessage } from '../state/GameStore.js';
 
 // ===== 状态切片类型定义 =====
@@ -165,7 +161,7 @@ export interface TeamMember {
   money: number;
   credit: number;
   env: number;
-  status: 'normal' | 'bankrupt' | 'jail';
+  status: string;
 }
 
 /** 队伍状态 */
@@ -178,7 +174,7 @@ export interface OtherPlayerInfo {
   id: string;
   username: string;
   position: { cellId: number };
-  status: import('@game/shared').PlayerStatus;
+  status: string;
   primaryValue: number;
 }
 
@@ -248,112 +244,28 @@ export type StateChangeListener = (event: StateChangeEvent) => void;
  *
  */
 export class GameViewModel {
-  private readonly store: GameStore | null;
-  private readonly unsubscribeStore: (() => void) | null;
+  private readonly store: GameStore;
+  private readonly unsubscribeStore: () => void;
+  private readonly displayName: string;
 
-  constructor(store: GameStore | null = null, displayName = '玩家') {
+  constructor(store: GameStore, displayName = '玩家') {
     this.store = store;
-    this.unsubscribeStore = store?.subscribe(() => {
+    this.displayName = displayName;
+    this.unsubscribeStore = store.subscribe(() => {
       this.notify('player', 'store');
       this.notify('movement', 'store');
       this.notify('chat', 'store');
-      this.cells = new Map(store.getSnapshot().cells);
       this.notify('all', 'store');
-    }) ?? null;
-    this.player.currentPlayerName = displayName;
+    });
   }
 
-  private projectedSnapshot(): ClientGameSnapshot | null {
-    return this.store?.getSnapshot() ?? null;
+  private projectedSnapshot(): ClientGameSnapshot {
+    return this.store.getSnapshot();
   }
 
   private projectPlayerName(): string {
-    return this.projectedSnapshot()?.currentPlayer?.username ?? this.player.currentPlayerName;
+    return this.projectedSnapshot().currentPlayer?.username ?? this.displayName;
   }
-  // — 状态切片 —
-  private player: PlayerSlice = {
-    currentPlayer: null,
-    currentPlayerPosition: 0,
-    currentMoney: 2000,
-    currentCredit: 50,
-    currentEnv: 0,
-    isBankrupt: false,
-    actionUsedThisTurn: false,
-    ownedProperties: new Set(),
-    propertyLevels: new Map(),
-    ownedInvestments: new Set(),
-    investmentShares: new Map(),
-    currentPlayerName: '玩家',
-  };
-
-  private movement: MovementSlice = {
-    isMoving: false,
-    canRoll: true,
-    remainingSteps: 0,
-    previousCellId: -1,
-    playerDisplayX: 600,
-    playerDisplayY: 500,
-    moveFromX: 0, moveFromY: 0,
-    moveToX: 0, moveToY: 0,
-    moveStartTime: 0,
-    isWaitingForChoice: false,
-    serverPath: [],
-    serverPathIndex: 0,
-    isServerAnimating: false,
-  };
-
-  private camera: CameraSlice = { cameraTargetX: 0, cameraTargetY: 0 };
-  private dice: DiceSlice = { diceValue: 0, diceAnimating: false, diceAnimStart: 0 };
-  private cooldown: CooldownSlice = { rollCooldownEnd: 0, rollCooldownTimer: null };
-  private jail: JailSlice = { isInJail: false, jailEndTime: 0 };
-
-  private dayNight: DayNightSlice = {
-    cycleDuration: 15 * 60 * 1000,
-    cycleStartTime: Date.now(),
-    serverTimeOffset: 0,
-    prosperity: 100,
-  };
-
-  private regions: RegionSlice = {
-    mapRegions: [],
-    valueFieldDefs: [],
-    regionProsperityMap: new Map(),
-  };
-
-  private chat: ChatSlice = {
-    activeChannels: new Set(['system']),
-    history: [],
-  };
-  private pathChoice: PathChoiceSlice = { active: false, options: [] };
-  private cellActions: CellActionOption[] = [];
-  private cells = new Map<number, import('@game/shared').Cell>();
-
-  private team: TeamSlice = { members: [] };
-  private tutorial: TutorialSlice = { step: 0, active: false };
-
-  private otherPlayers: OtherPlayersSlice = { players: [] };
-
-  private behavior: BehaviorSlice = { configs: new Map() };
-
-  // — 外部引用（非状态，由 GamePage 注入） —
-  /** 棋盘渲染器，供渲染循环使用 */
-  renderer: BoardRenderer | null = null;
-  /** 地图索引 */
-  mapIndex: MapIndex | null = null;
-  /** Canvas 元素 */
-  canvasEl: HTMLCanvasElement | null = null;
-  /** Socket 连接 */
-  gameSocket: TypedClientSocket | null = null;
-  /** 动画帧 ID */
-  animationFrameId: number | null = null;
-  /** 繁荣度定时器 */
-  prosperityTimer: ReturnType<typeof setInterval> | null = null;
-  /** 详细面板更新定时器 */
-  detailPanelUpdateTimer: ReturnType<typeof setInterval> | null = null;
-  /** 上次玩家时区 */
-  lastPlayerTimezone = '';
-  /** 上次昼夜状态 */
-  lastLocalIsDay: boolean | null = null;
 
   // — 订阅系统 —
   private listeners: Map<StateChangeKey, Set<StateChangeListener>> = new Map();
@@ -386,110 +298,69 @@ export class GameViewModel {
     }
   }
 
+  destroy(): void {
+    this.unsubscribeStore();
+    this.listeners.clear();
+  }
+
   // ===== Player =====
-  getPlayer(): PlayerSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { ...this.player, currentPlayer: snapshot.currentPlayer, currentPlayerPosition: snapshot.currentPlayerPosition, currentMoney: snapshot.currentMoney, currentCredit: snapshot.currentCredit, currentEnv: snapshot.currentEnv, isBankrupt: snapshot.isBankrupt, actionUsedThisTurn: snapshot.actionUsedThisTurn, ownedProperties: snapshot.ownedProperties, propertyLevels: snapshot.propertyLevels, ownedInvestments: snapshot.ownedInvestments, investmentShares: snapshot.investmentShares, currentPlayerName: this.projectPlayerName() } : this.player; }
+  getPlayer(): PlayerSlice {
+    const snapshot = this.projectedSnapshot();
+    return { currentPlayer: snapshot.currentPlayer, currentPlayerPosition: snapshot.currentPlayerPosition, currentMoney: snapshot.currentMoney, currentCredit: snapshot.currentCredit, currentEnv: snapshot.currentEnv, isBankrupt: snapshot.isBankrupt, actionUsedThisTurn: snapshot.actionUsedThisTurn, ownedProperties: snapshot.ownedProperties, propertyLevels: snapshot.propertyLevels, ownedInvestments: snapshot.ownedInvestments, investmentShares: snapshot.investmentShares, currentPlayerName: this.projectPlayerName() };
+  }
 
   // ===== Movement =====
   getMovement(): MovementSlice {
     const snapshot = this.projectedSnapshot();
-    return snapshot ? { ...this.movement, canRoll: snapshot.canRoll } : this.movement;
-  }
-  updateMovement(partial: Partial<MovementSlice>, source = 'ui'): void {
-    Object.assign(this.movement, partial);
-    this.notify('movement', source);
+    return { isMoving: snapshot.isMoving, canRoll: snapshot.canRoll, remainingSteps: snapshot.remainingSteps, previousCellId: snapshot.previousCellId, playerDisplayX: snapshot.playerDisplayX, playerDisplayY: snapshot.playerDisplayY, moveFromX: snapshot.moveFromX, moveFromY: snapshot.moveFromY, moveToX: snapshot.moveToX, moveToY: snapshot.moveToY, moveStartTime: snapshot.moveStartTime, isWaitingForChoice: snapshot.isWaitingForChoice, serverPath: snapshot.serverPath, serverPathIndex: snapshot.serverPathIndex, isServerAnimating: snapshot.isServerAnimating };
   }
 
   // ===== Camera =====
-  getCamera(): CameraSlice { return this.camera; }
-  setCamera(partial: Partial<CameraSlice>, source = 'external'): void {
-    Object.assign(this.camera, partial);
-    this.notify('camera', source);
-  }
+  getCamera(): CameraSlice { const snapshot = this.projectedSnapshot(); return { cameraTargetX: snapshot.cameraTargetX, cameraTargetY: snapshot.cameraTargetY }; }
 
   // ===== Dice =====
-  getDice(): DiceSlice { return this.dice; }
-  updateDice(partial: Partial<DiceSlice>, source = 'ui'): void {
-    Object.assign(this.dice, partial);
-    this.notify('dice', source);
-  }
+  getDice(): DiceSlice { const snapshot = this.projectedSnapshot(); return { diceValue: snapshot.diceValue, diceAnimating: snapshot.diceAnimating, diceAnimStart: snapshot.diceAnimStart }; }
 
   // ===== Cooldown =====
-  getCooldown(): CooldownSlice { return this.cooldown; }
-  updateCooldown(partial: Partial<CooldownSlice>, source = 'ui'): void {
-    Object.assign(this.cooldown, partial);
-    this.notify('cooldown', source);
-  }
+  getCooldown(): CooldownSlice { const snapshot = this.projectedSnapshot(); return { rollCooldownEnd: snapshot.rollCooldownEnd, rollCooldownTimer: null }; }
 
   // ===== Jail =====
-  getJail(): JailSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { ...this.jail, isInJail: snapshot.isInJail, jailEndTime: snapshot.jailEndTime } : this.jail; }
+  getJail(): JailSlice { const snapshot = this.projectedSnapshot(); return { isInJail: snapshot.isInJail, jailEndTime: snapshot.jailEndTime }; }
 
   // ===== Day/Night =====
-  getDayNight(): DayNightSlice { return this.dayNight; }
-  updateDayNight(partial: Partial<DayNightSlice>, source = 'ui'): void {
-    Object.assign(this.dayNight, partial);
-    this.notify('dayNight', source);
+  getDayNight(): DayNightSlice {
+    const snapshot = this.projectedSnapshot();
+    return { cycleDuration: 15 * 60 * 1000, cycleStartTime: snapshot.dayNightStartTime, serverTimeOffset: snapshot.serverTimeOffset, prosperity: 100 };
   }
 
   // ===== Regions =====
-  getRegions(): RegionSlice { return this.regions; }
-  setRegions(partial: Partial<RegionSlice>, source = 'external'): void {
-    Object.assign(this.regions, partial);
-    this.notify('regions', source);
-  }
+  getRegions(): RegionSlice { return { mapRegions: [], valueFieldDefs: [], regionProsperityMap: new Map() }; }
 
   // ===== Chat =====
   getChat(): ChatSlice {
     const snapshot = this.projectedSnapshot();
-    return snapshot ? { ...this.chat, history: snapshot.chatHistory } : this.chat;
-  }
-  setChat(partial: Partial<ChatSlice>, source = 'external'): void {
-    Object.assign(this.chat, partial);
-    this.notify('chat', source);
+    return { activeChannels: new Set(['system']), history: snapshot.chatHistory };
   }
 
-  getPathChoice(): PathChoiceSlice { return this.pathChoice; }
-  setPathChoice(options: PathChoiceOption[], source = 'external'): void {
-    this.pathChoice = { active: options.length > 0, options: [...options] };
-    this.notify('pathChoice', source);
-  }
-  clearPathChoice(source = 'external'): void {
-    this.setPathChoice([], source);
-  }
-
-  setCells(cells: Map<number, import('@game/shared').Cell>, source = 'external'): void {
-    this.cells = new Map(cells);
-    this.notify('all', source);
-  }
+  getPathChoice(): PathChoiceSlice { return this.projectedSnapshot().pathChoice; }
 
   getCell(cellId: number): import('@game/shared').Cell | null {
-    return this.cells.get(cellId) ?? null;
+    return this.projectedSnapshot().cells.get(cellId) ?? null;
   }
 
-  getCellActions(): CellActionOption[] { return [...this.cellActions]; }
-  setCellActions(actions: CellActionOption[], source = 'external'): void {
-    this.cellActions = actions.map(action => ({ ...action }));
-    this.notify('cellActions', source);
-  }
+  getCellActions(): CellActionOption[] { return [...this.projectedSnapshot().cellActions]; }
 
   // ===== Team =====
-  getTeam(): TeamSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { members: snapshot.teamMembers as TeamMember[] } : this.team; }
+  getTeam(): TeamSlice { return { members: this.projectedSnapshot().teamMembers }; }
 
   // ===== Tutorial =====
-  getTutorial(): TutorialSlice { return this.tutorial; }
-  setTutorial(partial: Partial<TutorialSlice>, source = 'external'): void {
-    Object.assign(this.tutorial, partial);
-    this.notify('tutorial', source);
-  }
+  getTutorial(): TutorialSlice { return { step: 0, active: false }; }
 
   // ===== Other Players =====
-  getOtherPlayers(): OtherPlayersSlice { const snapshot = this.projectedSnapshot(); return snapshot ? { players: snapshot.otherPlayers as OtherPlayerInfo[] } : this.otherPlayers; }
+  getOtherPlayers(): OtherPlayersSlice { return { players: this.projectedSnapshot().otherPlayers }; }
 
   // ===== Behavior =====
-  getBehavior(): BehaviorSlice { return this.behavior; }
-  setBehavior(partial: Partial<BehaviorSlice>, source = 'external'): void {
-    Object.assign(this.behavior, partial);
-    this.notify('behavior', source);
-  }
+  getBehavior(): BehaviorSlice { return { configs: new Map() }; }
 
   // ===== 工具方法 =====
 
@@ -497,8 +368,7 @@ export class GameViewModel {
    * 获取当前玩家所在时区
    */
   getPlayerTimezone(): string {
-    if (!this.mapIndex) return 'UTC+0';
-    const cell = this.mapIndex.getById(this.player.currentPlayerPosition);
+    const cell = this.projectedSnapshot().cells.get(this.projectedSnapshot().currentPlayerPosition);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tz = cell ? (cell as any).extra?.timezone ?? (cell as any).timezone : null;
     return tz || 'UTC+0';
@@ -511,9 +381,10 @@ export class GameViewModel {
     isDay: boolean; progress: number; hour: number; minute: number; timeStr: string;
   } {
     const offset = TIMEZONE_OFFSETS[timezone] ?? 0;
-    const serverNow = Date.now() + this.dayNight.serverTimeOffset;
-    const serverElapsed = serverNow - this.dayNight.cycleStartTime;
-    const localProgress = ((serverElapsed / this.dayNight.cycleDuration) + offset) % 1;
+    const dayNight = this.getDayNight();
+    const serverNow = Date.now() + dayNight.serverTimeOffset;
+    const serverElapsed = serverNow - dayNight.cycleStartTime;
+    const localProgress = ((serverElapsed / dayNight.cycleDuration) + offset) % 1;
     const totalMinutes = Math.floor(localProgress * 24 * 60);
     const hour = Math.floor(totalMinutes / 60);
     const minute = totalMinutes % 60;
@@ -526,42 +397,7 @@ export class GameViewModel {
    * 重置全部状态（用于游戏退出/重新开始）
    */
   reset(): void {
-    this.player = {
-      currentPlayer: null, currentPlayerPosition: 0, currentMoney: 2000,
-      currentCredit: 50, currentEnv: 0, isBankrupt: false, actionUsedThisTurn: false,
-      ownedProperties: new Set(), propertyLevels: new Map(),
-      ownedInvestments: new Set(), investmentShares: new Map(), currentPlayerName: '玩家',
-    };
-    this.movement = {
-      isMoving: false, canRoll: true, remainingSteps: 0, previousCellId: -1,
-      playerDisplayX: 600, playerDisplayY: 500,
-      moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0,
-      isWaitingForChoice: false, serverPath: [], serverPathIndex: 0, isServerAnimating: false,
-    };
-    this.camera = { cameraTargetX: 0, cameraTargetY: 0 };
-    this.dice = { diceValue: 0, diceAnimating: false, diceAnimStart: 0 };
-    this.cooldown = { rollCooldownEnd: 0, rollCooldownTimer: null };
-    this.jail = { isInJail: false, jailEndTime: 0 };
-    this.dayNight = { cycleDuration: 15 * 60 * 1000, cycleStartTime: Date.now(), serverTimeOffset: 0, prosperity: 100 };
-    this.regions = { mapRegions: [], valueFieldDefs: [], regionProsperityMap: new Map() };
-    this.chat = { activeChannels: new Set(['system']), history: [] };
-    this.pathChoice = { active: false, options: [] };
-    this.cellActions = [];
-    this.cells = new Map();
-    this.team = { members: [] };
-    this.tutorial = { step: 0, active: false };
-    this.otherPlayers = { players: [] };
-    this.behavior = { configs: new Map() };
-    this.renderer = null;
-    this.mapIndex = null;
-    this.canvasEl = null;
-    this.gameSocket = null;
-    this.animationFrameId = null;
-    this.prosperityTimer = null;
-    this.detailPanelUpdateTimer = null;
-    this.lastPlayerTimezone = '';
-    this.lastLocalIsDay = null;
-    this.unsubscribeStore?.();
+    this.store.reset();
     this.notify('all', 'reset');
   }
 }

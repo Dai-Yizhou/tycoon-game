@@ -2,10 +2,11 @@ import { GameHudShell } from "../src/components/GameHudShell.js";
 import { InteractiveMapSurface } from "../src/components/InteractiveMapSurface.js";
 import { GameViewModel } from "../src/game/GameViewModel.js";
 import { NoOpEffectHooks } from "../src/game/GameEffects.js";
+import { GameStore } from "../src/state/GameStore.js";
 
 describe("GameHudShell", () => {
   it("渲染稳定 data-ui/data-action 结构并连接操作回调", () => {
-    const vm = new GameViewModel();
+    const vm = new GameViewModel(new GameStore());
     const onRoll = jest.fn();
     const onChatSend = jest.fn();
     const shell = new GameHudShell(vm, new NoOpEffectHooks(), { onRoll, onChatSend });
@@ -26,9 +27,10 @@ describe("GameHudShell", () => {
   });
 
   it('在路径选择状态渲染底部行动组并触发路径回调', () => {
-    const vm = new GameViewModel();
+    const store = new GameStore();
+    const vm = new GameViewModel(store);
     const onPathChoice = jest.fn();
-    vm.setPathChoice([{ cellId: 4, label: '华尔街' }, { cellId: 8, label: '纪念碑' }]);
+    store.setPathChoice([{ cellId: 4, label: '华尔街' }, { cellId: 8, label: '纪念碑' }]);
     const shell = new GameHudShell(vm, new NoOpEffectHooks(), { onPathChoice });
     const root = shell.getElement();
 
