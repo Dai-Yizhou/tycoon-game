@@ -92,11 +92,12 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   // 时区变化
   socket.on('server.timezoneChanged', (payload: { toTimezoneName?: string; toTimezoneId?: string }) => {
     const tzName = payload.toTimezoneName || payload.toTimezoneId || '';
-    const tz = getPlayerTimezone();
-    const { timeStr, isDay } = getLocalDayNight(tz);
+    if (!store || !options.mapIndex) return;
+    const tz = getPlayerTimezone(store, options.mapIndex);
+    const { timeStr, isDay } = getLocalDayNight(store, tz);
     addChatMessage(t('dayNight.timezoneChanged', { tz: tzName, time: timeStr, dayNight: isDay ? t('dayNight.dayTime') : t('dayNight.nightTime') }), 'system');
-    updateTopBarTime();
-    updateBoardTheme();
+    updateTopBarTime(store, options.mapIndex);
+    updateBoardTheme(store, options.mapIndex);
   });
 
   // 心跳校正时钟偏移

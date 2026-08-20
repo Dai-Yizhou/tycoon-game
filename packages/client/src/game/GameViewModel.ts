@@ -267,6 +267,8 @@ export class GameViewModel {
     return this.projectedSnapshot().currentPlayer?.username ?? this.displayName;
   }
 
+  getStore(): GameStore { return this.store; }
+
   // — 订阅系统 —
   private listeners: Map<StateChangeKey, Set<StateChangeListener>> = new Map();
 

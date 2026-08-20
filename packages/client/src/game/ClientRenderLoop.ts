@@ -106,17 +106,17 @@ export function clearRenderContext(): void {
   renderContext = null;
 }
 
-export function updateBoardTheme(): void {
+export function updateBoardTheme(store: GameStore, mapIndex: MapIndex): void {
   const board = document.querySelector('.board-container') as HTMLElement | null;
   if (!board) return;
-  const { isDay } = getLocalDayNight(getPlayerTimezone());
+  const { isDay } = getLocalDayNight(store, getPlayerTimezone(store, mapIndex));
   board.style.background = isDay ? '#f1f5f9' : '#1e293b';
   board.style.filter = isDay ? 'none' : 'sepia(20%) saturate(80%) hue-rotate(200deg) brightness(85%)';
 }
 
-export function updateTopBarTime(): void {
+export function updateTopBarTime(store: GameStore, mapIndex: MapIndex): void {
   const time = document.querySelector('[data-ui="day-time"]');
   if (!time) return;
-  const { isDay, timeStr } = getLocalDayNight(getPlayerTimezone());
+  const { isDay, timeStr } = getLocalDayNight(store, getPlayerTimezone(store, mapIndex));
   time.textContent = `${isDay ? '昼' : '夜'} ${timeStr}`;
 }

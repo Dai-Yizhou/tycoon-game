@@ -7,10 +7,8 @@
 import type { MapData } from '@game/shared';
 import { loadMapFromObject } from '@game/shared/map/browser-loader';
 import type { RegionInfo, ValueFieldDef } from '../../state/GameStore.js';
-import {
-  mapIndex, currentPlayerPosition, serverTimeOffset, dayNightStartTime,
-  DAY_NIGHT_CYCLE,
-} from '../../state/GameStore.js';
+import type { GameStore } from '../../state/GameStore.js';
+import type { MapIndex } from '@game/shared';
 import { getExtra } from '@game/shared';
 
 const MAP_SCALE = 3.0;
@@ -125,10 +123,11 @@ function getFallbackMapData(): unknown[] {
   ];
 }
 
-export function getLocalDayNight(timezone: string): { isDay: boolean; progress: number; hour: number; minute: number; timeStr: string } {
-  const serverElapsed = Date.now() + serverTimeOffset - dayNightStartTime;
+export function getLocalDayNight(store: GameStore, timezone: string): { isDay: boolean; progress: number; hour: number; minute: number; timeStr: string } {
+  const snapshot = store.getSnapshot();
+  const serverElapsed = Date.now() + snapshot.serverTimeOffset - snapshot.dayNightStartTime;
   const offset = parseInt(timezone.replace('UTC', '')) || 0;
-  const localProgress = ((serverElapsed / DAY_NIGHT_CYCLE) + offset) % 1;
+  const localProgress = ((serverElapsed / (15 * 60 * 1000)) + offset) % 1;
   const totalMinutes = Math.floor(localProgress * 24 * 60);
   const hour = Math.floor(totalMinutes / 60) % 24;
   const minute = totalMinutes % 60;
@@ -137,9 +136,8 @@ export function getLocalDayNight(timezone: string): { isDay: boolean; progress: 
   return { isDay, progress: localProgress, hour, minute, timeStr };
 }
 
-export function getPlayerTimezone(): string {
-  if (!mapIndex) return 'UTC+0';
-  const cell = mapIndex.getById(currentPlayerPosition);
+export function getPlayerTimezone(store: GameStore, mapIndex: MapIndex): string {
+  const cell = mapIndex.getById(store.getSnapshot().currentPlayerPosition);
   if (!cell) return 'UTC+0';
   return getExtra<string>(cell, 'timezone', '') || 'UTC+0';
 }
