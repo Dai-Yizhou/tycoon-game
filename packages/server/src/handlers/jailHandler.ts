@@ -15,11 +15,12 @@
  */
 
 import type { ValueChangedPayload } from '@game/shared';
-import { CellTypes, PlayerStatus, getExtra } from '@game/shared';
+import { CellTypes, PlayerStatus, getExtra, t } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { HandlerRegistry } from '../transport/handlers.js';
+import type { EconomyService } from '../economy/EconomyService.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
 
 /**
@@ -66,16 +67,19 @@ export class JailHandler {
   private readonly jailStates: Map<string, JailStateData> = new Map();
   private readonly jailTimers: Map<string, NodeJS.Timeout> = new Map();
   private readonly configuredCooldownMs: number;
+  private readonly economy: EconomyService | null;
 
   constructor(
     io: TypedServer,
     world: GameWorld,
     _registry: HandlerRegistry,
     configuredCooldownMs = DEFAULT_JAIL_CONFIG.cooldownMs ?? 10_000,
+    economy: EconomyService | null = null,
   ) {
     this.io = io;
     this.world = world;
     this.configuredCooldownMs = configuredCooldownMs;
+    this.economy = economy;
   }
 
   /**
@@ -184,8 +188,8 @@ export class JailHandler {
       this.io.emit('server.notification', {
         id: `enter-jail-${playerId}-${Date.now()}`,
         type: 'warning',
-        title: '进入监狱',
-        content: `玩家 ${player.username} 进入监狱，需等待 ${cooldownMs}ms 才能出狱`,
+        title: t('server.jailEnteredTitle'),
+        content: t('server.jailEnteredContent', { name: player.username, duration: cooldownMs }),
         durationMs: 5000,
       });
 
@@ -288,8 +292,8 @@ export class JailHandler {
       this.io.emit('server.notification', {
         id: `release-jail-${playerId}-${Date.now()}`,
         type: 'success',
-        title: '出狱',
-        content: `玩家 ${player.username} 已出狱，恢复正常状态`,
+        title: t('server.jailReleasedTitle'),
+        content: t('server.jailReleasedContent', { name: player.username }),
         durationMs: 3000,
       });
 
@@ -370,6 +374,11 @@ export class JailHandler {
    * @param reason 原因（日志用）
    */
   private deductCredit(player: { id: string; values: Record<string, { id: string; name: string; current: number; min?: number; max?: number }> }, amount: number, reason: string): void {
+    if (this.economy) {
+      const change = this.economy.changeValue(player.id, 'credit', -amount, reason);
+      if (change.ok) this.io.emit('server.valueChanged', { playerId: player.id, fieldId: 'credit', current: change.current, delta: change.delta });
+      return;
+    }
     const creditField = player.values['credit'];
     if (!creditField) {
       logger.warn(`玩家 ${player.id} 没有 credit 字段，无法扣除信用值`);

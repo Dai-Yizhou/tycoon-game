@@ -275,7 +275,8 @@ describe('MonumentHandler', () => {
 
     it('信用值不会为负数', () => {
       const player = createTestPlayer('player1', 1000);
-      // 不设置信用值字段
+      delete player.values.credit;
+      world.addPlayer(player);
 
       const monumentCell = world.getMapIndex()!.getById(1)!;
       const cost = 100;

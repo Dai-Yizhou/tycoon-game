@@ -167,8 +167,6 @@ export class BoardRenderer {
     this.frameCount++;
 
     if (now - this.lastFrameTime >= 1000) {
-      const fps = this.frameCount;
-      console.debug(`BoardRenderer FPS: ${fps}`);
       this.frameCount = 0;
       this.lastFrameTime = now;
     }

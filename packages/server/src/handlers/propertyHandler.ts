@@ -32,6 +32,7 @@ import {
   type OwnershipConfig,
 } from '../economy/index.js';
 import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
+import { EconomyService } from '../economy/EconomyService.js';
 
 /**
  * 地产所有权信息
@@ -87,14 +88,16 @@ export class PropertyHandler {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
   private readonly ownershipConfig: OwnershipConfig;
+  private readonly economy: EconomyService;
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
   private readonly operationGuard = new EconomicOperationGuard<AckResult<{ cell: Cell }>>();
 
-  constructor(io: TypedServer, world: GameWorld, ownershipConfig: OwnershipConfig = DEFAULT_OWNERSHIP_CONFIG) {
+  constructor(io: TypedServer, world: GameWorld, ownershipConfig: OwnershipConfig = DEFAULT_OWNERSHIP_CONFIG, economy: EconomyService = new EconomyService(world)) {
     this.io = io;
     this.world = world;
     this.ownershipConfig = ownershipConfig;
+    this.economy = economy;
   }
 
   /**
@@ -483,7 +486,8 @@ export class PropertyHandler {
       const actualRent = Math.min(rent, payerMoney); // 避免负数
 
       // 扣除路过玩家财产
-      this.setPlayerMoney(payer, payerMoney - actualRent);
+      const payerChange = this.economy.changeValue(payerId, 'money', -actualRent, 'rent_payment');
+      if (!payerChange.ok) return null;
 
       // 增加所有者财产（按持股比例分配）
       this.distributeRentToOwners(cell, actualRent);
@@ -523,11 +527,11 @@ export class PropertyHandler {
     price: number,
   ): BuyResult | null {
     try {
-      const currentMoney = this.getPlayerMoney(player);
-      this.setPlayerMoney(player, currentMoney - price);
+      const buyerChange = this.economy.changeValue(player.id, 'money', -price, 'property_purchase');
+      if (!buyerChange.ok) return null;
       const ownership = addOwnership(cell, player.id, price, this.ownershipConfig);
       if (!ownership || ownership.share <= 0 || ownership.share > 1) {
-        this.setPlayerMoney(player, currentMoney);
+        this.economy.changeValue(player.id, 'money', price, 'property_purchase_rollback');
         return null;
       }
       this.distributeBuyInToOwners(cell, player.id, price);
@@ -552,8 +556,8 @@ export class PropertyHandler {
       const owner = this.world.getPlayer(ownership.playerId);
       if (!owner || owner.status === PlayerStatus.Bankrupt) continue;
       const payout = Math.floor(amount * (ownership.share / (1 - buyer.share)));
-      this.setPlayerMoney(owner, this.getPlayerMoney(owner) + payout);
-      this.io.emit('server.valueChanged', { playerId: owner.id, fieldId: 'money', current: this.getPlayerMoney(owner), delta: payout });
+      const change = this.economy.changeValue(owner.id, 'money', payout, 'property_buy_in_payout');
+      if (change.ok) this.io.emit('server.valueChanged', { playerId: owner.id, fieldId: 'money', current: change.current, delta: change.delta });
     }
   }
 
@@ -567,8 +571,8 @@ export class PropertyHandler {
   ): UpgradeResult | null {
     try {
       // 1. 扣除玩家财产
-      const currentMoney = this.getPlayerMoney(player);
-      this.setPlayerMoney(player, currentMoney - upgradeCost);
+      const change = this.economy.changeValue(player.id, 'money', -upgradeCost, 'property_upgrade');
+      if (!change.ok) return null;
 
       // 2. 增加格子等级
       const currentLevel = getExtra<number>(cell, 'level', 0) ?? 0;
@@ -597,10 +601,8 @@ export class PropertyHandler {
       const owner = this.world.getPlayer(ownership.playerId);
       if (!owner || !canCollectRent(owner.status)) continue;
       const shareRent = Math.floor(totalRent * ownership.share);
-      const newMoney = this.getPlayerMoney(owner) + shareRent;
-      this.setPlayerMoney(owner, newMoney);
-      this.world.updatePlayer(owner);
-      this.io.emit('server.valueChanged', { playerId: owner.id, fieldId: 'money', current: newMoney, delta: shareRent });
+      const change = this.economy.changeValue(owner.id, 'money', shareRent, 'rent_income');
+      if (change.ok) this.io.emit('server.valueChanged', { playerId: owner.id, fieldId: 'money', current: change.current, delta: change.delta });
     }
   }
 
@@ -628,18 +630,6 @@ export class PropertyHandler {
   /**
    * 设置玩家财产
    */
-  private setPlayerMoney(player: Player, value: number): void {
-    if (player.values['money']) {
-      player.values['money'].current = Math.max(0, value); // 防止负数
-    } else {
-      player.values['money'] = {
-        id: 'money',
-        name: '财产',
-        current: Math.max(0, value),
-        min: 0,
-      };
-    }
-  }
 }
 
 /**

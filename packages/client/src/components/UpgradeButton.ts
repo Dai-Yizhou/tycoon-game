@@ -149,7 +149,7 @@ export class UpgradeButton {
       if (canUpgrade) {
         Object.assign(button.style, ENABLED_STYLE);
         button.textContent = `升级 Lv.${level + 1} (${upgradeCost})`;
-        button.onclick = () => this.handleUpgrade(upgradeCost);
+        button.onclick = () => this.handleUpgrade();
       } else {
         Object.assign(button.style, DISABLED_STYLE);
         button.textContent = `升级 Lv.${level + 1} (${upgradeCost})`;
@@ -176,7 +176,7 @@ export class UpgradeButton {
   /**
    * 处理升级
    */
-  private handleUpgrade(expectedCost: number): void {
+  private handleUpgrade(): void {
     this.config.socket.emit(
       'client.upgradeProperty',
       { cellId: this.config.cell.id },

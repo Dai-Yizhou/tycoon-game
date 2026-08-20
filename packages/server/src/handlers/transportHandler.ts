@@ -15,12 +15,13 @@
  */
 
 import type { AckResult, Cell, Player, PositionChangedPayload } from '@game/shared';
-import { getExtra, normalizeCellType, CellTypes } from '@game/shared';
+import { getExtra, normalizeCellType, CellTypes, t } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
+import type { EconomyService } from '../economy/EconomyService.js';
 
 /**
  * 传送结果
@@ -56,6 +57,7 @@ export interface TransportNetworkState {
 export class TransportHandler {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
+  private readonly economy: EconomyService | null;
   /** 交通枢纽网络状态映射 */
   private readonly hubStates: Map<number, TransportNetworkState> = new Map();
   /** 昼夜周期时长（毫秒），默认 5 分钟 */
@@ -63,9 +65,10 @@ export class TransportHandler {
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
 
-  constructor(io: TypedServer, world: GameWorld) {
+  constructor(io: TypedServer, world: GameWorld, economy: EconomyService | null = null) {
     this.io = io;
     this.world = world;
+    this.economy = economy;
     this.initializeTransportNetwork();
   }
 
@@ -296,8 +299,13 @@ export class TransportHandler {
   ): TransportResult | null {
     try {
       // 1. 扣除玩家财产
-      const currentMoney = this.getPlayerMoney(player);
-      this.setPlayerMoney(player, currentMoney - cost);
+      if (this.economy) {
+        const change = this.economy.changeValue(player.id, 'money', -cost, 'transport');
+        if (!change.ok) return null;
+      } else {
+        const currentMoney = this.getPlayerMoney(player);
+        this.setPlayerMoney(player, currentMoney - cost);
+      }
 
       // 2. 更新玩家位置
       const fromCellId = player.position.cellId;
@@ -338,8 +346,8 @@ export class TransportHandler {
     this.io.emit('server.notification', {
       id: `transport_${result.playerId}_${Date.now()}`,
       type: 'info',
-      title: '传送成功',
-      content: `玩家 ${result.playerId.slice(0, 8)}... 通过交通枢纽传送到格子 ${result.toCellId}`,
+      title: t('server.transportSuccessTitle'),
+      content: t('server.transportSuccessContent', { player: result.playerId.slice(0, 8), cell: result.toCellId }),
       durationMs: 3000,
     });
 
@@ -510,8 +518,8 @@ export class TransportHandler {
     socket.emit('server.notification', {
       id: `transport_${hubId}`,
       type: 'info',
-      title: '交通枢纽',
-      content: `你可以付费传送到其他格子，费用 ${cost}`,
+      title: t('server.transportTitle'),
+      content: t('server.transportPrompt', { cost: cost ?? 50 }),
       actions: currentDestinations.map(dest => ({
         label: `传送到 ${dest}`,
         action: 'useTransport',

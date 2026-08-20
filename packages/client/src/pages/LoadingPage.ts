@@ -79,8 +79,10 @@ export function createLoadingPage(controller: GameController): HTMLElement {
   container.appendChild(page);
   let active = true;
   let socket: ReturnType<typeof createSocket> | null = null;
+  let connectionAttempt = 0;
   loadingPageCleanups.set(page, () => {
     active = false;
+    connectionAttempt += 1;
     if (controller.getState() !== 'game' && controller.getState() !== 'bankruptcy') {
       socket?.disconnect();
       if (controller.getSocket() === socket) controller.setSocket(null);
@@ -89,6 +91,9 @@ export function createLoadingPage(controller: GameController): HTMLElement {
 
   // 开始连接
   const startConnection = async (): Promise<void> => {
+    const attempt = ++connectionAttempt;
+    socket?.disconnect();
+    if (controller.getSocket() === socket) controller.setSocket(null);
     progressBar.style.width = '20%';
     progressText.textContent = '20%';
 
@@ -96,13 +101,13 @@ export function createLoadingPage(controller: GameController): HTMLElement {
       url: window.location.origin,
       token: getAuthToken() || undefined,
       onConnect: (socketId) => {
-        if (!active) return;
+        if (!active || attempt !== connectionAttempt) return;
         progressBar.style.width = '60%';
         progressText.textContent = '60%';
         controller.setConnected(socketId);
       },
       onError: (error) => {
-        if (!active) return;
+        if (!active || attempt !== connectionAttempt) return;
         if (error === 'authentication_failed') clearAuthToken();
         controller.setError(error);
         errorText.textContent = t('loading.connectFailed', { error });
@@ -120,12 +125,12 @@ export function createLoadingPage(controller: GameController): HTMLElement {
 
     try {
       await waitForConnection(socket, 5000);
-      if (!active) return;
+      if (!active || attempt !== connectionAttempt) return;
 
       // 发送登录请求
       const playerName = controller.getContext().playerName;
       socket.emit('client.login', { username: playerName, guest: false }, (result) => {
-        if (!active) return;
+        if (!active || attempt !== connectionAttempt) return;
         if (result.ok && result.data) {
           progressBar.style.width = '100%';
           progressText.textContent = '100%';
@@ -145,7 +150,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
         }
       });
     } catch (err) {
-      if (!active) return;
+      if (!active || attempt !== connectionAttempt) return;
       const message = err instanceof Error ? err.message : t('common.unknownError');
       controller.setError(message);
       errorText.textContent = t('loading.connectFailed', { error: message });

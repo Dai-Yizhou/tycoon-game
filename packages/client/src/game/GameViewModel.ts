@@ -332,11 +332,14 @@ export class GameViewModel {
   // ===== Day/Night =====
   getDayNight(): DayNightSlice {
     const snapshot = this.projectedSnapshot();
-    return { cycleDuration: 15 * 60 * 1000, cycleStartTime: snapshot.dayNightStartTime, serverTimeOffset: snapshot.serverTimeOffset, prosperity: 100 };
+    return { cycleDuration: 15 * 60 * 1000, cycleStartTime: snapshot.dayNightStartTime, serverTimeOffset: snapshot.serverTimeOffset, prosperity: snapshot.prosperity };
   }
 
   // ===== Regions =====
-  getRegions(): RegionSlice { return { mapRegions: [], valueFieldDefs: [], regionProsperityMap: new Map() }; }
+  getRegions(): RegionSlice {
+    const snapshot = this.projectedSnapshot();
+    return { mapRegions: snapshot.mapRegions, valueFieldDefs: snapshot.valueFieldDefs, regionProsperityMap: snapshot.regionProsperityMap };
+  }
 
   // ===== Chat =====
   getChat(): ChatSlice {

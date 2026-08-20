@@ -15,13 +15,14 @@
  */
 
 import type { AckResult, Cell, Player } from '@game/shared';
-import { getExtra, normalizeCellType, CellTypes } from '@game/shared';
+import { getExtra, normalizeCellType, CellTypes, t } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { ProsperityManager } from '../world/ProsperityManager.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
+import { EconomyService } from '../economy/EconomyService.js';
 
 /**
  * 修缮结果
@@ -69,6 +70,7 @@ export interface MonumentState extends MonumentInternalState {
 export class MonumentHandler {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
+  private readonly economy: EconomyService;
   /** 繁荣度管理器（可选，由 app.ts 注入） */
   private prosperityManager: ProsperityManager | null = null;
   /** 行为执行引擎（可选，由 app.ts 注入） */
@@ -78,9 +80,10 @@ export class MonumentHandler {
   /** 最大繁荣度 */
   private readonly maxProsperity = 100;
 
-  constructor(io: TypedServer, world: GameWorld, prosperityManager?: ProsperityManager) {
+  constructor(io: TypedServer, world: GameWorld, prosperityManager?: ProsperityManager, economy: EconomyService = new EconomyService(world)) {
     this.io = io;
     this.world = world;
+    this.economy = economy;
     if (prosperityManager) {
       this.prosperityManager = prosperityManager;
     }
@@ -304,13 +307,16 @@ export class MonumentHandler {
   ): RepairResult | null {
     try {
       // 1. 扣除玩家财产
-      const currentMoney = this.getPlayerMoney(player);
-      this.setPlayerMoney(player, currentMoney - cost);
+      const moneyChange = this.economy.changeValue(player.id, 'money', -cost, 'monument_repair');
+      if (!moneyChange.ok) return null;
 
       // 2. 增加玩家信用值
       const creditIncrease = getExtra<number>(monumentCell, 'creditIncrease', 10) ?? 10;
-      const currentCredit = this.getPlayerCredit(player);
-      this.setPlayerCredit(player, currentCredit + creditIncrease);
+      const creditChange = this.economy.changeValue(player.id, 'credit', creditIncrease, 'monument_repair');
+      if (!creditChange.ok) {
+        this.economy.changeValue(player.id, 'money', cost, 'monument_repair_rollback');
+        return null;
+      }
 
       // 3. 增加区域繁荣度（通过 ProsperityManager）
       const prosperityIncrease = getExtra<number>(monumentCell, 'prosperityIncrease', 20) ?? 20;
@@ -333,8 +339,6 @@ export class MonumentHandler {
       monumentCell.extra.lastRepairTime = Date.now();
 
       // 5. 更新玩家数据
-      this.world.updatePlayer(player);
-
       return {
         playerId: player.id,
         monumentId: monumentCell.id,
@@ -357,8 +361,8 @@ export class MonumentHandler {
     this.io.emit('server.notification', {
       id: `repair_${result.playerId}_${Date.now()}`,
       type: 'success',
-      title: '纪念碑修缮成功',
-      content: `玩家 ${result.playerId.slice(0, 8)}... 修缮了纪念碑 ${result.monumentId}，信用值增加 ${result.creditIncrease}`,
+      title: t('server.monumentRepairSuccess'),
+      content: t('server.monumentRepairContent', { player: result.playerId.slice(0, 8), id: result.monumentId, credit: result.creditIncrease }),
       durationMs: 3000,
     });
 
@@ -414,8 +418,8 @@ export class MonumentHandler {
     socket.emit('server.notification', {
       id: `monument_${monumentId}`,
       type: 'info',
-      title: '纪念碑',
-      content: `你可以修缮纪念碑，费用 ${cost}，当前区域繁荣度 ${currentProsperity}`,
+      title: t('server.monumentTitle'),
+      content: t('server.monumentPrompt', { cost, prosperity: currentProsperity }),
       actions: [
         { label: '修缮纪念碑', action: 'repairMonument', payload: { monumentId } },
         { label: '取消', action: 'dismiss' },
@@ -437,19 +441,6 @@ export class MonumentHandler {
   /**
    * 设置玩家财产
    */
-  private setPlayerMoney(player: Player, value: number): void {
-    if (player.values['money']) {
-      player.values['money'].current = Math.max(0, value); // 防止负数
-    } else {
-      player.values['money'] = {
-        id: 'money',
-        name: '财产',
-        current: Math.max(0, value),
-        min: 0,
-      };
-    }
-  }
-
   /**
    * 获取玩家信用值
    */
@@ -461,19 +452,6 @@ export class MonumentHandler {
   /**
    * 设置玩家信用值
    */
-  private setPlayerCredit(player: Player, value: number): void {
-    if (player.values['credit']) {
-      player.values['credit'].current = Math.max(0, value); // 防止负数
-    } else {
-      player.values['credit'] = {
-        id: 'credit',
-        name: '信用值',
-        current: Math.max(0, value),
-        min: 0,
-      };
-    }
-  }
-
   /**
    * 获取纪念碑所属区域的繁荣度
    *

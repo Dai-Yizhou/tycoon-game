@@ -24,6 +24,7 @@ import { DEFAULT_OWNERSHIP_CONFIG, addOwnership, getBuyInPrice, getOwnerships, t
 import type { PropertyOwnership } from './propertyHandler.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
 import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
+import { EconomyService } from '../economy/EconomyService.js';
 
 /**
  * 投资收益结果
@@ -66,12 +67,14 @@ export class InvestmentHandler {
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
   private readonly ownershipConfig: OwnershipConfig;
+  private readonly economy: EconomyService;
   private readonly operationGuard = new EconomicOperationGuard<AckResult<{ cell: Cell }>>();
 
-  constructor(io: TypedServer, world: GameWorld, ownershipConfig: OwnershipConfig = DEFAULT_OWNERSHIP_CONFIG) {
+  constructor(io: TypedServer, world: GameWorld, ownershipConfig: OwnershipConfig = DEFAULT_OWNERSHIP_CONFIG, economy: EconomyService = new EconomyService(world)) {
     this.io = io;
     this.world = world;
     this.ownershipConfig = ownershipConfig;
+    this.economy = economy;
   }
 
   /**
@@ -381,11 +384,11 @@ export class InvestmentHandler {
     price: number,
   ): { cell: Cell; ownership: PropertyOwnership } | null {
     try {
-      const currentMoney = this.getPlayerMoney(player);
-      this.setPlayerMoney(player, currentMoney - price);
+      const buyerChange = this.economy.changeValue(player.id, 'money', -price, 'investment_purchase');
+      if (!buyerChange.ok) return null;
       const ownership = addOwnership(cell, player.id, price, this.ownershipConfig);
       if (!ownership || ownership.share <= 0 || ownership.share > 1) {
-        this.setPlayerMoney(player, currentMoney);
+        this.economy.changeValue(player.id, 'money', price, 'investment_purchase_rollback');
         return null;
       }
       this.distributeBuyInToOwners(cell, player.id, price);
@@ -409,8 +412,8 @@ export class InvestmentHandler {
       const owner = this.world.getPlayer(ownership.playerId);
       if (!owner || owner.status === PlayerStatus.Bankrupt) continue;
       const payout = Math.floor(amount * (ownership.share / (1 - buyer.share)));
-      this.setPlayerMoney(owner, this.getPlayerMoney(owner) + payout);
-      this.io.emit('server.valueChanged', { playerId: owner.id, fieldId: 'money', current: this.getPlayerMoney(owner), delta: payout });
+      const change = this.economy.changeValue(owner.id, 'money', payout, 'investment_buy_in_payout');
+      if (change.ok) this.io.emit('server.valueChanged', { playerId: owner.id, fieldId: 'money', current: change.current, delta: change.delta });
     }
   }
 
@@ -466,15 +469,9 @@ export class InvestmentHandler {
       }
 
       // 更新玩家财产
-      const currentMoney = this.getPlayerMoney(player);
-      if (impact.type === 'profit') {
-        this.setPlayerMoney(player, currentMoney + playerAmount);
-      } else {
-        this.setPlayerMoney(player, currentMoney - playerAmount);
-      }
-
-      // 更新玩家数据
-      this.world.updatePlayer(player);
+      const delta = impact.type === 'profit' ? playerAmount : -playerAmount;
+      const change = this.economy.changeValue(player.id, 'money', delta, `investment_${impact.type}`);
+      if (!change.ok) continue;
 
       affectedPlayers.push({
         playerId: ownership.playerId,
@@ -486,8 +483,8 @@ export class InvestmentHandler {
       this.io.emit('server.valueChanged', {
         playerId: ownership.playerId,
         fieldId: 'money',
-        current: this.getPlayerMoney(player),
-        delta: impact.type === 'profit' ? playerAmount : -playerAmount,
+        current: change.current,
+        delta: change.delta,
       });
     }
 
@@ -557,18 +554,6 @@ export class InvestmentHandler {
   /**
    * 设置玩家财产
    */
-  private setPlayerMoney(player: Player, value: number): void {
-    if (player.values['money']) {
-      player.values['money'].current = Math.max(0, value); // 防止负数
-    } else {
-      player.values['money'] = {
-        id: 'money',
-        name: '财产',
-        current: Math.max(0, value),
-        min: 0,
-      };
-    }
-  }
 }
 
 /**

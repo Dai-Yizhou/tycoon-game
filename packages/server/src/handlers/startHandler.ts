@@ -12,11 +12,12 @@
  */
 
 import type { ValueChangedPayload } from '@game/shared';
-import { CellTypes, getExtra } from '@game/shared';
+import { CellTypes, getExtra, t } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { HandlerRegistry } from '../transport/handlers.js';
+import type { EconomyService } from '../economy/EconomyService.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
 
 /**
@@ -45,14 +46,17 @@ export class StartHandler {
   private readonly world: GameWorld;
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
+  private readonly economy: EconomyService | null;
 
   constructor(
     io: TypedServer,
     world: GameWorld,
     _registry: HandlerRegistry,
+    economy: EconomyService | null = null,
   ) {
     this.io = io;
     this.world = world;
+    this.economy = economy;
   }
 
   /**
@@ -172,8 +176,8 @@ export class StartHandler {
       this.io.emit('server.notification', {
         id: `pass-start-${playerId}-${Date.now()}`,
         type: 'success',
-        title: '经过起点',
-        content: `玩家 ${player.username} 经过起点，获得 ${bonus} 资金`,
+        title: t('server.passedStartTitle'),
+        content: t('server.passedStartContent', { name: player.username, amount: bonus }),
         durationMs: 3000,
       });
 
@@ -224,6 +228,12 @@ export class StartHandler {
    * @param reason 原因（日志用）
    */
   private addMoney(player: { id: string; values: Record<string, { id: string; name: string; current: number; min?: number; max?: number }> }, amount: number, reason: string): void {
+    if (this.economy) {
+      const change = this.economy.changeValue(player.id, 'money', amount, reason);
+      if (!change.ok) return;
+      this.io.emit('server.valueChanged', { playerId: player.id, fieldId: 'money', current: change.current, delta: change.delta });
+      return;
+    }
     const moneyField = player.values['money'];
     if (!moneyField) {
       logger.warn(`玩家 ${player.id} 没有 money 字段，无法发放资金`);

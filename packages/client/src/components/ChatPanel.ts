@@ -9,6 +9,7 @@
  */
 
 import type { ChatChannel, ChatMessage } from '@game/shared';
+import type { TypedClientSocket } from '../hooks/useSocket.js';
 
 /**
  * 聊天面板配置
@@ -17,7 +18,7 @@ export interface ChatPanelConfig {
   /** 容器元素 */
   container: HTMLElement;
   /** Socket 连接 */
-  socket: any;
+  socket: TypedClientSocket;
   /** 当前玩家 ID */
   playerId: string;
   /** 玩家名称 */
@@ -193,7 +194,7 @@ export class ChatPanel {
         channel: this.state.currentChannel,
         content,
       },
-      (result: any) => {
+      (result) => {
         if (result.ok) {
           this.state.inputText = '';
           if (this.inputElement) {

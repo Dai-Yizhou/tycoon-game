@@ -15,12 +15,14 @@ export interface EconomyChangeResult {
 export class EconomyService {
   constructor(private readonly world: GameWorld) {}
 
-  changeValue(playerId: string, fieldId: string, delta: number, reason: string): EconomyChangeResult {
+  changeValue(playerId: string, fieldId: string, delta: number, reason: string, createIfMissing = true): EconomyChangeResult {
     const player = this.world.getPlayer(playerId);
     const base = { ok: false, playerId, fieldId, previous: 0, current: 0, delta, reason };
     if (!player) return { ...base, error: 'player_not_found' };
     if (!Number.isFinite(delta)) return { ...base, error: 'invalid_delta' };
-    const field = player.values[fieldId];
+    const field = player.values[fieldId] ?? (createIfMissing
+      ? (player.values[fieldId] = { id: fieldId, name: fieldId, current: 0, min: 0 })
+      : undefined);
     if (!field) return { ...base, error: 'value_field_not_found' };
     const previous = field.current;
     const current = Math.min(field.max ?? Number.POSITIVE_INFINITY, Math.max(field.min ?? Number.NEGATIVE_INFINITY, previous + delta));

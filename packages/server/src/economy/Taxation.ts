@@ -18,6 +18,7 @@ import { getAccumulatedValue, getOwnerships } from './Ownership.js';
 import { logger } from '../utils/logger.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { TypedServer } from '../transport/SocketManager.js';
+import { EconomyService } from './EconomyService.js';
 
 /**
  * 税收配置
@@ -73,14 +74,16 @@ export class Taxation {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
   private readonly config: TaxConfig;
+  private readonly economy: EconomyService;
   private readonly taxRecords: Map<string, TaxRecord[]> = new Map(); // playerId -> taxRecords
   private taxTimer: NodeJS.Timeout | null = null;
   private lastTaxTime: number = 0;
 
-  constructor(io: TypedServer, world: GameWorld, config: TaxConfig) {
+  constructor(io: TypedServer, world: GameWorld, config: TaxConfig, economy: EconomyService = new EconomyService(world)) {
     this.io = io;
     this.world = world;
     this.config = config;
+    this.economy = economy;
   }
 
   /**
@@ -169,15 +172,8 @@ export class Taxation {
       return { success: true, taxRecord: undefined };
     }
 
-    // 5. 检查玩家财产是否足够支付
     const playerMoney = this.getPlayerMoney(player);
     const actualTax = Math.min(totalTax, playerMoney);
-
-    // 6. 收取税收
-    this.subtractPlayerMoney(player, actualTax);
-    this.world.updatePlayer(player);
-
-    // 7. 记录税收
     const taxRecord: TaxRecord = {
       id: `tax_${playerId}_${Date.now()}`,
       playerId,
@@ -189,6 +185,13 @@ export class Taxation {
     };
 
     this.addTaxRecord(playerId, taxRecord);
+
+    // 5. 收取税收
+    const change = this.economy.changeValue(playerId, 'money', -actualTax, 'tax');
+    if (!change.ok) {
+      this.removeTaxRecord(playerId, taxRecord.id);
+      return { success: false, error: change.error };
+    }
 
     // 8. 广播税收事件
     this.io.emit('server.taxCollected', {
@@ -317,20 +320,19 @@ export class Taxation {
     this.taxRecords.set(playerId, records);
   }
 
+  private removeTaxRecord(playerId: string, recordId: string): void {
+    const records = this.taxRecords.get(playerId);
+    if (!records) return;
+    const remaining = records.filter((record) => record.id !== recordId);
+    if (remaining.length === 0) this.taxRecords.delete(playerId);
+    else this.taxRecords.set(playerId, remaining);
+  }
+
   /**
    * 获取玩家财产
    */
   private getPlayerMoney(player: Player): number {
     return getValueCurrent(player, 'money', 0);
-  }
-
-  /**
-   * 扣除玩家财产
-   */
-  private subtractPlayerMoney(player: Player, amount: number): void {
-    if (player.values['money']) {
-      player.values['money'].current = Math.max(0, player.values['money'].current - amount);
-    }
   }
 
   /**
@@ -356,6 +358,7 @@ export function createTaxation(
   io: TypedServer,
   world: GameWorld,
   config: TaxConfig,
+  economy: EconomyService = new EconomyService(world),
 ): Taxation {
-  return new Taxation(io, world, config);
+  return new Taxation(io, world, config, economy);
 }

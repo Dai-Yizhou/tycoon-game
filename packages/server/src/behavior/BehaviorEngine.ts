@@ -21,6 +21,7 @@ import { logger } from '../utils/logger.js';
 import type { TypedServer } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { ProsperityManager } from '../world/ProsperityManager.js';
+import type { EconomyService } from '../economy/EconomyService.js';
 
 /**
  * 行为事件目标类型
@@ -126,6 +127,7 @@ export class BehaviorEngine {
   private readonly world: GameWorld;
   /** 繁荣度管理器（可选，用于区域查找） */
   private readonly prosperityManager: ProsperityManager | null;
+  private readonly economy: EconomyService | null;
   /** behavior 配置文件根目录 */
   private readonly configDir: string;
   /** 配置缓存 */
@@ -136,12 +138,14 @@ export class BehaviorEngine {
     world: GameWorld,
     options?: {
       prosperityManager?: ProsperityManager | null;
+      economy?: EconomyService | null;
       configDir?: string;
     },
   ) {
     this.io = io;
     this.world = world;
     this.prosperityManager = options?.prosperityManager ?? null;
+    this.economy = options?.economy ?? null;
     this.configDir = options?.configDir ?? path.resolve(process.cwd(), 'config', 'behaviors');
   }
 
@@ -474,6 +478,11 @@ export class BehaviorEngine {
    * @returns 变化记录或 null
    */
   private applyValueDelta(player: Player, fieldId: string, delta: number): BehaviorValueChange | null {
+    if (this.economy) {
+      const result = this.economy.changeValue(player.id, fieldId, delta, 'behavior_event');
+      if (!result.ok) return null;
+      return { playerId: player.id, fieldId, oldValue: result.previous, newValue: result.current, delta: result.delta };
+    }
     if (!player.values) {
       player.values = {};
     }

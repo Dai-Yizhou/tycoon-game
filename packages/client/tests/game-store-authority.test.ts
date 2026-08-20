@@ -74,6 +74,25 @@ describe('GameStore authority', () => {
     });
   });
 
+  it('从 Store 投影实时繁荣度和区域定义', () => {
+    const store = new GameStore();
+    const viewModel = new GameViewModel(store);
+
+    store.setRegions([
+      { id: 'region-1', name: '区域一', cellIds: [1], prosperity: 72 },
+    ], [
+      { id: 'prosperity', name: '繁荣度', scope: 'region', min: 0, max: 100 },
+    ]);
+    store.setProsperity('region-1', 72);
+
+    expect(viewModel.getDayNight().prosperity).toBe(72);
+    expect(viewModel.getRegions()).toEqual(expect.objectContaining({
+      mapRegions: [{ id: 'region-1', name: '区域一', cellIds: [1], prosperity: 72 }],
+      valueFieldDefs: [{ id: 'prosperity', name: '繁荣度', scope: 'region', min: 0, max: 100 }],
+    }));
+    expect(viewModel.getRegions().regionProsperityMap.get('region-1')).toBe(72);
+  });
+
   it('通过 Store 更新其他玩家的位置', () => {
     const store = new GameStore();
     store.applyEvent({

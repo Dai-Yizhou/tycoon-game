@@ -46,12 +46,59 @@
     "off": "Off",
     "language": "Language",
     "loadingMap": "Loading map...",
+    "mapLoadFailed": "Failed to load the board. Return and try again.",
     "unknownError": "Unknown error",
     "settingsLabel": "Settings",
     "featureInProgress": "📋 {{page}} page under development...",
     "backToStart": "Back to start page",
     "goTo": "Go to {{name}}",
     "canvasContextError": "Cannot acquire Canvas 2D context"
+  },
+  "server": {
+    "authInvalidCredentials": "Invalid username or password format",
+    "authUnavailable": "Authentication service is temporarily unavailable",
+    "usernameLength": "Username must be {{min}}-{{max}} characters and contain only letters, numbers, or underscores",
+    "passwordLength": "Password must be at least {{min}} characters",
+    "usernameExists": "Username already exists",
+    "invalidCredentials": "Invalid username or password",
+    "guestOnly": "Guest accounts must use guest login",
+    "passwordRequired": "Please enter a password",
+    "userNotFound": "User not found",
+    "guestMigrationRequired": "Non-guest accounts cannot be migrated"
+    ,"passedStartTitle": "Passed Start"
+    ,"passedStartContent": "Player {{name}} passed Start and received {{amount}} funds"
+    ,"monumentRepairSuccess": "Monument repaired"
+    ,"monumentRepairContent": "Player {{player}}... repaired monument {{id}} and gained {{credit}} credit"
+    ,"monumentTitle": "Monument"
+    ,"monumentPrompt": "You can repair this monument for {{cost}}. Current regional prosperity: {{prosperity}}"
+    ,"jailEnteredTitle": "Entered Jail"
+    ,"jailEnteredContent": "Player {{name}} entered jail and must wait {{duration}}ms before release"
+    ,"jailReleasedTitle": "Released from Jail"
+    ,"jailReleasedContent": "Player {{name}} was released and returned to normal status"
+    ,"transportSuccessTitle": "Transport complete"
+    ,"transportSuccessContent": "Player {{player}}... transported to cell {{cell}}"
+    ,"transportTitle": "Transport hub"
+    ,"transportPrompt": "You can pay to transport to another cell. Cost: {{cost}}"
+    ,"eventTitle": "Event triggered"
+    ,"teamInviteTitle": "Team invitation"
+    ,"teamInviteContent": "{{inviterName}} invited you to join the team"
+    ,"accept": "Accept"
+    ,"reject": "Reject"
+    ,"pathSelectTitle": "Path selection"
+    ,"pathSelectContent": "There are multiple paths ahead. Choose one."
+    ,"pathA": "Path A"
+    ,"pathB": "Path B"
+    ,"systemMessageTitle": "System message"
+    ,"gameEventTitle": "Game event"
+    ,"errorTitle": "Error"
+    ,"playerRestartedTitle": "Player restarted"
+    ,"playerRestartedContent": "{{playerName}} has restarted"
+    ,"eventEffect": "Effect: {{effect}}"
+    ,"regionEffect": "(affects all players in the region)"
+    ,"eraSettlementTitle": "Era settlement complete"
+    ,"eraSettlementContent": "{{players}} players participated in this era settlement, and {{monuments}} monument records were created."
+    ,"monumentRecordTitle": "Monument record"
+    ,"monumentRecordContent": "Category {{category}}: player {{player}} was recorded with {{value}}."
   },
   "game": {
     "title": "rentfree.io",

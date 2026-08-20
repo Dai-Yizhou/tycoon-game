@@ -17,6 +17,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { logger } from '../utils/logger.js';
+import { t } from '@game/shared';
 
 /**
  * 通知类型
@@ -97,50 +98,50 @@ export const NOTIFICATION_TEMPLATES = {
   // 组队邀请
   teamInvite: {
     type: 'info' as NotificationType,
-    title: '组队邀请',
-    contentTemplate: '{inviterName} 邀请您加入队伍',
+    title: t('server.teamInviteTitle'),
+    contentTemplate: t('server.teamInviteContent'),
     actions: [
-      { label: '接受', action: 'accept-team-invite' },
-      { label: '拒绝', action: 'reject-team-invite' },
+      { label: t('server.accept'), action: 'accept-team-invite' },
+      { label: t('server.reject'), action: 'reject-team-invite' },
     ],
     durationMs: 60000,
   },
   // 路径选择
   pathSelect: {
     type: 'info' as NotificationType,
-    title: '路径选择',
-    contentTemplate: '前方有多条路径，请选择一条',
+    title: t('server.pathSelectTitle'),
+    contentTemplate: t('server.pathSelectContent'),
     actions: [
-      { label: '路径A', action: 'select-path', payload: { pathId: 'A' } },
-      { label: '路径B', action: 'select-path', payload: { pathId: 'B' } },
+      { label: t('server.pathA'), action: 'select-path', payload: { pathId: 'A' } },
+      { label: t('server.pathB'), action: 'select-path', payload: { pathId: 'B' } },
     ],
     durationMs: 30000,
   },
   // 系统消息
   systemMessage: {
     type: 'info' as NotificationType,
-    title: '系统消息',
+    title: t('server.systemMessageTitle'),
     contentTemplate: '',
     durationMs: 5000,
   },
   // 游戏事件
   gameEvent: {
     type: 'success' as NotificationType,
-    title: '游戏事件',
+    title: t('server.gameEventTitle'),
     contentTemplate: '',
     durationMs: 5000,
   },
   // 错误消息
   errorMessage: {
     type: 'error' as NotificationType,
-    title: '错误',
+    title: t('server.errorTitle'),
     contentTemplate: '',
     durationMs: 0,
   },
   playerRestarted: {
     type: 'success' as NotificationType,
-    title: '玩家重启',
-    contentTemplate: '{playerName} 已重新开始',
+    title: t('server.playerRestartedTitle'),
+    contentTemplate: t('server.playerRestartedContent'),
     durationMs: 3000,
   },
 } as const;

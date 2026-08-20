@@ -7,7 +7,7 @@
  */
 
 import type { CellType, EraInfo, MapData, MapMeta, MonumentRecord, Player, ValueField } from '@game/shared';
-import { CellTypes, normalizeCellType } from '@game/shared';
+import { CellTypes, normalizeCellType, t } from '@game/shared';
 import { getOwnerships } from '../economy/Ownership.js';
 import type { EraStore } from '../storage/EraStore.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -540,8 +540,8 @@ export class EraManager {
     this.io.emit('server.notification', {
       id: `era_settlement_${Date.now()}`,
       type: 'success',
-      title: '时代结算完成',
-      content: `本时代共有 ${settlements.length} 名玩家参与结算，${monumentRecords.length} 项纪念碑铭记已生成。`,
+      title: t('server.eraSettlementTitle'),
+      content: t('server.eraSettlementContent', { players: settlements.length, monuments: monumentRecords.length }),
       durationMs: 0,
     });
 
@@ -550,8 +550,8 @@ export class EraManager {
       this.io.emit('server.notification', {
         id: `monument_${record.category}_${Date.now()}`,
         type: 'info',
-        title: '纪念碑铭记',
-        content: `类别 ${record.category}：玩家 ${record.playerId} 以 ${record.value} 被写入纪念碑。`,
+        title: t('server.monumentRecordTitle'),
+        content: t('server.monumentRecordContent', { category: record.category, player: record.playerId, value: record.value }),
         durationMs: 5000,
       });
     }

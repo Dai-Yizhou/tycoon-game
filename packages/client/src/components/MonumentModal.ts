@@ -85,7 +85,6 @@ const CANCEL_BUTTON_STYLE = {
 const MONUMENT_ICON = '🏛️';
 const SUCCESS_COLOR = '#10b981';
 const ERROR_COLOR = '#ef4444';
-const WARNING_COLOR = '#f59e0b';
 const PROSPERITY_COLORS = {
   high: '#10b981', // 高繁荣度：绿色
   medium: '#f59e0b', // 中繁荣度：黄色

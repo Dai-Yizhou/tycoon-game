@@ -23,8 +23,8 @@ import { logger } from './utils/logger.js';
 import { GameWorld } from './world/GameWorld.js';
 import { SocketManager, type TypedServer } from './transport/SocketManager.js';
 import { HandlerRegistry, registerHandlers } from './transport/handlers.js';
-import { Taxation, Bankruptcy, resolveOwnershipConfig, type TaxConfig, type OwnershipConfig } from './economy/index.js';
-import { readFileSync } from 'node:fs';
+import { EconomyService, Taxation, Bankruptcy, resolveOwnershipConfig, type TaxConfig, type OwnershipConfig } from './economy/index.js';
+import { existsSync, readFileSync } from 'node:fs';
 import { parseMapData, parseMapMeta } from '@game/shared';
 import { DayNightCycle, DEFAULT_DAY_NIGHT_CONFIG } from './world/DayNightCycle.js';
 import { TimeZoneManager } from './world/TimeZoneManager.js';
@@ -44,6 +44,16 @@ export type SocketManagerConfig = Omit<
   ConstructorParameters<typeof SocketManager>[1],
   'world'
 >;
+
+function resolveConfiguredPath(configuredPath: string): string {
+  if (path.isAbsolute(configuredPath)) return configuredPath;
+  const candidates = [
+    path.resolve(process.cwd(), configuredPath),
+    path.resolve(__dirname, '..', configuredPath),
+    path.resolve(__dirname, '../..', 'server', configuredPath),
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
+}
 
 /**
  * 应用依赖（可选注入）
@@ -171,8 +181,8 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
 
   // 加载地图数据与元数据（供 ProsperityManager、TimeZoneManager 等使用）
   try {
-    const mapFilePath = path.resolve(process.cwd(), config.mapPath);
-    const mapMetaFilePath = path.resolve(process.cwd(), config.mapMetaPath);
+    const mapFilePath = resolveConfiguredPath(config.mapPath);
+    const mapMetaFilePath = resolveConfiguredPath(config.mapMetaPath);
     const rawMap = JSON.parse(readFileSync(mapFilePath, 'utf-8'));
     const rawMeta = JSON.parse(readFileSync(mapMetaFilePath, 'utf-8'));
     const mapData = parseMapData(rawMap);
@@ -217,8 +227,8 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   // 地图数据 API（含区域配置和数值字段定义）
   app.get('/api/map', (_req: Request, res: Response) => {
     try {
-      const mapPath = path.resolve(process.cwd(), config.mapPath);
-      const mapMetaPath = path.resolve(process.cwd(), config.mapMetaPath);
+      const mapPath = resolveConfiguredPath(config.mapPath);
+      const mapMetaPath = resolveConfiguredPath(config.mapMetaPath);
       const raw = readFileSync(mapPath, 'utf-8');
       const mapData = parseMapData(JSON.parse(raw));
 
@@ -275,7 +285,8 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     throw new Error('无法启动经济系统：地图元数据未加载');
   }
   const ownershipConfig: OwnershipConfig = resolveOwnershipConfig(mapMeta.config?.ownership);
-  const taxation = new Taxation(io, world, readTaxConfig(mapMeta));
+  const economy = new EconomyService(world);
+  const taxation = new Taxation(io, world, readTaxConfig(mapMeta), economy);
   const bankruptcy = new Bankruptcy(io, world, taxation);
 
   // 启动经济系统定时器
@@ -284,7 +295,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   logger.info('Economy system initialized (taxation, bankruptcy)');
 
   // 注册业务事件处理器（需要在经济系统初始化后）
-  const handlerRegistry = registerHandlers(io, world, ownershipConfig, config.jailCooldownMs);
+  const handlerRegistry = registerHandlers(io, world, ownershipConfig, config.jailCooldownMs, economy);
   if (restoredSnapshot) taxation.restoreTaxRecords(restoredSnapshot.taxRecords);
   handlerRegistry.getJailHandler().restoreJailStates(restoredSnapshot?.jailStates);
   world.setSnapshotStateProvider(() => ({
@@ -342,6 +353,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   // 初始化行为执行引擎（FR-1/FR-4）
   const behaviorEngine = new BehaviorEngine(io, world, {
     prosperityManager,
+    economy,
   });
   handlerRegistry.setBehaviorEngine(behaviorEngine);
   logger.info('BehaviorEngine initialized and injected into EventHandler');

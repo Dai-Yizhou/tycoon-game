@@ -81,7 +81,6 @@ const CANCEL_BUTTON_STYLE = {
 };
 
 const TRANSPORT_ICON = '🚉';
-const SUCCESS_COLOR = '#10b981';
 const ERROR_COLOR = '#ef4444';
 
 /**

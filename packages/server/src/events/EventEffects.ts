@@ -13,11 +13,12 @@
  */
 
 /* eslint-disable no-case-declarations -- case 块内声明为有意为之 */
-import type { EventEffect, Player, ValueField } from '@game/shared';
+import type { EventEffect } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { ProsperityManager } from '../world/ProsperityManager.js';
+import { EconomyService } from '../economy/EconomyService.js';
 
 /**
  * 事件效果应用结果
@@ -43,12 +44,14 @@ export interface EventEffectResult {
 export class EventEffectsHandler {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
+  private readonly economy: EconomyService;
   /** 繁荣度管理器（可选，用于区域效果查找） */
   private prosperityManager: ProsperityManager | null = null;
 
-  constructor(io: TypedServer, world: GameWorld) {
+  constructor(io: TypedServer, world: GameWorld, economy?: EconomyService) {
     this.io = io;
     this.world = world;
+    this.economy = economy ?? new EconomyService(world);
   }
 
   /**
@@ -160,30 +163,17 @@ export class EventEffectsHandler {
       return null;
     }
 
-    // 获取或创建数值字段
-    const field = this.getOrCreateField(player, effect.field);
-    if (!field) {
-      logger.warn(`无法创建字段 ${effect.field}`);
-      return null;
-    }
+    const change = this.economy.changeValue(playerId, effect.field, effect.delta, 'event_effect');
+    if (!change.ok) return null;
 
-    // 记录旧值
-    const oldValue = field.current;
-
-    // 应用变化（考虑边界）
-    const newValue = this.applyValueChange(field, effect.delta);
-
-    // 更新玩家数据
-    this.world.updatePlayer(player);
-
-    logger.debug(`玩家 ${playerId} 字段 ${effect.field}: ${oldValue} → ${newValue} (delta: ${effect.delta})`);
+    logger.debug(`玩家 ${playerId} 字段 ${effect.field}: ${change.previous} → ${change.current} (delta: ${change.delta})`);
 
     return {
       playerId,
       fieldId: effect.field,
-      oldValue,
-      newValue,
-      delta: effect.delta,
+      oldValue: change.previous,
+      newValue: change.current,
+      delta: change.delta,
       message: effect.message,
     };
   }
@@ -193,24 +183,6 @@ export class EventEffectsHandler {
    *
    * 如果字段不存在，创建一个新字段（默认值为 0）
    */
-  private getOrCreateField(player: Player, fieldId: string): ValueField | null {
-    if (!player.values) {
-      player.values = {};
-    }
-
-    if (!player.values[fieldId]) {
-      // 创建新字段（默认配置）
-      player.values[fieldId] = {
-        id: fieldId,
-        name: fieldId, // 默认使用 ID 作为名称
-        current: 0,
-        min: 0, // 默认最小值为 0
-      };
-    }
-
-    return player.values[fieldId];
-  }
-
   /**
    * 应用数值变化（考虑边界）
    *
@@ -218,21 +190,6 @@ export class EventEffectsHandler {
    * @param delta 变化量
    * @returns 新值
    */
-  private applyValueChange(field: ValueField, delta: number): number {
-    let newValue = field.current + delta;
-
-    // 应用边界约束
-    if (field.min !== undefined) {
-      newValue = Math.max(newValue, field.min);
-    }
-    if (field.max !== undefined) {
-      newValue = Math.min(newValue, field.max);
-    }
-
-    field.current = newValue;
-    return newValue;
-  }
-
   /**
    * 批量广播效果结果
    *

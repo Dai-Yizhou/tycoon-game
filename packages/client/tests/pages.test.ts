@@ -257,5 +257,25 @@ describe('Pages', () => {
       cleanupGamePage(page);
       expect(mockContainer.contains(page)).toBe(false);
     });
+
+    test('cleanupGamePage 移除页面注册的全局和画布事件监听器', () => {
+      controller.setPlayerName('测试玩家');
+      const page = createGamePage(controller);
+      const canvas = page.querySelector('#game-canvas') as HTMLCanvasElement;
+      const windowRemove = jest.spyOn(window, 'removeEventListener');
+      const canvasRemove = jest.spyOn(canvas, 'removeEventListener');
+
+      cleanupGamePage(page);
+
+      expect(windowRemove).toHaveBeenCalledWith('game:cell-hover', expect.any(Function));
+      expect(windowRemove).toHaveBeenCalledWith('game:cell-leave', expect.any(Function));
+      expect(windowRemove).toHaveBeenCalledWith('resize', expect.any(Function));
+      expect(canvasRemove).toHaveBeenCalledWith('mousemove', expect.any(Function));
+      expect(canvasRemove).toHaveBeenCalledWith('click', expect.any(Function));
+      expect(canvasRemove).toHaveBeenCalledWith('mouseleave', expect.any(Function));
+
+      windowRemove.mockRestore();
+      canvasRemove.mockRestore();
+    });
   });
 });

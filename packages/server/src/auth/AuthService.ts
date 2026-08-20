@@ -12,6 +12,7 @@ import type {
   LoginRequest,
   GuestMigrationRequest,
 } from '@game/shared';
+import { t } from '@game/shared';
 import { JWTService } from './JWTService.js';
 import { logger } from '../utils/logger.js';
 
@@ -124,7 +125,7 @@ export class AuthService {
     if (!this.validateUsername(request.username)) {
       return {
         success: false,
-        error: `用户名长度需在 ${this.config.minUsernameLength}-${this.config.maxUsernameLength} 之间，且只包含字母、数字、下划线`,
+        error: t('server.usernameLength', { min: this.config.minUsernameLength, max: this.config.maxUsernameLength }),
       };
     }
 
@@ -132,7 +133,7 @@ export class AuthService {
     if (!this.validatePassword(request.password)) {
       return {
         success: false,
-        error: `密码长度至少 ${this.config.minPasswordLength} 位`,
+        error: t('server.passwordLength', { min: this.config.minPasswordLength }),
       };
     }
 
@@ -141,7 +142,7 @@ export class AuthService {
     if (existingUser) {
       return {
         success: false,
-        error: '用户名已存在',
+        error: t('server.usernameExists'),
       };
     }
 
@@ -185,7 +186,7 @@ export class AuthService {
     if (!user) {
       return {
         success: false,
-        error: '用户名或密码错误',
+        error: t('server.invalidCredentials'),
       };
     }
 
@@ -193,7 +194,7 @@ export class AuthService {
     if (user.isGuest) {
       return {
         success: false,
-        error: '游客账号需使用游客登录',
+        error: t('server.guestOnly'),
       };
     }
 
@@ -201,7 +202,7 @@ export class AuthService {
     if (!request.password) {
       return {
         success: false,
-        error: '请输入密码',
+        error: t('server.passwordRequired'),
       };
     }
 
@@ -209,7 +210,7 @@ export class AuthService {
     if (!passwordMatch) {
       return {
         success: false,
-        error: '用户名或密码错误',
+        error: t('server.invalidCredentials'),
       };
     }
 
@@ -276,7 +277,7 @@ export class AuthService {
     if (!user) {
       return {
         success: false,
-        error: '用户不存在',
+        error: t('server.userNotFound'),
       };
     }
 
@@ -284,7 +285,7 @@ export class AuthService {
     if (!user.isGuest) {
       return {
         success: false,
-        error: '非游客账号无法迁移',
+        error: t('server.guestMigrationRequired'),
       };
     }
 
@@ -292,7 +293,7 @@ export class AuthService {
     if (!this.validateUsername(request.username)) {
       return {
         success: false,
-        error: `用户名长度需在 ${this.config.minUsernameLength}-${this.config.maxUsernameLength} 之间，且只包含字母、数字、下划线`,
+        error: t('server.usernameLength', { min: this.config.minUsernameLength, max: this.config.maxUsernameLength }),
       };
     }
 
@@ -300,7 +301,7 @@ export class AuthService {
     if (!this.validatePassword(request.password)) {
       return {
         success: false,
-        error: `密码长度至少 ${this.config.minPasswordLength} 位`,
+        error: t('server.passwordLength', { min: this.config.minPasswordLength }),
       };
     }
 
@@ -309,7 +310,7 @@ export class AuthService {
     if (existingUser) {
       return {
         success: false,
-        error: '用户名已存在',
+        error: t('server.usernameExists'),
       };
     }
 

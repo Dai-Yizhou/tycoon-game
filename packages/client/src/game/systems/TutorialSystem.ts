@@ -5,10 +5,7 @@
  */
 
 import { t } from '@game/shared';
-import {
-  tutorialStep, tutorialActive,
-  setTutorialStep, setTutorialActive,
-} from '../../state/GameStore.js';
+import type { GameStore } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
 
 const tutorialSteps = [
@@ -22,21 +19,19 @@ const tutorialSteps = [
   { title: t('tutorial.step7'), content: t('tutorial.step7Content') },
 ];
 
-export function startTutorial(): void {
+export function startTutorial(store: GameStore): void {
   const hasCompletedTutorial = localStorage.getItem('gameTutorialCompleted');
   if (hasCompletedTutorial) return;
-  setTutorialStep(0);
-  setTutorialActive(true);
-  showTutorialStep();
+  showTutorialStep(store, 0);
 }
 
-export function showTutorialStep(): void {
-  if (tutorialStep >= tutorialSteps.length) {
-    endTutorial();
+export function showTutorialStep(store: GameStore, stepIndex: number): void {
+  if (stepIndex >= tutorialSteps.length) {
+    endTutorial(store);
     return;
   }
 
-  const step = tutorialSteps[tutorialStep];
+  const step = tutorialSteps[stepIndex];
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
   modal.innerHTML = `
@@ -45,10 +40,10 @@ export function showTutorialStep(): void {
       <div class="modal-body">
         <div class="tutorial-content">${step.content}</div>
         <div class="tutorial-progress">
-          <span>${tutorialStep + 1}/${tutorialSteps.length}</span>
+          <span>${stepIndex + 1}/${tutorialSteps.length}</span>
         </div>
         <div class="modal-actions">
-          ${tutorialStep > 0 ? `<button class="modal-btn btn-secondary" onclick="window.prevTutorialStep()">${t('common.prev')}</button>` : ''}
+          ${stepIndex > 0 ? `<button class="modal-btn btn-secondary" onclick="window.prevTutorialStep()">${t('common.prev')}</button>` : ''}
           <button class="modal-btn btn-primary" onclick="window.nextTutorialStep()">${t('common.next')}</button>
           <button class="modal-btn btn-cancel" onclick="window.endTutorial()">${t('common.skip')}</button>
         </div>
@@ -58,38 +53,32 @@ export function showTutorialStep(): void {
 
   window.nextTutorialStep = () => {
     modal.remove();
-    setTutorialStep(tutorialStep + 1);
-    showTutorialStep();
+    showTutorialStep(store, stepIndex + 1);
   };
 
   window.prevTutorialStep = () => {
     modal.remove();
-    setTutorialStep(tutorialStep - 1);
-    showTutorialStep();
+    showTutorialStep(store, stepIndex - 1);
   };
 
   window.endTutorial = () => {
     modal.remove();
-    endTutorial();
+    endTutorial(store);
   };
 
   document.body.appendChild(modal);
 }
 
-export function endTutorial(): void {
-  setTutorialActive(false);
+export function endTutorial(_store?: GameStore): void {
   localStorage.setItem('gameTutorialCompleted', 'true');
   addChatMessage(t('tutorial.complete'), 'system');
 }
 
-export function toggleTutorial(): void {
-  if (tutorialActive) {
+export function toggleTutorial(store: GameStore): void {
+  if (document.querySelector('.tutorial-modal')) {
     const overlay = document.querySelector('.modal-overlay');
     overlay?.remove();
-    setTutorialActive(false);
   } else {
-    setTutorialStep(0);
-    setTutorialActive(true);
-    showTutorialStep();
+    showTutorialStep(store, 0);
   }
 }

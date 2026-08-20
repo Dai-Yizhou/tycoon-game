@@ -46,12 +46,59 @@
     "off": "关",
     "language": "语言",
     "loadingMap": "加载地图中...",
+    "mapLoadFailed": "棋盘加载失败，请返回后重试",
     "unknownError": "未知错误",
     "settingsLabel": "设置",
     "featureInProgress": "📋 {{page}}页面功能开发中...",
     "backToStart": "返回开始页面",
     "goTo": "前往 {{name}}",
     "canvasContextError": "无法获取 Canvas 2D 上下文"
+  },
+  "server": {
+    "authInvalidCredentials": "用户名和密码格式不正确",
+    "authUnavailable": "认证服务暂时不可用",
+    "usernameLength": "用户名长度需在 {{min}}-{{max}} 之间，且只包含字母、数字、下划线",
+    "passwordLength": "密码长度至少 {{min}} 位",
+    "usernameExists": "用户名已存在",
+    "invalidCredentials": "用户名或密码错误",
+    "guestOnly": "游客账号需使用游客登录",
+    "passwordRequired": "请输入密码",
+    "userNotFound": "用户不存在",
+    "guestMigrationRequired": "非游客账号无法迁移"
+    ,"passedStartTitle": "经过起点"
+    ,"passedStartContent": "玩家 {{name}} 经过起点，获得 {{amount}} 资金"
+    ,"monumentRepairSuccess": "纪念碑修缮成功"
+    ,"monumentRepairContent": "玩家 {{player}}... 修缮了纪念碑 {{id}}，信用值增加 {{credit}}"
+    ,"monumentTitle": "纪念碑"
+    ,"monumentPrompt": "你可以修缮纪念碑，费用 {{cost}}，当前区域繁荣度 {{prosperity}}"
+    ,"jailEnteredTitle": "进入监狱"
+    ,"jailEnteredContent": "玩家 {{name}} 进入监狱，需等待 {{duration}}ms 才能出狱"
+    ,"jailReleasedTitle": "出狱"
+    ,"jailReleasedContent": "玩家 {{name}} 已出狱，恢复正常状态"
+    ,"transportSuccessTitle": "传送成功"
+    ,"transportSuccessContent": "玩家 {{player}}... 通过交通枢纽传送到格子 {{cell}}"
+    ,"transportTitle": "交通枢纽"
+    ,"transportPrompt": "你可以付费传送到其他格子，费用 {{cost}}"
+    ,"eventTitle": "事件触发"
+    ,"teamInviteTitle": "组队邀请"
+    ,"teamInviteContent": "{{inviterName}} 邀请您加入队伍"
+    ,"accept": "接受"
+    ,"reject": "拒绝"
+    ,"pathSelectTitle": "路径选择"
+    ,"pathSelectContent": "前方有多条路径，请选择一条"
+    ,"pathA": "路径A"
+    ,"pathB": "路径B"
+    ,"systemMessageTitle": "系统消息"
+    ,"gameEventTitle": "游戏事件"
+    ,"errorTitle": "错误"
+    ,"playerRestartedTitle": "玩家重启"
+    ,"playerRestartedContent": "{{playerName}} 已重新开始"
+    ,"eventEffect": "效果: {{effect}}"
+    ,"regionEffect": "（影响区域内所有玩家）"
+    ,"eraSettlementTitle": "时代结算完成"
+    ,"eraSettlementContent": "本时代共有 {{players}} 名玩家参与结算，{{monuments}} 项纪念碑铭记已生成。"
+    ,"monumentRecordTitle": "纪念碑铭记"
+    ,"monumentRecordContent": "类别 {{category}}：玩家 {{player}} 以 {{value}} 被写入纪念碑。"
   },
   "game": {
     "title": "rentfree.io",

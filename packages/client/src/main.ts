@@ -8,6 +8,7 @@
  */
 
 import { isFeatureEnabled, listEnabledFeatures, setLocale } from '@game/shared';
+import type { LocaleCode } from '@game/shared';
 import { GameController } from './game/index.js';
 import {
   createStartPage,
@@ -24,38 +25,25 @@ import {
 import './style.css';
 
 function disableZoom(): void {
-  const preventDefault = (e: Event): void => {
-    e.preventDefault();
+  const preventDefault = (event: Event): void => event.preventDefault();
+  const handleWheel = (event: WheelEvent): void => {
+    if (event.ctrlKey || event.metaKey) preventDefault(event);
   };
-
-  const handleWheel = (e: WheelEvent): void => {
-    if (e.ctrlKey || e.metaKey) {
-      preventDefault(e);
+  const handleKeyDown = (event: KeyboardEvent): void => {
+    if ((event.ctrlKey || event.metaKey) && ['+', '=', '-', '_', '0'].includes(event.key)) {
+      preventDefault(event);
     }
   };
-
-  const handleKeyDown = (e: KeyboardEvent): void => {
-    if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_' || e.key === '0')) {
-      preventDefault(e);
-    }
+  const handleTouch = (event: TouchEvent): void => {
+    if (event.touches.length > 1) preventDefault(event);
   };
-
-  const handleTouch = (e: TouchEvent): void => {
-    if (e.touches.length > 1) {
-      preventDefault(e);
-    }
-  };
-
   window.addEventListener('wheel', handleWheel, { passive: false });
   window.addEventListener('keydown', handleKeyDown, { passive: false });
   window.addEventListener('touchstart', handleTouch, { passive: false });
   window.addEventListener('touchmove', handleTouch, { passive: false });
-
   document.addEventListener('gesturestart', preventDefault);
   document.addEventListener('gesturechange', preventDefault);
   document.addEventListener('gestureend', preventDefault);
-
-  console.info('[client] Zoom prevention enabled');
 }
 
 let currentPage: HTMLElement | null = null;
@@ -63,11 +51,10 @@ let currentRenderedState: string | null = null;
 
 function bootstrap(): void {
   disableZoom();
-
   // 从 localStorage 读取语言设置
   const savedLocale = localStorage.getItem('gameLocale');
   if (savedLocale) {
-    setLocale(savedLocale as any);
+    if (savedLocale === 'zh-CN' || savedLocale === 'en-US') setLocale(savedLocale as LocaleCode);
   }
 
   const app = document.getElementById('app');

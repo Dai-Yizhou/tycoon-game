@@ -13,7 +13,7 @@
  */
 
 import type { EventDefinition, Player } from '@game/shared';
-import { CellTypes, EventTriggers, normalizeCellType, getExtra } from '@game/shared';
+import { CellTypes, EventTriggers, normalizeCellType, getExtra, t } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -21,6 +21,7 @@ import { EventRegistry, type EventRegistryConfig } from './EventRegistry.js';
 import { EventEffectsHandler, type EventEffectResult } from './EventEffects.js';
 import { BUILTIN_EVENT_TEMPLATES } from './eventTemplates.js';
 import type { BehaviorEngine, BehaviorExecuteResult } from '../behavior/BehaviorEngine.js';
+import type { EconomyService } from '../economy/EconomyService.js';
 
 /**
  * 事件触发结果
@@ -49,11 +50,12 @@ export class EventHandler {
     io: TypedServer,
     world: GameWorld,
     registryConfig?: EventRegistryConfig,
+    economy?: EconomyService,
   ) {
     this.io = io;
     this.world = world;
     this.registry = new EventRegistry(registryConfig);
-    this.effectsHandler = new EventEffectsHandler(io, world);
+    this.effectsHandler = new EventEffectsHandler(io, world, economy);
 
     // 注册内置事件模板
     this.registerBuiltinEvents();
@@ -241,7 +243,7 @@ export class EventHandler {
       id: `behavior-${result.behaviorId}-${Date.now()}`,
       type: notificationType,
       title: result.behaviorId,
-      content: `${result.event.msg}${effectDesc ? `\n\n效果: ${effectDesc}` : ''}${result.target === 'region' ? '\n（影响区域内所有玩家）' : ''}`,
+      content: `${result.event.msg}${effectDesc ? `\n\n${t('server.eventEffect', { effect: effectDesc })}` : ''}${result.target === 'region' ? `\n${t('server.regionEffect')}` : ''}`,
       durationMs: 5000,
     });
 
@@ -249,8 +251,8 @@ export class EventHandler {
     this.io.emit('server.notification', {
       id: `behavior-global-${result.behaviorId}-${Date.now()}`,
       type: 'info',
-      title: '事件触发',
-      content: `玩家 ${player.username} 触发了事件「${result.event.msg}」`,
+      title: t('server.eventTitle'),
+      content: `${player.username} 触发了事件「${result.event.msg}」`,
       durationMs: 3000,
     });
   }
@@ -323,7 +325,7 @@ export class EventHandler {
       id: `event-${event.id}-${Date.now()}`,
       type: this.getNotificationType(effects),
       title: event.name,
-      content: `${event.effects[0]?.message ?? '发生了某事件'}\n\n效果: ${effectDescriptions}`,
+      content: `${event.effects[0]?.message ?? t('server.eventTitle')}\n\n${t('server.eventEffect', { effect: effectDescriptions })}`,
       durationMs: 5000, // 5秒后自动关闭
     });
 
@@ -331,7 +333,7 @@ export class EventHandler {
     this.io.emit('server.notification', {
       id: `event-global-${event.id}-${Date.now()}`,
       type: 'info',
-      title: '事件触发',
+      title: t('server.eventTitle'),
       content: `玩家 ${player.username} 触发了事件「${event.name}」`,
       durationMs: 3000,
     });

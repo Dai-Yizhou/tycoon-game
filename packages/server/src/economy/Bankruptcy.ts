@@ -60,6 +60,7 @@ export class Bankruptcy {
       netWorthAtBankruptcy: player.values.money?.current ?? 0,
     };
 
+    this.taxation.clearTaxRecords(playerId);
     this.world.getPlayerManager().updateStatus(playerId, PlayerStatus.Bankrupt);
     this.clearPlayerAssets(playerId);
     const mutablePlayer = player as import('@game/shared').Player & { extra?: Record<string, unknown> };
@@ -71,7 +72,6 @@ export class Bankruptcy {
       delete mutablePlayer.extra.assets;
     }
     this.world.updatePlayer(player);
-    this.taxation.clearTaxRecords(playerId);
     this.world.saveSnapshot(this.taxation.getAllTaxRecords(), {});
     this.bankruptcyRecords.set(playerId, record);
 

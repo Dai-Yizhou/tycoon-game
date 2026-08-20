@@ -77,6 +77,17 @@ describe('server app', () => {
     });
   });
 
+  describe('GET /api/map', () => {
+    it('loads the configured map when the server starts from the repository root', async () => {
+      const { app } = createApp(loadConfig());
+      const res = await request(app).get('/api/map');
+      expect(res.status).toBe(200);
+      expect(res.body.mapData).toHaveLength(8);
+      expect(res.body.mapData[0]).toEqual(expect.objectContaining({ id: 0, x: 400, y: 300 }));
+      expect(res.body.regions).toHaveLength(1);
+    });
+  });
+
   describe('GET /', () => {
     it('returns server info', async () => {
       const { app } = createApp(loadConfig());
