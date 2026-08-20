@@ -395,6 +395,8 @@ pnpm build:shared && pnpm build:server && pnpm build:client && pnpm test
 | 4 事件格效果 | `server/config/behaviors/*.json` 或 `server/events/EventEffects.ts` | 复用 `server.notification`/`valueChanged` | 是 |
 | 5 注释 + 文档 | 各方 + `docs/architecture/*`、`guides/*` | — | — |
 | 6 三系统 | 新增 `shared/types/items.ts` + 协议；`server/items/ItemManager`；`client` Store/ViewModel/HUD | **新增事件** | 是 |
+| 7 清理 renderer 旧代码 | `client/renderer/index.ts`、`components/index.ts`、`BoardRenderer.ts`、`Camera.ts` | — | 否（纯客户端清理）|
+| 8 编写有价值的测试 | `client/tests/**`、`server/tests/**`、`shared/tests/**` | 校验两端协议成对 | — |
 
 **通用收尾（每次改完都做）**：
 ```bash
@@ -403,3 +405,140 @@ pnpm lint
 pnpm test
 ```
 并手动跑一次对应交互。**别把新功能做成"没人能触发的孤儿能力"**——每个新能力必须接到某个用户能触发的地方，否则它只是新增的技术债。
+
+---
+
+## 方向 7：清理 `client/renderer/` 里的旧代码与 fallback（附真实诊断）
+
+> 本节以 `packages/client/src/renderer/` 的真实现状为例，教你"识别 → 求证 → 安全修复"，不是空谈。你改到这里时，随时回来对照。
+
+### 7.1 先认清 renderer 目录的真实结构
+
+`src/renderer/` 下实际存在 7 个文件：`BoardRenderer/Camera/CellRenderer/ConnectionRenderer/DayNightRenderer/PlayerRenderer/index`。**生产代码真正用到的只有** `BoardRenderer`（`GamePage.ts` 直接 `import { BoardRenderer } from '../renderer/BoardRenderer.js'`；`ClientRenderLoop.ts` 用它的 `hitTest/getCanvas/getCamera/centerOn/render/resize`）。
+
+### 7.2 真实存在的旧代码/fallback（我已验证）
+
+在 renderer 里，旧代码有**四种**形态，各有不同的处理策略：
+
+**形态 A：死在"入口桶"里的过期 re-export（最危险，先处理）**
+`src/renderer/index.ts:13` 仍 `export { VisionMaskRenderer, DEFAULT_VISION_RADIUS, calculateVisionRadius } from './VisionMaskRenderer'`，但 **`VisionMaskRenderer.ts` 文件已被删除**（`src/renderer/` 下不存在）。同一问题在 `src/components/index.ts:5-14` 更严重——它 re-export 了 10 个已删除的组件（`DiceButton/DiceAnimation/JailIndicator/PropertyModal/UpgradeButton/EventModal/InvestmentModal/TransportModal/MonumentModal/ChatPanel`）。
+- **为什么"看起来能跑"**：`GamePage.ts`/`ClientRenderLoop.ts` 都是**直接 import 具体文件**，没人 import 这两个 index 桶 → 桶的错误没有被入口链触发 → `tsc`+`vite` 那份"通过"是**假通过**。
+- **它何时咬人**：一旦有测试或代码 `import from '.../index'`，立刻炸。实测：`tests/renderer.test.ts:14` 从 `../src/renderer` 桶导入，导致 **整个测试套件 `Cannot find module './VisionMaskRenderer'` 失败，一个大红色的 test suite failed to run**。
+- **修复**：见 7.4 步骤 4。
+
+**形态 B：标注"兼容旧调用方"的只读桥**
+[BoardRenderer.ts:203](file:///workspace/packages/client/src/renderer/BoardRenderer.ts) `getViewport()` 注释写着"兼容旧调用方"，返回 `{width,height,zoom}`；[Camera.ts:27](file:///workspace/packages/client/src/renderer/Camera.ts) `BoardViewport` 注释"兼容旧代码"。如果没有任何生产/测试调用方，这是纯残留，可直接删；若有调用方，删除前要把调用方改成 `getCamera().getState()`。
+
+**形态 C：注释宣称"做 X"但代码没做的残余**
+[BoardRenderer.ts](file:///workspace/packages/client/src/renderer/BoardRenderer.ts) 顶部注释写了 `视野遮罩`/`提供完整棋盘渲染流程`，但实际子渲染器只有格子/连线/玩家，**没有视野遮罩**——注释撒谎，因为遮罩渲染类被删了。改注释比改代码对。
+
+**形态 D：无副作用但无用的调用**
+[BoardRenderer.ts:185](file:///workspace/packages/client/src/renderer/BoardRenderer.ts) `void this.camera.screenToWorld(screenX, screenY)`：调用了返回坐标却 `void` 丢弃，随后又用 `worldToScreen` 算真正的命中。这一行是无用的死调用（若 `screenToWorld` 有副作用应保留并注明，否则删）。
+
+### 7.3 识别"被使用的文件"里有没有旧代码：四步求证法
+
+> 用"是否被引用 + 注释是否说谎 + 是否进产物 + 测试是否咬人"来交叉验证，绝不凭直觉。每步都给 grep 命令，套用到任意文件即可。
+
+1. **查生产引用**（区分"被用"与"孤儿"）
+   ```
+   Grep 于 packages/client: import ... from '.../renderer'  /  import ... from '.../VisionMaskRenderer'
+   ```
+   发现 `VisionMaskRenderer` 只出现在 `index.ts`（re-export 自己）和 `tests/renderer.test.ts`，生产代码 0 引用 → **生产死引用**。
+
+2. **查"引用它的还不存在的模块"**（抓形态 A）
+   在 `index.ts` 里再 grep 它 re-export 的每个名字，逐个确认源文件存在。`VisionMaskRenderer` → 源文件不在 → 过期 re-export。
+
+3. **查产物/编译是否真的干净**（戳穿"假通过"）
+   直接对整个 src 跑类型检查，不要只跑入口链：
+   ```bash
+   cd packages/client && npx tsc -p tsconfig.json --noEmit
+   ```
+   实测会报：`src/renderer/index.ts(13,82): error TS2307: Cannot find module './VisionMaskRenderer'` 和 `src/components/index.ts(5-14)` 十条。**这是"入口链检查"永远发现不了的死引用。**
+
+4. **跑测试看是否咬人**（测出"死引用是否已传染到测试"）
+   ```bash
+   cd packages/client && CI=true npx jest --forceExit tests/renderer.test.ts
+   ```
+   实测：套件直接 `Test suite failed to run`，因为 `renderer.test.ts` 从桶导入。**测试暴露了构建入口链遮住的问题。**
+
+> 小结：**"文件被用了"和"文件里干净"是两回事。** 判断旧代码，别用"这个文件还在被调用"当免死金牌；用上面四步。
+
+### 7.4 安全修复流程（按对代码影响从小到大）
+
+1. **先建基线（防丢现况）**：`git stash` 或确认工作树干净；记录当前 `HEAD`。
+2. **修形态 D**（零风险）：删 `BoardRenderer.ts:185` 的 `void this.camera.screenToWorld(...)` 死调用行。
+3. **修形态 C**（改注释）：把 `BoardRenderer` 顶部注释里不真实的"视野遮罩/完整流程"改准确；给 `Camera.ts:28` 的 `BoardViewport` 加"已弃用，见 CameraState"标记。
+4. **修形态 A**（核心，`renderer/index.ts` + `components/index.ts`）：
+   - **先删死 re-export**：把 `index.ts` 里指向不存在模块的行删掉（`VisionMaskRenderer` 行、10 个组件行）。
+   - **再确认桶的存活价值**：查是否还有东西从桶 import（本例生产代码都不 import 桶）。若没有，考虑**整个删除 index.ts 桶**或保留它 re-export 仍存在的成员。
+   - **同步修测试**：`tests/renderer.test.ts:14` 有两条路——(a) 删掉针对已删 `VisionMaskRenderer` 的用例（建议，因为对应生产代码已删）；(b) 若该功能确实需要，把用例改成 import 仍存在的渲染器。**不要留"测试引用已删生产代码"。**
+   - 参考：`components/index.ts` 同理，删 10 条死 re-export，保留仍在用的 `NotificationCenter/GameHudShell/InteractiveMapSurface`（`GamePage.ts` 直接 import 它们）。
+5. **修形态 B**（收尾）：确认 `getViewport()`/`BoardViewport` 无调用方后再删。
+6. **回归**：
+   ```bash
+   pnpm build:shared && cd packages/client && npx tsc -p tsconfig.json --noEmit   # 应为 0 错
+   cd packages/client && CI=true npx jest --forceExit tests/renderer.test.ts       # 应不再炸
+   pnpm lint && pnpm test
+   ```
+
+---
+
+## 方向 8：如何编写"有价值的测试"（对齐本项目的现实）
+
+> 目标是**别写"假绿"的测试**，也别让测试脆弱到"改点样式就红"。下面用本项目真实结构讲写什么、怎么写。
+
+### 8.1 价值观：值钱 vs 不值钱
+
+| 值得写（值钱） | 不值得写（空洞/脆） |
+|---|---|
+| 纯逻辑：`parseChatCommand('/invite x')` 返回 `{name:'invite',args:['x']}` | 只调用一次、没人断言含义的 smoke 测试 |
+| 协议/契约：断言新增事件在 `socket-events.ts` 里两端成对 | 断言实现细节（如"某变量名被调用了一次"） |
+| 数学/边界：相机 `zoomBy` 不会超 `minZoom/maxZoom`，结算金额正确 | 只测"没抛异常"不测行为是否正确 |
+| 状态机：Store 对某个 `server.xxx` 事件后 `getSnapshot()` 符合预期 | 依赖全局单例、每次跑都可能变的脆测试 |
+
+本项目已有的值钱范式：`tests/` 下的**架构守卫测试**（断言某模块没直接依赖某模块/某事件两端成对）、`Geometry`/行为类数学测试。
+
+### 8.2 用本项目真实结构写一个值钱的测试（逐步）
+
+以方向 1 的 `parseChatCommand` 为例，放进 `packages/client/tests/`（测试都在这里，且被 `tsconfig` 的 `exclude` 排除出生产编译，不会拖慢 `tsc`）：
+
+```ts
+// packages/client/tests/chat-command.test.ts
+import { parseChatCommand } from '../src/game/systems/ChatSystem.js';
+
+describe('parseChatCommand', () => {
+  it('识别正常指令', () => {
+    expect(parseChatCommand('/invite 张三')).toEqual({ name: 'invite', args: ['张三'], raw: '/invite 张三' });
+  });
+  it('多条参数', () => {
+    expect(parseChatCommand('/trade 李四 100')).toEqual({ name: 'trade', args: ['李四', '100'], raw: '/trade 李四 100' });
+  });
+  it('普通聊天不是指令', () => {
+    expect(parseChatCommand('大家好')).toBeNull();
+  });
+  it('空/纯斜杠视为无效', () => {
+    expect(parseChatCommand('/')).toBeNull();
+    expect(parseChatCommand('  ')).toBeNull();
+  });
+});
+```
+
+**好的测试特征**：纯函数、不碰 DOM/network/socket、输入输出确定、覆盖空/边界/正常。跑 `npx jest tests/chat-command.test.ts` 秒级通过。
+
+### 8.3 给"渲染器/Canvas"这类难测代码写测试
+
+Canvas 渲染依赖 `HTMLCanvasElement`（node 环境没有）。三个策略按优先级：
+1. **把纯逻辑抽出来测**（推荐）：相机坐标转换（`worldToScreen/screenToWorld`）、缩放夹紧、命中圆的 `isPointInCircle` 都是纯函数，直接测。能测出渲染正确性的底层。
+2. **用现成的测试替身**：`tests/renderer.test.ts` 里已有创建假 `ctx` 的方式（`new VisionMaskRenderer(ctx)` 用了 stub），复用该模式来做 canvas 测试；先确认它没有引用已删类（当前它正因 `VisionMaskRenderer` 崩溃，见方向 7）。
+3. **形状断言而非像素断言**：断言"调用了 `fillRect`/`arc`/`fillText` 且参数范围合理"，而不是比像素，避免脆。
+
+### 8.4 防止"测试把过期引用当功能"
+
+当生产代码删了某类，测试若仍 import 它，会整个套件红（见方向 7 的 `renderer.test.ts`）。**改生产代码时，同步清理引用它的测试**；反过来，如果测试引用了一个**已经不存在**的模块，这往往说明"生产代码删了但测试没跟上"，是**技术债信号**，而不是"功能缺失"。
+
+### 8.5 每轮小步验证（TDD 心智）
+
+```
+改一步 → 跑这一块的测试（npx jest tests/xxx.test.ts）→ 全量 pnpm test
+```
+别最后才跑全量。规则强调"可验证性执行前置"：每完成一个模块改动，先本地验证再继续。
