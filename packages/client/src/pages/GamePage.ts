@@ -44,32 +44,10 @@ import { InteractiveMapSurface } from '../components/InteractiveMapSurface.js';
 import { NoOpEffectHooks } from '../game/GameEffects.js';
 import { GameViewModel } from '../game/GameViewModel.js';
 import { GameStore } from '../state/GameStore.js';
+import type { TypedClientSocket } from '../hooks/useSocket.js';
 
 import {
-  animationFrameId,
-  currentPlayer,
-  gameSocket,
-  mapIndex,
-  otherPlayers, prosperityTimer,
-  regionProsperityMap, renderer,
-  rollCooldownTimer,
-  setAnimationFrameId,
-  setCameraTarget, setCanvasEl, setChatChannelContainer,
-  setDayNightCycle, setDayNightStartTime,
-  setGameSocket,
-  setMapIndex, setMapRegions,
-  setPlayerDisplayPos,
-  setProsperityTimer, setRenderer, setRollCooldownTimer,
-  setTeamPanelContentEl,
-  setTopBarProsperityEl, setTopBarProsperityFillEl, setTopBarRegionFieldsEl,
-  setTopBarTimeEl, setValueFieldDefs,
-  // 辅助函数
-  // 类型
   type RegionInfo,
-  // 额外状态变量
-  valueFieldDefs, teamMembers,
-  // 额外 setter
-  setDiceDisplayEl, setRollBtn, setActionButtonsEl, setChatBoxEl,
 } from '../state/GameStore.js';
 
 
@@ -111,6 +89,13 @@ let gameStore: GameStore | null = null;
 let gameHudShell: GameHudShell | null = null;
 let unregisterHudRefresh: (() => void) | null = null;
 let unsubscribeGameStore: (() => void) | null = null;
+let renderer: BoardRenderer | null = null;
+let mapIndex: MapIndex | null = null;
+let gameSocket: TypedClientSocket | null = null;
+let otherPlayers: Array<{ id: string; username: string; position: { cellId: number }; status: string; primaryValue: number }> = [];
+let teamMembers: Array<{ id: string; username: string; money: number; credit: number; env: number; status: string }> = [];
+let regionProsperityMap = new Map<string, number>();
+let valueFieldDefs: Array<{ id: string; name: string; scope: 'player' | 'region'; min?: number; max?: number }> = [];
 
 function createGameRuntime(store: GameStore, socket: NonNullable<typeof gameSocket>, index: NonNullable<typeof mapIndex>): GameRuntime {
   return { store, socket, mapIndex: index, cooldownTimer: null };
@@ -158,10 +143,9 @@ export function createGamePage(controller: GameController): HTMLElement {
     interactiveMap.followPlayer(snapshot.currentPlayerPosition);
     syncCellActions(snapshot.currentPlayerPosition);
   });
-  setCanvasEl(canvas);
   page.appendChild(boardContainer);
 
-  setRenderer(new BoardRenderer(canvas, { theme: designSnapshot }));
+  renderer = new BoardRenderer(canvas, { theme: designSnapshot });
   renderer!.drawPlaceholder(t('common.loadingMap'));
 
   const backButton = document.createElement('button');
@@ -210,13 +194,12 @@ export function createGamePage(controller: GameController): HTMLElement {
     ([mapResult]) => {
       if (!renderer || !mapResult) return;
       const { mapData, regions, valueFields } = mapResult;
-      setMapRegions(regions);
-      setValueFieldDefs(valueFields);
+      valueFieldDefs = valueFields;
       // 初始化区域繁荣度快照
       for (const r of regions) {
         regionProsperityMap.set(r.id, r.prosperity);
       }
-      setMapIndex(new MapIndex(mapData));
+      mapIndex = new MapIndex(mapData);
       gameStore?.setCells(mapData);
       renderer.loadMap(mapData);
       configureRenderContext(renderer, mapIndex!);
@@ -228,8 +211,7 @@ export function createGamePage(controller: GameController): HTMLElement {
       updateRendererPlayers(gameStore!);
       const startCell = mapIndex!.getById(0);
       if (startCell) {
-        setPlayerDisplayPos(startCell.x, startCell.y);
-        setCameraTarget(startCell.x, startCell.y);
+        gameStore?.applySnapshot({ sequence: gameStore.nextSequence(), playerDisplayX: startCell.x, playerDisplayY: startCell.y, cameraTargetX: startCell.x, cameraTargetY: startCell.y });
       }
       syncCellActions(snapshot.currentPlayerPosition);
       centerCameraOnCell(snapshot.currentPlayerPosition || 0);
@@ -243,10 +225,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   // 从 controller 获取登录时同步的时间数据
   const ctx = controller.getContext();
   if (ctx.cycleStartTime !== null) {
-    setDayNightStartTime(ctx.cycleStartTime);
-  }
-  if (ctx.cycleMinutes !== null) {
-    setDayNightCycle(ctx.cycleMinutes * 60 * 1000);
+    gameStore?.updateDayNight({ dayNightStartTime: ctx.cycleStartTime });
   }
 
   // 初始化已有玩家列表（登录时服务端返回的其他在线玩家）
@@ -263,12 +242,12 @@ export function createGamePage(controller: GameController): HTMLElement {
 
   // 监听服务端昼夜事件，同步时间
   const socket = controller.getSocket();
-  setGameSocket(socket);
+  gameSocket = socket;
   if (socket) {
     notificationCenter = createNotificationCenter({
       container: page,
       socket,
-      playerId: context.player?.id || currentPlayer?.id || '',
+      playerId: context.player?.id || '',
     });
     page.appendChild(notificationCenter.getElement());
 
@@ -522,7 +501,7 @@ window.showTeamManagement = function(): void {
       <div class="modal-header">${t('team.managementTitle')}</div>
       <div class="modal-body">
         <div class="team-management-list">
-          ${teamMembers.filter(m => !currentPlayer || m.id !== currentPlayer.id).map(m => `
+          ${teamMembers.filter(m => m.id !== gameStore?.getSnapshot().currentPlayer?.id).map(m => `
             <div class="management-item">
               <div style="display:flex; flex-direction:column; gap:4px;">
                 <span>${m.username}</span>
@@ -620,39 +599,20 @@ export function cleanupGamePage(page: HTMLElement): void {
   setChatStore(null);
   gameStore?.reset();
   gameStore = null;
-  if (animationFrameId) {
-    cancelAnimationFrame(animationFrameId);
-    setAnimationFrameId(null);
-  }
-  if (rollCooldownTimer) {
-    clearInterval(rollCooldownTimer);
-    setRollCooldownTimer(null);
-  }
-  if (prosperityTimer) {
-    clearInterval(prosperityTimer);
-    setProsperityTimer(null);
-  }
   if (notificationCenter) {
     notificationCenter.destroy();
     notificationCenter = null;
   }
   if (gameSocket) {
     unregisterSocketHandlers(gameSocket);
-    setGameSocket(null);
+    gameSocket = null;
   }
-  setRenderer(null);
-  setMapIndex(null);
-  setCanvasEl(null);
-  setRollBtn(null);
-  setDiceDisplayEl(null);
-  setActionButtonsEl(null);
-  setChatBoxEl(null);
-  setTopBarProsperityEl(null);
-  setTopBarProsperityFillEl(null);
-  setTopBarRegionFieldsEl(null);
-  setTopBarTimeEl(null);
-  setTeamPanelContentEl(null);
-  setChatChannelContainer(null);
+  renderer = null;
+  mapIndex = null;
+  otherPlayers = [];
+  teamMembers = [];
+  regionProsperityMap = new Map();
+  valueFieldDefs = [];
   page.remove();
 }
 
