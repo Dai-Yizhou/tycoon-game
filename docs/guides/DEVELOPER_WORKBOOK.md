@@ -542,3 +542,135 @@ Canvas 渲染依赖 `HTMLCanvasElement`（node 环境没有）。三个策略按
 改一步 → 跑这一块的测试（npx jest tests/xxx.test.ts）→ 全量 pnpm test
 ```
 别最后才跑全量。规则强调"可验证性执行前置"：每完成一个模块改动，先本地验证再继续。
+
+---
+
+## 方向 9：实战——修复 `renderer/Camera.ts` 的"宣称缩放/平移但实际不用"（附完整证据链）
+
+> 这是本仓库最典型的一类问题：**一个 API 被测试引用，但它对应的能力在生产代码中从未被使用**。直接删会"报错"（测试引用它），不删则是僵尸 API。本节用 `Camera.ts` 的真实源码给你一套"先判定真伪、再安全动刀"的完整流程。**动手前先照做，别直接删。**
+
+### 9.1 先理解"为什么符合直觉却不该删"
+
+`src/renderer/Camera.ts` 开头写着：
+```ts
+/**
+ * 相机控制器（缩放、平移）
+ * 负责管理视口状态，支持鼠标滚轮缩放和拖拽平移
+ */
+```
+方法列表有 `setZoom/zoomBy/pan/panTo/startDrag/updateDrag/endDrag/isDraggingActive/reset/worldToScreen/screenToWorld/updateViewportSize`。**注释和 API 都在告诉你"它支持缩放和平移"**。
+
+而真实运行行为是：镜头**始终跟随当前玩家居中**（没有鼠标缩放、没有拖拽平移）。所以你的判断——"与实际行为/需求不符"——完全正确。但这里有个陷阱：**直接删掉 `zoomBy/pan/startDrag/...` 会报错，因为 `tests/renderer.test.ts` 引用了它们**。那到底能不能删？要看这些方法到底被谁用、测试是不是在为"假需求"服务。逐条证据如下（都来自我实际 grep/读码）：
+
+**生产代码真正用到的 Camera 能力（不能删）**：
+- `getState()`：`ClientRenderLoop.ts:86`、`BoardRenderer.ts:118/186/205/224`
+- `panTo()`：`ClientRenderLoop.ts:90`、`BoardRenderer.ts:225`（用于居中跟随）
+- `worldToScreen()`：`BoardRenderer.ts:191`（hitTest 里把格子世界坐标转屏幕坐标做命中检测）
+- `updateViewportSize()`：`BoardRenderer.ts:256`（resize 时更新视口）
+- `CameraState` 的 `zoom/offsetX/offsetY/viewportWidth/viewportHeight`：子渲染器 `PlayerRenderer`/`CellRenderer`/`ConnectionRenderer` 都读它画放缩后的对象
+
+**生产代码从未调用、纯属僵尸 API（这是本方向目标）**：
+- `setZoom`、`zoomBy`、`pan`、`startDrag`、`updateDrag`、`endDrag`、`isDraggingActive`、`reset`
+- `Camera.screenToWorld`（唯一调用点是 `BoardRenderer.ts:185` 那行 `void this.camera.screenToWorld(...)`，返回值被 `void` 丢弃，本身也是死代码）
+- `BoardRenderer.screenToWorld`（L234，自身也没人调）
+- 配套死状态：`bounds/minZoom/maxZoom/zoomFactor`、`isDragging/lastMouseX/lastMouseY` 这几个字段
+
+**测试声称的能力（关键陷阱：测试 ≠ 需求）**：`tests/renderer.test.ts` 的 TR-5.2 三个用例
+```ts
+camera.zoomBy(1, 400, 300);  // L197
+camera.pan(50, 30);          // L209
+camera.startDrag(100,100); camera.updateDrag(120,110); camera.endDrag(); // L217-219
+```
+以及 TR-5.3 里 `camera.pan(50,50)`（L272）。这些测试在"验收缩放/拖拽功能"——但**生产代码从来不给玩家缩放/拖拽的入口**。所以这些测试验证的是一个**不存在于实际游戏里的能力**，属于"为纸面任务验收而写、与需求脱节"的测试（TR-5.2 的注释甚至写着"帧率 >= 30fps"做性能验收，同样与玩家可感知的交互无关）。
+
+**结论**：Camera 真正需要的只有"**跟随居中 + 视口 + 命中换算**"（`getState/panTo/worldToScreen/updateViewportSize`）；"**鼠标缩放 + 拖拽平移**"是一整套僵尸能力。`screenToWorld` 层也是死的。
+
+### 9.2 为什么要这样处置而不是"保留以防以后用"
+
+保留僵尸 API 的代价：误导后来者（以为游戏支持缩放，去找入口找不到）、让 `CameraState` 携带无用字段、让测试维护一个不存在的需求。**没有调用方的 public 方法就是负债，不是保险**。真要加缩放功能时，Git 历史里能找回；现在留着只会让代码更难懂。这就是"架构清理不彻底"的铁证——正因为能看出这是遗留，才该清。
+
+### 9.3 安全修复步骤（照做）
+
+**步骤 0：建基线**
+```bash
+git status        # 确认改动范围
+git stash         # 如有未提交改动，先暂存
+git rev-parse HEAD > /tmp/baseline.txt
+```
+
+**步骤 1：只删 100% 无调用的行（最低风险）**
+- 删 `Camera.ts` 里：`bounds/minZoom/maxZoom/zoomFactor` 及相关 `setZoom/zoomBy/pan/startDrag/updateDrag/endDrag/isDraggingActive/reset`、`isDragging/lastMouseX/lastMouseY` 字段、`Camera.screenToWorld`（若删，同步删 BoardRenderer:185 的 void 调用）。保留 `getState/panTo/worldToScreen/updateViewportSize` 与 `CameraState`。
+- 删 `BoardRenderer.ts` L234-237 的 `screenToWorld`。
+
+**步骤 2：处理"引用僵尸方法的测试"——改需求而非硬删测试**
+- 找到 `tests/renderer.test.ts` TR-5.2 三个用例和 TR-5.3 的 `camera.pan(50,50)`（L272）。
+- **不要**改成"删掉还假装有缩放"；而是**让测试反映真实需求**：改为测试 `panTo` 的居中行为（真正的需求），或删除针对已删方法的用例。
+- 例（把"假缩放测试"改成"真居中测试"）：
+```ts
+it('相机跟随居中（真实需求）', () => {
+  const camera = new Camera(800, 600);
+  camera.updateViewportSize(800, 600);
+  camera.panTo(400 - 100 * 1, 300 - 100 * 1);   // centerOn 的效果
+  const state = camera.getState();
+  expect(state.offsetX).toBe(300);
+  expect(state.offsetY).toBe(200);
+});
+```
+- 若 `renderer.tsx` 里还有对 `DEFAULT_VISION_RADIUS`/`VisionMaskRenderer` 的 import，一并删（见方向 7）。
+
+**步骤 3：删除过期桶导出（不让错误藏起来）**
+- `src/renderer/index.ts` 里所有指向不存在文件的导出删掉；若整个桶没人 import，可整删（见方向 7 步骤 4）。
+
+**步骤 4：逐层验证（不跳步）**
+```bash
+# 1) 类型检查全 src（戳穿"入口链 pass"）
+cd packages/client && npx tsc -p tsconfig.json --noEmit
+# 2) 只跑被牵连的测试
+cd packages/client && CI=true npx jest --forceExit tests/renderer.test.ts
+# 3) 全量验证
+pnpm build:client && pnpm lint && pnpm test
+```
+
+**步骤 5：回归手动**：浏览器里确认——玩家移动时镜头仍然跟随居中（`panTo` 还在）、点击格子仍命中（`worldToScreen`+`hitTest` 还在）。若以前"错误地"手动拖拽过棋盘让镜头偏离，现在反而固定居中了——那正是需求的本来面目。
+
+### 9.4 把方法论推广到"其他代码里大量此类问题"
+
+Camera 只是一个标本。仓库里其他"宣称能力但生产不用"的地方，用同一条判定链处理：
+
+**判定链（记住这 4 问）**：
+1. **生产调用吗**？—— grep 该 public 方法的调用方，排除测试。0 个 → 疑似僵尸。
+2. **测试在测"真需求"还是"纸面验收"**？—— 看测试描述是否对应玩家真实可触发行为。Camera 的 zoom/pan 测试对应不到任何 UI 入口 → 是纸面验收。
+3. **注释是否撒谎**？—— 函数头说自己"支持 X"，但找不到谁触发 X → 注释过时或能力被删。
+4. **删了会不会连锁炸**？—— 抓所有引用点（生产 import、测试 import、桶 re-export、void 丢弃调用）。先列全清单再动。
+
+**通用处置矩阵**：
+
+| 情形 | 处置 |
+|---|---|
+| 生产没人用 + 测试也不该有 | 删方法与它的测试，清桶导出 |
+| 生产没人用 + 测试在"验收纸面能力" | 删方法，**改写测试为真实需求**或删该用例（见 9.3 步骤2）|
+| 生产被调用点很少 | 逐点确认后，把测试改成用真实调用路径 |
+| 注释宣称但无实现 | 改注释（见方向 7 形态 C）|
+
+**关键认知**：**"被测试引用"不构成"不删"的理由，只构成"先确认需求"的提醒。** 真正决定删不删的，是"玩家/系统在当前版本是否真的会走到这条路径"。Camera 的缩放/拖拽没有入口，就是死；`panTo` 有 `ClientRenderLoop` 的跟随逻辑在用，就是活。
+
+---
+
+## 方向 10：把"测试"当成证据来核实架构问题（进阶）
+
+体会 9.1 之后，你会发现：**测试文件既是质量的守门员，也可能是"虚构需求"的注脚。** 当一段测试在验证生产代码里根本没有的交互时，它有几种误导：
+- 让维护者以为某功能是正式能力（实际是遗留）；
+- 让`tsc`/`jest`"看起来绿"，掩盖真实的死引用（`renderer.test.ts` 引用了已删的 `VisionMaskRenderer`，导致套件一跑就红，但也只有它暴露了这个死引用——测试反而成了发现死代码的探测器）。
+
+**利用测试反向定位死代码的实操**：
+```bash
+# 找出哪块测试"红"并指向不存在的模块/方法 → 往往就是"生产删了、测试没跟上"的死引用
+cd packages/client && npx jest --listTests 2>&1 | head
+```
+凡测试 import 的符号在生产 `src/` 里搜不到，即两条路：要么该功能确实被移除（删测试），要么该功能是"规划但未实现"（则它是需求缺口，需决定是否补生产实现）。**千万别为了"让测试过"去 hardcode 一个假对象回填**——那就真是为了绿而造假了。
+
+### 本次证据摘要（可复现）
+- 生产唯一用到的缩放/平移手段是 `panTo` 做"跟随居中"，见 `ClientRenderLoop.ts:41,85-92`。
+- Camera 的缩放/拖拽方法全部无生产调用；`screenToWorld` 唯一调用是 `BoardRenderer.ts:185` 的 `void` 丢弃。
+- 测试在验收这些"纸面能力"：`tests/renderer.test.ts` L197,209,217-219,272。
+- `VisionMaskRenderer` 已删但被 `renderer/index.ts:13` 与 `tests/renderer.test.ts:14` 引用 → 套件必炸。
