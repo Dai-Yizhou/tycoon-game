@@ -39,3 +39,4 @@ export {
 } from './Ownership.js';
 
 export { EconomicOperationGuard } from './EconomicOperationGuard.js';
+export { EconomyService, type EconomyChangeResult } from './EconomyService.js';
