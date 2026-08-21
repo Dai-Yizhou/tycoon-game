@@ -30,8 +30,7 @@ import { DayNightCycle, DEFAULT_DAY_NIGHT_CONFIG } from './world/DayNightCycle.j
 import { TimeZoneManager } from './world/TimeZoneManager.js';
 import { ProsperityManager, DEFAULT_PROSPERITY_CONFIG } from './world/ProsperityManager.js';
 import { BehaviorEngine } from './behavior/index.js';
-import { EraManager } from './era/index.js';
-import { InMemoryPlayerStore, MongoPlayerStore, MongoUserStore, InMemoryEraStore, InMemoryWorldStore, FileWorldStore, type PlayerStore, type WorldStore } from './storage/index.js';
+import { InMemoryPlayerStore, MongoPlayerStore, MongoUserStore, InMemoryWorldStore, FileWorldStore, type PlayerStore, type WorldStore } from './storage/index.js';
 import { JWTService } from './auth/JWTService.js';
 import { AuthService, type UserStore } from './auth/AuthService.js';
 import { InMemoryUserStore } from './auth/InMemoryUserStore.js';
@@ -125,8 +124,6 @@ export interface CreatedApp {
   prosperityManager?: ProsperityManager;
   /** 行为执行引擎实例 */
   behaviorEngine?: BehaviorEngine;
-  /** 时代管理器实例（FR-19/FR-20） */
-  eraManager?: EraManager;
   /** 玩家存储实例（FR-22 账号持久化） */
   playerStore?: PlayerStore;
   /** 用户存储实例 */
@@ -358,17 +355,6 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   handlerRegistry.setBehaviorEngine(behaviorEngine);
   logger.info('BehaviorEngine initialized and injected into EventHandler');
 
-  // 初始化时代管理器（FR-19/FR-20）
-  // 时代长度从配置读取（默认 90 天，对应现实 3-6 个月）
-  const eraStore = new InMemoryEraStore(restoredSnapshot?.era);
-  const eraManager = new EraManager(eraStore, world, io, {
-    defaultDuration: config.eraLengthDays * 24 * 60 * 60 * 1000,
-  });
-  eraManager.initialize().catch((err) => {
-    logger.error('EraManager initialize error:', err);
-  });
-  logger.info(`EraManager initialized (eraLengthDays=${config.eraLengthDays})`);
-
   io.on('connection', (socket) => {
     socketManager?.registerConnectionHandlers(socket);
     handlerRegistry.registerForSocket(socket);
@@ -395,7 +381,6 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     timeZoneManager,
     prosperityManager,
     behaviorEngine,
-    eraManager,
     playerStore,
     worldStore,
     handlerRegistry,
@@ -447,7 +432,6 @@ export async function gracefulShutdown(
   economy?: { taxation: Taxation; bankruptcy: Bankruptcy },
   dayNightCycle?: DayNightCycle,
   prosperityManager?: ProsperityManager,
-  eraManager?: EraManager,
   timeoutMs: number = 5000,
   world?: GameWorld,
   handlerRegistry?: HandlerRegistry,
@@ -456,16 +440,6 @@ export async function gracefulShutdown(
 ): Promise<void> {
   logger.info('graceful shutdown started');
   if (world) world.saveSnapshot(economy?.taxation.getAllTaxRecords(), undefined);
-
-  // 关闭时代管理器（清理定时器）
-  if (eraManager) {
-    try {
-      eraManager.close();
-      logger.info('EraManager stopped');
-    } catch (err) {
-      logger.error('error stopping eraManager', err);
-    }
-  }
 
   // 停止繁荣度更新定时器
   if (prosperityManager) {

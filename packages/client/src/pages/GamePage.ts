@@ -32,14 +32,9 @@ import {
 } from '../game/systems/MapLoader.js';
 
 import {
-  startTutorial,
-} from '../game/systems/TutorialSystem.js';
-
-import {
   addChatMessage, setChatStore,
 } from '../game/systems/ChatSystem.js';
 
-import { startRenderLoop, centerCameraOnCell, handleMouseMove, handleClick, handleMouseLeave, handleResize, configureRenderContext, clearRenderContext, updateRendererPlayers } from '../game/ClientRenderLoop.js';
 import { registerHudRefresh } from '../game/ClientHudBridge.js';
 
 import { handleRollDice,
@@ -183,23 +178,18 @@ export function createGamePage(controller: GameController): HTMLElement {
       mapIndex = new MapIndex(mapData);
       gameStore?.setCells(mapData);
       renderer.loadMap(mapData);
-      configureRenderContext(renderer, mapIndex!);
       const snapshot = gameStore!.getSnapshot();
       if (snapshot.currentPlayer) {
         interactiveMap.render(mapData, toInteractivePlayers(snapshot));
         interactiveMap.followPlayer(snapshot.currentPlayerPosition);
       }
-      updateRendererPlayers(gameStore!);
       const startCell = mapIndex!.getById(0);
       if (startCell) {
         gameStore?.applySnapshot({ sequence: gameStore.nextSequence(), playerDisplayX: startCell.x, playerDisplayY: startCell.y, cameraTargetX: startCell.x, cameraTargetY: startCell.y });
       }
       syncCellActions(snapshot.currentPlayerPosition);
-      centerCameraOnCell(snapshot.currentPlayerPosition || 0);
-      startRenderLoop(gameStore!);
       gameHudShell?.update();
       addChatMessage(t('game.welcomeMessage'), 'system');
-      startTutorial(gameStore!);
     },
   );
 
@@ -257,26 +247,15 @@ export function createGamePage(controller: GameController): HTMLElement {
     else gameHudShell?.hideCellHover();
   };
   const handleWindowCellLeave = (): void => gameHudShell?.hideCellHover();
-  const handleCanvasClick = (event: MouseEvent): void => {
-    if (gameStore && gameSocket && mapIndex) handleClick(event, createGameRuntime(gameStore, gameSocket, mapIndex));
-  };
   interactiveMapElement.addEventListener('map:hover', handleMapHover);
   interactiveMapElement.addEventListener('map:leave', handleMapLeave);
   window.addEventListener('game:cell-hover', handleWindowCellHover);
   window.addEventListener('game:cell-leave', handleWindowCellLeave);
-  canvas.addEventListener('mousemove', handleMouseMove);
-  canvas.addEventListener('click', handleCanvasClick);
-  canvas.addEventListener('mouseleave', handleMouseLeave);
-  window.addEventListener('resize', handleResize);
   pageEventCleanups.set(page, () => {
     interactiveMapElement.removeEventListener('map:hover', handleMapHover);
     interactiveMapElement.removeEventListener('map:leave', handleMapLeave);
     window.removeEventListener('game:cell-hover', handleWindowCellHover);
     window.removeEventListener('game:cell-leave', handleWindowCellLeave);
-    canvas.removeEventListener('mousemove', handleMouseMove);
-    canvas.removeEventListener('click', handleCanvasClick);
-    canvas.removeEventListener('mouseleave', handleMouseLeave);
-    window.removeEventListener('resize', handleResize);
   });
 
   container.appendChild(page);
@@ -496,8 +475,6 @@ function syncCellActions(cellId: number): void {
   if (!unchanged) gameStore.setCellActions(actions);
 }
 
-// ===== Tutorial System =====
-
 export function cleanupGamePage(page: HTMLElement): void {
   pageEventCleanups.get(page)?.();
   pageEventCleanups.delete(page);
@@ -509,7 +486,6 @@ export function cleanupGamePage(page: HTMLElement): void {
   gameViewModel = null;
   unsubscribeGameStore?.();
   unsubscribeGameStore = null;
-  clearRenderContext();
   setChatStore(null);
   gameStore?.reset();
   gameStore = null;

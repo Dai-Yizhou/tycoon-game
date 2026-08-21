@@ -1,3 +1,7 @@
+/** 
+ * hud全局回调槽
+ */
+
 type HudRefresh = () => void;
 
 let refreshHud: HudRefresh = () => undefined;

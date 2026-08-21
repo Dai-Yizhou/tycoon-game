@@ -11,7 +11,6 @@ import type { OtherPlayerInfo } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
 import { startServerPathAnimation } from './MovementSystem.js';
 import { requestHudRefresh } from '../ClientHudBridge.js';
-import { updateRendererPlayers, updateBoardTheme, updateTopBarTime } from '../ClientRenderLoop.js';
 import { getPlayerTimezone, getLocalDayNight } from './MapLoader.js';
 import type { GameController } from '../GameController.js';
 import { GameStore } from '../../state/GameStore.js';
@@ -73,8 +72,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     const tz = getPlayerTimezone(store, options.mapIndex);
     const { timeStr, isDay } = getLocalDayNight(store, tz);
     addChatMessage(t('dayNight.timezoneChanged', { tz: tzName, time: timeStr, dayNight: isDay ? t('dayNight.dayTime') : t('dayNight.nightTime') }), 'system');
-    updateTopBarTime(store, options.mapIndex);
-    updateBoardTheme(store, options.mapIndex);
   });
 
   // 心跳校正时钟偏移
@@ -165,7 +162,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       nextPlayers[existingIndex] = playerData;
     }
     store.applyEvent({ sequence: store.nextSequence(), type: 'players', players: nextPlayers });
-    updateRendererPlayers(store);
   });
 
   socket.on('server.playerLeft', (payload: { playerId: string }) => {
@@ -176,7 +172,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       const nextPlayers = currentPlayers.filter(p => p.id !== payload.playerId);
       store.applyEvent({ sequence: store.nextSequence(), type: 'players', players: nextPlayers });
       addChatMessage(t('player.left', { name: player.username }), 'system');
-      updateRendererPlayers(store);
     }
     // 队伍成员状态由 server.teamUpdated / server.teamDisbanded 事件权威维护，此处不本地修改 teamMembers
     // 仅清理邀请面板中对应条目
@@ -192,7 +187,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     const player = currentPlayers.find(p => p.id === payload.playerId);
     if (player) {
       store.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerMove', playerId: payload.playerId, cellId: payload.cellId });
-      updateRendererPlayers(store);
     }
     const activePlayer = store.getSnapshot().currentPlayer;
     if (activePlayer && payload.playerId === activePlayer.id) {
@@ -220,7 +214,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     const isOtherPlayer = snapshot.otherPlayers.some(player => player.id === payload.playerId);
     if (!isCurrentPlayer && !isOtherPlayer) return;
     store.applyEvent({ sequence: store.nextSequence(), type: 'value', playerId: payload.playerId, fieldId: payload.fieldId, current: payload.current });
-    if (isCurrentPlayer || isOtherPlayer) updateRendererPlayers(store);
     if (isCurrentPlayer) {
       requestHudRefresh();
     }
@@ -238,7 +231,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       const otherPlayer = snapshot.otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {
         store.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerStatus', playerId: payload.playerId, status: 'jail' });
-        updateRendererPlayers(store);
       }
     }
   });
@@ -256,7 +248,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       const otherPlayer = snapshot.otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {
         store.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerStatus', playerId: payload.playerId, status: 'normal' });
-      updateRendererPlayers(store);
       }
     }
   });
@@ -266,14 +257,12 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       const currentPlayers = store.getSnapshot().otherPlayers;
       const nextPlayers = currentPlayers.filter(player => player.id !== payload.playerId);
       store.applyEvent({ sequence: store.nextSequence(), type: 'players', players: nextPlayers });
-      updateRendererPlayers(store);
       return;
     }
     // 更新玩家状态
     const player = store.getSnapshot().otherPlayers.find(p => p.id === payload.playerId);
     if (player) {
       store.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerStatus', playerId: payload.playerId, status: payload.status as OtherPlayerInfo['status'] });
-      updateRendererPlayers(store);
     }
     if (payload.playerId === store.getSnapshot().currentPlayer?.id) {
       store.applyEvent({ sequence: store.nextSequence(), type: 'status', playerId: payload.playerId, status: payload.status as import('@game/shared').Player['status'] });

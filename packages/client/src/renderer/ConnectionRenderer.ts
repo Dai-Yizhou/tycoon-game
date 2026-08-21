@@ -42,16 +42,14 @@ export class ConnectionRenderer {
    *
    * @param cells 格子数组
    * @param cameraState 相机状态
-   * @param opacity 透明度（视野遮罩使用，默认 1）
    */
-  render(cells: MapData, cameraState: CameraState, opacity: number = 1): void {
+  render(cells: MapData, cameraState: CameraState): void {
     this.ctx.save();
-    this.ctx.globalAlpha = opacity;
 
     // 设置虚线样式
     this.ctx.strokeStyle = this.theme?.canvas.connection ?? this.config.color;
-    this.ctx.lineWidth = this.config.lineWidth * cameraState.zoom;
-    this.ctx.setLineDash(this.config.dashInterval.map((d) => d * cameraState.zoom));
+    this.ctx.lineWidth = this.config.lineWidth;
+    this.ctx.setLineDash(this.config.dashInterval.map((d) => d));
 
     // 遍历所有格子，绘制连接线
     for (const cell of cells) {
@@ -89,8 +87,8 @@ export class ConnectionRenderer {
    */
   private worldToScreen(worldX: number, worldY: number, camera: CameraState): { screenX: number; screenY: number } {
     return {
-      screenX: worldX * camera.zoom + camera.offsetX,
-      screenY: worldY * camera.zoom + camera.offsetY,
+      screenX: worldX + camera.offsetX,
+      screenY: worldY + camera.offsetY,
     };
   }
 }

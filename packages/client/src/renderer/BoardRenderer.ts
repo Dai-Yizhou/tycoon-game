@@ -182,9 +182,7 @@ export class BoardRenderer {
   hitTest(screenX: number, screenY: number): number | null {
     if (!this.mapIndex) return null;
 
-    void this.camera.screenToWorld(screenX, screenY);
-    const cameraState = this.camera.getState();
-    const scaledRadius = this.cellRenderer.getConfig().radius * cameraState.zoom;
+    const scaledRadius = this.cellRenderer.getConfig().radius;
 
     // 遍历所有格子，检测碰撞
     for (const cell of this.mapIndex.getAll()) {
@@ -198,12 +196,6 @@ export class BoardRenderer {
     }
 
     return null;
-  }
-
-  /** 兼容旧调用方，返回当前视口快照。 */
-  getViewport(): { width: number; height: number; zoom: number } {
-    const state = this.camera.getState();
-    return { width: state.viewportWidth, height: state.viewportHeight, zoom: state.zoom };
   }
 
   /**
@@ -223,17 +215,9 @@ export class BoardRenderer {
   centerOn(worldX: number, worldY: number): void {
     const state = this.camera.getState();
     this.camera.panTo(
-      state.viewportWidth / 2 - worldX * state.zoom,
-      state.viewportHeight / 2 - worldY * state.zoom,
+      state.viewportWidth / 2 - worldX,
+      state.viewportHeight / 2 - worldY,
     );
-  }
-
-  /**
-   * 屏幕坐标转世界坐标
-   */
-  screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
-    const { worldX, worldY } = this.camera.screenToWorld(screenX, screenY);
-    return { x: worldX, y: worldY };
   }
 
   /**
