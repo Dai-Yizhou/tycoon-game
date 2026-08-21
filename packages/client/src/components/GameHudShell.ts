@@ -1,5 +1,6 @@
 import type { GameEffectHooks } from "../game/GameEffects.js";
 import type { GameViewModel } from "../game/GameViewModel.js";
+import { t } from "../game/i18n.js";
 
 export interface GameHudShellConfig {
   onRoll?: () => void;
@@ -45,14 +46,14 @@ export class GameHudShell {
           <div class="player-badge" data-ui="player-badge">
             <div class="player-badge__avatar"></div>
             <div>
-              <div class="player-badge__name" data-ui="player-name">玩家</div>
-              <div class="player-badge__team" data-ui="player-team">独行</div>
+              <div class="player-badge__name" data-ui="player-name"></div>
+              <div class="player-badge__team" data-ui="player-team"></div>
             </div>
           </div>
           <div class="value-pills" data-ui="resource-strip">
-            <div class="value-pill"><span class="value-pill__label">金钱</span><span class="value-pill__num" data-ui="money">0</span></div>
-            <div class="value-pill value-pill--accent"><span class="value-pill__label">信用</span><span class="value-pill__num" data-ui="credit">0</span></div>
-            <div class="value-pill"><span class="value-pill__label">环保</span><span class="value-pill__num" data-ui="env">0</span></div>
+            <div class="value-pill"><span class="value-pill__label" data-ui="pill-money"></span><span class="value-pill__num" data-ui="money">0</span></div>
+            <div class="value-pill value-pill--accent"><span class="value-pill__label" data-ui="pill-credit"></span><span class="value-pill__num" data-ui="credit">0</span></div>
+            <div class="value-pill"><span class="value-pill__label" data-ui="pill-env"></span><span class="value-pill__num" data-ui="env">0</span></div>
           </div>
           <div class="topbar-spacer"></div>
           <div class="cycle-indicator" data-ui="day-night">
@@ -69,28 +70,28 @@ export class GameHudShell {
         </div>
 
         <div class="cell-hover-card" data-ui="hover-card">
-          <div class="cell-hover-card__type">等待</div>
-          <div class="cell-hover-card__title">悬停格子查看信息</div>
+          <div class="cell-hover-card__type"></div>
+          <div class="cell-hover-card__title"></div>
           <div class="cell-hover-card__rows"></div>
         </div>
 
         <div class="hud-chat-dock" data-ui="chat-panel">
           <div class="hud-chat-dock__head">
-            <span>聊天 / 通知</span>
-            <span class="hud-chat-dock__tabs"><b data-ui="sys-count">系统 0</b> 队伍 区域</span>
+            <span data-ui="chat-head"></span>
+            <span class="hud-chat-dock__tabs"><b data-ui="sys-count"></b><span data-ui="tabs-text"></span></span>
           </div>
           <div class="hud-chat-msgs" data-ui="chat-messages"></div>
           <div class="hud-chat-dock__input">
-            <select data-ui="chat-channel"><option value="team">队伍</option><option value="region">区域</option></select>
-            <input data-ui="chat-input" maxlength="200" placeholder="发送消息…" />
-            <button data-action="chat-send">发送</button>
+            <select data-ui="chat-channel"></select>
+            <input data-ui="chat-input" maxlength="200" />
+            <button data-action="chat-send"></button>
           </div>
         </div>
 
         <footer class="gp-actionbar" data-ui="action-dock">
           <div class="dice-zone">
-            <button class="dice-btn" data-action="roll">掷骰</button>
-            <span class="dice-status" data-ui="dice-status">就绪</span>
+            <button class="dice-btn" data-action="roll"></button>
+            <span class="dice-status" data-ui="dice-status"></span>
           </div>
           <div class="action-cluster" data-ui="action-cluster">
           </div>
@@ -100,6 +101,9 @@ export class GameHudShell {
 
     this.input = this.root.querySelector("[data-ui=chat-input]") as HTMLInputElement;
     this.channel = this.root.querySelector("[data-ui=chat-channel]") as HTMLSelectElement;
+
+    // 静态文本国际化（语言在会话启动时固定；如需运行中切换语言，需在切换时重调本方法）
+    this.bindStaticLabels();
 
     // Event wiring
     this.root.querySelector('[data-action="chat-send"]')?.addEventListener("click", () => this.sendChat());
@@ -121,6 +125,32 @@ export class GameHudShell {
 
   getElement(): HTMLElement { return this.root; }
 
+  /** 写入不进 innerHTML、只在语言切换时变化的静态文案。 */
+  private bindStaticLabels(): void {
+    const set = (selector: string, key: string): void => {
+      const el = this.root.querySelector(selector);
+      if (el) el.textContent = t(key);
+    };
+    set("[data-ui=pill-money]", "hud.money");
+    set("[data-ui=pill-credit]", "hud.credit");
+    set("[data-ui=pill-env]", "hud.env");
+    set("[data-ui=chat-head]", "hud.chatNotify");
+    set('[data-action="roll"]', "dice.roll");
+    set('[data-action="chat-send"]', "chat.send");
+    set("[data-ui=tabs-text]", "hud.chatTabs");
+
+    // 下拉频道选项与输入框占位符
+    this.channel.replaceChildren(
+      ...["team", "region"].map((value) => {
+        const opt = document.createElement("option");
+        opt.value = value;
+        opt.textContent = t(`chat.channel.${value}`);
+        return opt;
+      }),
+    );
+    this.input.placeholder = t("chat.inputPlaceholder");
+  }
+
   showCellHover(cellId: number, x: number, y: number): void {
     this.hoveredCell = { id: cellId, x, y };
     this.renderCellHover();
@@ -132,19 +162,24 @@ export class GameHudShell {
     const cell = this.vm.getCell(cellId);
     const card = this.root.querySelector("[data-ui=hover-card]") as HTMLElement;
     if (!cell) {
-      card.innerHTML = '<div class="cell-hover-card__type">同步中</div><div class="cell-hover-card__title">正在获取格子状态</div>';
+      card.innerHTML = `<div class="cell-hover-card__type">${this.escapeHtml(t("hud.hoverSyncing"))}</div><div class="cell-hover-card__title">${this.escapeHtml(t("hud.hoverFetching"))}</div>`;
       card.style.display = "block";
       return;
     }
     const extra = cell.extra as Record<string, unknown>;
     const ownerships = Array.isArray(extra.ownerships) ? extra.ownerships as Array<{ playerId: string; share: number }> : [];
     const type = String(extra.type ?? 'empty');
-    const name = String(extra.name ?? `格子 ${cell.id}`);
+    const name = String(extra.name ?? t("cell." + type));
     const price = Number(extra.price ?? 0);
     const level = Number(extra.level ?? 0);
-    card.innerHTML = `<div class="cell-hover-card__type">${this.escapeHtml(type.toUpperCase())} · 当前格</div><div class="cell-hover-card__title">${this.escapeHtml(name)}</div><div class="cell-hover-card__rows"><span>价格</span><b>${price ? `$${price}` : "—"}</b><span>等级</span><b>Lv.${level}</b><span>持有人</span><b>${ownerships.length ? `${ownerships.length} 人` : "无主"}</b></div>`;
+    const typeLabel = this.escapeHtml(String(extra.typeLabel ?? t("cell." + type)));
+    const holderText = ownerships.length > 0
+      ? t("hud.holderCount", { count: ownerships.length })
+      : t("hud.noOwners");
+    card.innerHTML = `<div class="cell-hover-card__type">${typeLabel} · ${t("hud.currentTag")}</div><div class="cell-hover-card__title">${this.escapeHtml(name)}</div><div class="cell-hover-card__rows"><span>${t("hud.price")}</span><b>${price ? `$${price}` : "—"}</b><span>${t("hud.level")}</span><b>Lv.${level}</b><span>${t("hud.holder")}</span><b>${holderText}</b></div>`;
     card.style.display="block"; card.style.left=`${Math.min(x+18,window.innerWidth-240)}px`; card.style.top=`${Math.max(76,y-12)}px`;
   }
+
   hideCellHover(): void {
     this.hoveredCell = null;
     (this.root.querySelector("[data-ui=hover-card]") as HTMLElement).style.display="none";
@@ -152,45 +187,66 @@ export class GameHudShell {
 
   update(): void {
     if (this.destroyed) return;
+    this.updatePlayerBadge();
+    this.updateValuePills();
+    this.updateDayNight();
+    this.updateDiceButton();
+    this.updateActionCluster();
+    this.updateChat();
+    this.renderCellHover();
+  }
+
+  /** 玩家名牌 + 队伍状态 */
+  private updatePlayerBadge(): void {
     const player = this.vm.getPlayer();
-    const movement = this.vm.getMovement();
     const team = this.vm.getTeam();
-    const chat = this.vm.getChat();
-    const pathChoice = this.vm.getPathChoice();
-    const cellActions = this.vm.getCellActions();
-
-    // Player badge
     const nameEl = this.root.querySelector("[data-ui=player-name]")!;
-    nameEl.textContent = player.currentPlayerName || "玩家";
+    nameEl.textContent = player.currentPlayerName || t("game.defaultPlayerName");
     const teamEl = this.root.querySelector("[data-ui=player-team]")!;
-    teamEl.textContent = team.members.length > 1 ? `队伍 ${team.members.length}人` : "独行";
+    teamEl.textContent = team.members.length > 1 ? t("hud.teamCount", { count: team.members.length }) : t("hud.lone");
+  }
 
-    // Value pills
+  /** 顶部数值条（金钱/信用/环保） */
+  private updateValuePills(): void {
+    const player = this.vm.getPlayer();
     for (const [key, value] of [["money", player.currentMoney], ["credit", player.currentCredit], ["env", player.currentEnv]] as const) {
       this.root.querySelector(`[data-ui=${key}]`)!.textContent = String(Math.round(value));
     }
+  }
 
-    // Day/Night cycle
+  /** 昼夜指示器 */
+  private updateDayNight(): void {
     const day = this.vm.getLocalDayNight(this.vm.getPlayerTimezone());
     const timeEl = this.root.querySelector("[data-ui=day-time]")!;
-    timeEl.textContent = `${day.isDay ? "昼" : "夜"} ${day.timeStr}`;
+    timeEl.textContent = `${day.isDay ? t("hud.dayShort") : t("hud.nightShort")} ${day.timeStr}`;
     const dotEl = this.root.querySelector("[data-ui=cycle-dot]")!;
     dotEl.className = `cycle-dot ${day.isDay ? "cycle-dot--day" : "cycle-dot--night"}`;
+  }
 
-    // Dice button
+  /** 掷骰按钮状态与文案 */
+  private updateDiceButton(): void {
+    const player = this.vm.getPlayer();
+    const movement = this.vm.getMovement();
     const rollBtn = this.root.querySelector('[data-action="roll"]') as HTMLButtonElement;
     const canRoll = movement.canRoll && !movement.isMoving && !player.isBankrupt;
     rollBtn.disabled = !canRoll;
     const statusEl = this.root.querySelector("[data-ui=dice-status]")!;
-    statusEl.textContent = movement.isMoving ? "移动中" : canRoll ? "就绪" : "冷却中";
+    statusEl.textContent = movement.isMoving
+      ? t("hud.moving")
+      : canRoll ? t("hud.ready") : t("hud.cooldown");
+  }
 
+  /** 动作/岔路按钮簇 */
+  private updateActionCluster(): void {
+    const pathChoice = this.vm.getPathChoice();
+    const cellActions = this.vm.getCellActions();
     const actionCluster = this.root.querySelector('[data-ui="action-cluster"]')!;
     const actionButtons = pathChoice.active ? pathChoice.options.map((option, index) => {
       const button = document.createElement('button');
       button.className = 'act-btn act-btn--accent';
       button.dataset.action = 'path-choice';
       button.dataset.cellId = String(option.cellId);
-      button.textContent = `选择路径 ${String.fromCharCode(65 + index)}`;
+      button.textContent = `${t("hud.choosePath")} ${String.fromCharCode(65 + index)}`;
       const detail = document.createElement('span');
       detail.className = 'act-btn__price';
       detail.textContent = `→ ${option.label}`;
@@ -213,23 +269,23 @@ export class GameHudShell {
       return button;
     });
     actionCluster.replaceChildren(...actionButtons);
-    this.renderCellHover();
+  }
 
-    // Chat messages (last 10)
+  /** 聊天消息 + 系统未读数 */
+  private updateChat(): void {
+    const chat = this.vm.getChat();
     const msgsEl = this.root.querySelector("[data-ui=chat-messages]")!;
     const recent = chat.history.slice(-10);
     if (recent.length > 0) {
       msgsEl.innerHTML = recent.map(m => {
-        const chanLabel = m.channel === "system" ? "系统" : m.channel === "team" ? "队伍" : "区域";
-        return `<div class="hud-chat-msg"><b>${chanLabel}</b><span>${this.escapeHtml(m.text)}</span></div>`;
+        const chanKey = m.channel === "system" ? "system" : m.channel === "team" ? "team" : "region";
+        return `<div class="hud-chat-msg"><b>${this.escapeHtml(t(`chat.channel.${chanKey}`))}</b><span>${this.escapeHtml(m.text)}</span></div>`;
       }).join("");
     } else {
-      msgsEl.innerHTML = `<div class="hud-chat-msg"><span>暂无消息</span></div>`;
+      msgsEl.innerHTML = `<div class="hud-chat-msg"><span>${this.escapeHtml(t("hud.noMessage"))}</span></div>`;
     }
-
-    // System unread count
     const sysCount = chat.history.filter(m => m.channel === "system").length;
-    this.root.querySelector("[data-ui=sys-count]")!.textContent = `系统 ${sysCount}`;
+    this.root.querySelector("[data-ui=sys-count]")!.textContent = t("hud.sysUnread", { count: sysCount });
   }
 
   destroy(): void {
