@@ -677,69 +677,73 @@ cd packages/client && npx jest --listTests 2>&1 | head
 
 ---
 
-## 方向 11：如何定位"真正负责渲染工作的代码"（不靠目录结构猜，靠引用链）
+## 方向 11：如何定位"真正负责渲染工作的代码"（用行为实验，而非 import 关系）
 
-> 一个目录"一眼看去全是废代码"，往往是**真代码被一大堆死东西埋住了**——不是它真的没有活代码。`src/renderer/` 正是标本。本节给你一套从"某个 UI 功能"反推"到底哪几行在真正干活"的可靠方法。
+> **重要纠正**：本手册早期版本教大家"从入口渲染循环 `startRenderLoop → BoardRenderer.render() → 三个子渲染器` 定位真渲染代码"，这个结论**是错的**。下文的正确方法是基于实际行为验证得出的。核心教训：**"被 import / 被调用"绝不等于"活着"——要看它是否真的承担了产出，必要时用实验证实。**
 
-### 11.1 先破除一个误区：目录里文件多 ≠ 活代码多
+### 11.1 一个足以推翻"import 即活"假设的真实例证
 
-`src/renderer/` 下有 7 个 `.ts`。单看目录，你会以为"渲染系统很重、很多组件"。
-但用下面的引用链方法一查，真相是：**生产代码直接 import 的只有 `BoardRenderer` 一个**（`GamePage.ts:21`、`ClientRenderLoop.ts:5` 都 `from '.../renderer/BoardRenderer.js'`）。
-其余文件是死是活，取决于**是否被 `BoardRenderer`（这个活入口）内部引用**，而不是看它在不在 renderer 目录里。
+`src/renderer/PlayerRenderer.ts`（Canvas 画棋子）被 `BoardRenderer` import，`BoardRenderer` 又被 `ClientRenderLoop`/`GamePage` 引用，`GamePage` 确实调用了 `startRenderLoop()`。按"import 即活"的逻辑，它是活的。
 
-### 11.2 五步定位法（从功能反推到行）
+但用**行为实验**验证后，结论翻转：
+- 在 `PlayerRenderer.render` 开头加 `console.warn("PlayerRenderer active")` → **没有任何输出** → 该方法实际从未执行；
+- 进一步在该方法里制造语法错误 → **游戏照常运行、不报错** → 说明这座 Canvas 渲染链**根本没被真正驱动**（或它的产物被完全遮蔽）。
 
-**第 1 步：找"每一帧在跑什么"——入口渲染循环**
-渲染一定有一个被 `requestAnimationFrame` 驱动的循环。搜它：
-```
-Grep: requestAnimationFrame
-# → src/game/ClientRenderLoop.ts:93  startRenderLoop() 是唯一主循环
-```
-拿到 `startRenderLoop()`（L72-96），它每帧调用了一个"核心函数"：
-```
-L91: updateRendererPlayers(store)  → renderer.updatePlayers(players)
-L92: renderer.render()              ← 真正画东西的核心
-L85-90: getCamera().panTo(...)     → 镜头跟随玩家
-```
+**为什么会出现"被引用却不执行"？** 需要精确归因，不能笼统说死。读真实代码，Canvas 渲染链其实**有一条可执行的调用路径**：
+- `GamePage.ts:199` 在 `Promise.all([loadMapData()]).then(...)` 成功后才调用 `startRenderLoop(gameStore!)`（:173-204）。**若地图数据异步加载失败/该分支未走到，`startRenderLoop` 根本不会被触发**，则整个 Canvas 链（`BoardRenderer.render → PlayerRenderer.render`）一次也不执行。
+- 即便触发了，`ClientRenderLoop.startRenderLoop`（L92）确实每帧调用 `renderer.render()`，但产物画在 `GamePage.ts:112` 创建的 `<canvas>` 上，而 `InteractiveMapSurface`（SVG）在 :114 **紧随其后 append、盖在 canvas 之上**（职责已被 SVG 承担，canvas 结果不可见）。
 
-**第 2 步：顺着 `renderer.render()` 进去（核心调用链）**
-`BoardRenderer.render()`（`src/renderer/BoardRenderer.ts:112-140`）就是画布的"总指挥"。它内部依次调用了三个子渲染器：
-```ts
-this.connectionRenderer.render(cells, cameraState);   // 画连线
-this.cellRenderer.render(cell, cameraState, 1);       // 画每个格子（循环）
-this.playerRenderer.render(player, cell, cameraState, i); // 画每个玩家棋子
-```
-**这仨（`ConnectionRenderer`/`CellRenderer`/`PlayerRenderer`）就是真正画内容的类**，因为只有它们出现在 `render()` 的调用里。
+所以"未输出/不阻断"的根因可能是**"该分支未触发"**或**"执行了但被 SVG 遮蔽"**之一。两者殊途同归：**Canvas 的 `PlayerRenderer` 不是当前玩家棋子的真实产出者**。真正的产出者是 `InteractiveMapSurface`（SVG）。**最终要落到实际行为验证**（探针/空实现/清空上层元素），别只信某一条调用路径的静态存在。
 
-**第 3 步：哪些"renderer"文件没进这条链 → 不是真渲染**
-做一次"减法"：把 renderer 目录里每个文件，去 `render()` 调用链和入口声明里比对，没出现的就不是"渲染主体"：
-- `BoardRenderer` ✓ 被 import + 是主控
-- `Camera` ✓ 被 `BoardRenderer` 内部用（坐标换算）
-- `CellRenderer` / `ConnectionRenderer` / `PlayerRenderer` ✓ 被 `render()` 调
-- `DayNightRenderer.ts` ✗ 我搜遍 `src`，**没有任何生产 `import DayNightRenderer`**。它预想提供"昼夜 Canvas 遮罩"，但从未接入。真实昼夜效果在 `ClientRenderLoop.updateBoardTheme`（L109-115）用 **DOM + CSS `filter`** 实现，不是 Canvas 渲染器。
-- `index.ts` ✗ 死桶，无人 import（见方向 7）。
+### 11.2 真正的渲染代码（本项目的正确答案）
 
-**第 4 步：区分"类在不在用" vs "类里哪些方法在用"**
-- 判断类的死活：看是否被活链 import/调用。
-- 判断类里方法的死活：沿用方向 9 的"生产调用 grep"。例如 `BoardRenderer` 是活的，但它的 `screenToWorld`（L234）没人调，`hitTest:185` 的 `void screenToWorld` 是死调用；`Camera` 是活的，但 `zoomBy/pan/startDrag/...` 是僵尸方法。
-- 结论：**一个目录"看着全废"，可能是 5 个活类各自带了一堆死方法，加上 1 个整文件死类 + 1 个死桶**——整体观感像废，实际骨架活着。
+读 `src/pages/GamePage.ts` 与 `src/components/InteractiveMapSurface.ts`：
 
-**第 5 步：验证——产物里到底有没有这些符号**
-```bash
-cd packages/client && pnpm build:client && grep -l "DayNightRenderer\|zoomBy\|computeOpacity\|Panorama\|VisionMaskRenderer" dist/assets/*.js || echo "不在产物里=死"
-# 而 "renderer.render" 、"updatePlayers" 对应的方法应该打得进关键路径
-```
+- `GamePage.ts:113` `const interactiveMap = new InteractiveMapSurface();`
+- `:114` 把它 append 进 `boardContainer`（紧接着 `canvas` 之后 → **SVG 盖在 canvas 上面**）
+- `:115-120` 订阅 `GameStore`，每次变更调 `interactiveMap.updatePlayers(players)` + `interactiveMap.followPlayer(pos)`
+- `:189-190` 地图加载后 `interactiveMap.render(mapData, players)` + `followPlayer(...)`
 
-### 11.3 一句话口诀
+`InteractiveMapSurface.ts`：
+- `:27-29` `__players` 分组里用 `<circle>`（头）+ `<path>`（身体）**真实画出玩家棋子**；
+- `:31` `updatePlayers()`、`:33-36` `followPlayer()`（镜头跟随玩家居中）——这俩就是"渲染玩家 + 跟随"的真正实现。
 
-> **"真正的渲染代码 = 入口循环(startRenderLoop) → BoardRenderer.render() → 三个子渲染器.render()"**。
-> 不在这条链上的 renderer 文件（`DayNightRenderer`、`index.ts`），以及这条链上每个类的“没用到的 public 方法”，都是清理与确认的对象；别因为它们躺在 `renderer/` 里就当它是"渲染的一部分"。
+而 canvas 那套（`BoardRenderer.render/SRC → PlayerRenderer.render`、`CellRenderer`、`ConnectionRenderer`）虽然被 import、被 `startRenderLoop` 调用，但：
+- 它的 canvas 被 SVG **盖住**，产物不可见；
+- 占位/加载提示等简单静态内容或许有用，但"渲染玩家棋子/棋盘交互"的实际职责**已由 SVG 承担**。
 
-### 11.4 适用到"任何其他目录"
+**结论（纠正版）**：要找"真正渲染玩家棋子的代码"，答案是 **`InteractiveMapSurface`（SVG）**，而**不是** `renderer/` 下的 Canvas 渲染器。`renderer/` 的 Canvas 栈是"有 import、有调用链、但被遮蔽/被取代"的**半死或死代码**——任务不同视是否一并清理其依赖（详见方向 12）。
 
-这套"入口 → 核心函数 → 减法 → 产物验证"四步，不只对 renderer：
-- 想找"组队谁在干活" → 找入口（`server.teamInviteReceived` 处理器）→ 往下追到 `TeamManager` 方法。
-- 想找"UI 谁在渲染" → 找 `GameHudShell` 的 `update()`，看它订阅了哪些切片、读哪些 ViewModel getter。
-- 想找"经济谁在记账" → 找 `economy.changeValue(...)` 的所有调用点（事件格、起点、租税、道具都是经过它）。
+### 11.3 用行为实验判断"活/死"（比 import 可靠得多）
 
-**关键：先找"入口/主循环/总指挥"，再从它往下追，而不是从目录结构向上猜。** 目录是组织方式，入口链是运行真相。
+"死代码"的定义应该升级为：**"文档/调用链看起来存在，但对最终产出的 0 贡献。"** 判断方法依次是：
+
+1. **看产物是否由它产出**：加 `console.warn` 探针在疑似方法首行，运行游戏看控制台（务必看清/清空以排除日志干扰）。没输出 → 该方法没执行。
+2. **制造并隔离一个语法错误**（实验用，做前 `git stash` 或备份）：若整个程序仍正常运行 → 该文件根本没进执行路径。注意：TS 编译错误会 `tsc` 挡下；用户观察到的"语法错误不阻断"需要是**运行时/类型之外**的错误，务必结合构建脚本判断。
+3. **看是否有替代实现盖住它**：`GamePage` 里 canvas 后面 append 的 `InteractiveMapSurface` 就是"替代实现盖住旧实现"的典型——两层都在，但只有顶层 SVG 可见。
+4. **做减法验证（副作用探针）**：直接给某 canvas 渲染方法设空实现，若画面无任何变化 → 它的产物已被取代或无意义。
+
+> 一句话：**"有生产调用"是"可能在用"，但不保证"真的是最终产物的来源"。** 判断"活"，证据要看 `render()`/`updatePlayers`/`followPlayer` 这些**真正写进 DOM 或 canvas** 的调用是否真的执行、且产物是否可见。
+
+### 11.4 定位"真渲染代码"的最终流程（纠正版）
+
+| 步骤 | 做什么 | 本项目实例 |
+|---|---|---|
+| 1. 找"写进页面/DOM/canvas 的动作" | 从 UI 入口出发，找每个 `append`/`createElement`/`setAttribute(d)`/`fillRect` 的源头 | 玩家棋子 → `InteractiveMapSurface.ts:28` 的 `<circle>`/`<path>` |
+| 2. 找"谁在数据变化时调用它" | 找订阅/回调：`store.subscribe(...)` / `update()` / socket handler | `GamePage.ts:115-120` 订阅 Store → `interactiveMap.updatePlayers` |
+| 3. 用探针/实验证实执行 | `console.warn` + 隔离语法错误，确认它真执行、真可见 | 实测 Canvas 的 `PlayerRenderer.render` 不输出 → 死 |
+| 4. 再确认"旧链是否被取代" | 找同职责的 "second implementation"，看谁在上面 | `InteractiveMapSurface` 盖在 `canvas` 之上 |
+| 5. 产物 grep 佐证 | build 后看符号是否进 dist 且被引用，但不作为唯一依据 | — |
+
+---
+
+## 方向 12：识别"有 import、有调用链，但已被取代"的死代码（本仓库高发）
+
+这是最常见的"伪活代码"：没人删它，是因为它**看起来**有人 import、有人调用。但它负责的职责已经被另一套实现顶替。识别与处置要点：
+
+1. **装备"职责归并"思维**：同一个 UI 元素只该有一份"负责产出的实现"。当发现"Canvas 版棋盘 + SVG 版棋盘"同时存在，且只有一层可见，就问：**谁真的在产出用户看到的东西？** 答：可见的那层。
+2. **用行为实验裁决，不服 import**（见 11.3）。
+3. **处置**：若旧链确实不再产出（探针无输出、空实现无副作用），就可以连删除依赖一起清理（删 `PlayerRenderer` 等前，先确认连累的 import 点）。若旧链仍负责一部分（如棋盘底图），则只删被取代的子项。
+4. **别被"它还 init/还有测试im来"拖住**：`GamePage` 仍然 `new BoardRenderer(canvas,...)`、仍有 `renderer.test.ts`，这只能证明"还在构造/还被测"，不能证明"还在产出玩家棋子"。**测试尤其能骗人**（见方向 10）。
+
+> 修正本手册早前一处表述：**"真正的渲染代码 = 入口循环 → BoardRenderer.render() → 三个子渲染器.render()" 这句话仅描述了一个存在调用链的候选路径，不代表它真的是最终产物来源。** 本项目真实产出玩家棋子的链条是 `GameStore.subscribe → InteractiveMapSurface.updatePlayers/render (SVG)`。
