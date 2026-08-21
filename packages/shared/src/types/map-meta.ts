@@ -59,6 +59,7 @@ export interface Region {
    * 用于客户端地图渲染时的视觉区分
    */
   color?: string;
+  themeId?: 'northeast' | 'south' | 'midwest' | 'west';
 }
 
 /**

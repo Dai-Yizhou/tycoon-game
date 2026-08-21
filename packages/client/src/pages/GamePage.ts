@@ -46,7 +46,7 @@ import {
 
 import { registerSocketHandlers, unregisterSocketHandlers } from '../game/systems/SocketEventHandler.js';
 import { DesignAdapter } from '../design/DesignAdapter.js';
-import { getThemeTokens } from '../design/ThemeConfig.js';
+import { getRegionThemeId, getThemeTokens } from '../design/ThemeConfig.js';
 
 let gameViewModel: GameViewModel | null = null;
 let gameStore: GameStore | null = null;
@@ -85,7 +85,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   const context = controller.getContext();
   const page = document.createElement('div');
   page.className = 'page game-page';
-  const designSnapshot = new DesignAdapter(getThemeTokens((globalThis as { __GAME_THEME__?: string }).__GAME_THEME__ ?? 'northeast')).createSnapshot('day');
+  const designSnapshot = new DesignAdapter(getThemeTokens()).createSnapshot('day');
   applyGamePageThemeSnapshot(page, designSnapshot);
   gameStore = new GameStore();
   setChatStore(gameStore);
@@ -102,13 +102,14 @@ export function createGamePage(controller: GameController): HTMLElement {
     interactiveMap.updatePlayers(players);
     interactiveMap.followPlayer(snapshot.currentPlayerPosition);
     syncCellActions(snapshot.currentPlayerPosition);
+    if (mapIndex) applyRegionTheme(page, snapshot.currentPlayerPosition);
   });
   page.appendChild(boardContainer);
 
 
   const backButton = document.createElement('button');
   backButton.className = 'back-button';
-  backButton.textContent = '返回';
+  backButton.textContent = t('common.backToStart');
   backButton.addEventListener('click', () => controller.setState('start'));
   page.appendChild(backButton);
   gameHudShell = new GameHudShell(gameViewModel, effects, {
@@ -156,9 +157,8 @@ export function createGamePage(controller: GameController): HTMLElement {
   Promise.all([loadMapData()]).then(
     ([mapResult]) => {
       if (!mapResult) {
-        console.error("mapResult not found");
         return;
-      }      
+      }
       const { mapData, regions } = mapResult;
       // 初始化区域繁荣度快照
       gameStore?.setRegions(regions, mapResult.valueFields);
@@ -170,6 +170,7 @@ export function createGamePage(controller: GameController): HTMLElement {
         interactiveMap.render(mapData, toInteractivePlayers(snapshot));
         interactiveMap.followPlayer(snapshot.currentPlayerPosition);
       }
+      applyRegionTheme(page, snapshot.currentPlayerPosition);
       const startCell = mapIndex!.getById(0);
       if (startCell) {
         gameStore?.applySnapshot({ sequence: gameStore.nextSequence(), playerDisplayX: startCell.x, playerDisplayY: startCell.y, cameraTargetX: startCell.x, cameraTargetY: startCell.y });
@@ -257,6 +258,15 @@ function applyGamePageThemeSnapshot(page: HTMLElement, snapshot: ReturnType<Desi
   for (const [name, value] of Object.entries(snapshot.dom)) {
     page.style.setProperty(name, value);
   }
+}
+
+function applyRegionTheme(page: HTMLElement, cellId: number): void {
+  const snapshot = gameStore?.getSnapshot();
+  const cell = snapshot?.cells.get(cellId);
+  const cellRegionId = typeof cell?.extra.regionId === 'string' ? cell.extra.regionId : undefined;
+  const region = snapshot?.mapRegions.find(candidate => candidate.id === cellRegionId || candidate.cellIds.includes(cellId));
+  const themeId = getRegionThemeId(region ?? { id: 'default' });
+  applyGamePageThemeTokens(page, { tokens: getThemeTokens(themeId) });
 }
 
 function initTeam(): void {
@@ -476,4 +486,3 @@ export function cleanupGamePage(page: HTMLElement): void {
   mapIndex = null;
   page.remove();
 }
-

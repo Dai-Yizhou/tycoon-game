@@ -164,8 +164,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 
 .cycle-indicator { display:flex; align-items:center; gap:6px; flex-shrink:0; }
 .cycle-dot { width:10px; height:10px; border-radius:50%; border:1px solid var(--gp-border); }
-.cycle-dot--day { background:#E8C84A; }
-.cycle-dot--night { background:#3A4A6B; }
+.cycle-dot--day { background:var(--gp-accent); }
+.cycle-dot--night { background:var(--gp-link); }
 .cycle-text { font-size:10px; color:var(--gp-muted); font-family:'SF Mono',Menlo,Monaco,Consolas,monospace; }
 
 /* —— 地图角落标签 —— */
@@ -189,7 +189,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   padding:8px 16px; background:var(--gp-card);
   border:1px solid var(--gp-accent); border-radius:1px;
   font-size:11px; color:var(--gp-fg);
-  box-shadow:0 2px 8px rgba(0,0,0,.4);
+  box-shadow:0 2px 8px color-mix(in srgb,var(--gp-border) 40%,transparent);
 }
 .event-toast__title { font-weight:800; color:var(--gp-accent); margin-right:6px; }
 
@@ -199,7 +199,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   z-index:8; width:200px;
   background:var(--gp-card);
   border:1px solid var(--gp-accent);
-  box-shadow:0 8px 24px rgba(0,0,0,.42);
+  box-shadow:0 8px 24px color-mix(in srgb,var(--gp-border) 42%,transparent);
   padding:10px; color:var(--gp-fg);
   pointer-events:none;
 }
@@ -216,7 +216,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   z-index:9;
   background:var(--gp-sidebar-bg);
   border:1px solid var(--gp-border);
-  box-shadow:0 8px 28px rgba(0,0,0,.24);
+  box-shadow:0 8px 28px color-mix(in srgb,var(--gp-border) 24%,transparent);
   overflow:hidden;
   backdrop-filter:blur(8px);
   -webkit-backdrop-filter:blur(8px);
@@ -232,7 +232,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .hud-chat-dock__tabs b { color:var(--gp-accent); }
 
 .hud-chat-msgs { max-height:120px; overflow-y:auto; padding:0 14px; display:none; }
-.hud-chat-msg { font-size:9px; line-height:1.35; padding:4px 0; border-bottom:1px dotted rgba(255,255,255,.08); }
+.hud-chat-msg { font-size:9px; line-height:1.35; padding:4px 0; border-bottom:1px dotted color-mix(in srgb,var(--gp-fg) 8%,transparent); }
 .hud-chat-msg b { color:var(--gp-accent); font-size:8px; margin-right:4px; }
 .hud-chat-msg span { color:var(--gp-muted); }
 
@@ -248,7 +248,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 }
 .hud-chat-dock__input button {
   padding:4px 8px; font-size:9px; font-weight:700;
-  background:var(--gp-accent); color:#FBF8F1;
+  background:var(--gp-accent); color:var(--gp-map-bg);
   border:none; border-radius:1px; cursor:pointer;
 }
 
@@ -287,7 +287,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   cursor:pointer; white-space:nowrap;
   transition:background .12s ease;
 }
-.act-btn:hover { background:#3D4047; }
+.act-btn:hover { background:var(--gp-border); }
 
 .actionbar-spacer { flex:1; }
 
@@ -301,7 +301,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .item-slot--has { color:var(--gp-fg); border-color:var(--gp-accent); }
 .item-slot__count {
   position:absolute; top:-4px; right:-4px;
-  background:var(--gp-accent); color:#FBF8F1;
+  background:var(--gp-accent); color:var(--gp-map-bg);
   font-size:7px; font-weight:800; padding:0 3px; border-radius:99px;
 }
 
@@ -341,9 +341,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .silhouette{opacity:.2;filter:none}
 .loading-spinner,.spinner{border-color:#4A2C2A!important;border-top-color:#D95A2B!important}
 .progress-container{width:300px}.progress-bar{height:6px;background:#4A2C2A;border-radius:0}.progress-bar>div{background:#D95A2B}
-.interactive-map-surface{position:absolute;inset:0;z-index:2;pointer-events:auto;background:#1A1C1F;background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 6px),repeating-linear-gradient(0deg,rgba(255,255,255,.02) 0 1px,transparent 1px 6px)}
-.game-page .board-container{z-index:1;background:#1A1C1F}.game-page #game-canvas{opacity:0;pointer-events:none}
-.interactive-map-surface__svg{width:100%;height:100%;display:block;overflow:visible}.map-link{stroke:#555;stroke-width:8;stroke-linecap:round}.map-node{cursor:pointer}.map-node__shape{fill:#2C2F35;stroke:#4A2C2A;stroke-width:3}.map-node:hover .map-node__shape{fill:#34373D;stroke:#D95A2B;stroke-width:5}.map-node__type{fill:#9AA0A6;font:700 13px "SF Mono",monospace;letter-spacing:.08em}.map-node__name{fill:#E6DCC3;font:900 19px Georgia,"Songti SC",serif}.map-node__price{fill:#D95A2B;font:700 15px "SF Mono",monospace}.map-node--event .map-node__shape{stroke:#8C4E3A}.map-node--transport .map-node__shape{stroke:#2F4B7A}.map-node--start .map-node__shape{stroke:#4A7C3F}.map-node--monument .map-node__shape{stroke:#E8C84A}
+.interactive-map-surface{position:absolute;inset:0;z-index:2;pointer-events:auto;background:var(--gp-map-bg);background-image:repeating-linear-gradient(90deg,color-mix(in srgb,var(--gp-fg) 3%,transparent) 0 1px,transparent 1px 6px),repeating-linear-gradient(0deg,color-mix(in srgb,var(--gp-fg) 2%,transparent) 0 1px,transparent 1px 6px)}
+.game-page .board-container{z-index:1;background:var(--gp-map-bg)}.game-page #game-canvas{opacity:0;pointer-events:none}
+.interactive-map-surface__svg{width:100%;height:100%;display:block;overflow:visible}.map-link{stroke:var(--gp-link);stroke-width:8;stroke-linecap:round}.map-node{cursor:pointer}.map-node__shape{fill:var(--gp-cell-bg);stroke:var(--gp-border);stroke-width:3}.map-node:hover .map-node__shape{fill:var(--gp-card);stroke:var(--gp-accent);stroke-width:5}.map-node__type{fill:var(--gp-muted);font:700 13px "SF Mono",monospace;letter-spacing:.08em}.map-node__name{fill:var(--gp-fg);font:900 19px Georgia,"Songti SC",serif}.map-node__price{fill:var(--gp-accent);font:700 15px "SF Mono",monospace}.map-node--event .map-node__shape{stroke:var(--gp-accent)}.map-node--transport .map-node__shape{stroke:var(--gp-link)}.map-node--start .map-node__shape{stroke:var(--gp-cell-property-fill)}.map-node--monument .map-node__shape{stroke:var(--gp-accent)}
 
 .map-player{pointer-events:none;filter:drop-shadow(0 3px 2px var(--gp-shadow-color,rgba(0,0,0,.45)))}.map-player__head{fill:var(--gp-player-head,#F2E9D8);stroke:var(--gp-player-outline,#1A1A1A);stroke-width:4}.map-player__body{fill:var(--gp-player-color,var(--gp-accent,#C0392B));stroke:var(--gp-player-outline,#1A1A1A);stroke-width:4;stroke-linejoin:round}
 

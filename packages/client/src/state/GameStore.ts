@@ -10,7 +10,7 @@ export interface OtherPlayerInfo {
   primaryValue: number;
 }
 
-export interface RegionInfo { id: string; name: string; cellIds: number[]; prosperity: number; timezone?: string; environmentValue?: number; }
+export interface RegionInfo { id: string; name: string; cellIds: number[]; prosperity: number; timezone?: string; environmentValue?: number; themeId?: 'northeast' | 'south' | 'midwest' | 'west'; }
 
 export interface ValueFieldDef {
   id: string; name: string; scope: 'player' | 'region';

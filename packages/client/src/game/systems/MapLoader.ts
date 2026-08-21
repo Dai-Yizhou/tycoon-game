@@ -2,6 +2,7 @@ import type { MapData, MapIndex } from '@game/shared';
 import { loadMapFromObject } from '@game/shared/map/browser-loader';
 import { getExtra } from '@game/shared';
 import type { GameStore, RegionInfo, ValueFieldDef } from '../../state/GameStore.js';
+import type { ThemeId } from '../../design/ThemeConfig.js';
 
 const MAP_SCALE = 3.0;
 
@@ -49,6 +50,7 @@ export async function loadMapData(): Promise<{
       name: String(region['name'] || ''),
       cellIds: Array.isArray(region['cellIds']) ? region['cellIds'] as number[] : [],
       prosperity: typeof region['prosperity'] === 'number' ? region['prosperity'] : 100,
+      ...(typeof region['themeId'] === 'string' ? { themeId: region['themeId'] as ThemeId } : {}),
       ...(typeof region['environmentValue'] === 'number' ? { environmentValue: region['environmentValue'] } : {}),
     }));
     const valueFields: ValueFieldDef[] = (data.valueFieldDefinitions || []).map((field: Record<string, unknown>) => ({

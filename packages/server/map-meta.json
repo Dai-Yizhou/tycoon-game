@@ -20,7 +20,8 @@
       "cellIds": [0, 1, 2, 3, 4, 5, 6, 7],
       "prosperity": 80,
       "environmentValue": 50,
-      "color": "#4CAF50"
+      "color": "#4CAF50",
+      "themeId": "south"
     }
   ],
   "valueFieldDefinitions": [
