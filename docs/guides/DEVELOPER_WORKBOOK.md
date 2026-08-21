@@ -542,3 +542,208 @@ Canvas 渲染依赖 `HTMLCanvasElement`（node 环境没有）。三个策略按
 改一步 → 跑这一块的测试（npx jest tests/xxx.test.ts）→ 全量 pnpm test
 ```
 别最后才跑全量。规则强调"可验证性执行前置"：每完成一个模块改动，先本地验证再继续。
+
+---
+
+## 方向 9：实战——修复 `renderer/Camera.ts` 的"宣称缩放/平移但实际不用"（附完整证据链）
+
+> 这是本仓库最典型的一类问题：**一个 API 被测试引用，但它对应的能力在生产代码中从未被使用**。直接删会"报错"（测试引用它），不删则是僵尸 API。本节用 `Camera.ts` 的真实源码给你一套"先判定真伪、再安全动刀"的完整流程。**动手前先照做，别直接删。**
+
+### 9.1 先理解"为什么符合直觉却不该删"
+
+`src/renderer/Camera.ts` 开头写着：
+```ts
+/**
+ * 相机控制器（缩放、平移）
+ * 负责管理视口状态，支持鼠标滚轮缩放和拖拽平移
+ */
+```
+方法列表有 `setZoom/zoomBy/pan/panTo/startDrag/updateDrag/endDrag/isDraggingActive/reset/worldToScreen/screenToWorld/updateViewportSize`。**注释和 API 都在告诉你"它支持缩放和平移"**。
+
+而真实运行行为是：镜头**始终跟随当前玩家居中**（没有鼠标缩放、没有拖拽平移）。所以你的判断——"与实际行为/需求不符"——完全正确。但这里有个陷阱：**直接删掉 `zoomBy/pan/startDrag/...` 会报错，因为 `tests/renderer.test.ts` 引用了它们**。那到底能不能删？要看这些方法到底被谁用、测试是不是在为"假需求"服务。逐条证据如下（都来自我实际 grep/读码）：
+
+**生产代码真正用到的 Camera 能力（不能删）**：
+- `getState()`：`ClientRenderLoop.ts:86`、`BoardRenderer.ts:118/186/205/224`
+- `panTo()`：`ClientRenderLoop.ts:90`、`BoardRenderer.ts:225`（用于居中跟随）
+- `worldToScreen()`：`BoardRenderer.ts:191`（hitTest 里把格子世界坐标转屏幕坐标做命中检测）
+- `updateViewportSize()`：`BoardRenderer.ts:256`（resize 时更新视口）
+- `CameraState` 的 `zoom/offsetX/offsetY/viewportWidth/viewportHeight`：子渲染器 `PlayerRenderer`/`CellRenderer`/`ConnectionRenderer` 都读它画放缩后的对象
+
+**生产代码从未调用、纯属僵尸 API（这是本方向目标）**：
+- `setZoom`、`zoomBy`、`pan`、`startDrag`、`updateDrag`、`endDrag`、`isDraggingActive`、`reset`
+- `Camera.screenToWorld`（唯一调用点是 `BoardRenderer.ts:185` 那行 `void this.camera.screenToWorld(...)`，返回值被 `void` 丢弃，本身也是死代码）
+- `BoardRenderer.screenToWorld`（L234，自身也没人调）
+- 配套死状态：`bounds/minZoom/maxZoom/zoomFactor`、`isDragging/lastMouseX/lastMouseY` 这几个字段
+
+**测试声称的能力（关键陷阱：测试 ≠ 需求）**：`tests/renderer.test.ts` 的 TR-5.2 三个用例
+```ts
+camera.zoomBy(1, 400, 300);  // L197
+camera.pan(50, 30);          // L209
+camera.startDrag(100,100); camera.updateDrag(120,110); camera.endDrag(); // L217-219
+```
+以及 TR-5.3 里 `camera.pan(50,50)`（L272）。这些测试在"验收缩放/拖拽功能"——但**生产代码从来不给玩家缩放/拖拽的入口**。所以这些测试验证的是一个**不存在于实际游戏里的能力**，属于"为纸面任务验收而写、与需求脱节"的测试（TR-5.2 的注释甚至写着"帧率 >= 30fps"做性能验收，同样与玩家可感知的交互无关）。
+
+**结论**：Camera 真正需要的只有"**跟随居中 + 视口 + 命中换算**"（`getState/panTo/worldToScreen/updateViewportSize`）；"**鼠标缩放 + 拖拽平移**"是一整套僵尸能力。`screenToWorld` 层也是死的。
+
+### 9.2 为什么要这样处置而不是"保留以防以后用"
+
+保留僵尸 API 的代价：误导后来者（以为游戏支持缩放，去找入口找不到）、让 `CameraState` 携带无用字段、让测试维护一个不存在的需求。**没有调用方的 public 方法就是负债，不是保险**。真要加缩放功能时，Git 历史里能找回；现在留着只会让代码更难懂。这就是"架构清理不彻底"的铁证——正因为能看出这是遗留，才该清。
+
+### 9.3 安全修复步骤（照做）
+
+**步骤 0：建基线**
+```bash
+git status        # 确认改动范围
+git stash         # 如有未提交改动，先暂存
+git rev-parse HEAD > /tmp/baseline.txt
+```
+
+**步骤 1：只删 100% 无调用的行（最低风险）**
+- 删 `Camera.ts` 里：`bounds/minZoom/maxZoom/zoomFactor` 及相关 `setZoom/zoomBy/pan/startDrag/updateDrag/endDrag/isDraggingActive/reset`、`isDragging/lastMouseX/lastMouseY` 字段、`Camera.screenToWorld`（若删，同步删 BoardRenderer:185 的 void 调用）。保留 `getState/panTo/worldToScreen/updateViewportSize` 与 `CameraState`。
+- 删 `BoardRenderer.ts` L234-237 的 `screenToWorld`。
+
+**步骤 2：处理"引用僵尸方法的测试"——改需求而非硬删测试**
+- 找到 `tests/renderer.test.ts` TR-5.2 三个用例和 TR-5.3 的 `camera.pan(50,50)`（L272）。
+- **不要**改成"删掉还假装有缩放"；而是**让测试反映真实需求**：改为测试 `panTo` 的居中行为（真正的需求），或删除针对已删方法的用例。
+- 例（把"假缩放测试"改成"真居中测试"）：
+```ts
+it('相机跟随居中（真实需求）', () => {
+  const camera = new Camera(800, 600);
+  camera.updateViewportSize(800, 600);
+  camera.panTo(400 - 100 * 1, 300 - 100 * 1);   // centerOn 的效果
+  const state = camera.getState();
+  expect(state.offsetX).toBe(300);
+  expect(state.offsetY).toBe(200);
+});
+```
+- 若 `renderer.tsx` 里还有对 `DEFAULT_VISION_RADIUS`/`VisionMaskRenderer` 的 import，一并删（见方向 7）。
+
+**步骤 3：删除过期桶导出（不让错误藏起来）**
+- `src/renderer/index.ts` 里所有指向不存在文件的导出删掉；若整个桶没人 import，可整删（见方向 7 步骤 4）。
+
+**步骤 4：逐层验证（不跳步）**
+```bash
+# 1) 类型检查全 src（戳穿"入口链 pass"）
+cd packages/client && npx tsc -p tsconfig.json --noEmit
+# 2) 只跑被牵连的测试
+cd packages/client && CI=true npx jest --forceExit tests/renderer.test.ts
+# 3) 全量验证
+pnpm build:client && pnpm lint && pnpm test
+```
+
+**步骤 5：回归手动**：浏览器里确认——玩家移动时镜头仍然跟随居中（`panTo` 还在）、点击格子仍命中（`worldToScreen`+`hitTest` 还在）。若以前"错误地"手动拖拽过棋盘让镜头偏离，现在反而固定居中了——那正是需求的本来面目。
+
+### 9.4 把方法论推广到"其他代码里大量此类问题"
+
+Camera 只是一个标本。仓库里其他"宣称能力但生产不用"的地方，用同一条判定链处理：
+
+**判定链（记住这 4 问）**：
+1. **生产调用吗**？—— grep 该 public 方法的调用方，排除测试。0 个 → 疑似僵尸。
+2. **测试在测"真需求"还是"纸面验收"**？—— 看测试描述是否对应玩家真实可触发行为。Camera 的 zoom/pan 测试对应不到任何 UI 入口 → 是纸面验收。
+3. **注释是否撒谎**？—— 函数头说自己"支持 X"，但找不到谁触发 X → 注释过时或能力被删。
+4. **删了会不会连锁炸**？—— 抓所有引用点（生产 import、测试 import、桶 re-export、void 丢弃调用）。先列全清单再动。
+
+**通用处置矩阵**：
+
+| 情形 | 处置 |
+|---|---|
+| 生产没人用 + 测试也不该有 | 删方法与它的测试，清桶导出 |
+| 生产没人用 + 测试在"验收纸面能力" | 删方法，**改写测试为真实需求**或删该用例（见 9.3 步骤2）|
+| 生产被调用点很少 | 逐点确认后，把测试改成用真实调用路径 |
+| 注释宣称但无实现 | 改注释（见方向 7 形态 C）|
+
+**关键认知**：**"被测试引用"不构成"不删"的理由，只构成"先确认需求"的提醒。** 真正决定删不删的，是"玩家/系统在当前版本是否真的会走到这条路径"。Camera 的缩放/拖拽没有入口，就是死；`panTo` 有 `ClientRenderLoop` 的跟随逻辑在用，就是活。
+
+---
+
+## 方向 10：把"测试"当成证据来核实架构问题（进阶）
+
+体会 9.1 之后，你会发现：**测试文件既是质量的守门员，也可能是"虚构需求"的注脚。** 当一段测试在验证生产代码里根本没有的交互时，它有几种误导：
+- 让维护者以为某功能是正式能力（实际是遗留）；
+- 让`tsc`/`jest`"看起来绿"，掩盖真实的死引用（`renderer.test.ts` 引用了已删的 `VisionMaskRenderer`，导致套件一跑就红，但也只有它暴露了这个死引用——测试反而成了发现死代码的探测器）。
+
+**利用测试反向定位死代码的实操**：
+```bash
+# 找出哪块测试"红"并指向不存在的模块/方法 → 往往就是"生产删了、测试没跟上"的死引用
+cd packages/client && npx jest --listTests 2>&1 | head
+```
+凡测试 import 的符号在生产 `src/` 里搜不到，即两条路：要么该功能确实被移除（删测试），要么该功能是"规划但未实现"（则它是需求缺口，需决定是否补生产实现）。**千万别为了"让测试过"去 hardcode 一个假对象回填**——那就真是为了绿而造假了。
+
+### 本次证据摘要（可复现）
+- 生产唯一用到的缩放/平移手段是 `panTo` 做"跟随居中"，见 `ClientRenderLoop.ts:41,85-92`。
+- Camera 的缩放/拖拽方法全部无生产调用；`screenToWorld` 唯一调用是 `BoardRenderer.ts:185` 的 `void` 丢弃。
+- 测试在验收这些"纸面能力"：`tests/renderer.test.ts` L197,209,217-219,272。
+- `VisionMaskRenderer` 已删但被 `renderer/index.ts:13` 与 `tests/renderer.test.ts:14` 引用 → 套件必炸。
+
+---
+
+## 方向 11：如何定位"真正负责渲染工作的代码"（用行为实验，而非 import 关系）
+
+> **重要纠正**：本手册早期版本教大家"从入口渲染循环 `startRenderLoop → BoardRenderer.render() → 三个子渲染器` 定位真渲染代码"，这个结论**是错的**。下文的正确方法是基于实际行为验证得出的。核心教训：**"被 import / 被调用"绝不等于"活着"——要看它是否真的承担了产出，必要时用实验证实。**
+
+### 11.1 一个足以推翻"import 即活"假设的真实例证
+
+`src/renderer/PlayerRenderer.ts`（Canvas 画棋子）被 `BoardRenderer` import，`BoardRenderer` 又被 `ClientRenderLoop`/`GamePage` 引用，`GamePage` 确实调用了 `startRenderLoop()`。按"import 即活"的逻辑，它是活的。
+
+但用**行为实验**验证后，结论翻转：
+- 在 `PlayerRenderer.render` 开头加 `console.warn("PlayerRenderer active")` → **没有任何输出** → 该方法实际从未执行；
+- 进一步在该方法里制造语法错误 → **游戏照常运行、不报错** → 说明这座 Canvas 渲染链**根本没被真正驱动**（或它的产物被完全遮蔽）。
+
+**为什么会出现"被引用却不执行"？** 需要精确归因，不能笼统说死。读真实代码，Canvas 渲染链其实**有一条可执行的调用路径**：
+- `GamePage.ts:199` 在 `Promise.all([loadMapData()]).then(...)` 成功后才调用 `startRenderLoop(gameStore!)`（:173-204）。**若地图数据异步加载失败/该分支未走到，`startRenderLoop` 根本不会被触发**，则整个 Canvas 链（`BoardRenderer.render → PlayerRenderer.render`）一次也不执行。
+- 即便触发了，`ClientRenderLoop.startRenderLoop`（L92）确实每帧调用 `renderer.render()`，但产物画在 `GamePage.ts:112` 创建的 `<canvas>` 上，而 `InteractiveMapSurface`（SVG）在 :114 **紧随其后 append、盖在 canvas 之上**（职责已被 SVG 承担，canvas 结果不可见）。
+
+所以"未输出/不阻断"的根因可能是**"该分支未触发"**或**"执行了但被 SVG 遮蔽"**之一。两者殊途同归：**Canvas 的 `PlayerRenderer` 不是当前玩家棋子的真实产出者**。真正的产出者是 `InteractiveMapSurface`（SVG）。**最终要落到实际行为验证**（探针/空实现/清空上层元素），别只信某一条调用路径的静态存在。
+
+### 11.2 真正的渲染代码（本项目的正确答案）
+
+读 `src/pages/GamePage.ts` 与 `src/components/InteractiveMapSurface.ts`：
+
+- `GamePage.ts:113` `const interactiveMap = new InteractiveMapSurface();`
+- `:114` 把它 append 进 `boardContainer`（紧接着 `canvas` 之后 → **SVG 盖在 canvas 上面**）
+- `:115-120` 订阅 `GameStore`，每次变更调 `interactiveMap.updatePlayers(players)` + `interactiveMap.followPlayer(pos)`
+- `:189-190` 地图加载后 `interactiveMap.render(mapData, players)` + `followPlayer(...)`
+
+`InteractiveMapSurface.ts`：
+- `:27-29` `__players` 分组里用 `<circle>`（头）+ `<path>`（身体）**真实画出玩家棋子**；
+- `:31` `updatePlayers()`、`:33-36` `followPlayer()`（镜头跟随玩家居中）——这俩就是"渲染玩家 + 跟随"的真正实现。
+
+而 canvas 那套（`BoardRenderer.render/SRC → PlayerRenderer.render`、`CellRenderer`、`ConnectionRenderer`）虽然被 import、被 `startRenderLoop` 调用，但：
+- 它的 canvas 被 SVG **盖住**，产物不可见；
+- 占位/加载提示等简单静态内容或许有用，但"渲染玩家棋子/棋盘交互"的实际职责**已由 SVG 承担**。
+
+**结论（纠正版）**：要找"真正渲染玩家棋子的代码"，答案是 **`InteractiveMapSurface`（SVG）**，而**不是** `renderer/` 下的 Canvas 渲染器。`renderer/` 的 Canvas 栈是"有 import、有调用链、但被遮蔽/被取代"的**半死或死代码**——任务不同视是否一并清理其依赖（详见方向 12）。
+
+### 11.3 用行为实验判断"活/死"（比 import 可靠得多）
+
+"死代码"的定义应该升级为：**"文档/调用链看起来存在，但对最终产出的 0 贡献。"** 判断方法依次是：
+
+1. **看产物是否由它产出**：加 `console.warn` 探针在疑似方法首行，运行游戏看控制台（务必看清/清空以排除日志干扰）。没输出 → 该方法没执行。
+2. **制造并隔离一个语法错误**（实验用，做前 `git stash` 或备份）：若整个程序仍正常运行 → 该文件根本没进执行路径。注意：TS 编译错误会 `tsc` 挡下；用户观察到的"语法错误不阻断"需要是**运行时/类型之外**的错误，务必结合构建脚本判断。
+3. **看是否有替代实现盖住它**：`GamePage` 里 canvas 后面 append 的 `InteractiveMapSurface` 就是"替代实现盖住旧实现"的典型——两层都在，但只有顶层 SVG 可见。
+4. **做减法验证（副作用探针）**：直接给某 canvas 渲染方法设空实现，若画面无任何变化 → 它的产物已被取代或无意义。
+
+> 一句话：**"有生产调用"是"可能在用"，但不保证"真的是最终产物的来源"。** 判断"活"，证据要看 `render()`/`updatePlayers`/`followPlayer` 这些**真正写进 DOM 或 canvas** 的调用是否真的执行、且产物是否可见。
+
+### 11.4 定位"真渲染代码"的最终流程（纠正版）
+
+| 步骤 | 做什么 | 本项目实例 |
+|---|---|---|
+| 1. 找"写进页面/DOM/canvas 的动作" | 从 UI 入口出发，找每个 `append`/`createElement`/`setAttribute(d)`/`fillRect` 的源头 | 玩家棋子 → `InteractiveMapSurface.ts:28` 的 `<circle>`/`<path>` |
+| 2. 找"谁在数据变化时调用它" | 找订阅/回调：`store.subscribe(...)` / `update()` / socket handler | `GamePage.ts:115-120` 订阅 Store → `interactiveMap.updatePlayers` |
+| 3. 用探针/实验证实执行 | `console.warn` + 隔离语法错误，确认它真执行、真可见 | 实测 Canvas 的 `PlayerRenderer.render` 不输出 → 死 |
+| 4. 再确认"旧链是否被取代" | 找同职责的 "second implementation"，看谁在上面 | `InteractiveMapSurface` 盖在 `canvas` 之上 |
+| 5. 产物 grep 佐证 | build 后看符号是否进 dist 且被引用，但不作为唯一依据 | — |
+
+---
+
+## 方向 12：识别"有 import、有调用链，但已被取代"的死代码（本仓库高发）
+
+这是最常见的"伪活代码"：没人删它，是因为它**看起来**有人 import、有人调用。但它负责的职责已经被另一套实现顶替。识别与处置要点：
+
+1. **装备"职责归并"思维**：同一个 UI 元素只该有一份"负责产出的实现"。当发现"Canvas 版棋盘 + SVG 版棋盘"同时存在，且只有一层可见，就问：**谁真的在产出用户看到的东西？** 答：可见的那层。
+2. **用行为实验裁决，不服 import**（见 11.3）。
+3. **处置**：若旧链确实不再产出（探针无输出、空实现无副作用），就可以连删除依赖一起清理（删 `PlayerRenderer` 等前，先确认连累的 import 点）。若旧链仍负责一部分（如棋盘底图），则只删被取代的子项。
+4. **别被"它还 init/还有测试im来"拖住**：`GamePage` 仍然 `new BoardRenderer(canvas,...)`、仍有 `renderer.test.ts`，这只能证明"还在构造/还被测"，不能证明"还在产出玩家棋子"。**测试尤其能骗人**（见方向 10）。
+
+> 修正本手册早前一处表述：**"真正的渲染代码 = 入口循环 → BoardRenderer.render() → 三个子渲染器.render()" 这句话仅描述了一个存在调用链的候选路径，不代表它真的是最终产物来源。** 本项目真实产出玩家棋子的链条是 `GameStore.subscribe → InteractiveMapSurface.updatePlayers/render (SVG)`。
