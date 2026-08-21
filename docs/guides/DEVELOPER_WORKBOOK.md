@@ -210,21 +210,25 @@ pnpm build && pnpm test
 ## 方向 3：优化 UI
 
 ### 3.1 认识 UI 分层（先知道改哪里）
-- **棋盘点阵（Canvas）**：`packages/client/src/renderer/`
-  - `BoardRenderer`（主渲染器，`render()` 依次画连线→格子→玩家）
-  - `CellRenderer` / `ConnectionRenderer` / `PlayerRenderer`（子渲染器，由 BoardRenderer `createRenderer` 实例化）
-  - `DayNightRenderer`（昼夜遮罩）等
+
+> **2026-08 更新**：旧 Canvas 渲染层（`src/renderer/` 的 `BoardRenderer/Camera/CellRenderer/ConnectionRenderer/PlayerRenderer/DayNightRenderer` 等）已被远程删除（提交 `d6adcc8`/`c87303b`）。现在**客户端唯一的棋盘渲染器是 `InteractiveMapSurface`（SVG）**。以下分层是当前真实结构。
+
+- **棋盘（SVG，唯一渲染器）**：`packages/client/src/components/InteractiveMapSurface.ts`
+  - `GamePage.ts` 在 `boardContainer` 里创建 `new InteractiveMapSurface()`，把它的 `.getElement()` append 进页面（在 canvas 元素之后）。
+  - 它订阅 `GameStore`（`updatePlayers()` / `followPlayer()`）把玩家棋子和"镜头跟随当前玩家"画成 SVG（`<rect>` 格子、`<line>` 连线、`<circle>`+`<path>` 棋子）。
+  - **改棋盘视觉（格子形状、连线、棋子样式）就改这个文件**；参考它的 `render/mapData/players/bounds/followPlayer` 结构。
+  - ⚠️ `GamePage.ts` 里仍 `document.createElement('canvas')` 并 append 了一个 `<canvas>`（约 L100-105），但清理后它**不再绑定任何渲染逻辑/事件** —— 这是一个残留的**空壳元素**。若确认无用途，可在后续清理中删掉（见方向 12 处置准则）。
 - **HUD / 面板（DOM）**：`GameHudShell.ts` —— 顶部状态栏、行动条、聊天、队伍、路径选择、格子 action 按钮都在这里，是 HTML 模板 + CSS。
 - **页面外壳**：`packages/client/src/pages/`（Start/Login/Loading/Game/Bankruptcy），路由在 `main.ts` 的 `switch(state)`。
-- **全局样式**：`src/style.css`。
-- **颜色体系（主题）**：`packages/shared/design-tokens/themes/*.json`（4 套主题），客户端 `src/design/ThemeConfig.ts` 用 `getThemeTokens()` 按 `ThemeId` 取，渲染器持有 `ThemeSnapshot` 上色。改配色优先改主题 JSON，而不是到处写死色值。
+- **全局样式**：`src/style.css`（棋盘 SVG 的 `.interactive-map-surface__*` 类也在这里定义）。
+- **颜色体系（主题）**：`packages/shared/design-tokens/themes/*.json`（4 套主题），客户端 `src/design/ThemeConfig.ts` 用 `getThemeTokens()` 按 `ThemeId` 取，UI 消费 CSS 变量（`GamePage` 通过 `DesignAdapter` 把 token 注入 `--gp-*`/`--tycoon-*` 变量）。改配色优先改主题 JSON，而不是到处写死色值。
 - **文本**：任何用户可见文案走 `t('key')`，key 定义在 `packages/shared/src/i18n/zh-CN.json` / `en-US.json`；`t()` 支持点分键 + `{{param}}` 占位符。
 
 ### 3.2 想"改视觉"的具体路径
 - **换主题/配色**：改 `design-tokens/themes/`；客户端 `GamePage` 初始化主题快照一次，渲染用 token。
 - **调 HUD 布局/间距/按钮**：改 `GameHudShell.ts` 的模板与对应 CSS；它通过订阅切片刷新（`subscribe('player'/'movement'/'team'/'dayNight'/'chat'/'pathChoice'/'cellActions', () => this.update())`）。
-- **棋盘对象呈现**：改对应 `*Renderer`；参考 `BoardRenderer.render()` 流程，别在两个渲染器里各画一遍。
-- **新弹窗/面板**：参考现有单个组件结构（DOM + 样式），**挂进 GameHudShell**，别新建"孤儿组件"塞进 `components/index.ts`（那里现在有一批死代码）。
+- **棋盘对象呈现（格子/连线/棋子/镜头）**：改 `InteractiveMapSurface.ts`。它已是唯一渲染器——不要新起第二个 Canvas/SVG 渲染器画同一批东西（避免再制造"双实现盖住"的技术债）。
+- **新弹窗/面板**：参考现有单个组件结构（DOM + 样式），**挂进 GameHudShell**，别新建"孤儿组件"塞进 `components/index.ts`。
 
 ### 3.3 注意（陷阱）
 - 主题变化是"一次初始化"，如需运行时切换（如昼夜换肤），要给渲染器提供可更新的 token 引用，别只读一次。
@@ -391,11 +395,11 @@ pnpm build:shared && pnpm build:server && pnpm build:client && pnpm test
 | 0 排查架构 | 用 grep/tsc/test 遍布全仓 | 核对 `socket-events` | — |
 | 1 聊天指令组队 | `client/.../ChatSystem.ts`、`GamePage.ts` | 复用 `client.inviteToTeam` | 不需要改 |
 | 2 账号持久化 | `server/.../SocketManager.ts`、`app.ts`；`client/.../main.ts` | 复用 | 是（token/状态在服务端）|
-| 3 优化 UI | `client/renderer/*`、`GameHudShell.ts`、`style.css`、`design-tokens/themes/*` | 无 | 否（只读展示）|
+| 3 优化 UI | `client/.../InteractiveMapSurface.ts`、`GameHudShell.ts`、`style.css`、`design-tokens/themes/*` | 无 | 否（只读展示）|
 | 4 事件格效果 | `server/config/behaviors/*.json` 或 `server/events/EventEffects.ts` | 复用 `server.notification`/`valueChanged` | 是 |
 | 5 注释 + 文档 | 各方 + `docs/architecture/*`、`guides/*` | — | — |
 | 6 三系统 | 新增 `shared/types/items.ts` + 协议；`server/items/ItemManager`；`client` Store/ViewModel/HUD | **新增事件** | 是 |
-| 7 清理 renderer 旧代码 | `client/renderer/index.ts`、`components/index.ts`、`BoardRenderer.ts`、`Camera.ts` | — | 否（纯客户端清理）|
+| 7 清理 renderer 旧代码 | **已完成（远程 `d6adcc8`/`c87303b` 删除整个 `client/renderer/*` 与部分 `utils/*`）**；剩余可清理：`GamePage.ts` 的空壳 `<canvas>`、`components/index.ts` 死 re-export | — | 否 |
 | 8 编写有价值的测试 | `client/tests/**`、`server/tests/**`、`shared/tests/**` | 校验两端协议成对 | — |
 
 **通用收尾（每次改完都做）**：
@@ -408,15 +412,21 @@ pnpm test
 
 ---
 
-## 方向 7：清理 `client/renderer/` 里的旧代码与 fallback（附真实诊断）
+## 方向 7：清理 `client/renderer/` 里的旧代码与 fallback（已完成，本文作案例教学）
 
-> 本节以 `packages/client/src/renderer/` 的真实现状为例，教你"识别 → 求证 → 安全修复"，不是空谈。你改到这里时，随时回来对照。
+> **2026-08 更新（重要）**：下面的诊断对象 `src/renderer/` 整目录已被远程删除（提交 `d6adcc8`"清理旧渲染层"、`c87303b`"清理渲染层"）。本节保留下文，是因为**"识别四种形态 + 求证法"这套方法完全可复用到任何目录**（如 `components/index.ts`、残余空壳元素）。读历史时请注意：文中引用的 `renderer/*.ts` 行号是当时的快照，**现在这些文件已不存在**——把它们当作"当时如何在现场判断"的教材，而不是"现在要去改的位置"。
 
-### 7.1 先认清 renderer 目录的真实结构
+### 7.0 这次清理留下的可继续项（当前真实状态）
 
-`src/renderer/` 下实际存在 7 个文件：`BoardRenderer/Camera/CellRenderer/ConnectionRenderer/DayNightRenderer/PlayerRenderer/index`。**生产代码真正用到的只有** `BoardRenderer`（`GamePage.ts` 直接 `import { BoardRenderer } from '../renderer/BoardRenderer.js'`；`ClientRenderLoop.ts` 用它的 `hitTest/getCanvas/getCamera/centerOn/render/resize`）。
+- `GamePage.ts` 仍 `document.createElement('canvas')` 并 append 了一个 **空壳 `<canvas>`**（约 L100-105，清理后不再绑定任何渲染/事件）。确认无用后可删。
+- `components/index.ts` 若仍 re-export 已删组件，同样是过期的死桶（判断法见下文 7.2 形态 A）。
+- 删除 `renderer/*` + `utils/colorScheme|geometry` 时，是否还有遗留的 **style.css 死样式**（针对已删 canvas 渲染器的类）值得复查。
 
-### 7.2 真实存在的旧代码/fallback（我已验证）
+### 7.1 当时 renderer 目录的真实结构（历史快照）
+
+`src/renderer/` 下有 7 个文件：`BoardRenderer/Camera/CellRenderer/ConnectionRenderer/DayNightRenderer/PlayerRenderer/index`。**生产代码真正用到的只有** `BoardRenderer`（`GamePage.ts` 直接 `import { BoardRenderer } from '../renderer/BoardRenderer.js'`；`ClientRenderLoop.ts` 用它的 `hitTest/getCanvas/getCamera/centerOn/render/resize`）——而即便是它，职责也已被 `InteractiveMapSurface`（SVG）取代（见方向 11）。
+
+### 7.2 当时发现的旧代码/fallback（四种形态，方法论通用）
 
 在 renderer 里，旧代码有**四种**形态，各有不同的处理策略：
 
@@ -525,16 +535,18 @@ describe('parseChatCommand', () => {
 
 **好的测试特征**：纯函数、不碰 DOM/network/socket、输入输出确定、覆盖空/边界/正常。跑 `npx jest tests/chat-command.test.ts` 秒级通过。
 
-### 8.3 给"渲染器/Canvas"这类难测代码写测试
+### 8.3 给"渲染器"这类难测代码写测试
 
-Canvas 渲染依赖 `HTMLCanvasElement`（node 环境没有）。三个策略按优先级：
-1. **把纯逻辑抽出来测**（推荐）：相机坐标转换（`worldToScreen/screenToWorld`）、缩放夹紧、命中圆的 `isPointInCircle` 都是纯函数，直接测。能测出渲染正确性的底层。
-2. **用现成的测试替身**：`tests/renderer.test.ts` 里已有创建假 `ctx` 的方式（`new VisionMaskRenderer(ctx)` 用了 stub），复用该模式来做 canvas 测试；先确认它没有引用已删类（当前它正因 `VisionMaskRenderer` 崩溃，见方向 7）。
-3. **形状断言而非像素断言**：断言"调用了 `fillRect`/`arc`/`fillText` 且参数范围合理"，而不是比像素，避免脆。
+渲染器通常依赖 DOM/canvas（node 环境没有）。三个策略按优先级：
+1. **把纯逻辑抽出来测**（推荐）：SVG/SVG 坐标换算、镜头跟随、命中判断都是纯函数（如 `InteractiveMapSurface` 的 `applyViewBox` 视口夹紧逻辑、`getBounds` 计算），可直接测。能测出渲染正确性的底层，而不碰 DOM。
+2. **用 DOM 环境替身**：若一定要测渲染产物，用 `jsdom` 或创建真实 `SVGSVGElement` 的测试建一个轻量环境来断言结构（格子数、棋子节点数），而非断言具体像素。
+3. **结构断言而非像素断言**：断言"渲染后有 N 个 `map-player` 节点、viewBox 落在预期范围"，而不是比像素，避免脆。
+
+> **⤷ 本仓的"渲染测试"在远程清理渲染层后已经指向空的**：`tests/renderer.test.ts:14` `import { BoardRenderer, Camera, VisionMaskRenderer, ... } from '../src/renderer'`、`tests/board-renderer.test.ts:1` `import { BoardRenderer } from '../src/renderer/BoardRenderer'`——生产代码 `src/renderer/*` 已被删，这两个测试文件现在 import 不存在模块，**会 `Failed to run`**。这是"删生产代码却没删测试"的残留（见 8.4）。正确的收尾：删除/改写这些指向已删模块的测试（若确有值得保留的棋盘行为断言，改为对 `InteractiveMapSurface` 测）。
 
 ### 8.4 防止"测试把过期引用当功能"
 
-当生产代码删了某类，测试若仍 import 它，会整个套件红（见方向 7 的 `renderer.test.ts`）。**改生产代码时，同步清理引用它的测试**；反过来，如果测试引用了一个**已经不存在**的模块，这往往说明"生产代码删了但测试没跟上"，是**技术债信号**，而不是"功能缺失"。
+当生产代码删了某类，测试若仍 import 它，会整个套件红。**改生产代码时，同步清理引用它的测试**（远程那两次清理就没做这步，留下一批指空测试）。反过来，如果测试引用了一个**已经不存在**的模块，这往往说明"生产代码删了但测试没跟上"，是**技术债信号**，而不是"功能缺失"——应立即删除或改写该测试。
 
 ### 8.5 每轮小步验证（TDD 心智）
 
@@ -545,9 +557,11 @@ Canvas 渲染依赖 `HTMLCanvasElement`（node 环境没有）。三个策略按
 
 ---
 
-## 方向 9：实战——修复 `renderer/Camera.ts` 的"宣称缩放/平移但实际不用"（附完整证据链）
+## 方向 9：实战——修复 `renderer/Camera.ts` 的"宣称缩放/平移但实际不用"（已解决，案例教学）
 
-> 这是本仓库最典型的一类问题：**一个 API 被测试引用，但它对应的能力在生产代码中从未被使用**。直接删会"报错"（测试引用它），不删则是僵尸 API。本节用 `Camera.ts` 的真实源码给你一套"先判定真伪、再安全动刀"的完整流程。**动手前先照做，别直接删。**
+> **2026-08 更新**：`Camera.ts` 已随 `renderer/` 一起被远程删除，本节问题（缩放/拖拽是僵尸 API）**已在清理中一并解决**。保留下文作方法论案例——尤其"**被测试引用 ≠ 真需求**"与"**判定生产是否真走到这条路径**"的思维，适用于任何"看着有人用其实被取代"的 API（例如剩余的空壳 `<canvas>`）。文中的 `Camera.ts` 行号是历史快照。
+
+> 这是本仓库最典型的一类问题：**一个 API 被测试引用，但它对应的能力在生产代码中从未被使用**。直接删会"报错"（测试引用它），不删则是僵尸 API。本节用 `Camera.ts` 当时的真实源码给你一套"先判定真伪、再安全动刀"的完整流程（这套流程在任何地方清理"疑似被取代"的 API 都适用）。
 
 ### 9.1 先理解"为什么符合直觉却不该删"
 
@@ -681,6 +695,8 @@ cd packages/client && npx jest --listTests 2>&1 | head
 
 > **重要纠正**：本手册早期版本教大家"从入口渲染循环 `startRenderLoop → BoardRenderer.render() → 三个子渲染器` 定位真渲染代码"，这个结论**是错的**。下文的正确方法是基于实际行为验证得出的。核心教训：**"被 import / 被调用"绝不等于"活着"——要看它是否真的承担了产出，必要时用实验证实。**
 
+> **2026-08 提示**：本节推理所涉及的中间层（`startRenderLoop`、`BoardRenderer`、`PlayerRenderer`）在远程清理 `d6adcc8`/`c87303b` 中已被删除。本节的价值在于**可复用的推论方法**（用行为实验判断活/死），读者阅读时把"当时它们存在"当作背景，最终结论（真正渲染代码是 `InteractiveMapSurface`·SVG）不变。
+
 ### 11.1 一个足以推翻"import 即活"假设的真实例证
 
 `src/renderer/PlayerRenderer.ts`（Canvas 画棋子）被 `BoardRenderer` import，`BoardRenderer` 又被 `ClientRenderLoop`/`GamePage` 引用，`GamePage` 确实调用了 `startRenderLoop()`。按"import 即活"的逻辑，它是活的。
@@ -708,11 +724,11 @@ cd packages/client && npx jest --listTests 2>&1 | head
 - `:27-29` `__players` 分组里用 `<circle>`（头）+ `<path>`（身体）**真实画出玩家棋子**；
 - `:31` `updatePlayers()`、`:33-36` `followPlayer()`（镜头跟随玩家居中）——这俩就是"渲染玩家 + 跟随"的真正实现。
 
-而 canvas 那套（`BoardRenderer.render/SRC → PlayerRenderer.render`、`CellRenderer`、`ConnectionRenderer`）虽然被 import、被 `startRenderLoop` 调用，但：
+而 canvas 那套（`BoardRenderer.render/SRC → PlayerRenderer.render`、`CellRenderer`、`ConnectionRenderer`）在本次清理前虽然被 import、被 `startRenderLoop` 调用，但：
 - 它的 canvas 被 SVG **盖住**，产物不可见；
 - 占位/加载提示等简单静态内容或许有用，但"渲染玩家棋子/棋盘交互"的实际职责**已由 SVG 承担**。
 
-**结论（纠正版）**：要找"真正渲染玩家棋子的代码"，答案是 **`InteractiveMapSurface`（SVG）**，而**不是** `renderer/` 下的 Canvas 渲染器。`renderer/` 的 Canvas 栈是"有 import、有调用链、但被遮蔽/被取代"的**半死或死代码**——任务不同视是否一并清理其依赖（详见方向 12）。
+**结论（经验证的正确答案）**：要找"真正渲染玩家棋子的代码"，答案是 **`InteractiveMapSurface`（SVG）**，**而**（清理前的）`renderer/` 下的 Canvas 渲染器**不是**。远程提交 `d6adcc8`/`c87303b` 已经把整个 `src/renderer/*` 删掉，**验证了本判断**：删掉 Canvas 栈后，客户端仍正常渲染（唯一渲染器就是 SVG）。这也印证了方向 12——"有 import、有调用链但被取代"的代码，删除后不影响运行。唯一遗留：`GamePage.ts` 的空壳 `<canvas>` 元素（见方向 3.1）与 `renderer`/`board-renderer` 两个指空测试（见方向 8.3），是下一轮回清清理对象。
 
 ### 11.3 用行为实验判断"活/死"（比 import 可靠得多）
 
@@ -737,13 +753,17 @@ cd packages/client && npx jest --listTests 2>&1 | head
 
 ---
 
-## 方向 12：识别"有 import、有调用链，但已被取代"的死代码（本仓库高发）
+## 方向 12：识别"有 import、有调用链，但已被取代"的死代码（本仓库已实战验证）
 
 这是最常见的"伪活代码"：没人删它，是因为它**看起来**有人 import、有人调用。但它负责的职责已经被另一套实现顶替。识别与处置要点：
 
 1. **装备"职责归并"思维**：同一个 UI 元素只该有一份"负责产出的实现"。当发现"Canvas 版棋盘 + SVG 版棋盘"同时存在，且只有一层可见，就问：**谁真的在产出用户看到的东西？** 答：可见的那层。
 2. **用行为实验裁决，不服 import**（见 11.3）。
 3. **处置**：若旧链确实不再产出（探针无输出、空实现无副作用），就可以连删除依赖一起清理（删 `PlayerRenderer` 等前，先确认连累的 import 点）。若旧链仍负责一部分（如棋盘底图），则只删被取代的子项。
-4. **别被"它还 init/还有测试im来"拖住**：`GamePage` 仍然 `new BoardRenderer(canvas,...)`、仍有 `renderer.test.ts`，这只能证明"还在构造/还被测"，不能证明"还在产出玩家棋子"。**测试尤其能骗人**（见方向 10）。
+4. **别被"它还 init / 还有测试在"拖住**：清理前的 `GamePage` 仍然 `new BoardRenderer(canvas,...)`、也有 `renderer.test.ts`，这只能证明"还在构造/还被测"，不能证明"还在产出玩家棋子"。**测试尤其能骗人**（见方向 10、方向 8.3）。
+
+> **2026-08 实战结果**：本仓库的 Canvas 渲染栈正是典型——被 `InteractiveMapSurface`（SVG）取代后，远程提交 `d6adcc8`/`c87303b` 将整个 `src/renderer/*`（`BoardRenderer/Camera/CellRenderer/ConnectionRenderer/PlayerRenderer/DayNightRenderer` 等，约 1455 行）与 `ClientRenderLoop.ts` 一并删除，**客户端运行不受影响**。这验证了"被取代即删"的判断。
+> 
+> **教训 / 继续项**：远程清理删了生产代码，但**没同步删引用它们的测试**（`tests/renderer.test.ts`、`tests/board-renderer.test.ts` 现在 import 已删的 `../src/renderer/*`，会 Failed to run），也没删 `GamePage.ts:100-105` 那个空壳 `<canvas>` 与可能的死 CSS。**"删生产代码必须同步清测试与死死 DOM"**——否则留下一批指空测试与空壳元素，仍是技术债。
 
 > 修正本手册早前一处表述：**"真正的渲染代码 = 入口循环 → BoardRenderer.render() → 三个子渲染器.render()" 这句话仅描述了一个存在调用链的候选路径，不代表它真的是最终产物来源。** 本项目真实产出玩家棋子的链条是 `GameStore.subscribe → InteractiveMapSurface.updatePlayers/render (SVG)`。

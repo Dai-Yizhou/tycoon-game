@@ -33,7 +33,7 @@
 |---|---|---|
 | `packages/shared` | 前后端**共享**的类型、事件契约、地图解析、i18n | 共享头文件 + 公共库 |
 | `packages/server` | 游戏真实逻辑（Node.js 服务） | 服务端主程序（在服务器上跑） |
-| `packages/client` | 浏览器界面（Vite + Canvas） | 客户端 UI 程序（在玩家浏览器跑） |
+| `packages/client` | 浏览器界面（Vite，棋盘用 SVG 渲染） | 客户端 UI 程序（在玩家浏览器跑） |
 
 共享包被 server 和 client 同时引用（别名 `@game/shared`）。**改"游戏规则"主要动 shared（类型/契约）和 server（逻辑）；改"界面"主要动 client。**
 
@@ -244,7 +244,7 @@ this.handleRentPayment(playerId, cellId, socket);
 4. 客户端读值：打一个 ViewModel 的 getter 或订阅切片。
 
 ### 5.4 改界面外观
-- 棋盘画布渲染：`packages/client/src/renderer/`（`BoardRenderer` / `CellRenderer` / `PlayerRenderer` …）。
+- 棋盘画布渲染：`packages/client/src/components/InteractiveMapSurface.ts`（SVG 渲染格子/连线/玩家棋子，是客户端唯一渲染器；旧 Canvas 渲染层 `src/renderer/*` 已在清理中移除）。
 - 顶部状态栏 / 行动条 / 聊天：`GameHudShell.ts`（HTML 模板 + CSS）。
 - 全局样式：`src/style.css`；主题色：`packages/shared/design-tokens/themes/*.json`。
 - 新页面（Start/Login/Loading/Game/Bankruptcy）：`src/pages/`，并在 [main.ts](file:///workspace/packages/client/src/main.ts) 的 `switch(state)` 注册。
@@ -318,5 +318,5 @@ this.handleRentPayment(playerId, cellId, socket);
 - 服务端玩法：`packages/server/src/handlers/`（start/property/jail/movement/dice…）
 - 客户端装配：`packages/client/src/main.ts`、`pages/GamePage.ts`、`state/GameStore.ts`、`game/GameViewModel.ts`
 - 客户端事件：`packages/client/src/game/systems/SocketEventHandler.ts`、`GameLogic.ts`
-- 客户端界面：`packages/client/src/components/GameHudShell.ts`、`renderer/`
+- 客户端界面：`packages/client/src/components/GameHudShell.ts`、`InteractiveMapSurface.ts`
 - 地图参数：`packages/server/map-meta.json`
