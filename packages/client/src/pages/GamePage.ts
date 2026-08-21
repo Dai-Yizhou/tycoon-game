@@ -18,7 +18,6 @@ declare global {
 import type { GameController } from '../game/GameController.js';
 import { MapIndex, t } from '@game/shared';
 import type { Player } from '@game/shared';
-import { createNotificationCenter, type NotificationCenter } from '../components/NotificationCenter.js';
 import { GameHudShell } from '../components/GameHudShell.js';
 import { InteractiveMapSurface } from '../components/InteractiveMapSurface.js';
 import { NoOpEffectHooks } from '../game/GameEffects.js';
@@ -49,7 +48,6 @@ import { registerSocketHandlers, unregisterSocketHandlers } from '../game/system
 import { DesignAdapter } from '../design/DesignAdapter.js';
 import { getThemeTokens } from '../design/ThemeConfig.js';
 
-let notificationCenter: NotificationCenter | null = null;
 let gameViewModel: GameViewModel | null = null;
 let gameStore: GameStore | null = null;
 let gameHudShell: GameHudShell | null = null;
@@ -204,12 +202,6 @@ export function createGamePage(controller: GameController): HTMLElement {
   const socket = controller.getSocket();
   gameSocket = socket;
   if (socket) {
-    notificationCenter = createNotificationCenter({
-      container: page,
-      socket,
-      playerId: context.player?.id || '',
-    });
-    page.appendChild(notificationCenter.getElement());
 
     registerSocketHandlers(socket, {
       controller,
@@ -218,7 +210,6 @@ export function createGamePage(controller: GameController): HTMLElement {
       onPathChoiceOptions: (options) => gameStore?.setPathChoice(options),
       onPathChoiceCleared: () => gameStore?.clearPathChoice(),
       onEvent: () => gameHudShell?.update(),
-      onNotification: (payload) => notificationCenter?.handleNotification({ ...payload, durationMs: payload.durationMs ?? 3000, createdAt: payload.createdAt ?? Date.now() }),
     });
   }
 
@@ -478,10 +469,6 @@ export function cleanupGamePage(page: HTMLElement): void {
   setChatStore(null);
   gameStore?.reset();
   gameStore = null;
-  if (notificationCenter) {
-    notificationCenter.destroy();
-    notificationCenter = null;
-  }
   if (gameSocket) {
     unregisterSocketHandlers(gameSocket);
     gameSocket = null;
