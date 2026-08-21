@@ -18,7 +18,6 @@ declare global {
 import type { GameController } from '../game/GameController.js';
 import { MapIndex, t } from '@game/shared';
 import type { Player } from '@game/shared';
-import { BoardRenderer } from '../renderer/BoardRenderer.js';
 import { createNotificationCenter, type NotificationCenter } from '../components/NotificationCenter.js';
 import { GameHudShell } from '../components/GameHudShell.js';
 import { InteractiveMapSurface } from '../components/InteractiveMapSurface.js';
@@ -56,7 +55,6 @@ let gameStore: GameStore | null = null;
 let gameHudShell: GameHudShell | null = null;
 let unregisterHudRefresh: (() => void) | null = null;
 let unsubscribeGameStore: (() => void) | null = null;
-let renderer: BoardRenderer | null = null;
 let mapIndex: MapIndex | null = null;
 let gameSocket: TypedClientSocket | null = null;
 const pageEventCleanups = new WeakMap<HTMLElement, () => void>();
@@ -115,8 +113,6 @@ export function createGamePage(controller: GameController): HTMLElement {
   });
   page.appendChild(boardContainer);
 
-  renderer = new BoardRenderer(canvas, { theme: designSnapshot });
-  renderer!.drawPlaceholder(t('common.loadingMap'));
 
   const backButton = document.createElement('button');
   backButton.className = 'back-button';
@@ -167,17 +163,16 @@ export function createGamePage(controller: GameController): HTMLElement {
 
   Promise.all([loadMapData()]).then(
     ([mapResult]) => {
-      if (!renderer || !mapResult) {
-        renderer?.drawPlaceholder(t('game.mapLoadFailed'));
+      if (!mapResult) {
+        console.error("mapResult not found");
         return;
-      }
+      }      
       const { mapData, regions } = mapResult;
       // 初始化区域繁荣度快照
       gameStore?.setRegions(regions, mapResult.valueFields);
       for (const r of regions) gameStore?.setProsperity(r.id, r.prosperity);
       mapIndex = new MapIndex(mapData);
       gameStore?.setCells(mapData);
-      renderer.loadMap(mapData);
       const snapshot = gameStore!.getSnapshot();
       if (snapshot.currentPlayer) {
         interactiveMap.render(mapData, toInteractivePlayers(snapshot));
@@ -497,9 +492,7 @@ export function cleanupGamePage(page: HTMLElement): void {
     unregisterSocketHandlers(gameSocket);
     gameSocket = null;
   }
-  renderer = null;
   mapIndex = null;
   page.remove();
 }
 
-export function getRenderer(): BoardRenderer | null { return renderer; }
