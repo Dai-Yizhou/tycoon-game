@@ -674,3 +674,72 @@ cd packages/client && npx jest --listTests 2>&1 | head
 - Camera 的缩放/拖拽方法全部无生产调用；`screenToWorld` 唯一调用是 `BoardRenderer.ts:185` 的 `void` 丢弃。
 - 测试在验收这些"纸面能力"：`tests/renderer.test.ts` L197,209,217-219,272。
 - `VisionMaskRenderer` 已删但被 `renderer/index.ts:13` 与 `tests/renderer.test.ts:14` 引用 → 套件必炸。
+
+---
+
+## 方向 11：如何定位"真正负责渲染工作的代码"（不靠目录结构猜，靠引用链）
+
+> 一个目录"一眼看去全是废代码"，往往是**真代码被一大堆死东西埋住了**——不是它真的没有活代码。`src/renderer/` 正是标本。本节给你一套从"某个 UI 功能"反推"到底哪几行在真正干活"的可靠方法。
+
+### 11.1 先破除一个误区：目录里文件多 ≠ 活代码多
+
+`src/renderer/` 下有 7 个 `.ts`。单看目录，你会以为"渲染系统很重、很多组件"。
+但用下面的引用链方法一查，真相是：**生产代码直接 import 的只有 `BoardRenderer` 一个**（`GamePage.ts:21`、`ClientRenderLoop.ts:5` 都 `from '.../renderer/BoardRenderer.js'`）。
+其余文件是死是活，取决于**是否被 `BoardRenderer`（这个活入口）内部引用**，而不是看它在不在 renderer 目录里。
+
+### 11.2 五步定位法（从功能反推到行）
+
+**第 1 步：找"每一帧在跑什么"——入口渲染循环**
+渲染一定有一个被 `requestAnimationFrame` 驱动的循环。搜它：
+```
+Grep: requestAnimationFrame
+# → src/game/ClientRenderLoop.ts:93  startRenderLoop() 是唯一主循环
+```
+拿到 `startRenderLoop()`（L72-96），它每帧调用了一个"核心函数"：
+```
+L91: updateRendererPlayers(store)  → renderer.updatePlayers(players)
+L92: renderer.render()              ← 真正画东西的核心
+L85-90: getCamera().panTo(...)     → 镜头跟随玩家
+```
+
+**第 2 步：顺着 `renderer.render()` 进去（核心调用链）**
+`BoardRenderer.render()`（`src/renderer/BoardRenderer.ts:112-140`）就是画布的"总指挥"。它内部依次调用了三个子渲染器：
+```ts
+this.connectionRenderer.render(cells, cameraState);   // 画连线
+this.cellRenderer.render(cell, cameraState, 1);       // 画每个格子（循环）
+this.playerRenderer.render(player, cell, cameraState, i); // 画每个玩家棋子
+```
+**这仨（`ConnectionRenderer`/`CellRenderer`/`PlayerRenderer`）就是真正画内容的类**，因为只有它们出现在 `render()` 的调用里。
+
+**第 3 步：哪些"renderer"文件没进这条链 → 不是真渲染**
+做一次"减法"：把 renderer 目录里每个文件，去 `render()` 调用链和入口声明里比对，没出现的就不是"渲染主体"：
+- `BoardRenderer` ✓ 被 import + 是主控
+- `Camera` ✓ 被 `BoardRenderer` 内部用（坐标换算）
+- `CellRenderer` / `ConnectionRenderer` / `PlayerRenderer` ✓ 被 `render()` 调
+- `DayNightRenderer.ts` ✗ 我搜遍 `src`，**没有任何生产 `import DayNightRenderer`**。它预想提供"昼夜 Canvas 遮罩"，但从未接入。真实昼夜效果在 `ClientRenderLoop.updateBoardTheme`（L109-115）用 **DOM + CSS `filter`** 实现，不是 Canvas 渲染器。
+- `index.ts` ✗ 死桶，无人 import（见方向 7）。
+
+**第 4 步：区分"类在不在用" vs "类里哪些方法在用"**
+- 判断类的死活：看是否被活链 import/调用。
+- 判断类里方法的死活：沿用方向 9 的"生产调用 grep"。例如 `BoardRenderer` 是活的，但它的 `screenToWorld`（L234）没人调，`hitTest:185` 的 `void screenToWorld` 是死调用；`Camera` 是活的，但 `zoomBy/pan/startDrag/...` 是僵尸方法。
+- 结论：**一个目录"看着全废"，可能是 5 个活类各自带了一堆死方法，加上 1 个整文件死类 + 1 个死桶**——整体观感像废，实际骨架活着。
+
+**第 5 步：验证——产物里到底有没有这些符号**
+```bash
+cd packages/client && pnpm build:client && grep -l "DayNightRenderer\|zoomBy\|computeOpacity\|Panorama\|VisionMaskRenderer" dist/assets/*.js || echo "不在产物里=死"
+# 而 "renderer.render" 、"updatePlayers" 对应的方法应该打得进关键路径
+```
+
+### 11.3 一句话口诀
+
+> **"真正的渲染代码 = 入口循环(startRenderLoop) → BoardRenderer.render() → 三个子渲染器.render()"**。
+> 不在这条链上的 renderer 文件（`DayNightRenderer`、`index.ts`），以及这条链上每个类的“没用到的 public 方法”，都是清理与确认的对象；别因为它们躺在 `renderer/` 里就当它是"渲染的一部分"。
+
+### 11.4 适用到"任何其他目录"
+
+这套"入口 → 核心函数 → 减法 → 产物验证"四步，不只对 renderer：
+- 想找"组队谁在干活" → 找入口（`server.teamInviteReceived` 处理器）→ 往下追到 `TeamManager` 方法。
+- 想找"UI 谁在渲染" → 找 `GameHudShell` 的 `update()`，看它订阅了哪些切片、读哪些 ViewModel getter。
+- 想找"经济谁在记账" → 找 `economy.changeValue(...)` 的所有调用点（事件格、起点、租税、道具都是经过它）。
+
+**关键：先找"入口/主循环/总指挥"，再从它往下追，而不是从目录结构向上猜。** 目录是组织方式，入口链是运行真相。
