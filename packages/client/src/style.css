@@ -353,8 +353,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .game-hud-shell{position:absolute;inset:0;z-index:20;pointer-events:none}
 .game-hud-shell .gp-layout{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .game-hud-shell .gp-layout>*{pointer-events:auto}
-.gp-topbar{position:absolute!important;inset:0 0 auto 0!important;height:76px!important;z-index:30!important}
-.gp-actionbar{position:absolute!important;inset:auto 0 0 0!important;height:112px!important;z-index:30!important}
+.gp-topbar{position:absolute!important;inset:0 0 auto 0!important;height:76px!important;z-index:30!important;background:linear-gradient(180deg,color-mix(in srgb,var(--gp-bar-bg) 78%,transparent) 0%,transparent 100%)!important;border-bottom:none!important}
+.gp-actionbar{position:absolute!important;inset:auto 0 0 0!important;height:112px!important;z-index:30!important;background:linear-gradient(0deg,color-mix(in srgb,var(--gp-bar-bg) 78%,transparent) 0%,transparent 100%)!important;border-top:none!important}
 .hud-chat-dock{z-index:32!important;bottom:128px!important}
 .cell-hover-card{z-index:40!important}
 @media(max-width:700px){.gp-topbar{height:64px!important}.gp-actionbar{height:94px!important}.hud-chat-dock{bottom:106px!important;left:10px!important;width:260px!important}.cell-hover-card{width:190px!important}}
