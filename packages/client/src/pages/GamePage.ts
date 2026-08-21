@@ -97,12 +97,6 @@ export function createGamePage(controller: GameController): HTMLElement {
   // Board
   const boardContainer = document.createElement('div');
   boardContainer.className = 'board-container';
-  const canvas = document.createElement('canvas');
-  canvas.id = 'game-canvas';
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  canvas.setAttribute('aria-label', t('game.boardAriaLabel'));
-  boardContainer.appendChild(canvas);
   const interactiveMap = new InteractiveMapSurface();
   boardContainer.appendChild(interactiveMap.getElement());
   unsubscribeGameStore = gameStore.subscribe((snapshot) => {
