@@ -97,7 +97,7 @@ export class DiceHandler {
   private handleRollDice(
     socket: TypedSocket,
     _payload: Record<string, never>,
-    ack?: (result: AckResult<{ dice: number; steps: number }>) => void,
+    ack?: (result: AckResult<{ dice: number; steps: number; cooldownMs: number; cooldownEndsAt: number }>) => void,
   ): void {
     try {
       // 1. 验证玩家身份
@@ -148,12 +148,14 @@ export class DiceHandler {
       const steps = dice; // 步数等于骰子值
 
       // 6. 更新冷却记录
-      this.cooldowns.set(playerId, Date.now());
+      const rolledAt = Date.now();
+      const cooldownEndsAt = rolledAt + cooldownMs;
+      this.cooldowns.set(playerId, rolledAt);
 
       // 7. 返回结果给客户端
-      const result: AckResult<{ dice: number; steps: number }> = {
+      const result: AckResult<{ dice: number; steps: number; cooldownMs: number; cooldownEndsAt: number }> = {
         ok: true,
-        data: { dice, steps },
+        data: { dice, steps, cooldownMs, cooldownEndsAt },
       };
       ack?.(result);
 
@@ -162,6 +164,8 @@ export class DiceHandler {
         playerId,
         dice,
         steps,
+        cooldownMs,
+        cooldownEndsAt,
       });
 
       logger.debug(`玩家 ${playerId} 掷骰: ${dice} 点，步数 ${steps}`);

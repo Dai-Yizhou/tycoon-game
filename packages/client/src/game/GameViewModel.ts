@@ -65,6 +65,7 @@ export interface DiceSlice {
 /** 冷却状态 */
 export interface CooldownSlice {
   rollCooldownEnd: number;
+  rollCooldownMs: number;
   rollCooldownTimer: ReturnType<typeof setInterval> | null;
 }
 
@@ -199,7 +200,6 @@ export interface BehaviorSlice {
 export const MOVE_STEP_DURATION = 280;
 export const CAMERA_FOLLOW_SPEED = 0.15;
 export const DICE_ANIM_DURATION = 700;
-export const ROLL_COOLDOWN = 3000;
 
 export const RARITY_COLORS: Record<string, string> = {
   common: '#9ca3af', uncommon: '#22c55e', rare: '#3b82f6',
@@ -324,7 +324,7 @@ export class GameViewModel {
   getDice(): DiceSlice { const snapshot = this.projectedSnapshot(); return { diceValue: snapshot.diceValue, diceAnimating: snapshot.diceAnimating, diceAnimStart: snapshot.diceAnimStart }; }
 
   // ===== Cooldown =====
-  getCooldown(): CooldownSlice { const snapshot = this.projectedSnapshot(); return { rollCooldownEnd: snapshot.rollCooldownEnd, rollCooldownTimer: null }; }
+  getCooldown(): CooldownSlice { const snapshot = this.projectedSnapshot(); return { rollCooldownEnd: snapshot.rollCooldownEnd, rollCooldownMs: snapshot.rollCooldownMs, rollCooldownTimer: null }; }
 
   // ===== Jail =====
   getJail(): JailSlice { const snapshot = this.projectedSnapshot(); return { isInJail: snapshot.isInJail, jailEndTime: snapshot.jailEndTime }; }

@@ -13,7 +13,6 @@ export interface GameRuntime {
   cooldownTimer: ReturnType<typeof setInterval> | null;
 }
 
-const ROLL_COOLDOWN = 3000;
 const cellType = (cell: Cell): string => String(cell.extra?.type ?? '');
 const cellName = (cell: Cell): string => String(cell.extra?.name ?? '');
 const cellCost = (cell: Cell, key: string): number => Number(cell.extra?.[key] ?? 0);
@@ -24,18 +23,17 @@ function setRuntimeSnapshot(runtime: GameRuntime, partial: Partial<ClientGameSna
 
 export function handleRollDice(runtime: GameRuntime): void {
   const snapshot = runtime.store.getSnapshot();
-  if (!snapshot.canRoll || snapshot.isMoving || snapshot.diceAnimating || snapshot.isBankrupt || snapshot.isWaitingForChoice || snapshot.isInJail) return;
-  if (Date.now() < snapshot.rollCooldownEnd) return;
+  if (!snapshot.canRoll || snapshot.isMoving || snapshot.diceAnimating || snapshot.isBankrupt || snapshot.isWaitingForChoice) return;
+  if (Date.now() < snapshot.rollCooldownEnd || (snapshot.isInJail && Date.now() < snapshot.jailEndTime)) return;
 
   setRuntimeSnapshot(runtime, { canRoll: false });
-  runtime.socket.emit('client.rollDice', {}, (result: { ok: boolean; data?: { dice: number }; error?: string }) => {
+  runtime.socket.emit('client.rollDice', {}, (result: { ok: boolean; data?: { dice: number; cooldownMs: number; cooldownEndsAt: number }; error?: string }) => {
     if (!result.ok || !result.data) {
       addChatMessage(t('dice.rollFailed', { error: result.error || t('dice.unknownError') }), 'error');
       setRuntimeSnapshot(runtime, { canRoll: true });
       return;
     }
-    const cooldownEnd = Date.now() + ROLL_COOLDOWN;
-    setRuntimeSnapshot(runtime, { diceValue: result.data.dice, diceAnimating: true, diceAnimStart: performance.now(), rollCooldownEnd: cooldownEnd });
+    setRuntimeSnapshot(runtime, { diceValue: result.data.dice, diceAnimating: true, diceAnimStart: performance.now(), rollCooldownEnd: result.data.cooldownEndsAt, rollCooldownMs: result.data.cooldownMs });
     addChatMessage(t('dice.rolled', { value: result.data.dice }), 'system');
     startRollCooldownTimer(runtime);
   });
@@ -59,7 +57,8 @@ export function startRollCooldownTimer(runtime: GameRuntime): void {
       return;
     }
     if (runtime.rollButton) {
-      const progress = 1 - remaining / ROLL_COOLDOWN;
+      const cooldownDuration = Math.max(snapshot.rollCooldownMs, 1);
+      const progress = Math.min(1, Math.max(0, 1 - remaining / cooldownDuration));
       runtime.rollButton.textContent = t('dice.cooldownBar');
       runtime.rollButton.classList.add('cooldown');
       runtime.rollButton.style.background = `linear-gradient(to right, var(--accent, #4f46e5) ${progress * 100}%, rgba(255,255,255,0.15) ${progress * 100}%)`;

@@ -227,8 +227,13 @@ export class GameHudShell {
   private updateDiceButton(): void {
     const player = this.vm.getPlayer();
     const movement = this.vm.getMovement();
+    const dice = this.vm.getDice();
+    const cooldown = this.vm.getCooldown();
+    const jail = this.vm.getJail();
     const rollBtn = this.root.querySelector('[data-action="roll"]') as HTMLButtonElement;
-    const canRoll = movement.canRoll && !movement.isMoving && !player.isBankrupt;
+    const cooldownActive = cooldown.rollCooldownEnd > Date.now();
+    const jailCooldownActive = jail.isInJail && jail.jailEndTime > Date.now();
+    const canRoll = movement.canRoll && !movement.isMoving && !dice.diceAnimating && !player.isBankrupt && !cooldownActive && !jailCooldownActive;
     rollBtn.disabled = !canRoll;
     const statusEl = this.root.querySelector("[data-ui=dice-status]")!;
     statusEl.textContent = movement.isMoving

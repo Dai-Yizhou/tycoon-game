@@ -423,7 +423,6 @@
   },
   "chat": {
     "noConnection": "Chat is unavailable while disconnected",
-    "sendFailed": "Message was not sent",
     "title": "Chat",
     "inputPlaceholder": "Type a message...",
     "send": "Send",

@@ -26,6 +26,33 @@ describe("GameHudShell", () => {
     shell.destroy();
   });
 
+  it('依据服务端冷却结束时间控制掷骰按钮', () => {
+    const store = new GameStore();
+    const vm = new GameViewModel(store);
+    const shell = new GameHudShell(vm, new NoOpEffectHooks());
+    const button = rootButton(shell);
+
+    store.updateCooldown({ rollCooldownEnd: Date.now() + 5000, rollCooldownMs: 5000 });
+    expect(button.disabled).toBe(true);
+
+    store.updateCooldown({ rollCooldownEnd: Date.now() - 1 });
+    expect(button.disabled).toBe(false);
+    shell.destroy();
+  });
+
+  it('监狱冷却未结束时即使普通冷却结束也保持禁用', () => {
+    const store = new GameStore();
+    const vm = new GameViewModel(store);
+    const shell = new GameHudShell(vm, new NoOpEffectHooks());
+    const button = rootButton(shell);
+
+    store.applyEvent({ sequence: 1, type: 'jail', isInJail: true, jailEndTime: Date.now() + 10000 });
+    store.updateCooldown({ rollCooldownEnd: Date.now() - 1, rollCooldownMs: 5000 });
+
+    expect(button.disabled).toBe(true);
+    shell.destroy();
+  });
+
   it('在路径选择状态渲染底部行动组并触发路径回调', () => {
     const store = new GameStore();
     const vm = new GameViewModel(store);
@@ -62,3 +89,7 @@ describe("GameHudShell", () => {
     expect(surface.getElement().querySelector('svg')?.getAttribute('viewBox')).not.toBe(initialViewBox);
   });
 });
+
+function rootButton(shell: GameHudShell): HTMLButtonElement {
+  return shell.getElement().querySelector('[data-action="roll"]') as HTMLButtonElement;
+}

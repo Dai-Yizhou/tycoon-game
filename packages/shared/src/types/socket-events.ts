@@ -92,7 +92,7 @@ export interface ClientToServerEvents {
   /** 掷骰子 */
   'client.rollDice': (
     payload: Record<string, never>,
-    ack?: (result: AckResult<{ dice: number; steps: number }>) => void,
+    ack?: (result: AckResult<{ dice: number; steps: number; cooldownMs: number; cooldownEndsAt: number }>) => void,
   ) => void;
 
   /**
@@ -389,7 +389,7 @@ export interface ServerToClientEvents {
   }) => void;
 
   /** 骰子结果广播（其他玩家可见） */
-  'server.diceRolled': (payload: { playerId: string; dice: number; steps: number }) => void;
+  'server.diceRolled': (payload: { playerId: string; dice: number; steps: number; cooldownMs: number; cooldownEndsAt: number }) => void;
 
   /** 全局初始数值字段定义（用于客户端 UI 渲染） */
   'server.valueFieldDefinitions': (payload: { definitions: ValueField[] }) => void;

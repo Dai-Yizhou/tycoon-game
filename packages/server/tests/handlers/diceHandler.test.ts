@@ -29,6 +29,11 @@ function createMockIO(): TypedServer {
 function createMockRegistry(): HandlerRegistry {
   return {
     handleMovement: jest.fn(),
+    getJailHandler: jest.fn(() => ({
+      canRoll: jest.fn(() => true),
+      getJailConfig: jest.fn(() => ({ cooldownMs: 10000 })),
+      handleJailDiceRoll: jest.fn(),
+    })),
   } as unknown as HandlerRegistry;
 }
 
@@ -87,6 +92,39 @@ describe('DiceHandler', () => {
       // 无冷却记录时应该返回 0
       const remaining = handler.getRemainingCooldown('player1');
       expect(remaining).toBe(0);
+    });
+  });
+
+  describe('roll cooldown authority', () => {
+    it('成功 ACK 应返回服务端计算的冷却结束时间', () => {
+      const player = createTestPlayer('player1');
+      world.addPlayer(player);
+      const socket = createMockSocket('player1');
+      const ack = jest.fn();
+
+      (handler as any).handleRollDice(socket, {}, ack);
+
+      expect(ack).toHaveBeenCalledWith(expect.objectContaining({
+        ok: true,
+        data: expect.objectContaining({
+          cooldownMs: 5000,
+          cooldownEndsAt: expect.any(Number),
+        }),
+      }));
+    });
+
+    it('监狱冷却结束后允许掷骰并返回较长冷却', () => {
+      const player = createTestPlayer('player1', 1, PlayerStatus.Jail);
+      world.addPlayer(player);
+      const socket = createMockSocket('player1');
+      const ack = jest.fn();
+
+      (handler as any).handleRollDice(socket, {}, ack);
+
+      expect(ack).toHaveBeenCalledWith(expect.objectContaining({
+        ok: true,
+        data: expect.objectContaining({ cooldownMs: 10000 }),
+      }));
     });
   });
 
