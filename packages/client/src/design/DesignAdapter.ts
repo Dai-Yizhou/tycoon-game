@@ -67,6 +67,7 @@ export class DesignAdapter {
     const connection = color('color.line.map');
     const accent = color('color.palette.accent');
     const muted = color('color.hud.muted');
+    const px = (path: string): string => `${number(path)}px`;
 
     return {
       canvas: {
@@ -103,6 +104,66 @@ export class DesignAdapter {
         '--gp-cell-bg': color('color.hud.cellBg'),
         '--gp-cell-border': color('color.hud.cellBorder'),
         '--gp-link': color('color.hud.link'),
+        // 主题标识 + 玩家色
+        '--theme-id': color('theme.id'),
+        '--player-red': color('color.player.red'),
+        '--player-blue': color('color.player.blue'),
+        '--player-green': color('color.player.green'),
+        // 字体（地域标题/功能/数字 + 通用正文/标题）
+        '--font-heading': color('font.heading'),
+        '--font-body': color('font.body'),
+        '--font-title': color('font.title'),
+        '--font-func': color('font.func'),
+        '--font-num': color('font.number'),
+        // 棋子几何
+        '--piece-width': px('dimension.piece.width'),
+        '--piece-head-diameter': px('dimension.piece.headDiameter'),
+        '--piece-torso-top': px('dimension.piece.torsoTop'),
+        '--piece-torso-bottom': px('dimension.piece.torsoBottom'),
+        '--piece-torso-height': px('dimension.piece.torsoHeight'),
+        '--piece-outline-width': px('dimension.piece.outline'),
+        // 1900 地域语法（棋盘与 SVG 地图语义令牌）
+        '--region-board-bg': color('color.region.board'),
+        '--region-fg': color('color.region.fg'),
+        '--region-border': color('color.region.border'),
+        '--region-border-w': px('color.region.borderWidth'),
+        '--region-radius': px('color.region.radius'),
+        '--region-chip-radius': px('color.region.chipRadius'),
+        '--region-accent': color('color.region.accent'),
+        '--region-accent-hover': color('color.region.accentHover'),
+        '--region-label-fg': color('color.region.labelFg'),
+        '--region-motion-fg': color('color.region.motionFg'),
+        '--region-rule': color('color.region.ruleColor'),
+        '--region-cell-bg': color('color.region.cellBg'),
+        '--region-cell-border': color('color.region.cellBorder'),
+        '--region-box-bg': color('color.region.boxBg'),
+        '--region-tab-bg': color('color.region.tabBg'),
+        '--region-frag-bg': color('color.region.fragBg'),
+        '--region-btn-fg': color('color.region.btnFg'),
+        '--region-focus': color('color.region.focus'),
+        '--region-focus-w': px('color.region.focusWidth'),
+        '--region-cycle-day': color('color.region.cycleDay'),
+        '--region-cycle-night': color('color.region.cycleNight'),
+        '--region-error': color('color.region.error'),
+        '--region-texture': color('texture.region.background'),
+        // 登录/加载/欢迎：语义令牌映射到同一套地域变量（standalone 时由 :root 兜底）
+        '--auth-bg': color('color.region.board'),
+        '--auth-fg': color('color.region.fg'),
+        '--auth-card': color('color.region.boxBg'),
+        '--auth-surface': color('color.region.cellBg'),
+        '--auth-muted': color('color.region.labelFg'),
+        '--auth-accent': color('color.region.accent'),
+        '--auth-accent-hover': color('color.region.accentHover'),
+        '--auth-border': color('color.region.border'),
+        '--auth-border-soft': color('color.region.cellBorder'),
+        '--auth-error': color('color.region.error'),
+        '--auth-track': color('color.region.board'),
+        '--auth-paper': color('color.region.btnFg'),
+        '--auth-radius': px('color.region.radius'),
+        // HUD 额外令牌
+        '--gp-paper': color('color.region.btnFg'),
+        '--gp-cycle-day': color('color.region.cycleDay'),
+        '--gp-cycle-night': color('color.region.cycleNight'),
       },
       piece: { outlineWidth: number('dimension.piece.outline') },
       line: { currentWidth: number('dimension.line.current') },
