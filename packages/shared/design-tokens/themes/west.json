@@ -93,11 +93,11 @@
     },
     "hud": {
       "barBg": {
-        "$value": "#3A2E2C",
+        "$value": "#C8CCCB",
         "$type": "color"
       },
       "sidebarBg": {
-        "$value": "#4A3E3C",
+        "$value": "#D0D4D3",
         "$type": "color"
       },
       "mapBg": {
@@ -105,11 +105,11 @@
         "$type": "color"
       },
       "card": {
-        "$value": "#6D3F3F",
+        "$value": "#ECEDEC",
         "$type": "color"
       },
       "fg": {
-        "$value": "#DDE0DF",
+        "$value": "#3A2E2C",
         "$type": "color"
       },
       "muted": {
@@ -117,15 +117,15 @@
         "$type": "color"
       },
       "cellBg": {
-        "$value": "#ECEDEC",
+        "$value": "#DDE0DF",
         "$type": "color"
       },
       "cellBorder": {
-        "$value": "{color.palette.border}",
+        "$value": "#6D3F3F",
         "$type": "color"
       },
       "link": {
-        "$value": "#6D3F3F",
+        "$value": "#B52B1D",
         "$type": "color"
       }
     },

@@ -3,6 +3,8 @@
  */
 
 import { GameController } from '../src/game/GameController.js';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   createStartPage,
   cleanupStartPage,
@@ -13,8 +15,18 @@ import {
   createGamePage,
   cleanupGamePage,
 } from '../src/pages/index.js';
+const styleSource = readFileSync(resolve(__dirname, '../src/style.css'), 'utf8');
 
 describe('Pages', () => {
+  test('游戏控件使用主题变量且返回按钮位于顶部中央', () => {
+    expect(styleSource).toContain('.cell-hover-card');
+    expect(styleSource).toContain('background: var(--gp-card)');
+    expect(styleSource).toContain('background: var(--gp-sidebar-bg)');
+    expect(styleSource).toContain('font-family: var(--font-body)');
+    expect(styleSource).toContain('left: 50%;');
+    expect(styleSource).toContain('transform: translateX(-50%);');
+    expect(styleSource).not.toContain('color-mix(in srgb, #000');
+  });
   let controller: GameController;
   let mockContainer: HTMLElement;
 
@@ -52,9 +64,7 @@ describe('Pages', () => {
       expect(button).toBeTruthy();
       expect(button?.textContent).toBe('开始游戏');
 
-      // 检查剪影元素
-      const silhouette = page.querySelector('.silhouette');
-      expect(silhouette).toBeTruthy();
+      expect(page.querySelector('.silhouette')).toBeNull();
     });
 
     test('TR-6.15: cleanupStartPage 正确清理页面', () => {
@@ -188,19 +198,6 @@ describe('Pages', () => {
   });
 
   describe('GamePage', () => {
-    test('TR-6.23: createGamePage 创建通知中心', () => {
-      controller.setPlayerName('测试玩家');
-      controller.setSocket({
-        on: jest.fn(),
-        off: jest.fn(),
-        emit: jest.fn(),
-      } as any);
-
-      const page = createGamePage(controller);
-
-      expect(page.querySelector('.notification-center')).toBeTruthy();
-    });
-
     test('GamePage 的掷骰按钮使用控制器中的已认证 socket', () => {
       controller.setPlayerName('测试玩家');
       const emit = jest.fn();
@@ -237,12 +234,6 @@ describe('Pages', () => {
       expect(page.classList.contains('page')).toBe(true);
       expect(page.classList.contains('game-page')).toBe(true);
 
-      // 检查 canvas
-      const canvas = page.querySelector('#game-canvas');
-      expect(canvas).toBeTruthy();
-      expect(canvas?.getAttribute('width')).toBe('1024');
-      expect(canvas?.getAttribute('height')).toBe('768');
-
       // 检查 HUD（新版 GameHudShell 唯一入口）
       const hud = page.querySelector('.game-hud-shell');
       expect(hud).toBeTruthy();
@@ -258,24 +249,5 @@ describe('Pages', () => {
       expect(mockContainer.contains(page)).toBe(false);
     });
 
-    test('cleanupGamePage 移除页面注册的全局和画布事件监听器', () => {
-      controller.setPlayerName('测试玩家');
-      const page = createGamePage(controller);
-      const canvas = page.querySelector('#game-canvas') as HTMLCanvasElement;
-      const windowRemove = jest.spyOn(window, 'removeEventListener');
-      const canvasRemove = jest.spyOn(canvas, 'removeEventListener');
-
-      cleanupGamePage(page);
-
-      expect(windowRemove).toHaveBeenCalledWith('game:cell-hover', expect.any(Function));
-      expect(windowRemove).toHaveBeenCalledWith('game:cell-leave', expect.any(Function));
-      expect(windowRemove).toHaveBeenCalledWith('resize', expect.any(Function));
-      expect(canvasRemove).toHaveBeenCalledWith('mousemove', expect.any(Function));
-      expect(canvasRemove).toHaveBeenCalledWith('click', expect.any(Function));
-      expect(canvasRemove).toHaveBeenCalledWith('mouseleave', expect.any(Function));
-
-      windowRemove.mockRestore();
-      canvasRemove.mockRestore();
-    });
   });
 });

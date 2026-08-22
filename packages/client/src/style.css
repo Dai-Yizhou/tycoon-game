@@ -71,6 +71,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   gap: 18px;
+  min-height: 100dvh;
+  padding: clamp(28px, 6vh, 72px) clamp(16px, 5vw, 64px);
   background: var(--auth-bg);
   color: var(--auth-fg);
 }
@@ -107,19 +109,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 }
 .start-button:hover { transform: translate(-2px, -2px); background: var(--auth-accent-hover); box-shadow: 3px 3px 0 var(--auth-border); }
 
-/* 剪影下落动画（地图轮廓，纯装饰） */
-.silhouette {
-  position: absolute; inset: auto auto 12% 10%;
-  width: 180px; height: 120px;
-  opacity: 0.16; filter: none;
-  background-color: var(--auth-accent);
-  clip-path: polygon(3% 44%, 16% 6%, 38% 20%, 52% 8%, 70% 26%, 92% 14%, 100% 60%, 84% 82%, 62% 66%, 44% 88%, 22% 74%, 2% 88%);
-  animation: float 6s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.lang-switcher { display: flex; gap: 10px; align-items: center; }
+.lang-switcher { position: absolute; left: 50%; bottom: clamp(24px, 7vh, 60px); transform: translateX(-50%); display: flex; gap: 10px; align-items: center; white-space: nowrap; }
 .lang-label { color: var(--auth-muted); font-size: 13px; }
+.lang-btn { padding: 4px 12px; font-size: 13px; border: var(--region-border-w) solid var(--auth-border-soft); border-radius: var(--region-radius); background: transparent; color: var(--auth-fg); cursor: pointer; }
+.lang-btn--active { border-color: var(--auth-fg); background: color-mix(in srgb, var(--auth-fg) 20%, transparent); }
+.lang-btn:hover, .lang-btn--hover { background: color-mix(in srgb, var(--auth-fg) 15%, transparent); }
 .version-info { margin-top: 6px; color: var(--auth-muted); font-size: 11px; font-family: var(--font-num); }
 
 /* —— 登录 / 加载（auth 页面） —— */
@@ -149,6 +143,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   border-radius: var(--auth-radius);
   box-shadow: 2px 2px 0 var(--auth-border);
   animation: slideUp 0.4s ease-out;
+  flex: 0 1 auto;
 }
 .login-card { display: flex; flex-direction: column; gap: 9px; }
 .loading-card { display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center; }
@@ -271,7 +266,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 /* 玩家棋子：语义色由交互层传入（--gp-player-color），头/描边取主题令牌 */
 .map-player {
   pointer-events: none;
-  filter: drop-shadow(0 3px 2px color-mix(in srgb, #000 45%, transparent));
+  filter: drop-shadow(0 3px 2px color-mix(in srgb, var(--region-border) 45%, transparent));
 }
 .map-player__head {
   fill: var(--tycoon-piece-head);
@@ -294,12 +289,12 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .gp-topbar {
   top: 0; left: 0; right: 0; height: 76px; z-index: 20;
   display: flex; align-items: center; gap: 14px; padding: 0 18px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--gp-bar-bg) 78%, transparent) 0%, transparent 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--gp-bar-bg) 25%, transparent) 0%, transparent 100%);
 }
 .gp-actionbar {
   bottom: 0; left: 0; right: 0; height: 112px; z-index: 20;
   display: flex; align-items: center; gap: 12px; padding: 0 18px;
-  background: linear-gradient(0deg, color-mix(in srgb, var(--gp-bar-bg) 78%, transparent) 0%, transparent 100%);
+  background: linear-gradient(0deg, color-mix(in srgb, var(--gp-bar-bg) 25%, transparent) 0%, transparent 100%);
 }
 
 .player-badge { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
@@ -388,10 +383,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   border: 0; border-bottom: var(--region-border-w) solid var(--gp-border);
   color: var(--gp-fg); cursor: pointer;
 }
-.hud-chat-dock__tabs { display: flex; gap: 5px; color: var(--gp-muted); font-size: 8px; }
+.hud-chat-dock__tabs { display: flex; gap: 5px; color: var(--gp-muted); font-size: 9px; }
 .hud-chat-dock__tabs b { color: var(--gp-accent); }
 .hud-chat-msgs { max-height: 120px; overflow-y: auto; padding: 0 14px; display: none; }
-.hud-chat-msg { font-size: 9px; line-height: 1.35; padding: 4px 0; border-bottom: 1px dotted color-mix(in srgb, var(--gp-fg) 8%, transparent); }
+.hud-chat-msg { font-size: 10px; line-height: 1.35; padding: 4px 0; border-bottom: 1px dotted color-mix(in srgb, var(--gp-fg) 8%, transparent); }
 .hud-chat-msg b { color: var(--gp-accent); font-size: 8px; margin-right: 4px; }
 .hud-chat-msg span { color: var(--gp-muted); }
 .hud-chat-dock__input {
@@ -417,7 +412,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .hud-chat-dock:focus-within .hud-chat-dock__input { display: flex; }
 
 /* 掷骰与行动按钮 */
-.dice-zone { display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0; }
+.dice-zone { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
 .dice-btn {
   font-weight: 800; font-size: 13px;
   padding: 8px 18px;
@@ -429,7 +424,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 }
 .dice-btn:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--gp-border); }
 .dice-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; background: var(--gp-card); }
-.dice-status { font-size: 8px; color: var(--gp-muted); font-family: var(--font-num); }
+.dice-status { font-size: 10px; color: var(--gp-muted); font-family: var(--font-num); }
 
 .action-cluster { display: flex; gap: 6px; flex-shrink: 0; }
 .act-btn {
@@ -441,14 +436,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 }
 .act-btn:hover:not(:disabled) { background: var(--gp-cell-bg); }
 .act-btn--accent { background: var(--gp-accent); color: var(--gp-paper); border-color: var(--gp-accent); }
-.act-btn--accent:hover:not(:disabled) { background: color-mix(in srgb, var(--gp-accent) 85%, #000); }
+.act-btn--accent:hover:not(:disabled) { background: color-mix(in srgb, var(--gp-accent) 85%, #ffffff); }
 .act-btn__price { display: block; font-family: var(--font-num); font-size: 9px; font-weight: 700; }
 
 .actionbar-spacer { flex: 1; }
 
 /* 返回按钮 */
 .back-button {
-  position: absolute; top: 12px; left: 18px; z-index: 40;
+  position: absolute; top: 25px; left: 45%; transform: translateY(-20%); z-index: 50;
   padding: 4px 10px; font-size: 11px; font-weight: 700;
   background: var(--gp-card); color: var(--gp-fg);
   border: var(--region-border-w) solid var(--gp-border); border-radius: var(--region-radius);
@@ -479,9 +474,16 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   .loading-card .loading-title { font-size: 22px; }
 }
 
+@media (max-height: 620px) {
+  .start-page, .login-page, .loading-page { justify-content: flex-start; overflow-y: auto; }
+  .start-page { padding-top: 12vh; }
+  .login-page { padding-top: 10vh; padding-bottom: 10vh; }
+  .lang-switcher { position: relative; left: auto; bottom: auto; transform: none; margin-top: 12px; }
+  .version-info { margin-top: 0; }
+}
+
 /* 减少动效偏好 */
 @media (prefers-reduced-motion: reduce) {
   .dice-btn, .act-btn, .start-button, .confirm-button, .retry-button,
   .username-input, .password-input, .progress-bar::after { transition: none; }
-  .silhouette { animation: none; }
 }

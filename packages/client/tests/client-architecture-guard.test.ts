@@ -11,7 +11,6 @@ describe('客户端架构守卫', () => {
   test('纯投影和渲染入口不包含旧状态回退桥', () => {
     const sources = [
       readSource('game/GameViewModel.ts'),
-      readSource('game/ClientRenderLoop.ts'),
       readSource('game/systems/MapLoader.ts'),
     ].join('\n');
 

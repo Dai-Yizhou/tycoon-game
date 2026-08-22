@@ -2,7 +2,6 @@
  * 开始界面
  *
  * 功能：
- * - 游戏标题动画（剪影下落效果）
  * - 开始按钮
  * - 标题渐显效果
  * - 语言切换按钮
@@ -39,18 +38,11 @@ export function createStartPage(controller: GameController): HTMLElement {
 
   page.appendChild(titleContainer);
 
-  // 剪影下落动画元素（地图轮廓）
-  const silhouette = document.createElement('div');
-  silhouette.className = 'silhouette';
-  page.appendChild(silhouette);
-
   // 开始按钮
   const startButton = document.createElement('button');
   startButton.className = 'start-button';
   startButton.textContent = t('game.startButton');
   startButton.addEventListener('click', () => {
-    // 触发剪影下落动画
-    silhouette.classList.add('falling');
     startButton.disabled = true;
 
     // 动画结束后进入登录页面
@@ -63,12 +55,10 @@ export function createStartPage(controller: GameController): HTMLElement {
   // 语言切换
   const langContainer = document.createElement('div');
   langContainer.className = 'lang-switcher';
-  langContainer.style.cssText = 'position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center;';
 
   const langLabel = document.createElement('span');
   langLabel.className = 'lang-label';
   langLabel.textContent = t('common.language') + ':';
-  langLabel.style.cssText = 'color: rgba(255,255,255,0.7); font-size: 13px;';
   langContainer.appendChild(langLabel);
 
   const locales: LocaleCode[] = ['zh-CN', 'en-US'];
@@ -78,7 +68,7 @@ export function createStartPage(controller: GameController): HTMLElement {
     const btn = document.createElement('button');
     btn.className = 'lang-btn';
     btn.textContent = locale === 'zh-CN' ? '中文' : 'English';
-    btn.style.cssText = `padding: 4px 12px; font-size: 13px; border: 1px solid ${locale === currentLocale ? '#fff' : 'rgba(255,255,255,0.3)'}; border-radius: 4px; background: ${locale === currentLocale ? 'rgba(255,255,255,0.2)' : 'transparent'}; color: #fff; cursor: pointer; transition: all 0.2s;`;
+    btn.classList.toggle('lang-btn--active', locale === currentLocale);
     btn.addEventListener('click', () => {
       setLocale(locale);
       localStorage.setItem('gameLocale', locale);
@@ -86,10 +76,10 @@ export function createStartPage(controller: GameController): HTMLElement {
       location.reload();
     });
     btn.addEventListener('mouseenter', () => {
-      btn.style.background = 'rgba(255,255,255,0.15)';
+      btn.classList.add('lang-btn--hover');
     });
     btn.addEventListener('mouseleave', () => {
-      btn.style.background = locale === currentLocale ? 'rgba(255,255,255,0.2)' : 'transparent';
+      btn.classList.remove('lang-btn--hover');
     });
     langContainer.appendChild(btn);
   }
