@@ -1,410 +1,487 @@
+/* ============================================================
+   game.css — 全局样式
+   ------------------------------------------------------------
+   单一来源：所有颜色/字体/边框/圆角/阴影均由 DesignAdapter 从
+   主题 JSON 注入为 CSS 变量（--region-* / --gp-* / --auth-* /
+   --font-* / --tycoon-*）。main.ts 在 <html> 上注入默认主题，
+   游戏页再按地区在自身元素上覆盖；因此本文件不出现视觉硬编码。
+   ============================================================ */
+
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   color-scheme: light;
-  background: #f0f2f5;
-  color: #1a1a2e;
-
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
-  --primary-light: #60a5fa;
-  --secondary: #64748b;
-  --accent: #f59e0b;
-  --accent-dark: #d97706;
-  --success: #10b981;
-  --error: #ef4444;
-
-  --bg-card: rgba(255, 255, 255, 0.92);
-  --bg-tertiary: #f1f5f9;
-  --border: #e2e8f0;
-  --border-light: #cbd5e1;
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
-
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-full: 9999px;
-
-  --transition-fast: 0.15s ease;
-  --transition-normal: 0.25s ease;
+  /* 动效时长（交互时序，非视觉主题，固定值） */
+  --motion-fast: 0.15s ease;
+  --motion-normal: 0.25s ease;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-body { overflow: hidden; user-select: none; -webkit-user-select: none; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  color: var(--region-fg);
+  background: var(--region-board-bg);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
 
 #app {
   width: 100vw; height: 100vh;
   position: relative; overflow: hidden;
-  background: #f8fafc;
+  background: var(--region-board-bg);
 }
 
 button {
   font-family: inherit; font-size: 13px; font-weight: 600;
-  border: none; border-radius: var(--radius-md);
+  border: none; border-radius: var(--region-radius);
   padding: 8px 16px; cursor: pointer;
-  transition: all var(--transition-fast);
-  color: white; position: relative; overflow: hidden;
+  transition: background var(--motion-fast), box-shadow var(--motion-fast),
+              transform var(--motion-fast), color var(--motion-fast);
 }
-button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-md); }
-button:active:not(:disabled) { transform: translateY(0); }
+button:hover:not(:disabled) { transform: translateY(-1px); }
 button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 
-/* ===== Pages ===== */
+/* ===== 页面骨架 ===== */
 .page {
-  width: 100%; height: 100%;
-  position: absolute; top: 0; left: 0;
-  animation: fadeIn var(--transition-normal) ease-out;
+  position: absolute; inset: 0;
+  animation: fadeIn var(--motion-normal) ease-out;
 }
-.game-page { padding: 0; display: block; }
-
-/* 主题令牌由 DesignAdapter 从主题 JSON 注入为 --gp-* CSS 变量 */
-.game-page { background: var(--gp-map-bg); }
+.game-page { display: block; padding: 0; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* ===== Start Page ===== */
-.start-page {
+/* ============================================================
+   欢迎页 / 登录页 / 加载页 —— 1900 地域语法（统一视觉）
+   ============================================================ */
+
+/* 页面底色取地域 board 色，标题用地域 serif，辅以 1900 特征边框与纹理。 */
+.start-page, .login-page, .loading-page {
+  position: relative; overflow: hidden;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 25%, #f8fafc 60%, #f1f5f9 100%);
+  gap: 18px;
+  background: var(--auth-bg);
+  color: var(--auth-fg);
 }
+
+/* 1900 特征：内框线 + 地域纹理叠加 */
+.start-page::before, .login-page::before, .loading-page::before {
+  content: ""; position: absolute; inset: 18px;
+  border: var(--region-border-w) solid var(--region-rule);
+  pointer-events: none;
+}
+.login-page::after, .loading-page::after {
+  content: ""; position: absolute; inset: 0;
+  opacity: 0.55; pointer-events: none;
+  background-image: var(--region-texture);
+}
+.start-page > *, .login-page > *, .loading-page > * { position: relative; z-index: 2; }
+
+/* —— 欢迎页 —— */
 .title-container { text-align: center; z-index: 10; animation: slideUp 0.6s ease-out; }
 .game-title {
+  font-family: var(--font-title);
   font-size: clamp(3rem, 8vw, 6rem); font-weight: 900;
-  color: #1e3a5f; letter-spacing: 0.02em; margin-bottom: 0.5rem;
-  text-shadow: 0 2px 8px rgba(30, 58, 95, 0.15);
+  color: var(--auth-fg); letter-spacing: 0.06em; margin-bottom: 0.5rem;
+  text-shadow: none;
 }
-.subtitle { color: #475569; font-size: clamp(1rem, 2vw, 1.4rem); font-weight: 500; letter-spacing: 0.08em; }
-.start-buttons { display: flex; flex-direction: column; gap: 16px; margin-top: 48px; animation: slideUp 0.6s ease-out 0.2s backwards; }
+.subtitle { color: var(--auth-muted); font-size: clamp(1rem, 2vw, 1.4rem); font-weight: 500; letter-spacing: 0.08em; }
 .start-button {
-  min-width: 260px; padding: 16px 40px; font-size: 1.2rem; font-weight: 700;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-  color: white; box-shadow: 0 4px 20px rgba(37, 99, 235, 0.3); letter-spacing: 0.08em;
+  min-width: 260px; padding: 16px 40px; margin-top: 48px;
+  font-size: 1.2rem; font-weight: 700; letter-spacing: 0.08em;
+  background: var(--auth-accent); color: var(--auth-paper);
+  border: var(--region-border-w) solid var(--auth-border);
+  border-radius: var(--region-radius);
+  box-shadow: 2px 2px 0 var(--auth-border);
 }
-.start-button:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 8px 32px rgba(37, 99, 235, 0.4); }
-.start-button.secondary { background: white; color: var(--primary); border: 2px solid var(--primary); box-shadow: var(--shadow-sm); }
-.start-button.secondary:hover { background: var(--primary); color: white; box-shadow: var(--shadow-md); }
+.start-button:hover { transform: translate(-2px, -2px); background: var(--auth-accent-hover); box-shadow: 3px 3px 0 var(--auth-border); }
 
-.silhouettes { position: absolute; top: 0; left: 0; width: 100%; height: 180px; overflow: hidden; pointer-events: none; z-index: 5; }
-.silhouette { position: absolute; top: -20px; font-size: 64px; animation: float 5s ease-in-out infinite; opacity: 0.5; filter: drop-shadow(0 2px 4px rgba(30, 58, 95, 0.15)); }
-.silhouette:nth-child(1) { left: 8%; animation-delay: 0s; }
-.silhouette:nth-child(2) { left: 25%; animation-delay: 0.8s; }
-.silhouette:nth-child(3) { left: 45%; animation-delay: 1.6s; }
-.silhouette:nth-child(4) { left: 65%; animation-delay: 1.2s; }
-.silhouette:nth-child(5) { left: 82%; animation-delay: 0.4s; }
+/* 剪影下落动画（地图轮廓，纯装饰） */
+.silhouette {
+  position: absolute; inset: auto auto 12% 10%;
+  width: 180px; height: 120px;
+  opacity: 0.16; filter: none;
+  background-color: var(--auth-accent);
+  clip-path: polygon(3% 44%, 16% 6%, 38% 20%, 52% 8%, 70% 26%, 92% 14%, 100% 60%, 84% 82%, 62% 66%, 44% 88%, 22% 74%, 2% 88%);
+  animation: float 6s ease-in-out infinite;
+  pointer-events: none;
+}
 
-/* ===== Login Page ===== */
-.login-page { display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #dbeafe 0%, #f0f2f5 100%); }
-.login-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px; width: 90%; max-width: 400px; box-shadow: var(--shadow-lg); animation: slideUp 0.4s ease-out; }
-.login-title { font-size: 1.8rem; font-weight: 700; color: var(--primary); text-align: center; margin-bottom: 8px; }
-.login-subtitle { color: var(--secondary); text-align: center; margin-bottom: 24px; font-size: 0.9rem; }
-.input-group { margin-bottom: 20px; }
-.input-label { display: block; color: var(--secondary); font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; }
-.input-field { width: 100%; padding: 12px 16px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-tertiary); color: #1a1a2e; font-size: 1rem; font-family: inherit; transition: all var(--transition-fast); }
-.input-field:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
-.login-button { width: 100%; padding: 14px; font-size: 1rem; margin-top: 8px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; font-weight: 700; }
-.guest-button { width: 100%; padding: 12px; margin-top: 12px; border-radius: var(--radius-md); background: transparent; color: var(--secondary); border: 1px solid var(--border-light); font-weight: 500; }
-.guest-button:hover { color: var(--primary); border-color: var(--primary); background: rgba(37, 99, 235, 0.05); }
-.back-link { text-align: center; margin-top: 20px; color: var(--secondary); font-size: 0.9rem; cursor: pointer; transition: color var(--transition-fast); }
-.back-link:hover { color: var(--primary); }
+.lang-switcher { display: flex; gap: 10px; align-items: center; }
+.lang-label { color: var(--auth-muted); font-size: 13px; }
+.version-info { margin-top: 6px; color: var(--auth-muted); font-size: 11px; font-family: var(--font-num); }
 
-/* ===== Loading Page ===== */
-.loading-page { display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(180deg, #dbeafe 0%, #f0f2f5 100%); }
-.loading-container { text-align: center; animation: slideUp 0.4s ease-out; }
-.loading-spinner { width: 56px; height: 56px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 24px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.loading-text { font-size: 1.3rem; color: #1e3a5f; font-weight: 700; margin-bottom: 16px; }
-.loading-detail { color: var(--secondary); font-size: 0.9rem; margin-bottom: 24px; }
-.progress-bar { width: 280px; height: 8px; background: var(--border); border-radius: var(--radius-full); overflow: hidden; margin: 0 auto; }
-.progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%); border-radius: var(--radius-full); transition: width 0.3s ease; box-shadow: 0 0 8px rgba(37, 99, 235, 0.3); }
-.progress-label { margin-top: 12px; color: var(--secondary); font-size: 0.85rem; font-weight: 600; }
+/* —— 登录 / 加载（auth 页面） —— */
+.auth-eyebrow {
+  color: var(--auth-accent);
+  font-family: var(--font-num);
+  font-weight: 700; font-size: 11px;
+  letter-spacing: 0.16em; text-transform: uppercase;
+}
+.login-title, .loading-title {
+  font-family: var(--font-title);
+  font-weight: 900; font-size: clamp(30px, 4vw, 54px);
+  color: var(--auth-fg); letter-spacing: 0.06em;
+  text-align: center; margin: 0;
+}
+.login-title::after, .loading-title::after {
+  content: ""; display: block;
+  width: 42px; height: 3px; margin: 14px auto 0;
+  background: var(--auth-accent);
+}
 
-/* ===== Board ===== */
-.board-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; background: #f1f5f9; }
-#game-canvas { display: block; width: 100%; height: 100%; cursor: default; }
+.login-card, .loading-card {
+  width: min(420px, calc(100vw - 48px));
+  padding: 30px;
+  background: var(--auth-card);
+  border: var(--region-border-w) solid var(--auth-border);
+  border-radius: var(--auth-radius);
+  box-shadow: 2px 2px 0 var(--auth-border);
+  animation: slideUp 0.4s ease-out;
+}
+.login-card { display: flex; flex-direction: column; gap: 9px; }
+.loading-card { display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center; }
+.loading-card .loading-title { font-size: 26px; }
 
+.auth-label, .auth-helper { color: var(--auth-muted); }
+.auth-label {
+  font-family: var(--font-num);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; margin-top: 5px;
+}
+.auth-helper { font-size: 11px; letter-spacing: 0.03em; }
 
-/* ===== 全屏地图 HUD 覆盖层（参考 game-page-hud-compact-chat.html） ===== */
-.game-page .board-container { position:absolute; inset:0; width:100%; height:100%; background:var(--gp-map-bg); }
-.game-page #game-canvas { position:absolute; inset:0; width:100%; height:100%; }
+.username-input, .password-input {
+  width: 100%; height: 44px; padding: 0 12px;
+  border: 1px solid var(--auth-border-soft);
+  border-radius: var(--auth-radius);
+  background: var(--auth-surface); color: var(--auth-fg);
+  outline: none; font-family: var(--font-body); font-size: 15px;
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+}
+.username-input:focus, .password-input:focus {
+  border-color: var(--auth-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--auth-accent) 20%, transparent);
+}
+.username-input::placeholder, .password-input::placeholder { color: color-mix(in srgb, var(--auth-muted) 70%, transparent); }
 
-.game-hud-shell { position:absolute; inset:0; z-index:120; pointer-events:none; color:var(--gp-fg); font-size:11px; font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif; }
-.game-hud-shell .gp-layout { position:absolute; inset:0; pointer-events:none; }
-.game-hud-shell .gp-layout > * { pointer-events:auto; position:absolute; }
+.auth-actions { display: flex; flex-direction: column; gap: 9px; width: min(420px, calc(100vw - 48px)); }
+.confirm-button, .retry-button {
+  width: 100%; padding: 12px 16px;
+  background: var(--auth-accent); color: var(--auth-paper);
+  border: var(--region-border-w) solid var(--auth-border);
+  border-radius: var(--auth-radius);
+  box-shadow: 2px 2px 0 var(--auth-border);
+}
+.confirm-button:hover:not(:disabled), .retry-button:hover {
+  transform: translate(-1px, -1px);
+  background: var(--auth-accent-hover);
+  box-shadow: 3px 3px 0 var(--auth-border);
+}
+.guest-button {
+  width: 100%; padding: 11px 16px;
+  background: transparent; color: var(--auth-fg);
+  border: var(--region-border-w) solid var(--auth-border-soft);
+  border-radius: var(--auth-radius);
+}
+.guest-button:hover { color: var(--auth-accent); border-color: var(--auth-accent); background: color-mix(in srgb, var(--auth-accent) 8%, transparent); }
 
-/* —— 顶部状态栏 —— */
+.error-container {
+  margin-top: 12px; padding: 10px;
+  border: 1px solid var(--auth-error);
+  background: color-mix(in srgb, var(--auth-error) 16%, transparent);
+  color: var(--auth-fg); font-size: 12px;
+}
+
+.spinner {
+  width: 46px; height: 46px;
+  border: 3px solid var(--auth-border);
+  border-top-color: var(--auth-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+.progress-container {
+  width: 100%; display: grid;
+  grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+}
+.progress-bar {
+  grid-column: 1 / -1; width: 100%; height: 7px;
+  background: var(--auth-track);
+  border: 1px solid var(--auth-border); border-radius: var(--auth-radius);
+  overflow: hidden;
+}
+.progress-bar::after {
+  content: ""; display: block;
+  width: var(--progress, 0%); height: 100%;
+  background: var(--auth-accent); transition: width var(--motion-normal);
+}
+.progress-text { color: var(--auth-accent); font-family: var(--font-num); font-weight: 700; font-size: 12px; justify-self: end; }
+
+/* ============================================================
+   游戏页：全屏地图 + HUD 覆盖层
+   ============================================================ */
+.game-page { background: var(--gp-map-bg); overflow: hidden; }
+
+/* 地图严格铺满视野，覆盖整个 body */
+.game-page .board-container {
+  position: absolute; inset: 0; z-index: 1;
+  width: 100%; height: 100%; overflow: hidden;
+  background: var(--gp-map-bg);
+}
+#game-canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+
+/* 交互式 SVG 地图（真正渲染棋子的层） */
+.interactive-map-surface {
+  position: absolute; inset: 0; z-index: 2; pointer-events: auto;
+  background: var(--gp-map-bg);
+  background-image: var(--region-texture);
+}
+.interactive-map-surface__svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.interactive-map-surface__links, .interactive-map-surface__nodes, .interactive-map-surface__players { width: 100%; height: 100%; }
+
+.map-link {
+  stroke: color-mix(in srgb, var(--region-motion-fg) 55%, transparent);
+  stroke-width: 8; stroke-linecap: round;
+}
+.map-node { cursor: pointer; }
+.map-node__shape {
+  fill: var(--region-cell-bg);
+  stroke: var(--region-border); stroke-width: 3;
+}
+.map-node:hover .map-node__shape { fill: var(--region-box-bg); stroke: var(--region-accent); stroke-width: 5; }
+.map-node__type { fill: var(--region-label-fg); font-weight: 700; font-size: 13px; font-family: var(--font-func); letter-spacing: 0.08em; }
+.map-node__name { fill: var(--region-fg); font-weight: 900; font-size: 19px; font-family: var(--font-title); }
+.map-node__price { fill: var(--region-accent); font-weight: 700; font-size: 15px; font-family: var(--font-num); }
+.map-node--event .map-node__shape { stroke: var(--region-error); }
+.map-node--transport .map-node__shape { stroke: var(--region-cycle-night); }
+.map-node--start .map-node__shape { stroke: var(--player-green); }
+.map-node--monument .map-node__shape { stroke: var(--region-cycle-day); }
+
+/* 玩家棋子：语义色由交互层传入（--gp-player-color），头/描边取主题令牌 */
+.map-player {
+  pointer-events: none;
+  filter: drop-shadow(0 3px 2px color-mix(in srgb, #000 45%, transparent));
+}
+.map-player__head {
+  fill: var(--tycoon-piece-head);
+  stroke: var(--tycoon-piece-outline); stroke-width: 4;
+}
+.map-player__body {
+  fill: var(--gp-player-color, var(--region-accent));
+  stroke: var(--tycoon-piece-outline); stroke-width: 4; stroke-linejoin: round;
+}
+
+/* —— HUD 外壳 —— */
+.game-hud-shell {
+  position: absolute; inset: 0; z-index: 20; pointer-events: none;
+  color: var(--gp-fg); font-size: 11px; font-family: var(--font-body);
+}
+.game-hud-shell .gp-layout { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.game-hud-shell .gp-layout > * { pointer-events: auto; position: absolute; }
+
+/* 顶栏 / 底栏：半透明渐变贴在整屏地图上（全视野） */
 .gp-topbar {
-  top:0; left:0; right:0; height:9%; min-height:48px;
-  z-index:8; display:flex; align-items:center; gap:14px; padding:0 18px;
-  background:var(--gp-bar-bg);
-  border-bottom:1px solid var(--gp-border);
+  top: 0; left: 0; right: 0; height: 76px; z-index: 20;
+  display: flex; align-items: center; gap: 14px; padding: 0 18px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--gp-bar-bg) 78%, transparent) 0%, transparent 100%);
 }
-.player-badge { display:flex; align-items:center; gap:8px; flex-shrink:0; }
-.player-badge__avatar { width:22px; height:22px; border-radius:50%; border:2px solid var(--gp-fg); background:var(--gp-accent); flex-shrink:0; }
-.player-badge__name { font-weight:800; font-size:12px; color:var(--gp-fg); }
-.player-badge__team { font-size:9px; color:var(--gp-muted); }
+.gp-actionbar {
+  bottom: 0; left: 0; right: 0; height: 112px; z-index: 20;
+  display: flex; align-items: center; gap: 12px; padding: 0 18px;
+  background: linear-gradient(0deg, color-mix(in srgb, var(--gp-bar-bg) 78%, transparent) 0%, transparent 100%);
+}
 
-.value-pills { display:flex; gap:6px; flex-shrink:0; }
+.player-badge { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.player-badge__avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--gp-fg); background: var(--gp-accent); flex-shrink: 0;
+}
+.player-badge__name { font-weight: 800; font-size: 12px; color: var(--gp-fg); }
+.player-badge__team { font-size: 9px; color: var(--gp-muted); }
+
+.value-pills { display: flex; gap: 6px; flex-shrink: 0; }
 .value-pill {
-  display:flex; flex-direction:column; align-items:center;
-  padding:2px 8px; border:1px solid var(--gp-border);
-  border-radius:1px; background:var(--gp-card); min-width:56px;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 2px 8px; min-width: 56px;
+  border: var(--region-border-w) solid var(--gp-border);
+  border-radius: var(--region-radius); background: var(--gp-card);
 }
-.value-pill__label { font-size:8px; color:var(--gp-muted); letter-spacing:.06em; text-transform:uppercase; }
-.value-pill__num { font-family:'SF Mono',Menlo,Monaco,Consolas,monospace; font-size:13px; font-weight:700; color:var(--gp-fg); }
-.value-pill--accent .value-pill__num { color:var(--gp-accent); }
+.value-pill__label { font-size: 8px; color: var(--gp-muted); font-family: var(--font-func); letter-spacing: 0.06em; text-transform: uppercase; }
+.value-pill__num { font-family: var(--font-num); font-size: 13px; font-weight: 700; color: var(--gp-fg); }
+.value-pill--accent .value-pill__num { color: var(--gp-accent); }
 
-.topbar-spacer { flex:1; }
+.topbar-spacer { flex: 1; }
 
-.cycle-indicator { display:flex; align-items:center; gap:6px; flex-shrink:0; }
-.cycle-dot { width:10px; height:10px; border-radius:50%; border:1px solid var(--gp-border); }
-.cycle-dot--day { background:var(--gp-accent); }
-.cycle-dot--night { background:var(--gp-link); }
-.cycle-text { font-size:10px; color:var(--gp-muted); font-family:'SF Mono',Menlo,Monaco,Consolas,monospace; }
+.cycle-indicator { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.cycle-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: var(--region-border-w) solid var(--gp-border);
+}
+.cycle-dot--day { background: var(--gp-cycle-day); }
+.cycle-dot--night { background: var(--gp-cycle-night); }
+.cycle-text { font-size: 10px; color: var(--gp-muted); font-family: var(--font-num); }
 
-/* —— 地图角落标签 —— */
-.map-overlay { position:absolute; z-index:5; font-size:9px; }
+/* 地图角落标签 */
+.map-overlay { position: absolute; z-index: 5; font-size: 9px; }
 .map-overlay--zone {
-  top:12px; right:18px;
-  color:var(--gp-fg);
-  border:1px solid var(--gp-border);
-  background:var(--gp-card); padding:2px 8px; border-radius:1px;
+  top: 88px; right: 18px;
+  color: var(--gp-fg);
+  border: var(--region-border-w) solid var(--gp-border);
+  background: var(--gp-card); padding: 2px 8px; border-radius: var(--region-radius);
 }
 .map-overlay--prosperity {
-  top:37px; right:18px;
-  color:var(--gp-muted);
-  font-family:'SF Mono',Menlo,Monaco,Consolas,monospace;
+  top: 112px; right: 18px;
+  color: var(--gp-muted); font-family: var(--font-num);
 }
 
-/* —— 事件提示 —— */
+/* 事件提示 */
 .event-toast {
-  top:10%; left:50%; transform:translateX(-50%);
-  z-index:12; min-width:260px; text-align:center;
-  padding:8px 16px; background:var(--gp-card);
-  border:1px solid var(--gp-accent); border-radius:1px;
-  font-size:11px; color:var(--gp-fg);
-  box-shadow:0 2px 8px color-mix(in srgb,var(--gp-border) 40%,transparent);
+  top: 10%; left: 50%; transform: translateX(-50%);
+  z-index: 12; min-width: 260px; text-align: center;
+  padding: 8px 16px; background: var(--gp-card);
+  border: var(--region-border-w) solid var(--gp-accent); border-radius: var(--region-radius);
+  font-size: 11px; color: var(--gp-fg);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--gp-border) 40%, transparent);
 }
-.event-toast__title { font-weight:800; color:var(--gp-accent); margin-right:6px; }
+.event-toast__title { font-weight: 800; color: var(--gp-accent); margin-right: 6px; }
 
-/* —— 当前格悬浮卡片 —— */
+/* 当前格悬浮卡片 */
 .cell-hover-card {
-  left:50%; top:24%; transform:translateX(-50%);
-  z-index:8; width:200px;
-  background:var(--gp-card);
-  border:1px solid var(--gp-accent);
-  box-shadow:0 8px 24px color-mix(in srgb,var(--gp-border) 42%,transparent);
-  padding:10px; color:var(--gp-fg);
-  pointer-events:none;
+  left: 50%; top: 24%; transform: translateX(-50%);
+  z-index: 40; width: 200px;
+  background: var(--gp-card);
+  border: var(--region-border-w) solid var(--gp-accent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--gp-border) 42%, transparent);
+  padding: 10px; color: var(--gp-fg); pointer-events: none;
 }
-.cell-hover-card__type { font-size:8px; letter-spacing:.08em; color:var(--gp-accent); text-transform:uppercase; }
-.cell-hover-card__title { font:900 15px Georgia,'Songti SC',serif; margin:2px 0 7px; }
-.cell-hover-card__rows { display:grid; grid-template-columns:1fr 1fr; gap:3px 10px; font-size:9px; }
-.cell-hover-card__rows span { color:var(--gp-muted); }
-.cell-hover-card__rows b { font-family:'SF Mono',Menlo,Monaco,Consolas,monospace; font-size:9px; }
+.cell-hover-card__type { font-size: 8px; letter-spacing: 0.08em; color: var(--gp-accent); text-transform: uppercase; }
+.cell-hover-card__title { font-family: var(--font-title); font-weight: 900; font-size: 15px; margin: 2px 0 7px; }
+.cell-hover-card__rows { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 9px; }
+.cell-hover-card__rows span { color: var(--gp-muted); }
+.cell-hover-card__rows b { font-family: var(--font-num); font-size: 9px; }
 
-/* —— 聊天/通知 Dock（左下角，默认收起，悬停展开） —— */
+/* 聊天 / 通知 Dock（左下角，默认收起，悬停展开） */
 .hud-chat-dock {
-  left:18px; right:auto; bottom:17%;
-  width:286px; min-height:52px;
-  z-index:9;
-  background:var(--gp-sidebar-bg);
-  border:1px solid var(--gp-border);
-  box-shadow:0 8px 28px color-mix(in srgb,var(--gp-border) 24%,transparent);
-  overflow:hidden;
-  backdrop-filter:blur(8px);
-  -webkit-backdrop-filter:blur(8px);
+  left: 18px; right: auto; bottom: 128px;
+  width: 286px; min-height: 52px; z-index: 32;
+  background: var(--gp-sidebar-bg);
+  border: var(--region-border-w) solid var(--gp-border);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--gp-border) 24%, transparent);
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 .hud-chat-dock__head {
-  height:52px; margin:0; padding:0 14px;
-  display:flex; align-items:center; justify-content:space-between;
-  border:0; color:var(--gp-fg); cursor:pointer;
-  border-bottom:1px solid var(--gp-border);
+  height: 52px; margin: 0; padding: 0 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  border: 0; border-bottom: var(--region-border-w) solid var(--gp-border);
+  color: var(--gp-fg); cursor: pointer;
 }
-.hud-chat-dock__head:after { content:"悬停展开"; margin-left:auto; color:var(--gp-muted); font-size:8px; font-weight:400; }
-.hud-chat-dock__tabs { display:flex; gap:5px; color:var(--gp-muted); font-size:8px; }
-.hud-chat-dock__tabs b { color:var(--gp-accent); }
-
-.hud-chat-msgs { max-height:120px; overflow-y:auto; padding:0 14px; display:none; }
-.hud-chat-msg { font-size:9px; line-height:1.35; padding:4px 0; border-bottom:1px dotted color-mix(in srgb,var(--gp-fg) 8%,transparent); }
-.hud-chat-msg b { color:var(--gp-accent); font-size:8px; margin-right:4px; }
-.hud-chat-msg span { color:var(--gp-muted); }
-
+.hud-chat-dock__tabs { display: flex; gap: 5px; color: var(--gp-muted); font-size: 8px; }
+.hud-chat-dock__tabs b { color: var(--gp-accent); }
+.hud-chat-msgs { max-height: 120px; overflow-y: auto; padding: 0 14px; display: none; }
+.hud-chat-msg { font-size: 9px; line-height: 1.35; padding: 4px 0; border-bottom: 1px dotted color-mix(in srgb, var(--gp-fg) 8%, transparent); }
+.hud-chat-msg b { color: var(--gp-accent); font-size: 8px; margin-right: 4px; }
+.hud-chat-msg span { color: var(--gp-muted); }
 .hud-chat-dock__input {
-  display:none; gap:4px; padding:7px 14px 13px;
-  border-top:1px solid var(--gp-border);
+  display: none; gap: 4px; padding: 7px 14px 13px;
+  border-top: var(--region-border-w) solid var(--gp-border);
 }
 .hud-chat-dock__input select,
 .hud-chat-dock__input input {
-  flex:1; min-width:0; border:1px solid var(--gp-border);
-  background:var(--gp-card); color:var(--gp-fg);
-  padding:4px 6px; font-size:9px; border-radius:1px;
+  flex: 1; min-width: 0;
+  border: var(--region-border-w) solid var(--gp-border);
+  background: var(--gp-card); color: var(--gp-fg);
+  padding: 4px 6px; font-size: 9px; border-radius: var(--region-radius);
 }
 .hud-chat-dock__input button {
-  padding:4px 8px; font-size:9px; font-weight:700;
-  background:var(--gp-accent); color:var(--gp-map-bg);
-  border:none; border-radius:1px; cursor:pointer;
+  padding: 4px 8px; font-size: 9px; font-weight: 700;
+  background: var(--gp-accent); color: var(--gp-paper);
+  border: none; border-radius: var(--region-radius); cursor: pointer;
 }
 
 .hud-chat-dock:hover .hud-chat-msgs,
-.hud-chat-dock:focus-within .hud-chat-msgs { display:block; }
+.hud-chat-dock:focus-within .hud-chat-msgs { display: block; }
 .hud-chat-dock:hover .hud-chat-dock__input,
-.hud-chat-dock:focus-within .hud-chat-dock__input { display:flex; }
-.hud-chat-dock:hover .hud-chat-dock__head:after,
-.hud-chat-dock:focus-within .hud-chat-dock__head:after { content:"收起"; }
+.hud-chat-dock:focus-within .hud-chat-dock__input { display: flex; }
 
-/* —— 底部行动栏 —— */
-.gp-actionbar {
-  bottom:0; left:0; right:0; height:14%; min-height:62px;
-  z-index:8; display:flex; align-items:center; gap:12px; padding:0 18px;
-  background:var(--gp-bar-bg);
-  border-top:1px solid var(--gp-border);
-}
-
-.dice-zone { display:flex; flex-direction:column; align-items:center; gap:2px; flex-shrink:0; }
+/* 掷骰与行动按钮 */
+.dice-zone { display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0; }
 .dice-btn {
-  font-family:inherit; font-weight:800; font-size:13px;
-  padding:8px 18px; border:2px solid var(--gp-border);
-  border-radius:1px; background:var(--gp-accent); color:#FBF8F1;
-  cursor:pointer; box-shadow:2px 2px 0 var(--gp-border);
-  transition:transform .12s ease, box-shadow .12s ease;
+  font-weight: 800; font-size: 13px;
+  padding: 8px 18px;
+  border: calc(var(--region-border-w) + 1px) solid var(--gp-border);
+  border-radius: var(--region-radius);
+  background: var(--gp-accent); color: var(--gp-paper);
+  cursor: pointer; box-shadow: 2px 2px 0 var(--gp-border);
+  transition: transform var(--motion-fast), box-shadow var(--motion-fast);
 }
-.dice-btn:hover:not(:disabled) { transform:translate(-1px,-1px); box-shadow:3px 3px 0 var(--gp-border); }
-.dice-btn:disabled { opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; background:var(--gp-card); }
-.dice-status { font-size:8px; color:var(--gp-muted); font-family:'SF Mono',Menlo,Monaco,Consolas,monospace; }
+.dice-btn:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--gp-border); }
+.dice-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; background: var(--gp-card); }
+.dice-status { font-size: 8px; color: var(--gp-muted); font-family: var(--font-num); }
 
-.action-cluster { display:flex; gap:6px; flex-shrink:0; }
+.action-cluster { display: flex; gap: 6px; flex-shrink: 0; }
 .act-btn {
-  font-size:11px; font-weight:700; padding:6px 12px;
-  border:1px solid var(--gp-border); border-radius:1px;
-  background:var(--gp-card); color:var(--gp-fg);
-  cursor:pointer; white-space:nowrap;
-  transition:background .12s ease;
+  font-size: 11px; font-weight: 700; padding: 6px 12px;
+  border: var(--region-border-w) solid var(--gp-border); border-radius: var(--region-radius);
+  background: var(--gp-card); color: var(--gp-fg);
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--motion-fast), color var(--motion-fast);
 }
-.act-btn:hover { background:var(--gp-border); }
+.act-btn:hover:not(:disabled) { background: var(--gp-cell-bg); }
+.act-btn--accent { background: var(--gp-accent); color: var(--gp-paper); border-color: var(--gp-accent); }
+.act-btn--accent:hover:not(:disabled) { background: color-mix(in srgb, var(--gp-accent) 85%, #000); }
+.act-btn__price { display: block; font-family: var(--font-num); font-size: 9px; font-weight: 700; }
 
-.actionbar-spacer { flex:1; }
+.actionbar-spacer { flex: 1; }
 
-.item-tray { display:flex; gap:4px; flex-shrink:0; }
-.item-slot {
-  width:32px; height:32px; border:1px solid var(--gp-border);
-  border-radius:1px; background:var(--gp-card);
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  font-size:8px; color:var(--gp-muted); cursor:pointer; position:relative;
-}
-.item-slot--has { color:var(--gp-fg); border-color:var(--gp-accent); }
-.item-slot__count {
-  position:absolute; top:-4px; right:-4px;
-  background:var(--gp-accent); color:var(--gp-map-bg);
-  font-size:7px; font-weight:800; padding:0 3px; border-radius:99px;
+/* 返回按钮 */
+.back-button {
+  position: absolute; top: 12px; left: 18px; z-index: 40;
+  padding: 4px 10px; font-size: 11px; font-weight: 700;
+  background: var(--gp-card); color: var(--gp-fg);
+  border: var(--region-border-w) solid var(--gp-border); border-radius: var(--region-radius);
+  cursor: pointer;
 }
 
-/* —— 返回按钮 —— */
-.game-page .back-button {
-  position:absolute; top:12px; left:18px; z-index:130;
-  padding:4px 10px; font-size:11px; font-weight:700;
-  background:var(--gp-card); color:var(--gp-fg);
-  border:1px solid var(--gp-border); border-radius:1px;
-  cursor:pointer;
+/* ===== 响应式 ===== */
+@media (max-width: 900px) {
+  .gp-topbar { padding: 0 10px; }
+  .gp-actionbar { padding: 0 10px; }
+  .map-overlay--zone { right: 8px; }
+  .map-overlay--prosperity { right: 8px; }
+  .hud-chat-dock { left: 8px; width: 244px; }
+  .cell-hover-card { left: 44%; width: 168px; }
+  .value-pills { gap: 4px; }
+  .value-pill { min-width: 44px; }
+}
+@media (max-width: 700px) {
+  .gp-topbar { height: 64px; }
+  .gp-actionbar { height: 94px; }
+  .hud-chat-dock { bottom: 106px; left: 10px; width: 260px; }
+  .cell-hover-card { width: 190px; }
+}
+@media (max-width: 600px) {
+  .start-page::before, .login-page::before, .loading-page::before { inset: 10px; }
+  .login-card, .loading-card { padding: 24px; }
+  .login-title { font-size: 34px; }
+  .loading-card .loading-title { font-size: 22px; }
 }
 
-/* —— 响应式 —— */
-@media (max-width:900px) {
-  .gp-topbar { padding:0 10px; }
-  .gp-actionbar { padding:0 10px; }
-  .map-overlay--zone { right:8px; }
-  .map-overlay--prosperity { right:8px; }
-  .hud-chat-dock { left:8px; width:244px; bottom:19%; }
-  .cell-hover-card { left:44%; width:168px; }
-  .value-pills { gap:4px; }
-  .value-pill { min-width:44px; }
-}
-
+/* 减少动效偏好 */
 @media (prefers-reduced-motion: reduce) {
-  .dice-btn { transition:none; }
-  .act-btn { transition:none; }
+  .dice-btn, .act-btn, .start-button, .confirm-button, .retry-button,
+  .username-input, .password-input, .progress-bar::after { transition: none; }
+  .silhouette { animation: none; }
 }
-
-/* 1900 地域语法：欢迎页、加载页与 SVG 地图统一视觉 */
-.start-page,.login-page,.loading-page{background:#2C2E33;color:#E6DCC3;font-family:Georgia,"Songti SC",serif}
-.start-page:before,.loading-page:before{content:"";position:absolute;inset:18px;border:1px solid rgba(230,220,195,.28);pointer-events:none}
-.game-title,.loading-title,.login-title{font-family:Georgia,"Songti SC",serif;color:#E6DCC3;letter-spacing:.08em;text-shadow:none}
-.subtitle,.loading-detail,.progress-text,.lang-label{color:#9AA0A6!important}
-.start-button,.retry-button,.confirm-button{background:#D95A2B!important;color:#FBF8F1!important;border:1px solid #4A2C2A!important;border-radius:1px!important;box-shadow:2px 2px 0 #4A2C2A!important}
-.start-button:hover,.retry-button:hover,.confirm-button:hover{background:#EF6A36!important}
-.silhouette{opacity:.2;filter:none}
-.loading-spinner,.spinner{border-color:#4A2C2A!important;border-top-color:#D95A2B!important}
-.progress-container{width:300px}.progress-bar{height:6px;background:#4A2C2A;border-radius:0}.progress-bar>div{background:#D95A2B}
-.interactive-map-surface{position:absolute;inset:0;z-index:2;pointer-events:auto;background:var(--gp-map-bg);background-image:repeating-linear-gradient(90deg,color-mix(in srgb,var(--gp-fg) 3%,transparent) 0 1px,transparent 1px 6px),repeating-linear-gradient(0deg,color-mix(in srgb,var(--gp-fg) 2%,transparent) 0 1px,transparent 1px 6px)}
-.game-page .board-container{z-index:1;background:var(--gp-map-bg)}.game-page #game-canvas{opacity:0;pointer-events:none}
-.interactive-map-surface__svg{width:100%;height:100%;display:block;overflow:visible}.map-link{stroke:var(--gp-link);stroke-width:8;stroke-linecap:round}.map-node{cursor:pointer}.map-node__shape{fill:var(--gp-cell-bg);stroke:var(--gp-border);stroke-width:3}.map-node:hover .map-node__shape{fill:var(--gp-card);stroke:var(--gp-accent);stroke-width:5}.map-node__type{fill:var(--gp-muted);font:700 13px "SF Mono",monospace;letter-spacing:.08em}.map-node__name{fill:var(--gp-fg);font:900 19px Georgia,"Songti SC",serif}.map-node__price{fill:var(--gp-accent);font:700 15px "SF Mono",monospace}.map-node--event .map-node__shape{stroke:var(--gp-accent)}.map-node--transport .map-node__shape{stroke:var(--gp-link)}.map-node--start .map-node__shape{stroke:var(--gp-cell-property-fill)}.map-node--monument .map-node__shape{stroke:var(--gp-accent)}
-
-.map-player{pointer-events:none;filter:drop-shadow(0 3px 2px var(--gp-shadow-color,rgba(0,0,0,.45)))}.map-player__head{fill:var(--gp-player-head,#F2E9D8);stroke:var(--gp-player-outline,#1A1A1A);stroke-width:4}.map-player__body{fill:var(--gp-player-color,var(--gp-accent,#C0392B));stroke:var(--gp-player-outline,#1A1A1A);stroke-width:4;stroke-linejoin:round}
-
-/* 严格全屏地图覆盖层布局 */
-.game-page{position:relative;overflow:hidden;background:var(--gp-map-bg)}
-.game-page .board-container{position:absolute;inset:0;z-index:1;width:100%;height:100%;overflow:hidden}
-.game-hud-shell{position:absolute;inset:0;z-index:20;pointer-events:none}
-.game-hud-shell .gp-layout{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.game-hud-shell .gp-layout>*{pointer-events:auto}
-.gp-topbar{position:absolute!important;inset:0 0 auto 0!important;height:76px!important;z-index:30!important;background:linear-gradient(180deg,color-mix(in srgb,var(--gp-bar-bg) 78%,transparent) 0%,transparent 100%)!important;border-bottom:none!important}
-.gp-actionbar{position:absolute!important;inset:auto 0 0 0!important;height:112px!important;z-index:30!important;background:linear-gradient(0deg,color-mix(in srgb,var(--gp-bar-bg) 78%,transparent) 0%,transparent 100%)!important;border-top:none!important}
-.hud-chat-dock{z-index:32!important;bottom:128px!important}
-.cell-hover-card{z-index:40!important}
-@media(max-width:700px){.gp-topbar{height:64px!important}.gp-actionbar{height:94px!important}.hud-chat-dock{bottom:106px!important;left:10px!important;width:260px!important}.cell-hover-card{width:190px!important}}
-
-/* ===== 登录 / 加载页：1900 地域语法最小实现 ===== */
-.login-page,.loading-page{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#2C2E33;color:#E6DCC3;position:relative;overflow:hidden}
-.login-page::before,.loading-page::before{content:"";position:absolute;inset:18px;border:1px solid rgba(230,220,195,.28);pointer-events:none}
-.login-page::after,.loading-page::after{content:"";position:absolute;inset:0;opacity:.16;pointer-events:none;background:repeating-linear-gradient(90deg,rgba(255,255,255,.08) 0 1px,transparent 1px 6px),repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 2px,transparent 2px 7px)}
-.auth-eyebrow{position:relative;z-index:2;color:#D95A2B;font:700 10px "SF Mono",Menlo,monospace;letter-spacing:.16em;margin-bottom:2px}
-.login-title,.loading-title{position:relative;z-index:2;color:#E6DCC3;font:900 clamp(30px,4vw,54px) Georgia,"Songti SC",serif;letter-spacing:.06em;text-shadow:none;text-align:center;margin:0}
-.login-title::after,.loading-title::after{content:"";display:block;width:42px;height:3px;background:#D95A2B;margin:14px auto 0}
-.login-card,.loading-card{position:relative;z-index:2;width:min(420px,calc(100vw - 48px));padding:30px;background:#34373D;border:1px solid #4A2C2A;border-radius:2px;box-shadow:4px 4px 0 rgba(74,44,42,.75);animation:slideUp .4s ease-out}
-.login-card{display:flex;flex-direction:column;gap:9px}
-.auth-label{color:#9AA0A6;font:700 10px "SF Mono",Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;margin-top:5px}
-.username-input,.password-input{width:100%;height:44px;padding:0 12px;border:1px solid #6A5148;border-radius:1px;background:#2C2F35;color:#E6DCC3;outline:none;font:15px Georgia,"Songti SC",serif;transition:border-color .15s,box-shadow .15s}
-.username-input:focus,.password-input:focus{border-color:#D95A2B;box-shadow:0 0 0 2px rgba(217,90,43,.2)}
-.username-input::placeholder,.password-input::placeholder{color:#777B7C}
-.auth-helper{position:relative;z-index:2;color:#9AA0A6;font-size:11px;letter-spacing:.03em}
-.auth-actions{position:relative;z-index:2;display:flex;flex-direction:column;gap:9px;width:min(420px,calc(100vw - 48px))}
-.confirm-button,.retry-button{width:100%;background:#D95A2B;color:#FBF8F1;border:1px solid #4A2C2A;border-radius:1px;box-shadow:2px 2px 0 #4A2C2A;padding:12px 16px}
-.confirm-button:hover:not(:disabled),.retry-button:hover{background:#EF6A36;transform:translate(-1px,-1px)}
-.guest-button{width:100%;background:transparent;color:#E6DCC3;border:1px solid #6A5148;border-radius:1px;padding:11px 16px}
-.guest-button:hover{color:#D95A2B;border-color:#D95A2B;background:rgba(217,90,43,.08)}
-.error-container{margin-top:12px;padding:10px;border:1px solid #8C4E3A;background:rgba(140,78,58,.16);color:#E6DCC3;font-size:12px}
-.loading-card{text-align:center;display:flex;flex-direction:column;align-items:center;gap:18px}
-.loading-card .loading-title{font-size:28px}
-.spinner,.loading-spinner{width:46px;height:46px;border:3px solid #4A2C2A;border-top-color:#D95A2B;border-radius:50%;animation:spin 1s linear infinite}
-.progress-container{width:100%;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
-.progress-bar{grid-column:1/-1;width:100%;height:7px;background:#25282E;border:1px solid #4A2C2A;border-radius:0;overflow:hidden}
-.progress-bar::after{content:"";display:block;width:var(--progress,0%);height:100%;background:#D95A2B;transition:width .25s ease}
-.progress-text{color:#D95A2B;font:700 12px "SF Mono",Menlo,monospace;justify-self:end}
-@media(max-width:600px){.login-page::before,.loading-page::before{inset:10px}.login-card,.loading-card{padding:24px}.login-title{font-size:34px}.loading-card .loading-title{font-size:24px}}
-
-/* Auth page semantic tokens: page components consume names, not raw visual values. */
-:root{--auth-bg:#2C2E33;--auth-fg:#E6DCC3;--auth-card:#34373D;--auth-surface:#2C2F35;--auth-muted:#9AA0A6;--auth-accent:#D95A2B;--auth-accent-hover:#EF6A36;--auth-border:#4A2C2A;--auth-border-soft:#6A5148;--auth-error:#8C4E3A;--auth-track:#25282E;--auth-paper:#FBF8F1;--auth-radius:2px;--auth-card-width:420px;--auth-field-height:44px;--auth-frame-padding:30px;--auth-shadow:4px 4px 0 rgba(74,44,42,.75)}
-.login-page,.loading-page{background:var(--auth-bg);color:var(--auth-fg)}
-.login-page::before,.loading-page::before{border-color:color-mix(in srgb,var(--auth-fg) 28%,transparent)}
-.auth-eyebrow{color:var(--auth-accent)}
-.login-title,.loading-title{color:var(--auth-fg)}
-.login-title::after,.loading-title::after{background:var(--auth-accent)}
-.login-card,.loading-card{width:min(var(--auth-card-width),calc(100vw - 48px));padding:var(--auth-frame-padding);background:var(--auth-card);border-color:var(--auth-border);border-radius:var(--auth-radius);box-shadow:var(--auth-shadow)}
-.auth-label,.auth-helper{color:var(--auth-muted)}
-.username-input,.password-input{height:var(--auth-field-height);border-color:var(--auth-border-soft);border-radius:var(--auth-radius);background:var(--auth-surface);color:var(--auth-fg)}
-.username-input:focus,.password-input:focus{border-color:var(--auth-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--auth-accent) 20%,transparent)}
-.confirm-button,.retry-button{background:var(--auth-accent);color:var(--auth-paper);border-color:var(--auth-border);border-radius:var(--auth-radius);box-shadow:2px 2px 0 var(--auth-border)}
-.confirm-button:hover:not(:disabled),.retry-button:hover{background:var(--auth-accent-hover)}
-.guest-button{background:transparent;color:var(--auth-fg);border-color:var(--auth-border-soft);border-radius:var(--auth-radius)}
-.guest-button:hover{color:var(--auth-accent);border-color:var(--auth-accent);background:color-mix(in srgb,var(--auth-accent) 8%,transparent)}
-.error-container{border-color:var(--auth-error);background:color-mix(in srgb,var(--auth-error) 16%,transparent);color:var(--auth-fg)}
-.spinner,.loading-spinner{border-color:var(--auth-border);border-top-color:var(--auth-accent)}
-.progress-bar{background:var(--auth-track);border-color:var(--auth-border)}
-.progress-bar::after{background:var(--auth-accent)}
-.progress-text{color:var(--auth-accent)!important}

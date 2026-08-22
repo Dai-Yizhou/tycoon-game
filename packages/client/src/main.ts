@@ -22,6 +22,8 @@ import {
   createBankruptcyPage,
   cleanupBankruptcyPage,
 } from './pages/index.js';
+import { DesignAdapter } from './design/DesignAdapter.js';
+import { getThemeTokens } from './design/ThemeConfig.js';
 import './style.css';
 
 function disableZoom(): void {
@@ -64,6 +66,13 @@ function bootstrap(): void {
   }
 
   app.innerHTML = '';
+
+  // 在根节点注入主题令牌：欢迎/登录/加载/破产等独立页面不持有自己的 DesignAdapter，
+  // 统一从 :root 继承；游戏页再在自身元素上按地区覆盖。默认取 northeast 主题。
+  const rootSnapshot = new DesignAdapter(getThemeTokens()).createSnapshot('day');
+  for (const [name, value] of Object.entries(rootSnapshot.dom)) {
+    document.documentElement.style.setProperty(name, value);
+  }
 
   const controller = new GameController(app);
 

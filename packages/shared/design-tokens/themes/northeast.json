@@ -128,10 +128,134 @@
         "$value": "#555",
         "$type": "color"
       }
+    },
+    "player": {
+      "red": {
+        "$value": "#C0392B",
+        "$type": "color"
+      },
+      "blue": {
+        "$value": "#2C5F8D",
+        "$type": "color"
+      },
+      "green": {
+        "$value": "#4A7C3F",
+        "$type": "color"
+      }
+    },
+    "region": {
+      "board": {
+        "$value": "#2C2E33",
+        "$type": "color"
+      },
+      "fg": {
+        "$value": "#E6DCC3",
+        "$type": "color"
+      },
+      "border": {
+        "$value": "#4A2C2A",
+        "$type": "color"
+      },
+      "borderWidth": {
+        "$value": 1,
+        "$type": "number"
+      },
+      "radius": {
+        "$value": 1,
+        "$type": "number"
+      },
+      "chipRadius": {
+        "$value": 1,
+        "$type": "number"
+      },
+      "accent": {
+        "$value": "#D95A2B",
+        "$type": "color"
+      },
+      "accentHover": {
+        "$value": "#EF6A36",
+        "$type": "color"
+      },
+      "labelFg": {
+        "$value": "#9AA0A6",
+        "$type": "color"
+      },
+      "motionFg": {
+        "$value": "#C9A98A",
+        "$type": "color"
+      },
+      "ruleColor": {
+        "$value": "rgba(230,220,195,0.22)",
+        "$type": "color"
+      },
+      "cellBg": {
+        "$value": "#34373D",
+        "$type": "color"
+      },
+      "cellBorder": {
+        "$value": "#4A2C2A",
+        "$type": "color"
+      },
+      "boxBg": {
+        "$value": "#34373D",
+        "$type": "color"
+      },
+      "tabBg": {
+        "$value": "#34373D",
+        "$type": "color"
+      },
+      "fragBg": {
+        "$value": "#34373D",
+        "$type": "color"
+      },
+      "btnFg": {
+        "$value": "#FBF8F1",
+        "$type": "color"
+      },
+      "focus": {
+        "$value": "#D95A2B",
+        "$type": "color"
+      },
+      "focusWidth": {
+        "$value": 2,
+        "$type": "number"
+      },
+      "cycleDay": {
+        "$value": "#E8C84A",
+        "$type": "color"
+      },
+      "cycleNight": {
+        "$value": "#3A4A6B",
+        "$type": "color"
+      },
+      "error": {
+        "$value": "#C0392B",
+        "$type": "color"
+      }
     }
   },
   "dimension": {
     "piece": {
+      "width": {
+        "$value": 32,
+        "$type": "number"
+      },
+      "headDiameter": {
+        "$value": 22,
+        "$type": "number"
+      },
+      "torsoTop": {
+        "$value": 16,
+        "$type": "number"
+      },
+      "torsoBottom": {
+        "$value": 26,
+        "$type": "number"
+      },
+      "torsoHeight": {
+        "$value": 30,
+        "$type": "number"
+      },
       "outline": {
         "$value": 3,
         "$type": "number"
@@ -162,6 +286,12 @@
         "$value": 0.12,
         "$type": "number"
       }
+    },
+    "region": {
+      "background": {
+        "$value": "repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 4px), repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 4px), repeating-linear-gradient(0deg, rgba(0,0,0,0.20) 0 2px, transparent 2px 6px)",
+        "$type": "string"
+      }
     }
   },
   "font": {
@@ -171,6 +301,14 @@
     },
     "body": {
       "$value": "Noto Sans SC, PingFang SC, sans-serif",
+      "$type": "fontFamily"
+    },
+    "title": {
+      "$value": "Georgia, 'Times New Roman', 'Songti SC', serif",
+      "$type": "fontFamily"
+    },
+    "func": {
+      "$value": "'Arial Narrow', -apple-system, 'PingFang SC', sans-serif",
       "$type": "fontFamily"
     },
     "number": {
