@@ -38,20 +38,27 @@ function buildLinearMap(n: number): MapData {
       x: i * 10,
       y: 0,
       destinations: dests,
-      extra: { type: i === 0 ? 'start' : 'property', name: `cell-${i}` },
+      extra: {
+        type: i === 0 ? 'start' : 'property',
+        region: 'test-region',
+        theme: 'northeast',
+        timezone: 480,
+        name: { 'zh-CN': `格子${i}`, 'en-US': `Cell ${i}` },
+        description: { 'zh-CN': `格子${i}描述`, 'en-US': `Cell ${i} description` },
+      },
     });
   }
   return cells;
 }
 
-function buildMapMeta(id: string = 'map-1'): MapMeta {
+function buildMapMeta(id: string = 'map-1', cellIds: number[] = []): MapMeta {
   return {
     id,
     name: `Map ${id}`,
     version: '1.0.0',
     templateName: 'default',
     timezones: [],
-    regions: [],
+    regions: [{ id: 'test-region', name: 'Test Region', cellIds, prosperity: 100 }],
     valueFieldDefinitions: [
       { id: 'money', name: '金钱', current: 1000 },
     ],
@@ -125,7 +132,7 @@ describe('GameWorld', () => {
     it('loadMap stores data and builds index', () => {
       const world = new GameWorld();
       const map = buildLinearMap(5);
-      const meta = buildMapMeta();
+      const meta = buildMapMeta('map-1', map.map((cell) => cell.id));
       const result = world.loadMap(map, meta);
       expect(result.valid).toBe(true);
       expect(world.getMapData()).toBe(map);
@@ -138,7 +145,8 @@ describe('GameWorld', () => {
 
     it('buildInitialPlayerValues uses map definitions', () => {
       const world = new GameWorld();
-      world.loadMap(buildLinearMap(3), buildMapMeta());
+      const map3 = buildLinearMap(3);
+      world.loadMap(map3, buildMapMeta('map-1', map3.map((cell) => cell.id)));
       const values = world.buildInitialPlayerValues();
       expect(values['money']).toBeDefined();
       expect(values['money']?.current).toBe(1000);
@@ -304,7 +312,8 @@ describe('GameWorld', () => {
       const world = new GameWorld();
       const handler = jest.fn();
       world.on(WorldEvents.MapLoaded, handler);
-      world.loadMap(buildLinearMap(3), buildMapMeta());
+      const map3 = buildLinearMap(3);
+      world.loadMap(map3, buildMapMeta('map-1', map3.map((cell) => cell.id)));
       expect(handler).toHaveBeenCalled();
       const arg = handler.mock.calls[0]?.[0] as { mapId: string; cellCount: number };
       expect(arg.mapId).toBe('map-1');

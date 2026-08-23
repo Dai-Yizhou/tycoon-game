@@ -11,6 +11,7 @@
 import type { MapData } from '../types/cell';
 import {
   DEFAULT_DAY_NIGHT_CYCLE_MINUTES,
+  isThemeId,
   type MapMeta,
   type Region,
   type TimeZone,
@@ -37,46 +38,6 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     return null;
   }
   return value as Record<string, unknown>;
-}
-
-/**
- * 解析单个 TimeZone
- *
- * 错误降级：缺少必填字段返回 null，由调用方过滤
- * 支持层级结构：子时区通过 parentId 指向父时区
- */
-function parseTimeZone(raw: unknown): TimeZone | null {
-  const record = asRecord(raw);
-  if (!record) return null;
-
-  const id = record['id'];
-  if (typeof id !== 'string' || id.length === 0) {
-    return null;
-  }
-
-  const nameRaw = record['name'];
-  const name = typeof nameRaw === 'string' ? nameRaw : undefined;
-
-  const offsetMinutesRaw = record['offsetMinutes'];
-  const offsetMinutes =
-    typeof offsetMinutesRaw === 'number' && Number.isFinite(offsetMinutesRaw)
-      ? offsetMinutesRaw
-      : 0;
-
-  const cellIdsRaw = record['cellIds'];
-  const cellIds: number[] = Array.isArray(cellIdsRaw)
-    ? cellIdsRaw.filter((c) => typeof c === 'number' && Number.isFinite(c))
-    : [];
-
-  const parentIdRaw = record['parentId'];
-  const parentId = typeof parentIdRaw === 'string' && parentIdRaw.length > 0
-    ? parentIdRaw
-    : undefined;
-
-  const result: TimeZone = { id, offsetMinutes, cellIds };
-  if (name !== undefined) result.name = name;
-  if (parentId !== undefined) result.parentId = parentId;
-  return result;
 }
 
 /**
@@ -154,6 +115,44 @@ function parseValueField(raw: unknown): ValueField | null {
 }
 
 /**
+ * 解析单个 TimeZone（已弃用）
+ *
+ * 仅为兼容旧配置格式而保留；运行时不再使用，每个格子的 `timezone`（数字偏移）才是权威来源。
+ */
+function parseTimeZone(raw: unknown): TimeZone | null {
+  const record = asRecord(raw);
+  if (!record) return null;
+
+  const id = record['id'];
+  if (typeof id !== 'string' || id.length === 0) {
+    return null;
+  }
+
+  const nameRaw = record['name'];
+  const name = typeof nameRaw === 'string' ? nameRaw : undefined;
+
+  const offsetRaw = record['offsetMinutes'];
+  const offsetMinutes =
+    typeof offsetRaw === 'number' && Number.isFinite(offsetRaw) ? offsetRaw : 0;
+
+  const cellIdsRaw = record['cellIds'];
+  const cellIds: number[] = Array.isArray(cellIdsRaw)
+    ? cellIdsRaw.filter((c) => typeof c === 'number' && Number.isFinite(c))
+    : [];
+
+  const parentIdRaw = record['parentId'];
+  const parentId = typeof parentIdRaw === 'string' && parentIdRaw.length > 0 ? parentIdRaw : undefined;
+
+  return {
+    id,
+    ...(name !== undefined ? { name } : {}),
+    offsetMinutes,
+    cellIds,
+    ...(parentId !== undefined ? { parentId } : {}),
+  };
+}
+
+/**
  * 解析地图元数据
  *
  * 必填字段：id、name、version、startCellId
@@ -203,10 +202,11 @@ export function parseMapMeta(raw: unknown): MapMeta {
       : DEFAULT_DAY_NIGHT_CYCLE_MINUTES;
 
   const timezonesRaw = record['timezones'];
+  // 已弃用：时区偏移改由每个格子直接声明。仍解析以兼容旧配置文件。
   const timezones: TimeZone[] = Array.isArray(timezonesRaw)
     ? (timezonesRaw
-        .map((tz) => parseTimeZone(tz))
-        .filter((tz): tz is TimeZone => tz !== null))
+        .map((t) => parseTimeZone(t))
+        .filter((t): t is TimeZone => t !== null))
     : [];
 
   const regionsRaw = record['regions'];
@@ -243,8 +243,8 @@ export function parseMapMeta(raw: unknown): MapMeta {
     name,
     version,
     templateName,
-    timezones,
     regions,
+    timezones,
     valueFieldDefinitions,
     dayNightCycleMinutes,
     startCellId: startCellIdRaw,
@@ -261,7 +261,10 @@ export function parseMapMeta(raw: unknown): MapMeta {
  * 检查项：
  * 1. startCellId 在 map 中存在
  * 2. 数值字段定义无重复
- * 3. 时区/区域引用的格子 ID 存在
+ * 3. 每个格子必须声明有效的 region、theme 与数字 timezone 偏移
+ * 4. name/description 本地化映射完整（zh-CN 与 en-US）
+ *
+ * 时区不再通过元数据表间接引用：每个格子在 `map.json` 直接声明 `timezone`（UTC 偏移分钟数）。
  *
  * @param meta 地图元数据
  * @param map 地图数据
@@ -277,9 +280,9 @@ export function validateMapMeta(meta: MapMeta, map: MapData): ValidationResult {
   }
 
   const regionIds = new Set(meta.regions.map((region) => region.id));
-  const timezoneIds = new Set(meta.timezones.map((timezone) => timezone.id));
   for (const cell of map) {
     const region = cell.extra['region'];
+    const theme = cell.extra['theme'];
     const timezone = cell.extra['timezone'];
     const name = cell.extra['name'];
     const description = cell.extra['description'];
@@ -288,10 +291,11 @@ export function validateMapMeta(meta: MapMeta, map: MapData): ValidationResult {
     } else if (!regionIds.has(region)) {
       errors.push(`格子 #${cell.id} 引用了不存在的区域: ${region}`);
     }
-    if (typeof timezone !== 'string' || timezone.length === 0) {
-      errors.push(`格子 #${cell.id} 缺少有效的 timezone`);
-    } else if (!timezoneIds.has(timezone)) {
-      errors.push(`格子 #${cell.id} 引用了不存在的时区: ${timezone}`);
+    if (!isThemeId(theme)) {
+      errors.push(`格子 #${cell.id} 缺少有效的 theme（应为 ${['northeast', 'south', 'midwest', 'west'].join(' | ')}）`);
+    }
+    if (typeof timezone !== 'number' || Number.isNaN(timezone)) {
+      errors.push(`格子 #${cell.id} 缺少有效的 timezone（应为 UTC 偏移分钟数）`);
     }
     for (const [field, value] of [['name', name], ['description', description]] as const) {
       if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -321,18 +325,6 @@ export function validateMapMeta(meta: MapMeta, map: MapData): ValidationResult {
     seenFieldIds.add(def.id);
   }
 
-  // 3. 时区引用的格子存在
-  for (const tz of meta.timezones) {
-    const missing = tz.cellIds.filter((id) => !idSet.has(id));
-    if (missing.length > 0) {
-      errors.push(
-        `时区 ${tz.id} 引用了不存在的格子: ${missing.slice(0, 10).join(', ')}${
-          missing.length > 10 ? `（共 ${missing.length} 处）` : ''
-        }`,
-      );
-    }
-  }
-
   // 4. 区域引用的格子存在
   for (const region of meta.regions) {
     const missing = region.cellIds.filter((id) => !idSet.has(id));
@@ -349,12 +341,15 @@ export function validateMapMeta(meta: MapMeta, map: MapData): ValidationResult {
     warnings.push('地图未定义任何数值字段，玩家初始 values 为空');
   }
 
-  if (meta.timezones.length === 0) {
-    warnings.push('地图未定义任何时区，将使用全局时间');
-  }
-
   if (meta.regions.length === 0) {
     warnings.push('地图未定义任何区域');
+  }
+
+  // 已弃用：时区改由每个格子直接声明数字 timezone 偏移，旧 timezones 表不再参与校验。
+  if ((meta.timezones?.length ?? 0) > 0) {
+    warnings.push(
+      '检测到已弃用的 timezones 表：时区已改为格子直接声明数字 timezone 偏移，此表仅供兼容参考',
+    );
   }
 
   return {

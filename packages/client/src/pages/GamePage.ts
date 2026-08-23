@@ -46,7 +46,7 @@ import {
 
 import { registerSocketHandlers, unregisterSocketHandlers } from '../game/systems/SocketEventHandler.js';
 import { DesignAdapter } from '../design/DesignAdapter.js';
-import { getRegionThemeId, getThemeTokens } from '../design/ThemeConfig.js';
+import { getRegionThemeId, getThemeId, getThemeTokens } from '../design/ThemeConfig.js';
 
 let gameViewModel: GameViewModel | null = null;
 let gameStore: GameStore | null = null;
@@ -263,9 +263,15 @@ function applyGamePageThemeSnapshot(page: HTMLElement, snapshot: ReturnType<Desi
 function applyRegionTheme(page: HTMLElement, cellId: number): void {
   const snapshot = gameStore?.getSnapshot();
   const cell = snapshot?.cells.get(cellId);
-  const cellRegionId = typeof cell?.extra.region === 'string' ? cell.extra.region : undefined;
-  const region = snapshot?.mapRegions.find(candidate => candidate.id === cellRegionId);
-  const themeId = getRegionThemeId(region ?? { id: 'default' });
+
+  // 权威来源：格子 extra.theme 直接声明的 UI 主题令牌（northeast/south/midwest/west），
+  // 与 themeTokens 键一一对应。缺失/未知时回退到区域 themeId，再回退默认主题。
+  let themeId = getThemeId(cell?.extra.theme);
+  if (cell?.extra.theme == null) {
+    const cellRegionId = typeof cell?.extra.region === 'string' ? cell.extra.region : undefined;
+    const region = snapshot?.mapRegions.find(candidate => candidate.id === cellRegionId);
+    themeId = getRegionThemeId(region ?? { id: 'default' });
+  }
   applyGamePageThemeTokens(page, { tokens: getThemeTokens(themeId) });
 }
 

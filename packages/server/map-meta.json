@@ -5,23 +5,38 @@
   "templateName": "default",
   "startCellId": 0,
   "dayNightCycleMinutes": 15,
-  "timezones": [
-    {
-      "id": "tz-main",
-      "name": "主时区",
-      "offsetMinutes": 0,
-      "cellIds": [0, 1, 2, 3, 4, 5, 6, 7]
-    }
-  ],
   "regions": [
     {
-      "id": "region-main",
-      "name": "主区域",
-      "cellIds": [0, 1, 2, 3, 4, 5, 6, 7],
+      "id": "northeast",
+      "name": "东北区域",
+      "cellIds": [0, 1],
+      "prosperity": 85,
+      "environmentValue": 55,
+      "color": "#4A90D9"
+    },
+    {
+      "id": "south",
+      "name": "南部区域",
+      "cellIds": [2, 3],
       "prosperity": 80,
       "environmentValue": 50,
-      "color": "#4CAF50",
-      "themeId": "south"
+      "color": "#4CAF50"
+    },
+    {
+      "id": "midwest",
+      "name": "中西部区域",
+      "cellIds": [4, 5],
+      "prosperity": 75,
+      "environmentValue": 45,
+      "color": "#E0A33E"
+    },
+    {
+      "id": "west",
+      "name": "西部区域",
+      "cellIds": [6, 7],
+      "prosperity": 70,
+      "environmentValue": 40,
+      "color": "#8E5CB8"
     }
   ],
   "valueFieldDefinitions": [

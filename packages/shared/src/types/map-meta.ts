@@ -2,41 +2,12 @@
  * 地图元数据（MapMeta）类型定义
  *
  * 地图元数据描述一张地图的所有「配置信息」，与「格子的位置/连接信息」（`MapData`）分离。
- * 包含：
- * - 时区配置（昼夜周期与本地时间偏移）
- * - 区域配置（繁荣度等）
- * - 数值字段定义（财产、信用值、备选字段等）
- * - 自定义配置（地图编辑器定义的杂项）
+ * 时区偏移不再由此文件管理：每个格子在 `map.json` 中直接声明 `timezone`（UTC 偏移分钟数），
+ * 客户端与服务端均从格子读取偏移计算本地时间与昼夜。
+ * 区域配置（繁荣度等）与数值字段定义、自定义配置仍在此定义。
  */
 
 import type { ValueField } from './player.js';
-
-/**
- * 时区
- *
- * 不同时区有不同的本地时间（基于全局时间 + 偏移分钟数）。
- * 昼夜判定按本地时间计算。
- *
- * 支持层级结构：子时区通过 parentId 指向父时区，
- * 子时区继承父时区的偏移但有更详细的边界定义。
- */
-export interface TimeZone {
-  /** 时区 ID */
-  id: string;
-  /** 时区显示名（可选） */
-  name?: string;
-  /** 相对 UTC 偏移分钟数（可为负数）
-   *  若为子时区且未指定，则继承父时区的偏移
-   */
-  offsetMinutes: number;
-  /** 属于该时区的格子 ID 列表 */
-  cellIds: number[];
-  /**
-   * 父时区 ID（可选）
-   * 若设置，则此时区为子时区，继承父时区的偏移（除非自己指定了不同的 offsetMinutes）
-   */
-  parentId?: string;
-}
 
 export interface MapCellLocale {
   'zh-CN': string;
@@ -65,7 +36,41 @@ export interface Region {
    * 用于客户端地图渲染时的视觉区分
    */
   color?: string;
-  themeId?: 'northeast' | 'south' | 'midwest' | 'west';
+}
+
+/**
+ * 时区配置（已弃用）
+ *
+ * 以往通过此表间接引用格子所属时区。现在每个格子在 `map.json` 中直接声明
+ * `timezone`（UTC 偏移分钟数），运行时以格子直接偏移为权威来源。
+ * 本类型仅保留以兼容旧配置与既有测试，不再作为运行时数据来源。
+ */
+export interface TimeZone {
+  /** 时区 ID */
+  id: string;
+  /** 时区显示名（可选） */
+  name?: string;
+  /** 时区偏移（分钟） */
+  offsetMinutes: number;
+  /** 属于该时区的格子 ID 列表 */
+  cellIds: number[];
+  /** 父时区 ID（可选，继承父时区偏移） */
+  parentId?: string;
+}
+
+/**
+ * UI 主题令牌名称
+ *
+ * 与 `packages/client/src/design/ThemeConfig.ts` 中的 `themeTokens` 键一一对应。
+ * 每个格子在 `map.json` 中通过 `theme` 字段声明所采用的 UI 主题。
+ */
+export type ThemeId = 'northeast' | 'south' | 'midwest' | 'west';
+
+/**
+ * 校验一个值是否为合法的 UI 主题令牌名称
+ */
+export function isThemeId(value: unknown): value is ThemeId {
+  return value === 'northeast' || value === 'south' || value === 'midwest' || value === 'west';
 }
 
 /**
@@ -85,10 +90,14 @@ export interface MapMeta {
    * 引擎运行时按此模板解析 `Cell.extra`。
    */
   templateName: string;
-  /** 时区配置列表 */
-  timezones: TimeZone[];
   /** 区域配置列表 */
   regions: Region[];
+  /**
+   * 时区配置（已弃用）
+   *
+   * 古旧配置文件会带此字段；运行时不再使用，每个格子的 `timezone`（数字偏移）才是权威来源。
+   */
+  timezones?: TimeZone[];
   /**
    * 数值字段定义
    *

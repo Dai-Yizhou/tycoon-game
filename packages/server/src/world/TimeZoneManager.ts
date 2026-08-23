@@ -98,18 +98,60 @@ export class TimeZoneManager {
   }
 
   /**
-   * 初始化时区（从地图元数据）
-   * 支持层级结构：子时区通过 parentId 指向父时区
+   * 初始化时区（从地图格子直接读取）
+   *
+   * 权威来源：每个格子在 `map.json` 直接声明数字 `timezone`（UTC 偏移分钟数）。
+   * 以偏移值为键合成内部时区条目；旧配置 `mapMeta.timezones` 表仅作兼容回退。
    */
   private initializeTimezones(): void {
     const mapMeta = this.world.getMapMeta();
+    const mapData = this.world.getMapData();
     if (!mapMeta) {
       logger.warn('地图元数据未加载，无法初始化时区');
       return;
     }
 
-    const timezones = mapMeta.timezones;
-    if (!timezones || timezones.length === 0) {
+    const offsetKey = (offset: number) => `offset:${offset}`;
+
+    // 1. 以每个格子直接声明的数字偏移为准建立内部时区条目
+    let coveredCells = 0;
+    if (mapData) {
+      for (const cell of mapData) {
+        const offset = cell.extra?.['timezone'];
+        if (typeof offset !== 'number' || !Number.isFinite(offset)) continue;
+
+        const id = offsetKey(offset);
+        let tz = this.timezoneMap.get(id);
+        if (!tz) {
+          tz = { id, name: formatOffsetLabel(offset), offsetMinutes: offset, cellIds: [] };
+          this.timezoneMap.set(id, tz);
+        }
+        this.cellTimezoneMap.set(cell.id, id);
+        if (!tz.cellIds.includes(cell.id)) {
+          tz.cellIds.push(cell.id);
+        }
+        coveredCells++;
+      }
+    }
+
+    // 2. 兼容旧配置：从 timezones 表补充（仅当其格子未被直接偏移覆盖）
+    for (const tz of mapMeta.timezones ?? []) {
+      if (!this.timezoneMap.has(tz.id)) {
+        this.timezoneMap.set(tz.id, { ...tz, cellIds: [...(tz.cellIds ?? [])] });
+      }
+      for (const cellId of tz.cellIds ?? []) {
+        if (!this.cellTimezoneMap.has(cellId)) {
+          this.cellTimezoneMap.set(cellId, tz.id);
+        }
+      }
+      if (tz.parentId) {
+        const siblings = this.childrenMap.get(tz.parentId) ?? [];
+        siblings.push(tz.id);
+        this.childrenMap.set(tz.parentId, siblings);
+      }
+    }
+
+    if (this.timezoneMap.size === 0) {
       this.timezoneMap.set(this.defaultTimezoneId, {
         id: this.defaultTimezoneId,
         offsetMinutes: 0,
@@ -119,21 +161,9 @@ export class TimeZoneManager {
       return;
     }
 
-    for (const tz of timezones) {
-      this.timezoneMap.set(tz.id, tz);
-
-      for (const cellId of tz.cellIds) {
-        this.cellTimezoneMap.set(cellId, tz.id);
-      }
-
-      if (tz.parentId) {
-        const siblings = this.childrenMap.get(tz.parentId) ?? [];
-        siblings.push(tz.id);
-        this.childrenMap.set(tz.parentId, siblings);
-      }
-    }
-
-    logger.info(`时区初始化完成：${this.timezoneMap.size} 个时区（其中 ${this.childrenMap.size} 个有时区）`);
+    logger.info(
+      `时区初始化完成：${this.timezoneMap.size} 个时区（覆盖 ${coveredCells} 个格子），其中 ${this.childrenMap.size} 个有时区`,
+    );
   }
 
   /**
@@ -206,19 +236,28 @@ export class TimeZoneManager {
 
   /**
    * 获取格子所属时区
-   * 优先返回最具体的子时区
+   *
+   * 权威来源：格子 `extra.timezone` 声明的数字 UTC 偏移（分钟）。
+   * 若初始化时已建立索引则直接返回；否则按偏移解析（动态补录）。
    */
   getCellTimezone(cellId: number): TimeZone | undefined {
-    const timezoneId = this.cellTimezoneMap.get(cellId);
-    if (timezoneId) {
-      return this.timezoneMap.get(timezoneId);
+    const indexedId = this.cellTimezoneMap.get(cellId);
+    if (indexedId) {
+      const indexed = this.timezoneMap.get(indexedId);
+      if (indexed) return indexed;
     }
 
     const mapIndex = this.world.getMapIndex();
     if (mapIndex) {
       const cell = mapIndex.getById(cellId);
       if (cell) {
-        const cellTzId = cell.extra?.timezone as string | undefined;
+        const offset = cell.extra?.['timezone'];
+        if (typeof offset === 'number' && Number.isFinite(offset)) {
+          return this.ensureOffsetTimezone(offset, cellId);
+        }
+
+        // 兼容旧配置：格子 extra.timezone 可能是时区 ID（字符串），查表回退
+        const cellTzId = cell.extra?.['timezone'] as string | undefined;
         if (cellTzId) {
           const tz = this.timezoneMap.get(cellTzId);
           if (tz) {
@@ -230,6 +269,23 @@ export class TimeZoneManager {
     }
 
     return this.timezoneMap.get(this.defaultTimezoneId);
+  }
+
+  /**
+   * 按数字偏移获取（或动态创建）一个内部时区条目
+   */
+  private ensureOffsetTimezone(offset: number, cellId: number): TimeZone {
+    const id = `offset:${offset}`;
+    let tz = this.timezoneMap.get(id);
+    if (!tz) {
+      tz = { id, name: formatOffsetLabel(offset), offsetMinutes: offset, cellIds: [] };
+      this.timezoneMap.set(id, tz);
+    }
+    this.cellTimezoneMap.set(cellId, id);
+    if (!tz.cellIds.includes(cellId)) {
+      tz.cellIds.push(cellId);
+    }
+    return tz;
   }
 
   /**
@@ -556,4 +612,15 @@ export class TimeZoneManager {
  */
 export function createTimeZoneManager(world: GameWorld, dayNightCycle: DayNightCycle): TimeZoneManager {
   return new TimeZoneManager(world, dayNightCycle);
+}
+
+/**
+ * 将 UTC 偏移（分钟）格式化为可读标签，如 480 → "UTC+08:00"、-330 → "UTC-05:30"。
+ */
+function formatOffsetLabel(offsetMinutes: number): string {
+  const sign = offsetMinutes < 0 ? '-' : '+';
+  const abs = Math.abs(offsetMinutes);
+  const hours = Math.floor(abs / 60);
+  const minutes = abs % 60;
+  return `UTC${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 }

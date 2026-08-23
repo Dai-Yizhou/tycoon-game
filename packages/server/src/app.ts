@@ -237,7 +237,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
         const rawMeta = JSON.parse(readFileSync(mapMetaPath, 'utf-8'));
         const mapMeta = parseMapMeta(rawMeta);
         regions = mapMeta.regions;
-        timezones = mapMeta.timezones;
+        timezones = mapMeta.timezones ?? [];
         valueFieldDefinitions = mapMeta.valueFieldDefinitions;
       } catch {
         // map-meta.json 不存在时使用空数组

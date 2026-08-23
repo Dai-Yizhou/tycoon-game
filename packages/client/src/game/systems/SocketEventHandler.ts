@@ -7,6 +7,7 @@
 
 import type { TypedClientSocket } from '../../hooks/useSocket.js';
 import { t, localizedText } from '../i18n.js';
+import { resolveTimezoneOffsetMinutes } from '../timezone.js';
 import type { OtherPlayerInfo } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
 import { startServerPathAnimation } from './MovementSystem.js';
@@ -67,10 +68,11 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   // 时区变化
   socket.on('server.timezoneChanged', (payload: { toTimezoneName?: string; toTimezoneId?: string }) => {
     const tzName = payload.toTimezoneName || payload.toTimezoneId || '';
-    const cell = store.getSnapshot().cells.get(store.getSnapshot().currentPlayerPosition);
-    const timezone = typeof cell?.extra.timezone === 'string' ? store.getSnapshot().mapTimezones.find(item => item.id === cell.extra.timezone) : undefined;
-    const serverElapsed = Date.now() + store.getSnapshot().serverTimeOffset - store.getSnapshot().dayNightStartTime;
-    const localProgress = ((serverElapsed / (15 * 60 * 1000)) + (timezone?.offsetMinutes ?? 0) / (24 * 60)) % 1;
+    const snapshot = store.getSnapshot();
+    const cell = snapshot.cells.get(snapshot.currentPlayerPosition);
+    const offsetMinutes = resolveTimezoneOffsetMinutes(cell, snapshot.mapTimezones);
+    const serverElapsed = Date.now() + snapshot.serverTimeOffset - snapshot.dayNightStartTime;
+    const localProgress = ((serverElapsed / (15 * 60 * 1000)) + offsetMinutes / (24 * 60)) % 1;
     const totalMinutes = Math.floor(localProgress * 24 * 60);
     const timeStr = `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
     const isDay = totalMinutes >= 6 * 60 && totalMinutes < 18 * 60;

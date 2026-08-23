@@ -12,6 +12,7 @@
 import type { Player } from '@game/shared';
 import type { GameStore, ClientGameSnapshot, ClientChatMessage } from '../state/GameStore.js';
 import { localizedText } from './i18n.js';
+import { resolveTimezoneOffsetMinutes } from './timezone.js';
 
 // ===== 状态切片类型定义 =====
 
@@ -338,10 +339,6 @@ export class GameViewModel {
     return { mapRegions: snapshot.mapRegions, valueFieldDefs: snapshot.valueFieldDefs, regionProsperityMap: snapshot.regionProsperityMap };
   }
 
-  getTimezone(timezoneId: string): import('../state/GameStore.js').TimeZoneInfo | null {
-    return this.projectedSnapshot().mapTimezones.find(timezone => timezone.id === timezoneId) ?? null;
-  }
-
   // ===== Chat =====
   getChat(): ChatSlice {
     const snapshot = this.projectedSnapshot();
@@ -381,21 +378,19 @@ export class GameViewModel {
   // ===== 工具方法 =====
 
   /**
-   * 获取当前玩家所在时区
+   * 获取当前玩家所在格子的时区偏移（分钟）
    */
-  getPlayerTimezone(): string {
+  getPlayerTimezoneOffset(): number {
     const cell = this.projectedSnapshot().cells.get(this.projectedSnapshot().currentPlayerPosition);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return cell ? String(cell.extra.timezone ?? '') : '';
+    return resolveTimezoneOffsetMinutes(cell, this.projectedSnapshot().mapTimezones);
   }
 
   /**
-   * 基于服务器时间 + 时区计算本地昼夜状态
+   * 基于服务器时间 + 时区偏移计算本地昼夜状态
    */
-  getLocalDayNight(timezone: string): {
+  getLocalDayNight(offsetMinutes: number): {
     isDay: boolean; progress: number; hour: number; minute: number; timeStr: string;
   } {
-    const offsetMinutes = this.getTimezone(timezone)?.offsetMinutes ?? 0;
     const dayNight = this.getDayNight();
     const serverNow = Date.now() + dayNight.serverTimeOffset;
     const serverElapsed = serverNow - dayNight.cycleStartTime;

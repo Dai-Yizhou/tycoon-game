@@ -84,7 +84,13 @@ describe('server app', () => {
       expect(res.status).toBe(200);
       expect(res.body.mapData).toHaveLength(8);
       expect(res.body.mapData[0]).toEqual(expect.objectContaining({ id: 0, x: 400, y: 300 }));
-      expect(res.body.regions).toHaveLength(1);
+      expect(res.body.regions).toHaveLength(4);
+      expect((res.body.regions as Array<{ id: string }>).map((r) => r.id)).toEqual([
+        'northeast',
+        'south',
+        'midwest',
+        'west',
+      ]);
     });
   });
 

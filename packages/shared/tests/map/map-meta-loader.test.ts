@@ -40,9 +40,9 @@ const VALID_META: MapMeta = {
 };
 
 const SAMPLE_MAP: MapData = [
-  { id: 0, x: 0, y: 0, destinations: [1], extra: { type: 'start', region: 'r1', timezone: 'tz-day', name: { 'zh-CN': '起点', 'en-US': 'Start' }, description: { 'zh-CN': '起点', 'en-US': 'Start' } } },
-  { id: 1, x: 10, y: 0, destinations: [0, 2], extra: { type: 'property', region: 'r1', timezone: 'tz-day', name: { 'zh-CN': '地产', 'en-US': 'Property' }, description: { 'zh-CN': '地产', 'en-US': 'Property' } } },
-  { id: 2, x: 20, y: 0, destinations: [1], extra: { type: 'property', region: 'r1', timezone: 'tz-night', name: { 'zh-CN': '地产二', 'en-US': 'Property Two' }, description: { 'zh-CN': '地产二', 'en-US': 'Property Two' } } },
+  { id: 0, x: 0, y: 0, destinations: [1], extra: { type: 'start', region: 'r1', theme: 'northeast', timezone: 0, name: { 'zh-CN': '起点', 'en-US': 'Start' }, description: { 'zh-CN': '起点', 'en-US': 'Start' } } },
+  { id: 1, x: 10, y: 0, destinations: [0, 2], extra: { type: 'property', region: 'r1', theme: 'south', timezone: 60, name: { 'zh-CN': '地产', 'en-US': 'Property' }, description: { 'zh-CN': '地产', 'en-US': 'Property' } } },
+  { id: 2, x: 20, y: 0, destinations: [1], extra: { type: 'property', region: 'r1', theme: 'west', timezone: -300, name: { 'zh-CN': '地产二', 'en-US': 'Property Two' }, description: { 'zh-CN': '地产二', 'en-US': 'Property Two' } } },
 ];
 
 describe('map-meta-loader - parseMapMeta', () => {
@@ -199,13 +199,13 @@ describe('map-meta-loader - validateMapMeta', () => {
     expect(result.errors.some((e) => /数值字段定义重复/.test(e))).toBe(true);
   });
 
-  it('时区引用不存在的格子时报错', () => {
+  it('已弃用的 timezones 表引用未知格子不会导致校验失败', () => {
     const meta = {
       ...VALID_META,
-      timezones: [{ id: 'tz1', offsetMinutes: 0, cellIds: [0, 99] }],
+      timezones: [{ id: 'tz1', offsetMinutes: 0, cellIds: [99] }],
     };
     const result = validateMapMeta(meta, SAMPLE_MAP);
-    expect(result.errors.some((e) => /不存在/.test(e))).toBe(true);
+    expect(result.valid).toBe(true);
   });
 
   it('区域引用不存在的格子时报错', () => {
@@ -242,10 +242,11 @@ describe('map-meta-loader - validateMapMeta', () => {
     expect(result.warnings.some((w) => /数值字段/.test(w))).toBe(true);
   });
 
-  it('timezones 为空时产生 warning', () => {
-    const meta = { ...VALID_META, timezones: [] };
+  it('存在已弃用的 timezones 表时产生 deprecation warning', () => {
+    const meta = { ...VALID_META, timezones: [{ id: 'tz1', offsetMinutes: 0, cellIds: [0] }] };
     const result = validateMapMeta(meta, SAMPLE_MAP);
-    expect(result.warnings.some((w) => /时区/.test(w))).toBe(true);
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((w) => /已弃用.*timezones/.test(w))).toBe(true);
   });
 
   it('regions 为空时产生 warning', () => {
@@ -271,7 +272,7 @@ describe('map-meta-loader - 集成', () => {
     };
     const meta = parseMapMeta(raw);
     const map: MapData = [
-      { id: 0, x: 0, y: 0, destinations: [], extra: { type: 'start', region: 'region', timezone: 'tz', name: { 'zh-CN': '起点', 'en-US': 'Start' }, description: { 'zh-CN': '起点', 'en-US': 'Start' } } } as Cell,
+      { id: 0, x: 0, y: 0, destinations: [], extra: { type: 'start', region: 'region', theme: 'northeast', timezone: 480, name: { 'zh-CN': '起点', 'en-US': 'Start' }, description: { 'zh-CN': '起点', 'en-US': 'Start' } } } as Cell,
     ];
     const result = validateMapMeta(meta, map);
     expect(result.valid).toBe(true);

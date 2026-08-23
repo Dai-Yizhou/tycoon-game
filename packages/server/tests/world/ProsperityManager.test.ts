@@ -38,6 +38,7 @@ const mockMapMeta: MapMeta = {
 const mockWorld = {
   getAllPlayers: jest.fn(() => []),
   getMapMeta: jest.fn(() => mockMapMeta),
+  getMapData: jest.fn(() => []),
   getMapIndex: jest.fn(() => ({
     getById: jest.fn((id: number) => ({
       id,

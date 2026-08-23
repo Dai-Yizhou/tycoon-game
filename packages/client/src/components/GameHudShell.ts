@@ -240,7 +240,7 @@ export class GameHudShell {
 
   /** 昼夜指示器 */
   private updateDayNight(): void {
-    const day = this.vm.getLocalDayNight(this.vm.getPlayerTimezone());
+    const day = this.vm.getLocalDayNight(this.vm.getPlayerTimezoneOffset());
     const timeEl = this.root.querySelector("[data-ui=day-time]")!;
     timeEl.textContent = `${day.isDay ? t("hud.dayShort") : t("hud.nightShort")} ${day.timeStr}`;
     const dotEl = this.root.querySelector("[data-ui=cycle-dot]")!;

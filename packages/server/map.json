@@ -4,8 +4,9 @@
     "x": 400,
     "y": 300,
     "destinations": [1, 7],
-    "region": "region-main",
-    "timezone": "tz-main",
+    "region": "northeast",
+    "theme": "northeast",
+    "timezone": 480,
     "name": {
       "zh-CN": "起点",
       "en-US": "Start"
@@ -29,8 +30,9 @@
     "x": 550,
     "y": 300,
     "destinations": [0, 2],
-    "region": "region-main",
-    "timezone": "tz-main",
+    "region": "northeast",
+    "theme": "northeast",
+    "timezone": 480,
     "name": {
       "zh-CN": "樱花大道",
       "en-US": "Sakura Avenue"
@@ -54,8 +56,9 @@
     "x": 680,
     "y": 350,
     "destinations": [1, 3],
-    "region": "region-main",
-    "timezone": "tz-main",
+    "region": "south",
+    "theme": "south",
+    "timezone": 330,
     "name": {
       "zh-CN": "事件",
       "en-US": "Event"
@@ -79,8 +82,9 @@
     "x": 720,
     "y": 480,
     "destinations": [2, 4, 5],
-    "region": "region-main",
-    "timezone": "tz-main",
+    "region": "south",
+    "theme": "south",
+    "timezone": 330,
     "name": {
       "zh-CN": "岔路口",
       "en-US": "Crossroads"
@@ -104,8 +108,9 @@
     "x": 650,
     "y": 580,
     "destinations": [3, 6],
-    "region": "region-main",
-    "timezone": "tz-main",
+    "region": "midwest",
+    "theme": "midwest",
+    "timezone": 0,
     "name": {
       "zh-CN": "交通枢纽",
       "en-US": "Transit Hub"
@@ -129,8 +134,9 @@
     "x": 520,
     "y": 600,
     "destinations": [3, 6],
-    "region": "region-main",
-    "timezone": "tz-main",
+    "region": "midwest",
+    "theme": "midwest",
+    "timezone": 0,
     "name": {
       "zh-CN": "投资中心",
       "en-US": "Investment Center"
@@ -154,8 +160,9 @@
     "x": 380,
     "y": 560,
     "destinations": [4, 5, 7],
-    "region": "region-main",
-    "timezone": "tz-main",
+    "region": "west",
+    "theme": "west",
+    "timezone": -480,
     "name": {
       "zh-CN": "监狱",
       "en-US": "Jail"
@@ -179,8 +186,9 @@
     "x": 250,
     "y": 450,
     "destinations": [6, 0],
-    "region": "region-main",
-    "timezone": "tz-main",
+    "region": "west",
+    "theme": "west",
+    "timezone": -480,
     "name": {
       "zh-CN": "纪念碑",
       "en-US": "Monument"

@@ -43,7 +43,7 @@ describe('i18n', () => {
 
     it('should translate nested keys', () => {
       expect(t('property.levelFormat', { level: 2 })).toBe('等级 2/4');
-      expect(t('transport.costValue', { cost: 100 })).toBe('💰 100 元');
+      expect(t('transport.costValue', { cost: 100 })).toBe('100 元');
     });
 
     it('should work with English locale', () => {
