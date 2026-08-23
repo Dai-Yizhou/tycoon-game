@@ -496,7 +496,7 @@ export class TransportHandler {
     // 检查是否有 behavior 字段（作为额外效果）
     const player = this.world.getPlayer(playerId);
     if (player) {
-      const behaviorId = getExtra<string>(hubCell, 'behavior', '') ?? '';
+      const behaviorId = hubCell.behavior ?? '';
       if (behaviorId && this.behaviorEngine) {
         const behaviorResult = this.behaviorEngine.executeBehavior(behaviorId, player, {
           cellType: CellTypes.Transport,
