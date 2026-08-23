@@ -1,5 +1,5 @@
 import type { GameEffectHooks } from "../game/GameEffects.js";
-import type { GameViewModel } from "../game/GameViewModel.js";
+import type { GameViewModel, ValueFieldDef } from "../game/GameViewModel.js";
 import { t, localizedText } from "../game/i18n.js";
 
 /** 时区偏移（分钟）→ "UTC±H:MM"；0 显示 "UTC+0" */
@@ -65,11 +65,7 @@ export class GameHudShell {
               <div class="player-badge__team" data-ui="player-team"></div>
             </div>
           </div>
-          <div class="value-pills" data-ui="resource-strip">
-            <div class="value-pill"><span class="value-pill__label" data-ui="pill-money"></span><span class="value-pill__num" data-ui="money">0</span></div>
-            <div class="value-pill value-pill--accent"><span class="value-pill__label" data-ui="pill-credit"></span><span class="value-pill__num" data-ui="credit">0</span></div>
-            <div class="value-pill"><span class="value-pill__label" data-ui="pill-env"></span><span class="value-pill__num" data-ui="env">0</span></div>
-          </div>
+          <div class="value-pills" data-ui="resource-strip"></div>
           <div class="topbar-spacer"></div>
           <div class="cycle-indicator" data-ui="day-night">
             <div class="cycle-dot" data-ui="cycle-dot"></div>
@@ -168,9 +164,6 @@ export class GameHudShell {
       const el = this.root.querySelector(selector);
       if (el) el.textContent = t(key);
     };
-    set("[data-ui=pill-money]", "hud.money");
-    set("[data-ui=pill-credit]", "hud.credit");
-    set("[data-ui=pill-env]", "hud.env");
     set('[data-action="roll"]', "dice.roll");
     set('[data-action="chat-send"]', "chat.send");
 
@@ -243,10 +236,12 @@ export class GameHudShell {
     // 时区偏移（分钟）→ UTC±H:MM
     const tzText = formatTimezoneOffset(Number(extra.timezone ?? 0));
 
-    const rows: Array<[string, string]> = [
-      [t("hud.price"), price ? `$${price}` : "—"],
-      [t("hud.level"), `Lv.${level}`],
-    ];
+    // 根据格子能力决定展示字段：仅价格>0（可购买）的格子显示价格，仅具备升级档位（可升级）的格子显示等级
+    const purchasable = price > 0;
+    const upgradeable = (Array.isArray(upgradeRaw) && upgradeRaw.length > 0) || (typeof upgradeRaw === 'number' && upgradeRaw > 0);
+    const rows: Array<[string, string]> = [];
+    if (purchasable) rows.push([t("hud.price"), `$${price}`]);
+    if (upgradeable) rows.push([t("hud.level"), level > 0 ? `Lv.${level}` : "—"]);
     if (rentText) rows.push([t("hud.rent"), rentText]);
     if (upgradeText) rows.push([t("hud.upgrade"), upgradeText]);
     rows.push([t("hud.holder"), holderText], [t("hud.timezone"), tzText]);
@@ -296,12 +291,38 @@ export class GameHudShell {
     teamEl.textContent = team.members.length > 1 ? t("hud.teamCount", { count: team.members.length }) : t("hud.lone");
   }
 
-  /** 顶部数值条（金钱/信用/环保） */
+  /** 顶部数值条：由地图 valueFieldDefinitions 驱动（名称/数量/作用域均随地图变化，不硬编码前端字段名） */
   private updateValuePills(): void {
     const player = this.vm.getPlayer();
-    for (const [key, value] of [["money", player.currentMoney], ["credit", player.currentCredit], ["env", player.currentEnv]] as const) {
-      this.root.querySelector(`[data-ui=${key}]`)!.textContent = String(Math.round(value));
-    }
+    const defs = this.vm.getRegions().valueFieldDefs;
+    const strip = this.root.querySelector("[data-ui=resource-strip]")!;
+    // 字段数值来源：
+    // - scope 'player'：直接从当前玩家的 values[def.id].current 读取
+    // - scope 'region'：从当前格子所属区域的 environmentValue 读取（可随地图更换名称/数量）
+    const playerValues = player.currentPlayer?.values ?? {};
+    const cell = this.vm.getCell(player.currentPlayerPosition);
+    const regionId = String(cell?.extra?.['region'] ?? "");
+    const region = this.vm.getRegions().mapRegions.find(r => r.id === regionId);
+    // 地图未提供字段定义时，退化到默认“财产”一栏，避免空栏
+    const slots: ValueFieldDef[] = defs.length > 0
+      ? defs
+      : [{ id: "money", name: t("hud.money"), scope: "player" }];
+    strip.replaceChildren(...slots.map((def, index) => {
+      const pill = document.createElement("div");
+      pill.className = `value-pill${index === 0 ? " value-pill--accent" : ""}`;
+      const label = document.createElement("span");
+      label.className = "value-pill__label";
+      label.textContent = localizedText(def.name, t("hud." + def.id));
+      const num = document.createElement("span");
+      num.className = "value-pill__num";
+      const raw = def.scope === "region"
+        ? region?.environmentValue ?? player.currentEnv
+        : playerValues[def.id]?.current ?? 0;
+      const value = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
+      num.textContent = String(Math.round(value));
+      pill.append(label, num);
+      return pill;
+    }));
   }
 
   /** 昼夜指示器 */
@@ -371,7 +392,7 @@ export class GameHudShell {
     const chat = this.vm.getChat();
     const msgsEl = this.root.querySelector("[data-ui=chat-messages]")!;
     const channelId = (channel: string): string => channel === "system" ? "system" : channel === "team" ? "team" : "region";
-    const recent = chat.history.filter(message => this.activeFilters.has(channelId(message.channel))).slice(-10);
+    const recent = chat.history.filter(message => this.activeFilters.has(channelId(message.channel))).slice(-50);
     if (recent.length > 0) {
       msgsEl.innerHTML = recent.map(m => {
         const chanKey = channelId(m.channel);

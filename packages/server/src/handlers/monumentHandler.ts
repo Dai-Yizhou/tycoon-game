@@ -77,6 +77,8 @@ export class MonumentHandler {
   private behaviorEngine: BehaviorEngine | null = null;
   /** 纪念碑状态映射 */
   private readonly monumentStates: Map<number, MonumentInternalState> = new Map();
+  /** 每位玩家本次停靠是否已修缮（停一次只能修缮一次，到达时重置） */
+  private readonly repairedThisVisit = new Map<string, boolean>();
   /** 最大繁荣度 */
   private readonly maxProsperity = 100;
 
@@ -196,6 +198,13 @@ export class MonumentHandler {
       if (cellType !== CellTypes.Monument) {
         emitError(socket, ErrorCodes.InvalidPayload, '该格子不是纪念碑');
         ack?.({ ok: false, error: 'not_monument' });
+        return;
+      }
+
+      // 5.1 本次停靠仅允许修缮一次
+      if (this.repairedThisVisit.get(playerId) === true) {
+        emitError(socket, ErrorCodes.InvalidPayload, '本次停靠已修缮过该纪念碑');
+        ack?.({ ok: false, error: 'already_repaired_this_visit' });
         return;
       }
 
@@ -323,6 +332,8 @@ export class MonumentHandler {
       const monumentState = this.monumentStates.get(monumentCell.id);
       if (monumentState) {
         monumentState.lastRepairTime = Date.now();
+        // 本次停靠已修缮，置位标记，直到再次离开后重新到达才允许再次修缮
+        this.repairedThisVisit.set(player.id, true);
       }
       if (this.prosperityManager) {
         // 通过 ProsperityManager 查找纪念碑所属区域并增加繁荣度
@@ -399,6 +410,10 @@ export class MonumentHandler {
 
     const monumentCell = mapIndex.getById(monumentId);
     if (!monumentCell) return;
+
+    // 玩家本次停靠（到达）时重置修缮标记，实现"停一次只能修缮一次"：
+    // 每次到达可修缮一次，修缮后置位，直到再次离开后重新到达才能再次修缮。
+    this.repairedThisVisit.set(playerId, false);
 
     const monumentState = this.monumentStates.get(monumentId);
     if (!monumentState) {

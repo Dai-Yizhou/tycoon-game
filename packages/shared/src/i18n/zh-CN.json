@@ -279,6 +279,7 @@
   },
   "investment": {
     "title": "投资项目",
+    "invest": "投资",
     "fullInvest": "全额投资 {{name}}",
     "coInvest": "合租投资 {{name}}",
     "price": "投资价格: {{price}} 元",

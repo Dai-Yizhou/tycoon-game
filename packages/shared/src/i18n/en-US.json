@@ -279,6 +279,7 @@
   },
   "investment": {
     "title": "Investment",
+    "invest": "Invest",
     "fullInvest": "Full Investment {{name}}",
     "coInvest": "Co-invest {{name}}",
     "price": "Price: {{price}}",
