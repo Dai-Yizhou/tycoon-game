@@ -11,6 +11,7 @@
 
 import type { Player } from '@game/shared';
 import type { GameStore, ClientGameSnapshot, ClientChatMessage } from '../state/GameStore.js';
+import { localizedText } from './i18n.js';
 
 // ===== 状态切片类型定义 =====
 
@@ -211,10 +212,6 @@ export const RARITY_LABELS: Record<string, string> = {
   epic: '史诗', legendary: '传奇', ultimate: '究极', unique: '唯一',
 };
 
-export const TIMEZONE_OFFSETS: Record<string, number> = {
-  'UTC-8': 0, 'UTC-4': 0.25, 'UTC+0': 0.5, 'UTC+4': 0.75,
-};
-
 export const CHAT_CHANNEL_DEFS: ChatChannelDef[] = [
   { id: 'system', label: '系统', color: '#6b7280' },
   { id: 'team', label: '队伍', color: '#3b82f6' },
@@ -341,13 +338,27 @@ export class GameViewModel {
     return { mapRegions: snapshot.mapRegions, valueFieldDefs: snapshot.valueFieldDefs, regionProsperityMap: snapshot.regionProsperityMap };
   }
 
+  getTimezone(timezoneId: string): import('../state/GameStore.js').TimeZoneInfo | null {
+    return this.projectedSnapshot().mapTimezones.find(timezone => timezone.id === timezoneId) ?? null;
+  }
+
   // ===== Chat =====
   getChat(): ChatSlice {
     const snapshot = this.projectedSnapshot();
-    return { activeChannels: new Set(['system']), history: snapshot.chatHistory };
+    return { activeChannels: new Set(['region', 'system', 'team']), history: snapshot.chatHistory };
   }
 
-  getPathChoice(): PathChoiceSlice { return this.projectedSnapshot().pathChoice; }
+  getPathChoice(): PathChoiceSlice {
+    const slice = this.projectedSnapshot().pathChoice;
+    const localizedOptions = slice.options.map(opt => ({
+      ...opt,
+      label: localizedText(opt.label, '')
+    }));
+    return {
+      ...slice,
+      options: localizedOptions
+    };
+  }
 
   getCell(cellId: number): import('@game/shared').Cell | null {
     return this.projectedSnapshot().cells.get(cellId) ?? null;
@@ -375,8 +386,7 @@ export class GameViewModel {
   getPlayerTimezone(): string {
     const cell = this.projectedSnapshot().cells.get(this.projectedSnapshot().currentPlayerPosition);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tz = cell ? (cell as any).extra?.timezone ?? (cell as any).timezone : null;
-    return tz || 'UTC+0';
+    return cell ? String(cell.extra.timezone ?? '') : '';
   }
 
   /**
@@ -385,11 +395,11 @@ export class GameViewModel {
   getLocalDayNight(timezone: string): {
     isDay: boolean; progress: number; hour: number; minute: number; timeStr: string;
   } {
-    const offset = TIMEZONE_OFFSETS[timezone] ?? 0;
+    const offsetMinutes = this.getTimezone(timezone)?.offsetMinutes ?? 0;
     const dayNight = this.getDayNight();
     const serverNow = Date.now() + dayNight.serverTimeOffset;
     const serverElapsed = serverNow - dayNight.cycleStartTime;
-    const localProgress = ((serverElapsed / dayNight.cycleDuration) + offset) % 1;
+    const localProgress = ((serverElapsed / dayNight.cycleDuration) + offsetMinutes / (24 * 60)) % 1;
     const totalMinutes = Math.floor(localProgress * 24 * 60);
     const hour = Math.floor(totalMinutes / 60);
     const minute = totalMinutes % 60;

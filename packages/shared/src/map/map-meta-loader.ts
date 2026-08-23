@@ -276,6 +276,37 @@ export function validateMapMeta(meta: MapMeta, map: MapData): ValidationResult {
     idSet.add(cell.id);
   }
 
+  const regionIds = new Set(meta.regions.map((region) => region.id));
+  const timezoneIds = new Set(meta.timezones.map((timezone) => timezone.id));
+  for (const cell of map) {
+    const region = cell.extra['region'];
+    const timezone = cell.extra['timezone'];
+    const name = cell.extra['name'];
+    const description = cell.extra['description'];
+    if (typeof region !== 'string' || region.length === 0) {
+      errors.push(`格子 #${cell.id} 缺少有效的 region`);
+    } else if (!regionIds.has(region)) {
+      errors.push(`格子 #${cell.id} 引用了不存在的区域: ${region}`);
+    }
+    if (typeof timezone !== 'string' || timezone.length === 0) {
+      errors.push(`格子 #${cell.id} 缺少有效的 timezone`);
+    } else if (!timezoneIds.has(timezone)) {
+      errors.push(`格子 #${cell.id} 引用了不存在的时区: ${timezone}`);
+    }
+    for (const [field, value] of [['name', name], ['description', description]] as const) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        errors.push(`格子 #${cell.id} 缺少有效的 ${field} 本地化映射`);
+        continue;
+      }
+      const locales = value as Record<string, unknown>;
+      for (const locale of ['zh-CN', 'en-US']) {
+        if (typeof locales[locale] !== 'string' || locales[locale].trim().length === 0) {
+          errors.push(`格子 #${cell.id} 的 ${field} 缺少 ${locale} 文本`);
+        }
+      }
+    }
+  }
+
   // 1. startCellId 存在
   if (!idSet.has(meta.startCellId)) {
     errors.push(`startCellId (${meta.startCellId}) 在地图中不存在`);

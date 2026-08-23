@@ -1,6 +1,6 @@
 import type { GameEffectHooks } from "../game/GameEffects.js";
 import type { GameViewModel } from "../game/GameViewModel.js";
-import { t } from "../game/i18n.js";
+import { t, localizedText } from "../game/i18n.js";
 
 export interface GameHudShellConfig {
   onRoll?: () => void;
@@ -30,6 +30,8 @@ export class GameHudShell {
   private readonly input: HTMLInputElement;
   private readonly channel: HTMLSelectElement;
   private readonly unsubscribers: Array<() => void> = [];
+  private readonly activeFilters = new Set(["region", "system", "team"]);
+  private isExpanded = false;
   private destroyed = false;
   private hoveredCell: { id: number; x: number; y: number } | null = null;
 
@@ -76,15 +78,18 @@ export class GameHudShell {
         </div>
 
         <div class="hud-chat-dock" data-ui="chat-panel">
-          <div class="hud-chat-dock__head">
-            <span data-ui="chat-head"></span>
-            <span class="hud-chat-dock__tabs"><b data-ui="sys-count"></b><span data-ui="tabs-text"></span></span>
+          <div class="hud-chat-dock__ticker" data-ui="chat-toggle" role="button" tabindex="0">
+            <span class="hud-chat-dock__ticker-icon">&gt;</span>
+            <span class="hud-chat-dock__ticker-text" data-ui="chat-ticker"></span>
           </div>
-          <div class="hud-chat-msgs" data-ui="chat-messages"></div>
-          <div class="hud-chat-dock__input">
-            <select data-ui="chat-channel"></select>
-            <input data-ui="chat-input" maxlength="200" />
-            <button data-action="chat-send"></button>
+          <div class="hud-chat-dock__expanded">
+            <div class="hud-chat-dock__filters" data-ui="chat-filters"></div>
+            <div class="hud-chat-msgs" data-ui="chat-messages"></div>
+            <div class="hud-chat-dock__input">
+              <select data-ui="chat-channel"></select>
+              <input data-ui="chat-input" maxlength="200" />
+              <button data-action="chat-send"></button>
+            </div>
           </div>
         </div>
 
@@ -109,6 +114,25 @@ export class GameHudShell {
     this.root.querySelector('[data-action="chat-send"]')?.addEventListener("click", () => this.sendChat());
     this.input.addEventListener("keydown", (e) => { if (e.key === "Enter") this.sendChat(); });
     this.root.querySelector('[data-action="roll"]')?.addEventListener("click", () => this.config.onRoll?.());
+    const toggle = this.root.querySelector('[data-ui="chat-toggle"]');
+    const setExpanded = (expanded: boolean): void => {
+      this.isExpanded = expanded;
+      this.root.querySelector('[data-ui="chat-panel"]')?.classList.toggle("is-expanded", expanded);
+    };
+    toggle?.addEventListener("click", () => setExpanded(!this.isExpanded));
+    toggle?.addEventListener("keydown", (event) => {
+      const keyboardEvent = event as KeyboardEvent;
+      if (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") {
+        event.preventDefault();
+        setExpanded(!this.isExpanded);
+      }
+    });
+    this.input.addEventListener("focus", () => setExpanded(true));
+    this.input.addEventListener("blur", () => {
+      window.setTimeout(() => {
+        if (!this.root.contains(document.activeElement)) setExpanded(false);
+      }, 150);
+    });
 
     // Subscriptions
     this.unsubscribers.push(
@@ -134,10 +158,8 @@ export class GameHudShell {
     set("[data-ui=pill-money]", "hud.money");
     set("[data-ui=pill-credit]", "hud.credit");
     set("[data-ui=pill-env]", "hud.env");
-    set("[data-ui=chat-head]", "hud.chatNotify");
     set('[data-action="roll"]', "dice.roll");
     set('[data-action="chat-send"]', "chat.send");
-    set("[data-ui=tabs-text]", "hud.chatTabs");
 
     // 下拉频道选项与输入框占位符
     this.channel.replaceChildren(
@@ -169,14 +191,16 @@ export class GameHudShell {
     const extra = cell.extra as Record<string, unknown>;
     const ownerships = Array.isArray(extra.ownerships) ? extra.ownerships as Array<{ playerId: string; share: number }> : [];
     const type = String(extra.type ?? 'empty');
-    const name = String(extra.name ?? t("cell." + type));
+    
+    const name = localizedText(extra.name, t("cell." + type));
+    const description = localizedText(extra.description, '');
     const price = Number(extra.price ?? 0);
     const level = Number(extra.level ?? 0);
     const typeLabel = this.escapeHtml(String(extra.typeLabel ?? t("cell." + type)));
     const holderText = ownerships.length > 0
       ? t("hud.holderCount", { count: ownerships.length })
       : t("hud.noOwners");
-    card.innerHTML = `<div class="cell-hover-card__type">${typeLabel} · ${t("hud.currentTag")}</div><div class="cell-hover-card__title">${this.escapeHtml(name)}</div><div class="cell-hover-card__rows"><span>${t("hud.price")}</span><b>${price ? `$${price}` : "—"}</b><span>${t("hud.level")}</span><b>Lv.${level}</b><span>${t("hud.holder")}</span><b>${holderText}</b></div>`;
+    card.innerHTML = `<div class="cell-hover-card__type">${typeLabel}</div><div class="cell-hover-card__title">${this.escapeHtml(name)}</div>${description ? `<div class="cell-hover-card__description">${this.escapeHtml(description)}</div>` : ""}<div class="cell-hover-card__rows"><span>${t("hud.price")}</span><b>${price ? `$${price}` : "—"}</b><span>${t("hud.level")}</span><b>Lv.${level}</b><span>${t("hud.holder")}</span><b>${holderText}</b></div>`;
     card.style.display="block"; card.style.left=`${Math.min(x+18,window.innerWidth-240)}px`; card.style.top=`${Math.max(76,y-12)}px`;
   }
 
@@ -276,21 +300,50 @@ export class GameHudShell {
     actionCluster.replaceChildren(...actionButtons);
   }
 
-  /** 聊天消息 + 系统未读数 */
+  /** 聊天消息、ticker 与频道筛选 */
   private updateChat(): void {
     const chat = this.vm.getChat();
     const msgsEl = this.root.querySelector("[data-ui=chat-messages]")!;
-    const recent = chat.history.slice(-10);
+    const channelId = (channel: string): string => channel === "system" ? "system" : channel === "team" ? "team" : "region";
+    const recent = chat.history.filter(message => this.activeFilters.has(channelId(message.channel))).slice(-10);
     if (recent.length > 0) {
       msgsEl.innerHTML = recent.map(m => {
-        const chanKey = m.channel === "system" ? "system" : m.channel === "team" ? "team" : "region";
+        const chanKey = channelId(m.channel);
         return `<div class="hud-chat-msg"><b>${this.escapeHtml(t(`chat.channel.${chanKey}`))}</b><span>${this.escapeHtml(m.text)}</span></div>`;
       }).join("");
     } else {
       msgsEl.innerHTML = `<div class="hud-chat-msg"><span>${this.escapeHtml(t("hud.noMessage"))}</span></div>`;
     }
-    const sysCount = chat.history.filter(m => m.channel === "system").length;
-    this.root.querySelector("[data-ui=sys-count]")!.textContent = t("hud.sysUnread", { count: sysCount });
+    const lastMessage = chat.history[chat.history.length - 1];
+    const ticker = this.root.querySelector("[data-ui=chat-ticker]")!;
+    if (lastMessage) {
+      const key = channelId(lastMessage.channel);
+      ticker.innerHTML = `<span class="ch">${this.escapeHtml(t(`chat.channel.${key}`))}</span>${this.escapeHtml(lastMessage.text)}`;
+    } else {
+      ticker.textContent = t("hud.noMessage");
+    }
+    this.renderFilters();
+  }
+
+  private renderFilters(): void {
+    const filters = this.root.querySelector("[data-ui=chat-filters]")!;
+    const channels = [
+      { id: "region", labelKey: "chat.channel.region" },
+      { id: "system", labelKey: "chat.channel.system" },
+      { id: "team", labelKey: "chat.channel.team" },
+    ];
+    filters.innerHTML = channels.map(channel => {
+      const checked = this.activeFilters.has(channel.id);
+      return `<label class="hud-chat-dock__filter${checked ? " hud-chat-dock__filter--checked" : ""}" data-channel="${channel.id}"><input type="checkbox" data-ui="filter-${channel.id}"${checked ? " checked" : ""}>${this.escapeHtml(t(channel.labelKey))}</label>`;
+    }).join("");
+    channels.forEach(channel => {
+      const checkbox = this.root.querySelector(`[data-ui="filter-${channel.id}"]`) as HTMLInputElement | null;
+      checkbox?.addEventListener("change", () => {
+        if (checkbox.checked) this.activeFilters.add(channel.id);
+        else this.activeFilters.delete(channel.id);
+        this.updateChat();
+      });
+    });
   }
 
   destroy(): void {

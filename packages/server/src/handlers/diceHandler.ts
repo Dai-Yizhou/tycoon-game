@@ -125,7 +125,7 @@ export class DiceHandler {
 
       if (player.status === PlayerStatus.Jail && !this.registry.getJailHandler().canRoll(playerId)) {
         emitError(socket, ErrorCodes.RateLimit, '监狱冷却中');
-        ack?.({ ok: false, error: 'jail_cooldown', data: { dice: 0, steps: 0 } });
+        ack?.({ ok: false, error: 'jail_cooldown' });
         return;
       }
 
@@ -139,7 +139,6 @@ export class DiceHandler {
         ack?.({
           ok: false,
           error: 'cooldown',
-          data: { dice: 0, steps: 0 },
         });
         return;
       }

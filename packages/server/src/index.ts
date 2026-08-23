@@ -47,7 +47,7 @@ export async function bootstrap(config: ServerConfig = loadConfig()): Promise<vo
   }
 
   // 创建应用
-  const { httpServer, socketManager, economy, dayNightCycle, prosperityManager, eraManager, world, handlerRegistry, userStore, playerStore } = createApp(config, {
+  const { httpServer, socketManager, economy, dayNightCycle, prosperityManager, world, handlerRegistry, userStore, playerStore } = createApp(config, {
     socketManagerOptions: {},
     clientDistPath,
   });
@@ -63,7 +63,7 @@ export async function bootstrap(config: ServerConfig = loadConfig()): Promise<vo
   // 注册信号处理
   const shutdown = (signal: string) => {
     logger.info(`received ${signal}`);
-        gracefulShutdown(httpServer, socketManager, economy, dayNightCycle, prosperityManager, eraManager, 5000, world, handlerRegistry, userStore, playerStore)
+        gracefulShutdown(httpServer, socketManager, economy, dayNightCycle, prosperityManager, 5000, world, handlerRegistry, userStore, playerStore)
       .then(() => {
         process.exit(0);
       })

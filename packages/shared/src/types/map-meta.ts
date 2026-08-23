@@ -38,6 +38,12 @@ export interface TimeZone {
   parentId?: string;
 }
 
+export interface MapCellLocale {
+  'zh-CN': string;
+  'en-US': string;
+  [locale: string]: string;
+}
+
 /**
  * 区域
  *

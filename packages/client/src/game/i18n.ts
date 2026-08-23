@@ -37,6 +37,26 @@ export function getLanguage(): LocaleCode {
 }
 
 /**
+ * 解析多语言字段为当前语言的文本
+ * - 传入普通字符串则原样返回
+ * - 传入多语言对象（服务端返回的 name/label/description 等）则按
+ *   「当前语言 → zh-CN → en-US → 任意非空键」顺序回退取文本
+ * - 均未命中时返回 fallback
+ */
+export function localizedText(value: unknown, fallback: string = ''): string {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const translations = value as Record<string, unknown>;
+    const locales = [getLanguage(), 'zh-CN', 'en-US', ...Object.keys(translations)];
+    for (const locale of locales) {
+      const v = translations[locale];
+      if (typeof v === 'string' && v.trim().length > 0) return v;
+    }
+  }
+  return fallback;
+}
+
+/**
  * 获取支持的语言列表
  */
 export function getSupportedLanguages(): LocaleCode[] {

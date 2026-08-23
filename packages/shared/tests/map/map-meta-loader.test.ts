@@ -40,9 +40,9 @@ const VALID_META: MapMeta = {
 };
 
 const SAMPLE_MAP: MapData = [
-  { id: 0, x: 0, y: 0, destinations: [1], extra: { type: 'start' } },
-  { id: 1, x: 10, y: 0, destinations: [0, 2], extra: { type: 'property' } },
-  { id: 2, x: 20, y: 0, destinations: [1], extra: { type: 'property' } },
+  { id: 0, x: 0, y: 0, destinations: [1], extra: { type: 'start', region: 'r1', timezone: 'tz-day', name: { 'zh-CN': '起点', 'en-US': 'Start' }, description: { 'zh-CN': '起点', 'en-US': 'Start' } } },
+  { id: 1, x: 10, y: 0, destinations: [0, 2], extra: { type: 'property', region: 'r1', timezone: 'tz-day', name: { 'zh-CN': '地产', 'en-US': 'Property' }, description: { 'zh-CN': '地产', 'en-US': 'Property' } } },
+  { id: 2, x: 20, y: 0, destinations: [1], extra: { type: 'property', region: 'r1', timezone: 'tz-night', name: { 'zh-CN': '地产二', 'en-US': 'Property Two' }, description: { 'zh-CN': '地产二', 'en-US': 'Property Two' } } },
 ];
 
 describe('map-meta-loader - parseMapMeta', () => {
@@ -217,6 +217,24 @@ describe('map-meta-loader - validateMapMeta', () => {
     expect(result.errors.some((e) => /不存在/.test(e))).toBe(true);
   });
 
+  it('格子缺少显式区域、时区或本地化字段时报错', () => {
+    const map = SAMPLE_MAP.map((cell, index) => index === 1
+      ? { ...cell, extra: { ...cell.extra, region: undefined, description: undefined } }
+      : cell);
+    const result = validateMapMeta(VALID_META, map);
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/格子 #1.*region|格子 #1.*description/);
+  });
+
+  it('格子的区域和时区引用必须存在于元数据', () => {
+    const map = SAMPLE_MAP.map((cell, index) => index === 2
+      ? { ...cell, extra: { ...cell.extra, region: 'unknown', timezone: 'unknown' } }
+      : cell);
+    const result = validateMapMeta(VALID_META, map);
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/格子 #2.*区域|格子 #2.*时区/);
+  });
+
   it('valueFieldDefinitions 为空时产生 warning', () => {
     const meta = { ...VALID_META, valueFieldDefinitions: [] };
     const result = validateMapMeta(meta, SAMPLE_MAP);
@@ -245,15 +263,15 @@ describe('map-meta-loader - 集成', () => {
       version: '0.1.0',
       templateName: 't1',
       startCellId: 0,
-      timezones: [],
-      regions: [],
+      timezones: [{ id: 'tz', offsetMinutes: 0, cellIds: [0] }],
+      regions: [{ id: 'region', name: 'Region', cellIds: [0], prosperity: 0 }],
       valueFieldDefinitions: [{ id: 'money', name: 'Money', current: 100 }],
       dayNightCycleMinutes: 15,
       config: {},
     };
     const meta = parseMapMeta(raw);
     const map: MapData = [
-      { id: 0, x: 0, y: 0, destinations: [], extra: { type: 'start' } } as Cell,
+      { id: 0, x: 0, y: 0, destinations: [], extra: { type: 'start', region: 'region', timezone: 'tz', name: { 'zh-CN': '起点', 'en-US': 'Start' }, description: { 'zh-CN': '起点', 'en-US': 'Start' } } } as Cell,
     ];
     const result = validateMapMeta(meta, map);
     expect(result.valid).toBe(true);

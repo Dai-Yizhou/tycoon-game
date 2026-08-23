@@ -6,12 +6,11 @@
  */
 
 import type { TypedClientSocket } from '../../hooks/useSocket.js';
-import { t } from '../i18n.js';
+import { t, localizedText } from '../i18n.js';
 import type { OtherPlayerInfo } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
 import { startServerPathAnimation } from './MovementSystem.js';
 import { requestHudRefresh } from '../ClientHudBridge.js';
-import { getPlayerTimezone, getLocalDayNight } from './MapLoader.js';
 import type { GameController } from '../GameController.js';
 import { GameStore } from '../../state/GameStore.js';
 import type { MapIndex } from '@game/shared';
@@ -68,9 +67,13 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   // 时区变化
   socket.on('server.timezoneChanged', (payload: { toTimezoneName?: string; toTimezoneId?: string }) => {
     const tzName = payload.toTimezoneName || payload.toTimezoneId || '';
-    if (!options.mapIndex) return;
-    const tz = getPlayerTimezone(store, options.mapIndex);
-    const { timeStr, isDay } = getLocalDayNight(store, tz);
+    const cell = store.getSnapshot().cells.get(store.getSnapshot().currentPlayerPosition);
+    const timezone = typeof cell?.extra.timezone === 'string' ? store.getSnapshot().mapTimezones.find(item => item.id === cell.extra.timezone) : undefined;
+    const serverElapsed = Date.now() + store.getSnapshot().serverTimeOffset - store.getSnapshot().dayNightStartTime;
+    const localProgress = ((serverElapsed / (15 * 60 * 1000)) + (timezone?.offsetMinutes ?? 0) / (24 * 60)) % 1;
+    const totalMinutes = Math.floor(localProgress * 24 * 60);
+    const timeStr = `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
+    const isDay = totalMinutes >= 6 * 60 && totalMinutes < 18 * 60;
     addChatMessage(t('dayNight.timezoneChanged', { tz: tzName, time: timeStr, dayNight: isDay ? t('dayNight.dayTime') : t('dayNight.nightTime') }), 'system');
   });
 
@@ -204,7 +207,8 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     if (!store.getSnapshot().currentPlayer) return;
     store.applySnapshot({ sequence: store.nextSequence(), isWaitingForChoice: true });
     options.onPathChoiceOptions?.(payload.options.map(opt => ({ cellId: opt.cellId, label: opt.label || `格子 ${opt.cellId}` })));
-    addChatMessage(t('intersection.chooseDirection', { options: payload.options.map(o => o.label).join(' / ') }), 'system');
+    const directionLabels = payload.options.map(o => localizedText(o.label, `格子 ${o.cellId}`));
+    addChatMessage(t('intersection.chooseDirection', { options: directionLabels.join(' / ') }), 'system');
   });
 
   socket.on('server.valueChanged', (payload: { playerId: string; fieldId: string; current: number; delta: number }) => {

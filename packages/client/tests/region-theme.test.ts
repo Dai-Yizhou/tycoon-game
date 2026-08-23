@@ -12,10 +12,19 @@ describe('区域主题', () => {
     expect(getThemeTokens('south').color).toBeDefined();
   });
 
-  it('归一化地图格子时保留所属区域标识', () => {
+  it('归一化地图格子时保留显式区域和时区标识', () => {
     const [cell] = normalizeClientMapData([
-      { id: 1, x: 10, y: 20, destinations: [], type: 'property', regionId: 'south-region' },
+      { id: 1, x: 10, y: 20, destinations: [], type: 'property', region: 'south-region', timezone: 'tz-west' },
     ]);
-    expect(cell.extra.regionId).toBe('south-region');
+    expect(cell.extra.region).toBe('south-region');
+    expect(cell.extra.timezone).toBe('tz-west');
+  });
+
+  it('归一化服务端已解析的格子时保留 extra 内的类型和名称', () => {
+    const [cell] = normalizeClientMapData([
+      { id: 1, x: 10, y: 20, destinations: [], extra: { type: 'property', name: { 'zh-CN': '地产', 'en-US': 'Property' } } },
+    ]);
+    expect(cell.extra.type).toBe('property');
+    expect(cell.extra.name).toEqual({ 'zh-CN': '地产', 'en-US': 'Property' });
   });
 });

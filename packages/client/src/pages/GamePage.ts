@@ -159,9 +159,9 @@ export function createGamePage(controller: GameController): HTMLElement {
       if (!mapResult) {
         return;
       }
-      const { mapData, regions } = mapResult;
+      const { mapData, regions, timezones } = mapResult;
       // 初始化区域繁荣度快照
-      gameStore?.setRegions(regions, mapResult.valueFields);
+      gameStore?.setRegions(regions, mapResult.valueFields, timezones);
       for (const r of regions) gameStore?.setProsperity(r.id, r.prosperity);
       mapIndex = new MapIndex(mapData);
       gameStore?.setCells(mapData);
@@ -263,8 +263,8 @@ function applyGamePageThemeSnapshot(page: HTMLElement, snapshot: ReturnType<Desi
 function applyRegionTheme(page: HTMLElement, cellId: number): void {
   const snapshot = gameStore?.getSnapshot();
   const cell = snapshot?.cells.get(cellId);
-  const cellRegionId = typeof cell?.extra.regionId === 'string' ? cell.extra.regionId : undefined;
-  const region = snapshot?.mapRegions.find(candidate => candidate.id === cellRegionId || candidate.cellIds.includes(cellId));
+  const cellRegionId = typeof cell?.extra.region === 'string' ? cell.extra.region : undefined;
+  const region = snapshot?.mapRegions.find(candidate => candidate.id === cellRegionId);
   const themeId = getRegionThemeId(region ?? { id: 'default' });
   applyGamePageThemeTokens(page, { tokens: getThemeTokens(themeId) });
 }
@@ -445,17 +445,17 @@ function syncCellActions(cellId: number): void {
       ? snapshot.actionUsedThisTurn
         ? []
         : Number((extra.upgradeCost as number[] | undefined)?.[level] ?? 0) > 0
-          ? [{ id: 'upgrade-property', label: '升级', detail: `$${Number((extra.upgradeCost as number[] | undefined)?.[level] ?? 0)}`, enabled: !snapshot.isBankrupt }]
+          ? [{ id: 'upgrade-property', label: t('property.upgradeTitle'), detail: `$${Number((extra.upgradeCost as number[] | undefined)?.[level] ?? 0)}`, enabled: !snapshot.isBankrupt }]
           : []
-      : [{ id: 'buy-property', label: '购买', detail: `$${price}`, enabled: !snapshot.isBankrupt && canAfford }]
+      : [{ id: 'buy-property', label: t('property.buyTitle'), detail: `$${price}`, enabled: !snapshot.isBankrupt && canAfford }]
     : type === 'investment'
       ? snapshot.ownedInvestments.has(cellId)
         ? []
-        : [{ id: 'buy-investment', label: '全额投资', detail: `$${price}`, enabled: !snapshot.isBankrupt && canAfford }, { id: 'co-invest', label: '合租投资', detail: '共享份额', enabled: !snapshot.isBankrupt && canAfford }]
+        : [{ id: 'co-invest', label: t('investment.coInvest'), detail: '$${price}', enabled: !snapshot.isBankrupt && canAfford }]
       : type === 'transport'
-        ? [{ id: 'transport', label: '传送', detail: `$${Number(extra.transportCost ?? 0)}`, enabled: !snapshot.isBankrupt }]
+        ? [{ id: 'transport', label: t('transport.teleport'), detail: `$${Number(extra.transportCost ?? 0)}`, enabled: !snapshot.isBankrupt }]
         : type === 'monument'
-          ? [{ id: 'restore-monument', label: '修缮', detail: `$${Number(extra.monumentCost ?? 0)}`, enabled: !snapshot.isBankrupt }]
+          ? [{ id: 'restore-monument', label: t('monument.repair'), detail: `$${Number(extra.monumentCost ?? 0)}`, enabled: !snapshot.isBankrupt }]
           : [];
   const currentActions = snapshot.cellActions;
   const unchanged = currentActions.length === actions.length && actions.every((action, index) => {

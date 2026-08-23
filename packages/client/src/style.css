@@ -254,7 +254,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   fill: var(--region-cell-bg);
   stroke: var(--region-border); stroke-width: 3;
 }
-.map-node:hover .map-node__shape { fill: var(--region-box-bg); stroke: var(--region-accent); stroke-width: 5; }
+.map-node:hover .map-node__shape { fill: var(--region-box-bg); }
 .map-node__type { fill: var(--region-label-fg); font-weight: 700; font-size: 13px; font-family: var(--font-func); letter-spacing: 0.08em; }
 .map-node__name { fill: var(--region-fg); font-weight: 900; font-size: 19px; font-family: var(--font-title); }
 .map-node__price { fill: var(--region-accent); font-weight: 700; font-size: 15px; font-family: var(--font-num); }
@@ -357,59 +357,137 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   z-index: 40; width: 200px;
   background: var(--gp-card);
   border: var(--region-border-w) solid var(--gp-accent);
+  border-radius: var(--region-radius);
   box-shadow: 0 8px 24px color-mix(in srgb, var(--gp-border) 42%, transparent);
   padding: 10px; color: var(--gp-fg); pointer-events: none;
 }
-.cell-hover-card__type { font-size: 8px; letter-spacing: 0.08em; color: var(--gp-accent); text-transform: uppercase; }
-.cell-hover-card__title { font-family: var(--font-title); font-weight: 900; font-size: 15px; margin: 2px 0 7px; }
-.cell-hover-card__rows { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 9px; }
+.cell-hover-card__type { font-family:var(--font-func); font-size: 8px; letter-spacing: 0.08em; color: var(--gp-accent); text-transform: uppercase; }
+.cell-hover-card__title { font-family: var(--font-title); font-weight: 900; font-size: 15px; margin: 3px 0 3px; }
+.cell-hover-card__description { font-family: var(--font-func); margin: 2px 0px 5px; }
+.cell-hover-card__rows { font-family:var(--font-func); display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 9px; }
 .cell-hover-card__rows span { color: var(--gp-muted); }
 .cell-hover-card__rows b { font-family: var(--font-num); font-size: 9px; }
 
-/* 聊天 / 通知 Dock（左下角，默认收起，悬停展开） */
+/* 聊天 / 通知 Dock（左下角，折叠态=ticker，展开态=分栏面板）
+   折叠态：单行 ticker 显示最新消息
+   展开态：频道复选框筛选 + 消息列表 + 输入框
+   展开触发：hover、focus-within、is-expanded 类（由 JS 控制）
+*/
 .hud-chat-dock {
   left: 18px; right: auto; bottom: 128px;
-  width: 286px; min-height: 52px; z-index: 32;
+  width: 260px; z-index: 32;
+  border-radius: var(--region-radius);
   background: var(--gp-sidebar-bg);
   border: var(--region-border-w) solid var(--gp-border);
-  box-shadow: 0 8px 28px color-mix(in srgb, var(--gp-border) 24%, transparent);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--gp-border) 22%, transparent);
   overflow: hidden;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
-.hud-chat-dock__head {
-  height: 52px; margin: 0; padding: 0 14px;
-  display: flex; align-items: center; justify-content: space-between;
-  border: 0; border-bottom: var(--region-border-w) solid var(--gp-border);
-  color: var(--gp-fg); cursor: pointer;
+
+/* ===== 折叠态 Ticker（方案 B） ===== */
+.hud-chat-dock__ticker {
+  display: flex; align-items: center; gap: 5px;
+  height: 20px; padding: 0 8px;
+  cursor: pointer;
 }
-.hud-chat-dock__tabs { display: flex; gap: 5px; color: var(--gp-muted); font-size: 9px; }
-.hud-chat-dock__tabs b { color: var(--gp-accent); }
-.hud-chat-msgs { max-height: 120px; overflow-y: auto; padding: 0 14px; display: none; }
-.hud-chat-msg { font-size: 10px; line-height: 1.35; padding: 4px 0; border-bottom: 1px dotted color-mix(in srgb, var(--gp-fg) 8%, transparent); }
-.hud-chat-msg b { color: var(--gp-accent); font-size: 8px; margin-right: 4px; }
-.hud-chat-msg span { color: var(--gp-muted); }
+.hud-chat-dock__ticker-icon {
+  font-size: 9px; font-weight: 900; color: var(--gp-accent);
+  flex-shrink: 0;
+}
+.hud-chat-dock__ticker-text {
+  flex: 1; font-size: 9px; color: var(--gp-fg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  line-height: 20px;
+}
+.hud-chat-dock__ticker-text .ch {
+  color: var(--gp-accent); font-weight: 700; font-size: 8px; margin-right: 3px;
+}
+.hud-chat-dock__ticker-badge {
+  font-size: 7px; font-weight: 800; color: var(--gp-paper);
+  background: var(--gp-accent); border-radius: 99px;
+  padding: 1px 5px; min-width: 12px; text-align: center; flex-shrink: 0;
+}
+
+/* ===== 展开态内容（默认隐藏，hover/focus/JS 展开） ===== */
+.hud-chat-dock__expanded {
+  display: none; flex-direction: column;
+}
+.hud-chat-dock:hover .hud-chat-dock__expanded,
+.hud-chat-dock:focus-within .hud-chat-dock__expanded,
+.hud-chat-dock.is-expanded .hud-chat-dock__expanded { display: flex; }
+
+.hud-chat-dock:hover .hud-chat-dock__ticker,
+.hud-chat-dock:focus-within .hud-chat-dock__ticker,
+.hud-chat-dock.is-expanded .hud-chat-dock__ticker { display: none; }
+
+/* ===== 频道筛选栏（压缩至与单条消息等高） ===== */
+.hud-chat-dock__filters {
+  display: flex; align-items: center; gap: 6px;
+  height: 20px; padding: 0 8px;
+  border-bottom: var(--region-border-w) solid var(--gp-border);
+  overflow-x: auto; scrollbar-width: none;
+}
+.hud-chat-dock__filters::-webkit-scrollbar { display: none; }
+.hud-chat-dock__filter {
+  display: flex; align-items: center; gap: 2px;
+  font-size: 9px; color: var(--gp-muted);
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.hud-chat-dock__filter input[type="checkbox"] {
+  width: 8px; height: 8px; margin: 0;
+  border-radius: var(--region-radius);
+  appearance: none;
+  background-color: var(--gp-card);
+  border: var(--region-border-w) solid var(--gp-border);
+  cursor: pointer;
+}
+.hud-chat-dock__filter input[type="checkbox"]:checked {
+  background-color: var(--gp-accent);
+  border-color: var(--gp-accent);
+}
+.hud-chat-dock__filter--checked { color: var(--gp-fg); }
+
+/* ===== 消息列表 ===== */
+.hud-chat-msgs {
+  max-height: 96px; overflow-y: auto; padding: 0 8px;
+}
+.hud-chat-msg {
+  font-size: 9.5px; line-height: 1.3; padding: 2px 0;
+  border-bottom: 1px dotted color-mix(in srgb, var(--gp-fg) 8%, transparent);
+  color: var(--gp-fg);
+}
+.hud-chat-msg:last-child { border-bottom: none; }
+.hud-chat-msg b {
+  color: var(--gp-accent); font-weight: 700; font-size: 8px; margin-right: 3px;
+}
+.hud-chat-msg span { color: var(--gp-fg); }
+.hud-chat-msg .sys { color: var(--gp-muted); font-style: italic; }
+.hud-chat-msg .time { color: var(--gp-muted); font-size: 7px; float: right; }
+.hud-chat-msg--hidden { display: none; }
+
+/* ===== 输入栏 ===== */
 .hud-chat-dock__input {
-  display: none; gap: 4px; padding: 7px 14px 13px;
+  display: flex; gap: 3px; padding: 3px 8px 5px;
   border-top: var(--region-border-w) solid var(--gp-border);
 }
-.hud-chat-dock__input select,
-.hud-chat-dock__input input {
+.hud-chat-dock__input select{
   flex: 1; min-width: 0;
   border: var(--region-border-w) solid var(--gp-border);
   background: var(--gp-card); color: var(--gp-fg);
-  padding: 4px 6px; font-size: 9px; border-radius: var(--region-radius);
+  padding: 2px 5px; font-size: 9px; border-radius: var(--region-radius);
+}
+.hud-chat-dock__input input {
+  flex: 2; min-width: 0;
+  border: var(--region-border-w) solid var(--gp-border);
+  background: var(--gp-card); color: var(--gp-fg);
+  padding: 2px 5px; font-size: 9px; border-radius: var(--region-radius);
 }
 .hud-chat-dock__input button {
-  padding: 4px 8px; font-size: 9px; font-weight: 700;
+  padding: 2px 7px; font-size: 8px; font-weight: 800;
   background: var(--gp-accent); color: var(--gp-paper);
   border: none; border-radius: var(--region-radius); cursor: pointer;
 }
-
-.hud-chat-dock:hover .hud-chat-msgs,
-.hud-chat-dock:focus-within .hud-chat-msgs { display: block; }
-.hud-chat-dock:hover .hud-chat-dock__input,
-.hud-chat-dock:focus-within .hud-chat-dock__input { display: flex; }
 
 /* 掷骰与行动按钮 */
 .dice-zone { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
@@ -456,7 +534,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   .gp-actionbar { padding: 0 10px; }
   .map-overlay--zone { right: 8px; }
   .map-overlay--prosperity { right: 8px; }
-  .hud-chat-dock { left: 8px; width: 244px; }
+  .hud-chat-dock { left: 8px; width: 224px; }
   .cell-hover-card { left: 44%; width: 168px; }
   .value-pills { gap: 4px; }
   .value-pill { min-width: 44px; }
@@ -464,7 +542,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 @media (max-width: 700px) {
   .gp-topbar { height: 64px; }
   .gp-actionbar { height: 94px; }
-  .hud-chat-dock { bottom: 106px; left: 10px; width: 260px; }
+  .hud-chat-dock { bottom: 106px; left: 10px; width: 240px; }
   .cell-hover-card { width: 190px; }
 }
 @media (max-width: 600px) {
