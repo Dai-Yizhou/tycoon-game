@@ -65,12 +65,15 @@
 
 ### 1.4 行为目标与操作（BehaviorEngine 契约）
 
-- **目标 `target`**：`single`（触发者）| `team`（触发者队伍）| `region`（触发者所在区域全部玩家）| `globe`（全部玩家）。`target` **必填，无默认掩盖**；`region`/`globe` 展开为玩家列表，逐个按 `op` 应用。
-- **操作 `op`**（三分支），装在一个 `op` 对象内（见 §3.4）：
+- **目标 `target`**：`single`（触发者）| `team`（触发者队伍）| `region`（触发者所在区域全部玩家）| `globe`（全部玩家）。`target` **必填，无默认掩盖**；`region`/`globe` 展开为玩家列表，逐个按 `ops` 应用。
+- **操作 `ops`**（数组，每效果可**同时携带多种类型**，见 §3.4）：
   - `value`：对一个 UCT 做数值增减（代码统一 `+=`，符号在数据里），作用于解析后的目标玩家/区域。
   - `ownership`：股份持有权变更（`acquireShare`/`loseShare`），需额外数据。
   - `position`：位置变更（`moveTo`/`teleport`），需额外数据。
-- **效果选中（【已决】独立概率）**：每个效果按 `weight`(`[0,1]`，可为 `number | {$ref}`) **独立判定**，可同时命中多个；`weight=1` 必中；互斥由作者用权重控制。`target` **必填，无默认掩盖**。运行时引用见 §4。
+- **效果选中（【已决】独立/互斥两类分开触发）**：每效果含 `weight`(可为 `number | {$ref}`) 与 `exclusive`(bool)。
+  - `exclusive:false`（缺省）＝独立，各按 `weight`（可为 `$ref`）独立判定，可同时命中多个；
+  - `exclusive:true`＝互斥，同组归一后仅命中其一；
+  - 执行时先独立、后互斥，两类分开触发。`target` **必填，无默认掩盖**。运行时引用见 §4。
 
 ---
 
@@ -104,9 +107,9 @@
 
 ### 2.5 `investment`
 - **触发（踩中）**：未持股 且 股东数 < `maxOwnerCount` → 可选购买（`price` UCT，合投）。
-- **条件触发（已决：格内声明触发器）**：持股玩家在指定触发条件满足时生效，**不限位置**。投资格用 `triggers[]` 声明，订阅全局域事件：
+- **条件触发（已决：格内声明触发器）**：持股玩家在指定触发条件满足时生效，**不限位置**。投资格用 `investmentTriggers[]` 声明，订阅全局域事件：
 ```jsonc
-"triggers": [
+"investmentTriggers": [
   { "id": "div-on-event",
     "on": "any-player-lands-event",         // 任意玩家踩中任意 event 格
     "shareholders": "all-not-banned",        // 作用股东范围
@@ -134,10 +137,10 @@
 - **澄清**：经过不触发传送；踩停才可选；可同时含多个 UCT 费用目地。
 
 ### 2.8 `event`
-- **触发（踩中）**：从 `behaviorLand` 行为 JSON 的 `effects` 中**加权随机**选中一个并执行。
-- **目标**：`single/team/region/globe`；**操作**：`value`(UCT)/`ownership`/`position`。
+- **触发（踩中）**：对 `behaviorLand` 行为 JSON 的 `effects` 按**独立/互斥两类分开**执行选中：先独立效果（`exclusive:false` 各按 `weight` 独立判定，可多命中），再互斥分组（`exclusive:true` 归一后仅命中其一）。
+- **目标**：`single/team/region/globe`；**操作**：每个命中的效果执行其 `ops[]`，可同时含 `value`(UCT)/`ownership`/`position`。
 - **配置**：`behaviorLand`。
-- **澄清**：已实现但需按新契约核对（target 四态、op 三类、UCT 字段ID驱动、无静默回退）。
+- **澄清**：已实现但需按新契约核对（target 四态、`ops` 数组 + exclusive 容斥、UCT 字段ID驱动、无静默回退）。
 
 ---
 
@@ -153,23 +156,17 @@
   "name": { "zh-CN": "示例地图", "en-US": "Demo Map" },
   // 数值字段全集（同时是"通用费用类型"的字段来源）
   "valueFieldDefinitions": [
-    { "id": "money", "name": "财产", "scope": "player", "current": 1000, "min": 0 },
-    { "id": "credit", "name": "信用", "scope": "player", "current": 50,  "min": 0 },
-    { "id": "env",    "name": "环保", "scope": "player", "current": 10,  "min": 0 },
-    { "id": "pros",   "name": "繁荣", "scope": "region", "current": 50,  "min": 0, "max": 100 }
+    { "id": "money", "name": { "zh-CN": "财产", "en-US": "Money" }, "scope": "player", "current": 1000, "min": 0 },
+    { "id": "credit", "name": { "zh-CN": "信用", "en-US": "Credit" }, "scope": "player", "current": 50,  "min": 0 },
+    { "id": "env",    "name": { "zh-CN": "环保", "en-US": "Env" }, "scope": "player", "current": 10,  "min": 0 },
+    { "id": "pros",   "name": { "zh-CN": "繁荣", "en-US": "Prosperity" }, "scope": "region", "current": 50,  "min": 0, "max": 100 }
   ],
   // 通用费用类型字段约定（与 valueFieldDefinitions 一并解析）
   "extra": { "player": ["money", "credit", "env"], "region": ["pros"] },
   "regions": [
-    { "id": "r1", "name": { "zh-CN": "东区", "en-US": "East" }, "cellIds": [0, 1, 2], "prosperity": 50, "color": "#4f7cff" }
+    { "id": "r1", "name": { "zh-CN": "东区", "en-US": "East" }, "cellIds": [0, 1, 2], "prosperity": 50 }
   ],
-  "startCellId": 0,
-  "dayNightCycleMinutes": 15,
-  "config": {
-    "creditFieldId": "credit",        // 事件概率调节所用的信用字段
-    "jailCooldown": 8000,
-    "creditPenalty": 5
-  }
+  "startCellId": 0
 }
 ```
 
@@ -192,7 +189,7 @@
   "behaviorPass": "",   // 经过钩子，仅 supply
   "behaviorLand": "",   // 踩中钩子，仅 supply、event
   "theme": "",
-  "regionId": "r1",                       // 引用 map-meta.regions.id（region 名称/颜色在 map-meta 维护，不重复存 i18n）
+  "regionId": "r1",                       // 引用 map-meta.regions.id（区域数据统一在此维护，格子只引用；消除当前"格内重复记录区域"问题）
   "timezone": -60,                        // UTC 偏移分钟（字面量，不写表达式）
 
   // —— 类型相关费用字段（均为 UCT，符号写在数据里，代码统一 +=）——
@@ -201,10 +198,9 @@
   "maxLevel": 3,
   "rent": [ { "player": { "money": -1 } }, { "player": { "money": -2 } }, { "player": { "money": -3 } }, { "player": { "money": -4 } } ],   // property：踩中者支付（负号）
   "upgradeCost": [ { "player": { "money": -1 } }, { "player": { "money": -2 } }, { "player": { "money": -3 } } ],   // property 升级支付（负号）
-  "repairCost": { "player": { "money": -20, "credit": 5 }, "region": { "pros": 10 } },   // monument：扣钱 + 加信用 + 升区域繁荣（符号内嵌）
-  "repairLimit": 1,                       // monument 每掷骰至多修缮一次（可省，默认 1）
+  "repairCost": { "player": { "money": -20, "credit": 5 }, "region": { "pros": 10 } },   // monument：扣钱 + 加信用 + 升区域繁荣（符号内嵌）；踩中仅可修缮一次
   "jailCooldown": 8000, "jailCost": { "player": { "credit": -3 } },   // jail：扣信用
-  "triggers": [                           // investment：条件触发（格内声明触发器，见 §2.5）
+  "investmentTriggers": [                 // 仅 investment：条件触发（格内声明触发器，见 §2.5）
     { "id": "div-on-event",   "on": "any-player-lands-event",
       "shareholders": "all-not-banned",        "delta": { "player": { "money": 5, "env": 1 }, "region": { "pros": 1 } } },
     { "id": "loss-on-bankrupt", "on": "shareholder-bankrupt",
@@ -213,7 +209,7 @@
 }
 ```
 
-> 固定字段必需；费用字段按类型出现。UCT 允许稀疏省略（缺省=0）且**字段值带符号**；schema 不拒绝混合符号。`region` 的 i18n 名称/颜色统一在 map-meta.regions 维护，格子仅用 `regionId` 引用，避免名称重复源。
+> 固定字段必需；费用字段按类型出现。UCT 允许稀疏省略（缺省=0）且**字段值带符号**；schema 不拒绝混合符号。`region` 数据统一在 map-meta.regions 维护，格子仅以 `regionId` 引用（不存在区域颜色概念）。
 
 ### 3.3 UCT 运算与符号（【已决】全局统一 `+=`）
 
@@ -229,34 +225,46 @@
   "id": "event-example",
   "effects": [
     {
-      "target": "team",          // single|team|region|globe（必填，无默认掩盖）
-      "weight": 0.4,             // [0,1] 小数 或 {"$ref": ...}；1=必中；各效果独立判定（独立概率）
+      "target": "team",           // single|team|region|globe（必填，无默认掩盖）
+      "weight": 0.4,              // [0,1] 小数 或 {"$ref": ...}；见「容斥」判定
+      "exclusive": true,          // 容斥分组：true=互斥（组内归一、仅命中其一），false/缺省=独立（各自独立判定）
       "msg": { "zh-CN": "", "en-US": "" },
-      "op": { "type": "value",   // value | ownership | position（三分支）
-        // value：UCT 数值增减，代码 +=，符号在数据/引用求值结果里
-        "delta": { "player": { "money": { "$ref": "$actor.money" }, "env": -5 }, "region": { "pros": 1 } } }
+      "ops": [                    // 允许同时携带多种类型的效果（数组）
+        { "type": "value",        // value：UCT 数值增减，代码 +=，符号在数据/引用求值结果里
+          "delta": { "player": { "money": { "$ref": "$actor.money" }, "env": -5 }, "region": { "pros": 1 } } },
+        { "type": "ownership", "action": "acquireShare",     // ownership：acquireShare | loseShare
+          "cellId": { "$ref": "$cell.id" }, "share": 0.1 },  // share: number | {$ref}
+        { "type": "position", "action": "teleport",          // position：moveTo | teleport
+          "cellId": { "$ref": "$nearestPlayer.cellId" } }    // cellId: number | {$ref}
+      ]
     },
     {
       "target": "single",
       "weight": 0.6,
+      "exclusive": true,          // 与上一条同为 exclusive:true，故同组互斥
       "msg": { "zh-CN": "", "en-US": "" },
-      "op": { "type": "ownership", "action": "acquireShare",  // acquireShare | loseShare
-        "cellId": { "$ref": "$cell.id" }, "share": 0.1 }      // share: number | {$ref}
-      // 或 position 变体：
-      // "op": { "type": "position", "action": "moveTo", "cellId": {"$ref": "$nearestPlayer.cellId"} }
-      //   action: moveTo | teleport；cellId: number | {$ref}
+      "ops": [ { "type": "value", "delta": { "player": { "money": -20 } } } ]
     }
   ]
 }
 ```
 
-- **`op.value`**：`delta` 为 **UCT**（字段值可为 `number | {$ref}`）。作用于解析后的目标玩家/区域，逐字段 `+=`（代码统一加号，符号在数据/引用求值结果中）。
-- **`op.ownership`**：`action`＝`acquireShare`/`loseShare`；`cellId` 目标格（数字或引用）；`share`＝股份比例（数字或引用）。变更某玩家对该格的持股。
-- **`op.position`**：`action`＝`moveTo`/`teleport`；`cellId` 目标格（数字或引用）。`moveTo` 直接改位置，`teleport` 走传送流程。
-- **其 Q4 关心的三要素获取/变更**：
-  - **数值字段**：在 `op.value.delta` 里按 UCT 字段写增减，正负按需；可引用玩法变量（`$ref`）。
-  - **股份所有权**：`op.ownership` 显式给格子与股比，增/减持。
-  - **位置**：`op.position` 给定目标格，可经白名单解析器引用（如 `$nearestPlayer`）。
+**容斥（【已决】独立/互斥两类分开触发）**
+- `exclusive:false`（缺省）＝**独立计算**：每个效果按其 `weight` 独立判定，可同时命中多个。
+- `exclusive:true`＝**互斥计算**：所有 `exclusive:true` 的效果归为**同一互斥分组**，`weight` **作归一**后仅命中其一（`weight` 越大概率越高；全 0 视为均等）。
+- 执行时**先处理独立效果，再单独处理互斥组**（两类分开触发、互不干扰）。
+- `weight` 可为 `number | {$ref}`（受限表达式/白名单）。
+
+**`ops[i].type` 三分支**
+- `value`：`delta` 为 **UCT**（字段值可为 `number | {$ref}`），作用于解析后的目标玩家/区域，逐字段 `+=`。
+- `ownership`：`action`＝`acquireShare`/`loseShare`；`cellId`＝目标格；`share`＝股份比例（数字或引用）。
+- `position`：`action`＝`moveTo`/`teleport`；`cellId`＝目标格（数字或引用）。
+
+**Q4 关心的三要素获取/变更（可同效果叠加）**
+- **数值字段**：任一 `ops[].type=value` 的 `delta` 按 UCT 写增减，正负按需；可引用玩法变量。
+- **股份所有权**：`ops[].type=ownership` 显式给格子与股比，增/减持。
+- **位置**：`ops[].type=position` 给定目标格，可经白名单解析器引用（如 `$nearestPlayer`）。
+
 - **运行时引用 `{$ref:"<path>"}`**：在**求值时**解析到运行时上下文（见 §4）。
 
 ---
@@ -293,16 +301,16 @@
   - `map-parser.ts`：提取 `teleportDestinations/behaviorPass/behaviorLand/regionId` 为顶层字段（不入 `extra`、不重复存区域 i18n）；**先吃 map-meta** 的 UCT 契约再解析格子；schema 校验器。
 - **服务端**：
   - `map-meta-loader` 先加载，暴露 UCT 全集与 region 框架。
-  - `BehaviorEngine`：UCT 化 Evaluate（逐字段 `+=`，不再区分方向）、4 态目标、三类 op、运行时引用求值器、白名单解析器。
+  - `BehaviorEngine`：UCT 化 Evaluate（逐字段 `+=`，不再区分方向）、4 态目标、`ops` 数组 + exclusive 容斥（独立/互斥分开触发）、运行时引用求值器、白名单解析器。
   - `MovementHandler`：经过钩子走路径按序 + 踩中分发器（`settleLanding`）。
   - `propertyHandler`：不持股者踩中支付 → 股东按股比分配（逐字段 `floor`，保留符号）→ 排除禁用收款。
   - `monumentHandler`/`transportHandler`(teleportDestinations)/`supplyHandler`(A+B)/`jailHandler`(校验或字段化)/`EventHandler`(behaviorLand + 4 态)。
-  - `InvestmentHandler.triggerInvestmentEvent` 泛化为"域事件 → 投资格内 `triggers` 订阅"分发（§2.5）。
+  - `InvestmentHandler.triggerInvestmentEvent` 泛化为"域事件 → 投资格内 `investmentTriggers` 订阅"分发（§2.5）。
 - **前端/UI**：
-  - 类型图标/文案：`supply` 替代 `start`；`BehaviorConfig`/`BehaviorEvent` 客户端类型对齐（target 4 态、UCT delta、op 三分支）。
+  - 类型图标/文案：`supply` 替代 `start`；`BehaviorConfig`/`BehaviorEvent` 客户端类型对齐（target 4 态、UCT delta、`ops` 数组 + exclusive、weight `$ref`）。
   - HUD：数值字段按 map-meta `valueFieldDefinitions` 渲染（不写死 money/credit/env）。
   - 移动/岔路（普通边 `choosePath` 不变）；transport 踩停后 `useTransport` 呈现 `teleportDestinations` 各 `cost`。
-  - property 购买/升级、monument 修缮、踩中分红结算、投资买入与投资格 `triggers` 触发结果结算展示。
+  - property 购买/升级、monument 修缮、踩中分红结算、投资买入与投资格 `investmentTriggers` 触发结果结算展示。
 
 ---
 
@@ -312,9 +320,10 @@
 |---|---|---|---|
 | Q1 | 能否省略与当前格子无关的 UCT 键以省内存 | **能**。允许稀疏省略，缺省字段按 0 处理（UCT 零元，非行为回退）；运行时只读取 map-meta 声明过的字段 | §1.2 / §3.3 |
 | Q2 | 能否在 JSON 引用运行时变量（信用参与概率、取最近玩家位置） | **能**。受限 `$ref` 表达式 + 白名单解析器（`$actor/$target/$map/$cell/$region`、字段读取、受限算术、`$nearestPlayer` 等），仅服务端求值 | §4 |
-| Q3 | investment 的条件触发如何建模（任意玩家踩 event 分红 / 持股人破产扣款） | **格内声明触发器** `triggers[]`，订阅全局域事件（`on`），`shareholders` 指定作用股东范围，`delta` 为 UCT 总值按股拆 | §2.5 / §3.2 |
-| Q4 | effects.op 如何携带三类操作 | `op.type` ∈ `value`(UCT 数值) / `ownership`(股份变更) / `position`(位置变更)；细分 `action` 与参数；数值/股比/目标格均可 `$ref` | §3.4 |
-| Q5 | map-meta.json 的写法 | 顶层含 `id/version/templateName/name`、`valueFieldDefinitions`（全字段 + scope/current/min/max）、`extra`（UCT 字段约定）、`regions`、`startCellId`、`dayNightCycleMinutes`、`config` | §3.1 |
+| Q3 | investment 的条件触发如何建模（任意玩家踩 event 分红 / 持股人破产扣款） | **格内声明触发器** `investmentTriggers[]`，订阅全局域事件（`on`），`shareholders` 指定作用股东范围，`delta` 为 UCT 总值按股拆 | §2.5 / §3.2 |
+| Q4 | effects.op 如何携带三类操作 | 每效果可**同时携带多种类型**：`ops[]` 数组，每项 `{type: value|ownership|position}` + 细分 `action` 与参数；数值/股比/目标格均可 `$ref` | §3.4 |
+| Q5 | map-meta.json 的写法 | 顶层含 `id/version/templateName/name`、`valueFieldDefinitions`（全字段 + scope/current/min/max，`name` 为 i18n）、`extra`（UCT 字段约定）、`regions`、`startCellId` | §3.1 |
+| 容斥 | event 多效果的容斥/选中方式 | 每个效果 `weight` 之外带 `exclusive`（bool）：「独立计算」的各自独立判定；「互斥计算」的分组归一后仅命中其一；两类**分开触发** | §3.4 / §1.4 |
 
 > 「符号/方向」专项决策：**代码层对 UCT 统一 `field += uct.field`（加号），正负号由配置数据承载**；允许同一 UCT 内混合符号，schema 不拒绝。删除原 `direction` 字段（方向已内嵌于符号）。
 
@@ -324,9 +333,9 @@
 
 ### 通用
 - [ ] map-meta → map.json 按 UCT 契约解析；字段全集一致。
-- [ ] UCT 校验：缺失键补 0（零元）；未声明字段不出现；`op.value` 字段在 UCT 内；字段值带符号且合法数值。
+- [ ] UCT 校验：缺失键补 0（零元）；未声明字段不出现；`ops[].value.delta` 字段在 UCT 内；字段值带符号且合法数值。
 - [ ] UCT 应用：逐字段 `+=` 后按 `valueFieldDefinitions.[min,max]` 截断；`floor` 保留符号。
-- [ ] `behavior*`/`teleportDestinations`/`triggers.on` 指向无效 → 快速失败。
+- [ ] `behavior*`/`teleportDestinations`/`investmentTriggers.on` 指向无效 → 快速失败。
 - [ ] `destinations` 有向边移动正确（单边情形）。
 
 ### 逐类型
@@ -341,19 +350,19 @@
 | property | 持股者踩中 | 不触发；可升级(未满级) |
 | property | 满员/未满员 | 满员不可购 |
 | property | 支付不足 | 支付余款(可 0)，股东分得相应减少，无负债 |
-| investment | 未满员踩中 | 可购；`triggers` 触发（如"任意玩家踩 event 格"分红、"持股人破产"扣款）对股东生效，不限位置 |
+| investment | 未满员踩中 | 可购；`investmentTriggers` 触发（如"任意玩家踩 event 格"分红、"持股人破产"扣款）对股东生效，不限位置 |
 | jail | 踩中 | 冷却+、credit−（`jailCost` 负号）、禁用收款；到期释放 |
 | transport | 移动路过 | 仅普通边，无传送 |
 | transport | 踩停 | 可选付费传送至 teleportDestinations（不掷骰）；拒绝则停格 |
 | transport | 传送 | 扣 UCT（负号）→ 移动 → 目标踩中结算；防环 |
-| event | 踩中 | effects 按 weight 独立概率选中并执行（4 态目标、三类 op），无静默回退 |
+| event | 踩中 | 独立效果（exclusive:false 各按 weight 判定，可多命中）与互斥组（exclusive:true 归一仅命中其一）**分开触发**；命中效果执行 `ops[]`（4 态目标、三类 op 可叠加），无静默回退 |
 
 ---
 
 ## 9. 落地顺序建议（依赖序）
 
 1. 共享层：UCT 类型、`Cell` 新字段、`CellTypes.supply`、map-parser 吃 map-meta、schema 校验。
-2. `BehaviorEngine`：UCT 求值、4 态目标、三类 op、运行时引用/白名单解析器。
+2. `BehaviorEngine`：UCT 求值、4 态目标、`ops` 数组 + exclusive 容斥、运行时引用/白名单解析器。
 3. `MovementHandler` 经过钩子 + `settleLanding` 分发器。
 4. 各 handler 迁移（property / monument / transport / supply / event / jail 字段化）。
 5. 前端/UI：类型与行为配置对齐、HUD 字段通用化、交互 UI。
