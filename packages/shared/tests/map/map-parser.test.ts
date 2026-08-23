@@ -75,11 +75,13 @@ describe('map-parser - parseMapData', () => {
     expect(cell.extra['x']).toBeUndefined();
     expect(cell.extra['y']).toBeUndefined();
     expect(cell.extra['destinations']).toBeUndefined();
+    expect(cell.extra['behavior']).toBeUndefined();
+    // behavior 是内置顶层字段
+    expect(cell.behavior).toBe('');
     // 模板约定字段都在
     expect(cell.extra['name']).toBe('');
     expect(cell.extra['type']).toBe('');
     expect(cell.extra['price']).toBe(0);
-    expect(cell.extra['behavior']).toBe('');
     expect(cell.extra['icon']).toBe('');
   });
 

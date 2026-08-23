@@ -13,7 +13,7 @@
  */
 
 import type { EventDefinition, Player } from '@game/shared';
-import { CellTypes, EventTriggers, normalizeCellType, getExtra, t } from '@game/shared';
+import { CellTypes, EventTriggers, normalizeCellType, t } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -148,34 +148,40 @@ export class EventHandler {
         return null;
       }
 
-      // 3. 检查格子是否有 behavior 字段（FR-1）
-      const behaviorId = getExtra<string>(cell, 'behavior', '') ?? '';
-      if (behaviorId && this.behaviorEngine) {
-        // 使用 BehaviorEngine 执行
-        const behaviorResult = this.behaviorEngine.executeBehavior(behaviorId, player);
-        if (behaviorResult) {
-          // 广播事件通知
-          this.broadcastBehaviorNotification(player, behaviorResult, socket);
-
-          logger.info(
-            `玩家 ${playerId} 触发 behavior ${behaviorId}: ${behaviorResult.event.msg}`,
-          );
-
-          // 构造事件结果，保留事件处理器的统一返回结构
-          return {
-            event: {
-              id: `behavior-${behaviorId}`,
-              name: behaviorId,
-              trigger: EventTriggers.OnLand,
-              effects: [],
-              weight: 1,
-            },
-            effects: [],
-            behaviorResult,
-          };
+      // 3. 检查格子是否配置了 behavior（内置顶层字段，FR-1）
+      const behaviorId = cell.behavior ?? '';
+      if (behaviorId) {
+        // 已配置 behavior 时走专属路径：执行失败即报错返回，不再回退到随机事件，
+        // 以免掩盖配置/加载问题（如 config/behaviors/{id}.json 缺失）。
+        if (!this.behaviorEngine) {
+          logger.error(`事件格 ${cellId} 配置了 behavior ${behaviorId}，但 BehaviorEngine 未注入`);
+          return null;
         }
-        // behavior 执行失败，回退到随机事件
-        logger.warn(`behavior ${behaviorId} 执行失败，回退到随机事件`);
+        const behaviorResult = this.behaviorEngine.executeBehavior(behaviorId, player);
+        if (!behaviorResult) {
+          logger.error(`事件格 ${cellId} 的 behavior ${behaviorId} 执行失败`);
+          return null;
+        }
+
+        // 广播事件通知
+        this.broadcastBehaviorNotification(player, behaviorResult, socket);
+
+        logger.info(
+          `玩家 ${playerId} 触发 behavior ${behaviorId}: ${behaviorResult.event.msg}`,
+        );
+
+        // 构造事件结果，保留事件处理器的统一返回结构
+        return {
+          event: {
+            id: `behavior-${behaviorId}`,
+            name: behaviorId,
+            trigger: EventTriggers.OnLand,
+            effects: [],
+            weight: 1,
+          },
+          effects: [],
+          behaviorResult,
+        };
       }
 
       // 4. 原有随机事件逻辑
