@@ -2,7 +2,7 @@ import type { MapData } from '@game/shared';
 import type { RegionInfo, TimeZoneInfo, ValueFieldDef } from '../../state/GameStore.js';
 import type { ThemeId } from '../../design/ThemeConfig.js';
 
-const MAP_SCALE = 3.0;
+const MAP_SCALE = 5.0;
 
 export function normalizeClientMapData(data: unknown[]): MapData {
   return data.map((raw) => {

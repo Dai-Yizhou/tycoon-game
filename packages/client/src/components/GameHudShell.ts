@@ -2,6 +2,18 @@ import type { GameEffectHooks } from "../game/GameEffects.js";
 import type { GameViewModel } from "../game/GameViewModel.js";
 import { t, localizedText } from "../game/i18n.js";
 
+/** 时区偏移（分钟）→ "UTC±H:MM"；0 显示 "UTC+0" */
+function formatTimezoneOffset(offsetMinutes: number): string {
+  if (!Number.isFinite(offsetMinutes)) offsetMinutes = 0;
+  const total = Math.round(offsetMinutes);
+  if (total === 0) return "UTC+0";
+  const sign = total < 0 ? "-" : "+";
+  const abs = Math.abs(total);
+  const hh = Math.floor(abs / 60);
+  const mm = abs % 60;
+  return `UTC${sign}${hh}:${String(mm).padStart(2, "0")}`;
+}
+
 export interface GameHudShellConfig {
   onRoll?: () => void;
   onChatSend?: (message: string, channel: string) => void;
@@ -34,6 +46,7 @@ export class GameHudShell {
   private isExpanded = false;
   private destroyed = false;
   private hoveredCell: { id: number; x: number; y: number } | null = null;
+  private hoverCardCellId: number | null = null;
 
   constructor(
     private readonly vm: GameViewModel,
@@ -181,17 +194,23 @@ export class GameHudShell {
   private renderCellHover(): void {
     if (!this.hoveredCell) return;
     const { id: cellId, x, y } = this.hoveredCell;
-    const cell = this.vm.getCell(cellId);
     const card = this.root.querySelector("[data-ui=hover-card]") as HTMLElement;
-    if (!cell) {
-      card.innerHTML = `<div class="cell-hover-card__type">${this.escapeHtml(t("hud.hoverSyncing"))}</div><div class="cell-hover-card__title">${this.escapeHtml(t("hud.hoverFetching"))}</div>`;
-      card.style.display = "block";
-      return;
+    // 内容仅在格子切换时重建，避免高频 update() 反复重写 innerHTML 导致闪烁
+    if (this.hoverCardCellId !== cellId) {
+      this.hoverCardCellId = cellId;
+      const cell = this.vm.getCell(cellId);
+      card.innerHTML = cell
+        ? this.buildCellHoverContent(cell)
+        : `<div class="cell-hover-card__type">${this.escapeHtml(t("hud.hoverSyncing"))}</div><div class="cell-hover-card__title">${this.escapeHtml(t("hud.hoverFetching"))}</div>`;
     }
+    this.positionCellHover(card, x, y);
+    card.style.display = "block";
+  }
+
+  private buildCellHoverContent(cell: import('@game/shared').Cell): string {
     const extra = cell.extra as Record<string, unknown>;
-    const ownerships = Array.isArray(extra.ownerships) ? extra.ownerships as Array<{ playerId: string; share: number }> : [];
     const type = String(extra.type ?? 'empty');
-    
+    const ownerships = Array.isArray(extra.ownerships) ? extra.ownerships as Array<{ playerId: string; share: number }> : [];
     const name = localizedText(extra.name, t("cell." + type));
     const description = localizedText(extra.description, '');
     const price = Number(extra.price ?? 0);
@@ -200,8 +219,55 @@ export class GameHudShell {
     const holderText = ownerships.length > 0
       ? t("hud.holderCount", { count: ownerships.length })
       : t("hud.noOwners");
-    card.innerHTML = `<div class="cell-hover-card__type">${typeLabel}</div><div class="cell-hover-card__title">${this.escapeHtml(name)}</div>${description ? `<div class="cell-hover-card__description">${this.escapeHtml(description)}</div>` : ""}<div class="cell-hover-card__rows"><span>${t("hud.price")}</span><b>${price ? `$${price}` : "—"}</b><span>${t("hud.level")}</span><b>Lv.${level}</b><span>${t("hud.holder")}</span><b>${holderText}</b></div>`;
-    card.style.display="block"; card.style.left=`${Math.min(x+18,window.innerWidth-240)}px`; card.style.top=`${Math.max(76,y-12)}px`;
+
+    // 当前档位租金
+    const rentRaw = extra.rent;
+    let rentText = "";
+    if (Array.isArray(rentRaw) && rentRaw.length > 0) {
+      const rent = Number(rentRaw[Math.min(level, rentRaw.length - 1)] ?? 0);
+      if (rent > 0) rentText = `$${rent}`;
+    } else if (typeof rentRaw === 'number' && rentRaw > 0) {
+      rentText = `$${rentRaw}`;
+    }
+
+    // 下一级升级费用
+    const upgradeRaw = extra.upgradeCost;
+    let upgradeText = "";
+    if (Array.isArray(upgradeRaw) && upgradeRaw.length > 0) {
+      const next = Number(upgradeRaw[Math.min(level, upgradeRaw.length - 1)] ?? 0);
+      if (next > 0) upgradeText = `$${next}`;
+    } else if (typeof upgradeRaw === 'number' && upgradeRaw > 0) {
+      upgradeText = `$${upgradeRaw}`;
+    }
+
+    // 时区偏移（分钟）→ UTC±H:MM
+    const tzText = formatTimezoneOffset(Number(extra.timezone ?? 0));
+
+    const rows: Array<[string, string]> = [
+      [t("hud.price"), price ? `$${price}` : "—"],
+      [t("hud.level"), `Lv.${level}`],
+    ];
+    if (rentText) rows.push([t("hud.rent"), rentText]);
+    if (upgradeText) rows.push([t("hud.upgrade"), upgradeText]);
+    rows.push([t("hud.holder"), holderText], [t("hud.timezone"), tzText]);
+
+    const rowsHtml = rows
+      .map(([label, value]) => `<span>${this.escapeHtml(label)}</span><b>${this.escapeHtml(value)}</b>`)
+      .join("");
+    return `<div class="cell-hover-card__type">${typeLabel}</div><div class="cell-hover-card__title">${this.escapeHtml(name)}</div>${description ? `<div class="cell-hover-card__description">${this.escapeHtml(description)}</div>` : ""}<div class="cell-hover-card__rows">${rowsHtml}</div>`;
+  }
+
+  /** 将卡片定位到格子右侧（空间不足则移至左侧），并夹紧在视口内，避免重叠/出界 */
+  private positionCellHover(card: HTMLElement, x: number, y: number): void {
+    const cw = card.offsetWidth || 210;
+    const ch = card.offsetHeight || 130;
+    let left = x + 100;
+    if (left + cw > window.innerWidth - 8) left = x - cw - 20;
+    left = Math.max(8, Math.min(left, window.innerWidth - cw - 8));
+    let top = y;
+    top = Math.max(76, Math.min(top, window.innerHeight - ch - 8));
+    card.style.left = `${left}px`;
+    card.style.top = `${top}px`;
   }
 
   hideCellHover(): void {

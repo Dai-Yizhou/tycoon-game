@@ -98,10 +98,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   color: var(--auth-fg); letter-spacing: 0.06em; margin-bottom: 0.5rem;
   text-shadow: none;
 }
-.subtitle { color: var(--auth-muted); font-size: clamp(1rem, 2vw, 1.4rem); font-weight: 500; letter-spacing: 0.08em; }
+.subtitle { color: var(--auth-muted); font-family: var(--font-func); font-size: clamp(1rem, 2vw, 1.4rem); font-weight: 500; letter-spacing: 0.08em; }
 .start-button {
   min-width: 260px; padding: 16px 40px; margin-top: 48px;
-  font-size: 1.2rem; font-weight: 700; letter-spacing: 0.08em;
+  font-family: var(--font-title); font-size: 1.3rem; font-weight: 900; letter-spacing: 0.08em;
   background: var(--auth-accent); color: var(--auth-paper);
   border: var(--region-border-w) solid var(--auth-border);
   border-radius: var(--region-radius);
@@ -114,7 +114,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .lang-btn { padding: 4px 12px; font-size: 13px; border: var(--region-border-w) solid var(--auth-border-soft); border-radius: var(--region-radius); background: transparent; color: var(--auth-fg); cursor: pointer; }
 .lang-btn--active { border-color: var(--auth-fg); background: color-mix(in srgb, var(--auth-fg) 20%, transparent); }
 .lang-btn:hover, .lang-btn--hover { background: color-mix(in srgb, var(--auth-fg) 15%, transparent); }
-.version-info { margin-top: 6px; color: var(--auth-muted); font-size: 11px; font-family: var(--font-num); }
+.version-info { margin-top: 6px; color: var(--auth-muted); font-family: var(--font-num); font-size: 11px; font-family: var(--font-num); }
 
 /* —— 登录 / 加载（auth 页面） —— */
 .auth-eyebrow {
@@ -535,7 +535,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   .map-overlay--zone { right: 8px; }
   .map-overlay--prosperity { right: 8px; }
   .hud-chat-dock { left: 8px; width: 224px; }
-  .cell-hover-card { left: 44%; width: 168px; }
+  .cell-hover-card { width: 168px; }
   .value-pills { gap: 4px; }
   .value-pill { min-width: 44px; }
 }

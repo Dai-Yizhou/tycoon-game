@@ -457,7 +457,7 @@ function syncCellActions(cellId: number): void {
     : type === 'investment'
       ? snapshot.ownedInvestments.has(cellId)
         ? []
-        : [{ id: 'co-invest', label: t('investment.coInvest'), detail: '$${price}', enabled: !snapshot.isBankrupt && canAfford }]
+        : [{ id: 'co-invest', label: t('investment.coInvest'), detail: `$${price}`, enabled: !snapshot.isBankrupt && canAfford }]
       : type === 'transport'
         ? [{ id: 'transport', label: t('transport.teleport'), detail: `$${Number(extra.transportCost ?? 0)}`, enabled: !snapshot.isBankrupt }]
         : type === 'monument'
