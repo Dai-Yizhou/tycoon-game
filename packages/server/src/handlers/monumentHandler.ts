@@ -228,7 +228,7 @@ export class MonumentHandler {
       }
 
       // 9. 检查是否有 behavior 字段（作为额外效果）
-      const behaviorId = getExtra<string>(monumentCell, 'behavior', '') ?? '';
+      const behaviorId = monumentCell.behavior ?? '';
       if (behaviorId && this.behaviorEngine) {
         const behaviorResult = this.behaviorEngine.executeBehavior(behaviorId, player, {
           cellType: CellTypes.Monument,

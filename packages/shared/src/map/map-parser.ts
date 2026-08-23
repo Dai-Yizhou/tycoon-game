@@ -39,6 +39,7 @@ export const BUILTIN_FIELDS: ReadonlySet<string> = new Set([
   'x',
   'y',
   'destinations',
+  'behavior',
 ]);
 
 /**
@@ -114,11 +115,15 @@ function buildCell(raw: unknown, index: number): Cell {
     }
   }
 
+  // behavior 为内置顶层字段（非 extra 自定义数据）
+  const behavior = typeof record['behavior'] === 'string' ? record['behavior'] : '';
+
   return {
     id: idRaw,
     x: xRaw,
     y: yRaw,
     destinations,
+    behavior,
     extra,
   };
 }
@@ -317,6 +322,7 @@ export function normalizeMapData(map: MapData): MapData {
         x,
         y,
         destinations: Array.isArray(cell.destinations) ? [...cell.destinations] : [],
+        behavior: typeof cell.behavior === 'string' ? cell.behavior : '',
         extra: { ...(cell.extra ?? {}) },
       };
     });

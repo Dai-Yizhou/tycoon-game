@@ -1,0 +1,15 @@
+{
+  "id": "event_generic",
+  "name": "随机事件",
+  "description": "地图事件格触发的通用随机事件集，同时涵盖个人与区域内多人效果",
+  "events": [
+    { "msg": "🍀 天降横财！获得 300 元", "money": 300, "credit": 0, "env": 0, "weight": 4, "good": true, "creditModifier": 0.3 },
+    { "msg": "💸 遭遇小偷，损失 120 元", "money": -120, "credit": -5, "env": 0, "weight": 6, "good": false, "creditModifier": -0.4 },
+    { "msg": "⭐ 见义勇为，信用值 +10", "money": 0, "credit": 10, "env": 0, "weight": 5, "good": true, "creditModifier": 0.5 },
+    { "msg": "🌱 义务植树，环保值 +5", "money": 0, "credit": 0, "env": 5, "weight": 5, "good": true, "creditModifier": 0.4 },
+    { "msg": "🎰 幸运抽奖，额外获得 200 元", "money": 200, "credit": 0, "env": 0, "weight": 4, "good": true, "creditModifier": 0.2 },
+    { "msg": "🤝 团队协作奖励，区域内所有人获得 100 元", "money": 100, "credit": 0, "env": 0, "target": "region", "weight": 3, "good": true, "creditModifier": 0.2 },
+    { "msg": "🚨 区域突发停电，区域内所有人损失 80 元", "money": -80, "credit": 0, "env": 0, "target": "region", "weight": 4, "good": false, "creditModifier": -0.3 },
+    { "msg": "📢 区域共享成果，区域内所有人信用值 +4", "money": 0, "credit": 4, "env": 0, "target": "region", "weight": 4, "good": true, "creditModifier": 0.3 }
+  ]
+}

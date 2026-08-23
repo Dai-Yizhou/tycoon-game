@@ -71,7 +71,7 @@
       "en-US": "Random event"
     },
     "extra": {},
-    "behavior": "",
+    "behavior": "event_generic",
     "icon": "",
     "level": 0,
     "upgradeCost": [],

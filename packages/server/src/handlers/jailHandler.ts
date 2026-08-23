@@ -159,7 +159,7 @@ export class JailHandler {
       this.scheduleRelease(playerId, cooldownMs);
 
       // 检查是否有 behavior 字段（作为额外效果）
-      const behaviorId = getExtra<string>(cell, 'behavior', '') ?? '';
+      const behaviorId = cell.behavior ?? '';
       if (behaviorId && this.behaviorEngine) {
         const behaviorResult = this.behaviorEngine.executeBehavior(behaviorId, player, {
           cellType: CellTypes.Jail,

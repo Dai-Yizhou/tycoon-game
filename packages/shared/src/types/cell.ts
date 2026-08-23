@@ -82,6 +82,13 @@ export interface Cell {
    */
   destinations: number[];
   /**
+   * 格子行为配置 ID（内置顶层字段）
+   *
+   * 指向 `config/behaviors/${behavior}.json`。属于格子的第一等字段，
+   * 与 id/x/y/destinations 同级，不属于 extra 自定义数据。
+   */
+  behavior?: string;
+  /**
    * 格子动态扩展属性
    *
    * 包含但不限于以下模板约定字段：
@@ -90,7 +97,6 @@ export interface Cell {
    * - `price`: number - 购买价格
    * - `rent`: number[] | number - 租金（多级）
    * - `description`: string | string[] - 描述
-   * - `behavior`: string - 行为文件名
    * - `icon`: string - 图标文件名
    * - `level`: number - 等级
    * - `upgradeCost`: number[] - 升级费用
