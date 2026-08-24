@@ -15,7 +15,7 @@
  */
 
 import type { AckResult, Cell, Player, PositionChangedPayload } from '@game/shared';
-import { getExtra, normalizeCellType, CellTypes, t } from '@game/shared';
+import { getExtra, normalizeCellType, CellTypes, t, type Uct } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -203,7 +203,13 @@ export class TransportHandler {
       }
 
       // 9. 获取传送费用
-      const cost = getExtra<number>(hubCell, 'transportCost', 50) ?? 50;
+      const teleportCost = this.getTeleportCost(hubCell, payload.targetCellId);
+      if (!teleportCost) {
+        emitError(socket, ErrorCodes.InvalidPayload, '目标格子没有传送费用配置');
+        ack?.({ ok: false, error: 'transport_cost_not_found' });
+        return;
+      }
+      const cost = Math.max(0, -(teleportCost.player?.money ?? 0));
 
       // 10. 检查玩家财产是否足够
       const money = this.getPlayerMoney(player);
@@ -276,7 +282,7 @@ export class TransportHandler {
         return {
           cellId,
           name: cell ? (getExtra<string>(cell, 'name', `格子 ${cellId}`) ?? `格子 ${cellId}`) : `格子 ${cellId}`,
-          cost: getExtra<number>(hubCell, 'transportCost', 50) ?? 50,
+          cost: Math.max(0, -(this.getTeleportCost(hubCell, cellId)?.player?.money ?? 0)),
         };
       });
 
@@ -417,14 +423,15 @@ export class TransportHandler {
   private getHubDestinations(cell: Cell): number[] {
     // 交通枢纽的 destinations 字段包含潜在目的地
     // 可能是其他交通枢纽或普通格子
-    const destinations = getExtra<number[]>(cell, 'destinations', []) ?? [];
+    const destinations = cell.teleportDestinations?.map((destination) => destination.cellId) ?? [];
     if (destinations.length > 0) {
       return destinations;
     }
+    return cell.destinations ?? [];
+  }
 
-    // 如果 destinations 为空，尝试从 transportDestinations 字段读取
-    const transportDestinations = getExtra<number[]>(cell, 'transportDestinations', []) ?? [];
-    return transportDestinations;
+  private getTeleportCost(cell: Cell | undefined, targetCellId: number): Uct | undefined {
+    return cell?.teleportDestinations?.find((destination) => destination.cellId === targetCellId)?.cost;
   }
 
   /**
@@ -496,7 +503,7 @@ export class TransportHandler {
     // 检查是否有 behavior 字段（作为额外效果）
     const player = this.world.getPlayer(playerId);
     if (player) {
-      const behaviorId = hubCell.behavior ?? '';
+      const behaviorId = hubCell.behaviorLand ?? '';
       if (behaviorId && this.behaviorEngine) {
         const behaviorResult = this.behaviorEngine.executeBehavior(behaviorId, player, {
           cellType: CellTypes.Transport,
@@ -513,13 +520,13 @@ export class TransportHandler {
 
     // 发送通知给玩家，显示可用目的地
     const currentDestinations = this.hubStates.get(hubId)?.currentDestinations ?? [];
-    const cost = getExtra<number>(hubCell, 'transportCost', 50);
+    const costs = currentDestinations.map((destination) => this.getTeleportCost(hubCell, destination)?.player?.money ?? 0);
 
     socket.emit('server.notification', {
       id: `transport_${hubId}`,
       type: 'info',
       title: t('server.transportTitle'),
-      content: t('server.transportPrompt', { cost: cost ?? 50 }),
+      content: t('server.transportPrompt', { cost: costs.length === 1 ? Math.abs(costs[0] ?? 0) : '各目的地费用不同' }),
       actions: currentDestinations.map(dest => ({
         label: `传送到 ${dest}`,
         action: 'useTransport',

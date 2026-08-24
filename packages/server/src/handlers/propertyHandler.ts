@@ -16,7 +16,7 @@
  */
 
 import type { AckResult, Cell, Player } from '@game/shared';
-import { getExtra, normalizeCellType, CellTypes, PlayerStatus, canCollectRent } from '@game/shared';
+import { getExtra, normalizeCellType, CellTypes, PlayerStatus, canCollectRent, type Uct } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -26,7 +26,6 @@ import {
   DEFAULT_OWNERSHIP_CONFIG,
   addOwnership,
   getAccumulatedValue,
-  getBuyInPrice,
   getOwnerships,
   type Ownership,
   type OwnershipConfig,
@@ -203,28 +202,24 @@ export class PropertyHandler {
       }
 
       // 7. 获取价格
-      const price = ownerships.length > 0 ? getBuyInPrice(cell, this.ownershipConfig) : (getExtra<number>(cell, 'price', 0) ?? 0);
-      if (price <= 0) {
+      const priceUct = ownerships.length > 0
+        ? this.scaleUct(cell.price, this.ownershipConfig.buyInMultiplier)
+        : cell.price;
+      const price = this.getUctCost(priceUct);
+      if (Object.keys(priceUct?.player ?? {}).length === 0 || !this.canApplyUct(player, priceUct)) {
         emitError(socket, ErrorCodes.InvalidPayload, '该地产无价格信息');
         ack?.({ ok: false, error: 'no_price' });
         return;
       }
 
       // 8. 检查玩家财产是否足够
-      const money = this.getPlayerMoney(player);
-      if (money < price) {
-        emitError(socket, ErrorCodes.InvalidPayload, `财产不足，需要 ${price}，当前 ${money}`);
-        ack?.({ ok: false, error: 'insufficient_money' });
-        return;
-      }
-
       if (!this.world.compareAndSwapEconomicVersions(payload.cellId, payload.expectedResourceVersion, payload.expectedCellVersion)) {
         ack?.({ ok: false, error: payload.expectedCellVersion !== undefined ? 'cell_version_conflict' : 'resource_version_conflict' });
         return;
       }
 
       // 9. 执行购买
-      const result = this.executeBuyProperty(player, cell, price);
+      const result = this.executeBuyProperty(player, cell, priceUct!);
       if (!result) {
         emitError(socket, ErrorCodes.InternalError, '购买失败');
         ack?.({ ok: false, error: 'buy_failed' });
@@ -235,7 +230,7 @@ export class PropertyHandler {
       this.updateCell(result.cell);
 
       // 11. 检查是否有 behavior 字段（作为额外效果）
-      const behaviorId = cell.behavior ?? '';
+      const behaviorId = cell.behaviorLand ?? '';
       if (behaviorId && this.behaviorEngine) {
         const behaviorResult = this.behaviorEngine.executeBehavior(behaviorId, player, {
           cellType: cellType,
@@ -254,12 +249,6 @@ export class PropertyHandler {
       this.io.emit('server.propertyBought', {
         cell: result.cell,
         playerId,
-      });
-      this.io.emit('server.valueChanged', {
-        playerId,
-        fieldId: 'money',
-        current: this.getPlayerMoney(player),
-        delta: -price,
       });
 
       // 13. 返回成功结果
@@ -344,7 +333,7 @@ export class PropertyHandler {
 
       // 7. 获取当前等级和升级费用
       const currentLevel = getExtra<number>(cell, 'level', 0) ?? 0;
-      const upgradeCosts = getExtra<number[]>(cell, 'upgradeCost', []) ?? [];
+      const upgradeCosts = cell.upgradeCost ?? [];
       
       // 验证是否可升级（等级上限检查）
       const maxLevel = upgradeCosts.length;
@@ -355,26 +344,18 @@ export class PropertyHandler {
       }
 
       // 8. 获取升级费用
-      const upgradeCost = upgradeCosts[currentLevel];
-      if (upgradeCost <= 0) {
+      if (!upgradeCosts[currentLevel] || !this.canApplyUct(player, upgradeCosts[currentLevel])) {
         emitError(socket, ErrorCodes.InvalidPayload, '升级费用无效');
         ack?.({ ok: false, error: 'invalid_upgrade_cost' });
         return;
       }
 
       // 9. 检查玩家财产是否足够
-      const money = this.getPlayerMoney(player);
-      if (money < upgradeCost) {
-        emitError(socket, ErrorCodes.InvalidPayload, `财产不足，需要 ${upgradeCost}，当前 ${money}`);
-        ack?.({ ok: false, error: 'insufficient_money' });
-        return;
-      }
-
       if (!this.world.compareAndSwapEconomicVersions(payload.cellId, payload.expectedResourceVersion, payload.expectedCellVersion)) {
         ack?.({ ok: false, error: payload.expectedCellVersion !== undefined ? 'cell_version_conflict' : 'resource_version_conflict' });
         return;
       }
-      const result = this.executeUpgradeProperty(player, cell, upgradeCost);
+      const result = this.executeUpgradeProperty(player, cell, upgradeCosts[currentLevel]);
       if (!result) {
         emitError(socket, ErrorCodes.InternalError, '升级失败');
         ack?.({ ok: false, error: 'upgrade_failed' });
@@ -390,12 +371,6 @@ export class PropertyHandler {
         playerId,
         newLevel: result.newLevel,
         cost: result.cost,
-      });
-      this.io.emit('server.valueChanged', {
-        playerId,
-        fieldId: 'money',
-        current: this.getPlayerMoney(player),
-        delta: -result.cost,
       });
 
       // 13. 返回成功结果
@@ -474,39 +449,39 @@ export class PropertyHandler {
 
       // 6. 获取租金
       const level = getExtra<number>(cell, 'level', 0) ?? 0;
-      const rentArray = getExtra<number[]>(cell, 'rent', []) ?? [];
-      const rent = rentArray[level] ?? 0;
+      const rentUct = cell.rent?.[level];
+      const rent = this.getUctCost(rentUct);
 
       if (rent <= 0) {
         return null;
       }
+      if (!rentUct) return null;
 
       // 7. 执行租金扣除
-      const payerMoney = this.getPlayerMoney(payer);
-      const actualRent = Math.min(rent, payerMoney); // 避免负数
-
-      // 扣除路过玩家财产
-      const payerChange = this.economy.changeValue(payerId, 'money', -actualRent, 'rent_payment');
-      if (!payerChange.ok) return null;
+      if (!this.canApplyUct(payer, rentUct)) return null;
+      const payerChanges = this.applyUct(payer, rentUct, 'rent_payment');
+      if (payerChanges.length === 0) return null;
 
       // 增加所有者财产（按持股比例分配）
-      this.distributeRentToOwners(cell, actualRent);
-
-      // 8. 广播租金支付事件
-      this.io.emit('server.valueChanged', {
-        playerId: payerId,
-        fieldId: 'money',
-        current: payerMoney - actualRent,
-        delta: -actualRent,
-      });
+      this.distributeRentToOwners(cell, rentUct, 1);
+      for (const [fieldId, delta] of Object.entries(rentUct?.region ?? {})) {
+        const applied = this.world.changeRegionValue(cell.regionId, fieldId, delta);
+        this.io.emit('server.notification', {
+          id: `region-value-${cell.regionId}-${fieldId}-${Date.now()}`,
+          type: 'info',
+          title: `${cell.regionId}.${fieldId}`,
+          content: `${applied} (${delta >= 0 ? '+' : ''}${delta})`,
+          durationMs: 2000,
+        });
+      }
 
       // 找出主要所有者用于返回
       const mainOwner = receivableOwnerIds[0];
 
-      logger.debug(`玩家 ${payerId} 向格子 ${cellId} 的所有者支付租金 ${actualRent}`);
+      logger.debug(`玩家 ${payerId} 向格子 ${cellId} 的所有者支付 UCT 租金`);
 
       return {
-        rent: actualRent,
+        rent,
         payerId,
         ownerId: mainOwner,
       };
@@ -524,14 +499,15 @@ export class PropertyHandler {
   private executeBuyProperty(
     player: Player,
     cell: Cell,
-    price: number,
+    price: import('@game/shared').Uct,
   ): BuyResult | null {
     try {
-      const buyerChange = this.economy.changeValue(player.id, 'money', -price, 'property_purchase');
-      if (!buyerChange.ok) return null;
-      const ownership = addOwnership(cell, player.id, price, this.ownershipConfig);
+      const priceAmount = this.getUctCost(price);
+      const buyerChanges = this.applyUct(player, price, 'property_purchase');
+      if (buyerChanges.length === 0) return null;
+      const ownership = addOwnership(cell, player.id, priceAmount, this.ownershipConfig);
       if (!ownership || ownership.share <= 0 || ownership.share > 1) {
-        this.economy.changeValue(player.id, 'money', price, 'property_purchase_rollback');
+        this.rollbackUct(player, buyerChanges, 'property_purchase_rollback');
         return null;
       }
       this.distributeBuyInToOwners(cell, player.id, price);
@@ -548,16 +524,19 @@ export class PropertyHandler {
     }
   }
 
-  private distributeBuyInToOwners(cell: Cell, buyerId: string, amount: number): void {
+  private distributeBuyInToOwners(cell: Cell, buyerId: string, amount: Uct): void {
     const buyer = getOwnerships(cell).find((ownership) => ownership.playerId === buyerId);
     if (!buyer || buyer.share >= 1) return;
     for (const ownership of getOwnerships(cell)) {
       if (ownership.playerId === buyerId) continue;
       const owner = this.world.getPlayer(ownership.playerId);
       if (!owner || owner.status === PlayerStatus.Bankrupt) continue;
-      const payout = Math.floor(amount * (ownership.share / (1 - buyer.share)));
-      const change = this.economy.changeValue(owner.id, 'money', payout, 'property_buy_in_payout');
-      if (change.ok) this.io.emit('server.valueChanged', { playerId: owner.id, fieldId: 'money', current: change.current, delta: change.delta });
+      const scale = ownership.share / (1 - buyer.share);
+      this.applyUct(owner, {
+        player: Object.fromEntries(
+          Object.entries(amount.player ?? {}).map(([fieldId, delta]) => [fieldId, -delta * scale]),
+        ),
+      }, 'property_buy_in_payout');
     }
   }
 
@@ -567,24 +546,24 @@ export class PropertyHandler {
   private executeUpgradeProperty(
     player: Player,
     cell: Cell,
-    upgradeCost: number,
+    upgradeCost: import('@game/shared').Uct,
   ): UpgradeResult | null {
     try {
-      // 1. 扣除玩家财产
-      const change = this.economy.changeValue(player.id, 'money', -upgradeCost, 'property_upgrade');
-      if (!change.ok) return null;
+      const cost = this.getUctCost(upgradeCost);
+      const changes = this.applyUct(player, upgradeCost, 'property_upgrade');
+      if (changes.length === 0) return null;
 
       // 2. 增加格子等级
       const currentLevel = getExtra<number>(cell, 'level', 0) ?? 0;
       const newLevel = currentLevel + 1;
       cell.extra.level = newLevel;
-      cell.extra.accumulatedValue = getAccumulatedValue(cell) + upgradeCost;
+      cell.extra.accumulatedValue = getAccumulatedValue(cell) + cost;
 
       this.world.updatePlayer(player);
 
       return {
         cell,
-        cost: upgradeCost,
+        cost,
         newLevel,
       };
     } catch (err) {
@@ -596,13 +575,12 @@ export class PropertyHandler {
   /**
    * 分配租金给所有者（按持股比例）
    */
-  private distributeRentToOwners(cell: Cell, totalRent: number): void {
+  private distributeRentToOwners(cell: Cell, rent: Uct, scale: number): void {
     for (const ownership of getOwnerships(cell)) {
       const owner = this.world.getPlayer(ownership.playerId);
       if (!owner || !canCollectRent(owner.status)) continue;
-      const shareRent = Math.floor(totalRent * ownership.share);
-      const change = this.economy.changeValue(owner.id, 'money', shareRent, 'rent_income');
-      if (change.ok) this.io.emit('server.valueChanged', { playerId: owner.id, fieldId: 'money', current: change.current, delta: change.delta });
+      const shareScale = ownership.share * scale;
+      this.applyUct(owner, { player: Object.fromEntries(Object.entries(rent.player ?? {}).map(([fieldId, delta]) => [fieldId, -delta * shareScale])) }, 'rent_income');
     }
   }
 
@@ -619,12 +597,45 @@ export class PropertyHandler {
     }
   }
 
-  /**
-   * 获取玩家财产
-   */
-  private getPlayerMoney(player: Player): number {
-    const moneyField = player.values['money'];
-    return moneyField?.current ?? 0;
+  private getUctCost(uct: Uct | undefined): number {
+    return Object.values(uct?.player ?? {}).reduce((total, value) => total + Math.abs(value), 0);
+  }
+
+  private scaleUct(uct: Uct | undefined, scale: number): Uct | undefined {
+    if (!uct) return undefined;
+    return {
+      player: Object.fromEntries(Object.entries(uct.player ?? {}).map(([fieldId, delta]) => [fieldId, delta * scale])),
+      region: Object.fromEntries(Object.entries(uct.region ?? {}).map(([fieldId, delta]) => [fieldId, delta * scale])),
+    };
+  }
+
+  private canApplyUct(player: Player, uct: Uct | undefined, scale = 1): boolean {
+    return Object.entries(uct?.player ?? {}).every(([fieldId, configuredDelta]) => {
+      const field = player.values[fieldId];
+      if (!field) return false;
+      const next = field.current + configuredDelta * scale;
+      return next >= (field.min ?? Number.NEGATIVE_INFINITY) && next <= (field.max ?? Number.POSITIVE_INFINITY);
+    });
+  }
+
+  private applyUct(player: Player, uct: Uct | undefined, reason: string, scale = 1): Array<{ fieldId: string; delta: number; previous: number }> {
+    const changes: Array<{ fieldId: string; delta: number; previous: number }> = [];
+    for (const [fieldId, configuredDelta] of Object.entries(uct?.player ?? {})) {
+      const delta = configuredDelta * scale;
+      const previous = player.values[fieldId]?.current ?? 0;
+      const change = this.economy.changeValue(player.id, fieldId, delta, reason);
+      if (!change.ok) {
+        this.rollbackUct(player, changes, `${reason}_rollback`);
+        return [];
+      }
+      changes.push({ fieldId, delta, previous });
+      this.io.emit('server.valueChanged', { playerId: player.id, fieldId, current: change.current, delta: change.delta });
+    }
+    return changes;
+  }
+
+  private rollbackUct(player: Player, changes: Array<{ fieldId: string; delta: number }>, reason: string): void {
+    for (const change of changes) this.economy.changeValue(player.id, change.fieldId, -change.delta, reason);
   }
 
   /**

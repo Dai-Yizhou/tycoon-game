@@ -89,18 +89,24 @@ export class HandlerRegistry {
     this.world = world;
 
     const mapMeta = world.getMapMeta();
-    const diceConfig = mapMeta?.config ?? {};
-    const resolvedOwnershipConfig = ownershipConfig ?? resolveOwnershipConfig(mapMeta?.config?.ownership);
+    const resolvedOwnershipConfig = ownershipConfig ?? resolveOwnershipConfig(undefined);
 
     const cooldownConfig = {
-      normal: ((diceConfig.diceCooldownSeconds as number) ?? 5) * 1000,
-      diceMin: (diceConfig.diceMin as number) ?? 1,
-      diceMax: (diceConfig.diceMax as number) ?? 6,
+      normal: mapMeta?.dice.cooldownMs ?? 3000,
+      diceMin: mapMeta?.dice.min ?? 1,
+      diceMax: mapMeta?.dice.max ?? 6,
     };
 
     this.diceHandler = new DiceHandler(io, world, this, cooldownConfig);
     this.movementHandler = new MovementHandler(io, world, (playerId, cellId, socket) => {
       this.handleCellEvent(playerId, cellId, socket);
+    }, (playerId, cellId, socket) => {
+      const cell = this.world.getMapIndex()?.getById(cellId);
+      const behaviorId = cell?.behaviorPass ?? '';
+      if (!behaviorId) return;
+      const player = this.world.getPlayer(playerId);
+      if (!player || !cell) return;
+      this.eventHandler.handleBehavior(playerId, behaviorId, player, cell, socket);
     });
     // 初始化地产处理器
     this.propertyHandler = new PropertyHandler(io, world, resolvedOwnershipConfig, economy ?? new EconomyService(world));
@@ -273,23 +279,33 @@ export class HandlerRegistry {
    * 处理到达格子后的事件。
    */
   handleCellEvent(playerId: string, cellId: number, socket: TypedSocket): void {
-    // 处理起点格（经过起点发放补充资金）
-    this.startHandler.handlePassStart(playerId, cellId);
+    const cell = this.world.getMapIndex()?.getById(cellId);
+    if (!cell) return;
 
-    // 处理监狱格（踩中监狱进入监狱状态）
-    this.jailHandler.handleEnterJail(playerId, cellId);
-
-    // 处理事件格（踩中事件格触发随机事件）
-    this.eventHandler.handleEventCell(playerId, cellId, socket);
-
-    // 处理交通枢纽（付费传送）
-    this.transportHandler.handleTransportCell(playerId, cellId, socket);
-
-    // 处理纪念碑（修缮）
-    this.monumentHandler.handleMonumentCell(playerId, cellId, socket);
-
-    // 处理租金支付（已有 PropertyHandler）
-    this.handleRentPayment(playerId, cellId, socket);
+    switch (cell.type) {
+      case 'supply':
+        this.startHandler.handlePassStart(playerId, cellId);
+        return;
+      case 'event':
+        this.eventHandler.handleEventCell(playerId, cellId, socket);
+        this.investmentHandler.dispatchDomainEvent('any-player-lands-event');
+        return;
+      case 'jail':
+        this.jailHandler.handleEnterJail(playerId, cellId);
+        return;
+      case 'transport':
+        this.transportHandler.handleTransportCell(playerId, cellId, socket);
+        return;
+      case 'monument':
+        this.monumentHandler.handleMonumentCell(playerId, cellId, socket);
+        return;
+      case 'property':
+        this.handleRentPayment(playerId, cellId, socket);
+        return;
+      case 'investment':
+      case 'empty':
+        return;
+    }
   }
 
   /**
@@ -408,8 +424,7 @@ export class HandlerRegistry {
   }
 
   private getPlayerRegionId(cellId: number): string | null {
-    const regions = this.world.getMapMeta()?.regions ?? [];
-    return regions.find(region => region.cellIds.includes(cellId))?.id ?? null;
+    return this.world.getMapIndex()?.getById(cellId)?.regionId ?? null;
   }
 }
 

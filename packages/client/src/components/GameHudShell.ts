@@ -201,44 +201,36 @@ export class GameHudShell {
   }
 
   private buildCellHoverContent(cell: import('@game/shared').Cell): string {
-    const extra = cell.extra as Record<string, unknown>;
-    const type = String(extra.type ?? 'empty');
-    const ownerships = Array.isArray(extra.ownerships) ? extra.ownerships as Array<{ playerId: string; share: number }> : [];
-    const name = localizedText(extra.name, t("cell." + type));
-    const description = localizedText(extra.description, '');
-    const price = Number(extra.price ?? 0);
-    const level = Number(extra.level ?? 0);
-    const typeLabel = this.escapeHtml(String(extra.typeLabel ?? t("cell." + type)));
-    const holderText = ownerships.length > 0
-      ? t("hud.holderCount", { count: ownerships.length })
-      : t("hud.noOwners");
+    const type = cell.type;
+    const name = localizedText(cell.name, t("cell." + type));
+    const description = localizedText(cell.description, '');
+    const price = Object.values(cell.price?.player ?? {}).filter((value) => value < 0).reduce((total, value) => total + Math.abs(value), 0);
+    const level = 0;
+    const typeLabel = this.escapeHtml(t("cell." + type));
+    const holderText = t("hud.noOwners");
 
     // 当前档位租金
-    const rentRaw = extra.rent;
+    const rentRaw = cell.rent;
     let rentText = "";
     if (Array.isArray(rentRaw) && rentRaw.length > 0) {
-      const rent = Number(rentRaw[Math.min(level, rentRaw.length - 1)] ?? 0);
+      const rent = Object.values(rentRaw[Math.min(level, rentRaw.length - 1)]?.player ?? {}).filter((value) => value < 0).reduce((total, value) => total + Math.abs(value), 0);
       if (rent > 0) rentText = `$${rent}`;
-    } else if (typeof rentRaw === 'number' && rentRaw > 0) {
-      rentText = `$${rentRaw}`;
     }
 
     // 下一级升级费用
-    const upgradeRaw = extra.upgradeCost;
+    const upgradeRaw = cell.upgradeCost;
     let upgradeText = "";
     if (Array.isArray(upgradeRaw) && upgradeRaw.length > 0) {
-      const next = Number(upgradeRaw[Math.min(level, upgradeRaw.length - 1)] ?? 0);
+      const next = Object.values(upgradeRaw[Math.min(level, upgradeRaw.length - 1)]?.player ?? {}).filter((value) => value < 0).reduce((total, value) => total + Math.abs(value), 0);
       if (next > 0) upgradeText = `$${next}`;
-    } else if (typeof upgradeRaw === 'number' && upgradeRaw > 0) {
-      upgradeText = `$${upgradeRaw}`;
     }
 
     // 时区偏移（分钟）→ UTC±H:MM
-    const tzText = formatTimezoneOffset(Number(extra.timezone ?? 0));
+    const tzText = formatTimezoneOffset(cell.timezone);
 
     // 根据格子能力决定展示字段：仅价格>0（可购买）的格子显示价格，仅具备升级档位（可升级）的格子显示等级
     const purchasable = price > 0;
-    const upgradeable = (Array.isArray(upgradeRaw) && upgradeRaw.length > 0) || (typeof upgradeRaw === 'number' && upgradeRaw > 0);
+    const upgradeable = (upgradeRaw?.length ?? 0) > 0;
     const rows: Array<[string, string]> = [];
     if (purchasable) rows.push([t("hud.price"), `$${price}`]);
     if (upgradeable) rows.push([t("hud.level"), level > 0 ? `Lv.${level}` : "—"]);
@@ -301,8 +293,7 @@ export class GameHudShell {
     // - scope 'region'：从当前格子所属区域的 environmentValue 读取（可随地图更换名称/数量）
     const playerValues = player.currentPlayer?.values ?? {};
     const cell = this.vm.getCell(player.currentPlayerPosition);
-    const regionId = String(cell?.extra?.['region'] ?? "");
-    const region = this.vm.getRegions().mapRegions.find(r => r.id === regionId);
+    const regionId = cell?.regionId ?? "";
     // 地图未提供字段定义时，退化到默认“财产”一栏，避免空栏
     const slots: ValueFieldDef[] = defs.length > 0
       ? defs
@@ -316,7 +307,7 @@ export class GameHudShell {
       const num = document.createElement("span");
       num.className = "value-pill__num";
       const raw = def.scope === "region"
-        ? region?.environmentValue ?? player.currentEnv
+        ? this.vm.getRegions().regionProsperityMap.get(regionId) ?? 0
         : playerValues[def.id]?.current ?? 0;
       const value = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
       num.textContent = String(Math.round(value));

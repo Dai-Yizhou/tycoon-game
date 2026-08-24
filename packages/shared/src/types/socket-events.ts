@@ -179,13 +179,6 @@ export interface ClientToServerEvents {
     ack?: (result: AckResult<{ cell: Cell }>) => void,
   ) => void;
 
-  /** 触发投资项目事件 */
-  'client.triggerInvestmentEvent': (
-    payload: { investmentId: number; eventId: string },
-    ack?: (result: AckResult) => void,
-  ) => void;
-
-
   /** 修缮纪念碑 */
   'client.repairMonument': (
     payload: { monumentId: number },
@@ -413,9 +406,8 @@ export interface ServerToClientEvents {
   /** 投资项目事件被触发 */
   'server.investmentEventTriggered': (payload: {
     investmentId: number;
-    amount: number;
-    type: 'profit' | 'loss';
-    affectedPlayers: Array<{ playerId: string; share: number; amount: number }>;
+    amount: import('./cell.js').Uct;
+    affectedPlayers: Array<{ playerId: string; share: number; amount: import('./cell.js').Uct }>;
   }) => void;
 
   /** 计税周期完成 */

@@ -1,0 +1,21 @@
+{
+  "id": "target-modes",
+  "effects": [
+    {
+      "weight": 1,
+      "exclusive": false,
+      "msg": { "zh-CN": "信用", "en-US": "Credit" },
+      "ops": [
+        { "type": "value", "target": "globe", "delta": { "player": { "credit": 5 } } }
+      ]
+    },
+    {
+      "weight": 1,
+      "exclusive": true,
+      "msg": { "zh-CN": "财产", "en-US": "Money" },
+      "ops": [
+        { "type": "value", "target": "globe", "delta": { "player": { "money": 10 } } }
+      ]
+    }
+  ]
+}

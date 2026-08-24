@@ -230,7 +230,8 @@ export class EventEffectsHandler {
     const mapMeta = this.world.getMapMeta();
     if (mapMeta && mapMeta.regions) {
       for (const region of mapMeta.regions) {
-        if (region.cellIds.includes(cellId)) {
+        const regionCellIds = this.world.getMapData()?.filter((cell) => cell.regionId === region.id).map((cell) => cell.id) ?? [];
+        if (regionCellIds.includes(cellId)) {
           return region.id;
         }
       }
@@ -262,7 +263,7 @@ export class EventEffectsHandler {
       if (mapMeta && mapMeta.regions) {
         const region = mapMeta.regions.find(r => r.id === regionId);
         if (region) {
-          regionCellIds = region.cellIds;
+          regionCellIds = this.world.getMapData()?.filter((cell) => cell.regionId === region.id).map((cell) => cell.id) ?? [];
         }
       }
     }

@@ -1,26 +1,12 @@
 import type { MapData } from '@game/shared';
 import type { RegionInfo, TimeZoneInfo, ValueFieldDef } from '../../state/GameStore.js';
-import type { ThemeId } from '../../design/ThemeConfig.js';
 
 const MAP_SCALE = 5.0;
 
 export function normalizeClientMapData(data: unknown[]): MapData {
   return data.map((raw) => {
     const cell = raw as Record<string, unknown>;
-    const id = cell['id'] as number;
-    const origX = cell['x'] as number;
-    const origY = cell['y'] as number;
-    const extra = cell['extra'];
-    const normalizedExtra = extra && typeof extra === 'object' && !Array.isArray(extra)
-      ? { ...(extra as Record<string, unknown>) }
-      : Object.fromEntries(Object.entries(cell).filter(([key]) => !['id', 'x', 'y', 'destinations'].includes(key)));
-    return {
-      id,
-      x: origX * MAP_SCALE,
-      y: origY * MAP_SCALE,
-      destinations: (cell['destinations'] as number[]) ?? [],
-      extra: normalizedExtra,
-    };
+    return { ...cell, x: Number(cell['x']) * MAP_SCALE, y: Number(cell['y']) * MAP_SCALE } as unknown as MapData[number];
   });
 }
 
@@ -37,20 +23,16 @@ export async function loadMapData(): Promise<{
     const mapData = normalizeClientMapData(data.mapData);
     const regions: RegionInfo[] = (data.regions || []).map((region: Record<string, unknown>) => ({
       id: String(region['id'] || ''),
-      name: String(region['name'] || ''),
-      cellIds: Array.isArray(region['cellIds']) ? region['cellIds'] as number[] : [],
-      prosperity: typeof region['prosperity'] === 'number' ? region['prosperity'] : 100,
-      ...(typeof region['themeId'] === 'string' ? { themeId: region['themeId'] as ThemeId } : {}),
-      ...(typeof region['environmentValue'] === 'number' ? { environmentValue: region['environmentValue'] } : {}),
+      name: typeof region['name'] === 'object' ? String((region['name'] as Record<string, unknown>)['zh-CN'] || '') : '',
+      cellIds: [],
+      prosperity: typeof region['initial'] === 'object' && region['initial'] !== null
+        ? Number(((region['initial'] as Record<string, unknown>)['region'] as Record<string, unknown> | undefined)?.['pros'] ?? 0)
+        : 0,
     }));
-    const timezones: TimeZoneInfo[] = (data.timezones || []).map((timezone: Record<string, unknown>) => ({
-      id: String(timezone['id'] || ''),
-      ...(typeof timezone['name'] === 'string' ? { name: timezone['name'] } : {}),
-      offsetMinutes: typeof timezone['offsetMinutes'] === 'number' ? timezone['offsetMinutes'] : 0,
-    }));
+    const timezones: TimeZoneInfo[] = [];
     const valueFields: ValueFieldDef[] = (data.valueFieldDefinitions || []).map((field: Record<string, unknown>) => ({
       id: String(field['id'] || ''),
-      name: String(field['name'] || ''),
+      name: typeof field['name'] === 'object' ? String((field['name'] as Record<string, unknown>)['zh-CN'] || '') : '',
       scope: field['scope'] === 'region' ? 'region' : 'player',
       ...(typeof field['min'] === 'number' ? { min: field['min'] } : {}),
       ...(typeof field['max'] === 'number' ? { max: field['max'] } : {}),

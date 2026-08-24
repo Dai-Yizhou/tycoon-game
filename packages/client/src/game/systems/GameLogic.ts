@@ -13,9 +13,8 @@ export interface GameRuntime {
   cooldownTimer: ReturnType<typeof setInterval> | null;
 }
 
-const cellType = (cell: Cell): string => String(cell.extra?.type ?? '');
-const cellName = (cell: Cell): string => String(cell.extra?.name ?? '');
-const cellCost = (cell: Cell, key: string): number => Number(cell.extra?.[key] ?? 0);
+const cellType = (cell: Cell): string => cell.type;
+const cellName = (cell: Cell): string => cell.name['zh-CN'] || cell.name['en-US'];
 
 function setRuntimeSnapshot(runtime: GameRuntime, partial: Partial<ClientGameSnapshot>): void {
   runtime.store.applySnapshot({ sequence: runtime.store.nextSequence(), ...partial });
@@ -75,7 +74,7 @@ export function onPlayerArrived(runtime: GameRuntime): void {
   setRuntimeSnapshot(runtime, { playerDisplayX: cell.x, playerDisplayY: cell.y, cameraTargetX: cell.x, cameraTargetY: cell.y });
   const name = cellName(cell);
   switch (cellType(cell)) {
-    case 'start': addChatMessage(t('player.passedStart'), 'system'); break;
+    case 'supply': addChatMessage(t('player.passedStart'), 'system'); break;
     case 'property': addChatMessage(t(snapshot.ownedProperties.has(cell.id) ? 'property.alreadyOwned' : 'property.availableForPurchase', { name }), 'system'); break;
     case 'investment': addChatMessage(t(snapshot.ownedInvestments.has(cell.id) ? 'investment.arrivedSettlement' : 'investment.available', { name }), 'system'); break;
     case 'event': addChatMessage(t('event.arrived'), 'system'); break;
@@ -116,11 +115,6 @@ export function handleTransport(runtime: GameRuntime): void {
   const snapshot = runtime.store.getSnapshot();
   const cell = runtime.mapIndex.getById(snapshot.currentPlayerPosition);
   if (!cell || cellType(cell) !== 'transport' || snapshot.actionUsedThisTurn) return;
-  const cost = cellCost(cell, 'transportCost');
-  if (snapshot.currentMoney < cost) {
-    addChatMessage(t('transport.insufficientMoney'), 'system');
-    return;
-  }
   runtime.socket.emit('client.getTransportDestinations', { hubCellId: cell.id }, (result) => {
     if (!result.ok) addChatMessage(result.error || t('common.unknownError'), 'error');
   });

@@ -65,9 +65,9 @@ export class InteractiveMapSurface {
     nodes.classList.add("interactive-map-surface__nodes");
     cells.forEach(c => {
       const g = document.createElementNS(ns, "g");
-      const type = String(c.extra.type ?? "property");
-      const name = localizedText(c.extra.name, `格子 ${c.id}`);
-      const price = Number(c.extra.price ?? 0);
+      const type = String(c.type ?? c.extra?.type ?? "property");
+      const name = localizedText(c.name ?? c.extra?.name, `格子 ${c.id}`);
+      const price = Object.values(c.price?.player ?? {}).filter((value) => value < 0).reduce((total, value) => total + Math.abs(value), 0);
       g.classList.add("map-node", `map-node--${type}`);
       g.dataset.cellId = String(c.id);
       g.setAttribute("transform", `translate(${c.x} ${c.y})`);

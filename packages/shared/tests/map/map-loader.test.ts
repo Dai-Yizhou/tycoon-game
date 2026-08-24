@@ -24,35 +24,29 @@ const REAL_MAP_JSON = JSON.stringify([
     id: 0,
     x: 356,
     y: 109,
-    destinations: [],
-    name: '',
-    type: 'start',
-    price: 0,
-    rent: [0, 10],
-    description: ['hi'],
-    extra: [''],
-    behavior: '',
-    icon: '',
-    level: 0,
-    upgradeCost: [],
-    owners: [],
+    destinations: [1],
+    name: { 'zh-CN': '补给站', 'en-US': 'Supply' },
+    type: 'supply',
+    description: { 'zh-CN': '补给', 'en-US': 'Supply' },
+    regionId: 'r1',
+    theme: 'northeast',
+    timezone: 0,
+    behaviorPass: '',
+    behaviorLand: '',
+    teleportDestinations: [],
   },
   {
     id: 1,
     x: 521,
     y: 284,
-    destinations: [0],
-    name: '',
+    destinations: [],
+    name: { 'zh-CN': '空地', 'en-US': 'Empty' },
     type: 'property',
-    price: 0,
-    rent: [],
-    description: [],
-    extra: ['34436'],
-    behavior: '',
-    icon: '',
-    level: 0,
-    upgradeCost: [],
-    owners: [],
+    description: { 'zh-CN': '空地', 'en-US': 'Empty' },
+    regionId: 'r1',
+    theme: 'northeast',
+    timezone: 0,
+    teleportDestinations: [],
   },
 ]);
 
@@ -61,7 +55,7 @@ describe('map-loader - loadMapFromString', () => {
     const map = await loadMapFromString(REAL_MAP_JSON);
     expect(map).toHaveLength(2);
     expect(map[0]?.id).toBe(0);
-    expect(map[0]?.extra['rent']).toEqual([0, 10]);
+    expect(map[0]?.type).toBe('supply');
   });
 
   it('空字符串抛错', async () => {
@@ -89,7 +83,7 @@ describe('map-loader - loadMapFromString', () => {
 describe('map-loader - loadMapFromObject', () => {
   it('解析合法数组', () => {
     const map = loadMapFromObject([
-      { id: 0, x: 0, y: 0, destinations: [] },
+      { id: 0, x: 0, y: 0, destinations: [1], type: 'empty', name: { 'zh-CN': '空', 'en-US': 'Empty' }, description: { 'zh-CN': '空', 'en-US': 'Empty' }, regionId: 'r1', theme: 'northeast', timezone: 0, teleportDestinations: [] },
     ]);
     expect(map).toHaveLength(1);
   });

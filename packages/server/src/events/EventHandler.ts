@@ -78,6 +78,14 @@ export class EventHandler {
     return this.behaviorEngine;
   }
 
+  handleBehavior(playerId: string, behaviorId: string, player: Player, cell: import('@game/shared').Cell, socket: TypedSocket): BehaviorExecuteResult | null {
+    if (!this.behaviorEngine) return null;
+    const result = this.behaviorEngine.executeBehavior(behaviorId, player, { cell, cellType: cell.type, action: 'pass' });
+    this.broadcastBehaviorNotification(player, result, socket);
+    logger.info(`玩家 ${playerId} 经过格子 ${cell.id} 触发 behavior ${behaviorId}`);
+    return result;
+  }
+
   /**
    * 注册内置事件模板
    */
@@ -149,7 +157,7 @@ export class EventHandler {
       }
 
       // 3. 检查格子是否配置了 behavior（内置顶层字段，FR-1）
-      const behaviorId = cell.behavior ?? '';
+      const behaviorId = cell.behaviorLand ?? '';
       if (behaviorId) {
         // 已配置 behavior 时走专属路径：执行失败即报错返回，不再回退到随机事件，
         // 以免掩盖配置/加载问题（如 config/behaviors/{id}.json 缺失）。

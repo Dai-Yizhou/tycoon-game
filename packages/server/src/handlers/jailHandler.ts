@@ -14,8 +14,8 @@
  * - 监狱中禁用收租功能
  */
 
-import type { ValueChangedPayload } from '@game/shared';
-import { CellTypes, PlayerStatus, getExtra, t } from '@game/shared';
+import type { Player } from '@game/shared';
+import { CellTypes, PlayerStatus, t } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -24,11 +24,9 @@ import type { EconomyService } from '../economy/EconomyService.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
 
 /**
- * 监狱配置（从 MapMeta.config 读取）
+ * 监狱运行时配置
  */
 export interface JailConfig {
-  /** 每次入狱扣除的信用值，默认 5 */
-  creditPenalty?: number;
   /** 现实时间冷却（毫秒），默认 10000 */
   cooldownMs?: number;
 }
@@ -37,7 +35,6 @@ export interface JailConfig {
  * 默认监狱配置
  */
 export const DEFAULT_JAIL_CONFIG: JailConfig = {
-  creditPenalty: 5,
   cooldownMs: 10000,
 };
 
@@ -135,18 +132,17 @@ export class JailHandler {
       }
 
       // 判断是否为监狱格子
-      const cellType = getExtra<string>(cell, 'type', '');
+      const cellType = cell.type;
       if (cellType !== CellTypes.Jail) {
         return false;
       }
 
       // 获取监狱配置
-      const config = this.getJailConfig();
-      const cooldownMs = config.cooldownMs ?? DEFAULT_JAIL_CONFIG.cooldownMs ?? 10_000;
+      const cooldownMs = cell.jailCooldown ?? this.configuredCooldownMs;
 
       // 设置监狱状态
       player.status = PlayerStatus.Jail;
-      this.deductCredit(player, config.creditPenalty ?? DEFAULT_JAIL_CONFIG.creditPenalty ?? 5, 'jail_entry');
+      this.applyJailCost(player, cell.jailCost);
       this.world.updatePlayer(player);
 
       // 记录监狱状态数据
@@ -159,7 +155,7 @@ export class JailHandler {
       this.scheduleRelease(playerId, cooldownMs);
 
       // 检查是否有 behavior 字段（作为额外效果）
-      const behaviorId = cell.behavior ?? '';
+      const behaviorId = cell.behaviorLand ?? '';
       if (behaviorId && this.behaviorEngine) {
         const behaviorResult = this.behaviorEngine.executeBehavior(behaviorId, player, {
           cellType: CellTypes.Jail,
@@ -314,17 +310,16 @@ export class JailHandler {
     const cell = mapIndex.getById(cellId);
     if (!cell) return false;
 
-    const cellType = getExtra<string>(cell, 'type', '');
-    return cellType === CellTypes.Jail;
+    return cell.type === CellTypes.Jail;
   }
 
   /**
    * 获取监狱配置
    *
-   * 从 MapMeta.config 中读取
+   * 返回运行时默认配置；格子级 cooldown 和 cost 在入狱时读取。
    */
   getJailConfig(): JailConfig {
-    return { ...DEFAULT_JAIL_CONFIG, cooldownMs: this.configuredCooldownMs };
+    return { cooldownMs: this.configuredCooldownMs };
   }
 
   /**
@@ -366,44 +361,20 @@ export class JailHandler {
     return this.getJailConfig().cooldownMs ?? DEFAULT_JAIL_CONFIG.cooldownMs ?? 10_000;
   }
 
-  /**
-   * 扣除玩家信用值
-   *
-   * @param player 玩家
-   * @param amount 扣除金额
-   * @param reason 原因（日志用）
-   */
-  private deductCredit(player: { id: string; values: Record<string, { id: string; name: string; current: number; min?: number; max?: number }> }, amount: number, reason: string): void {
-    if (this.economy) {
-      const change = this.economy.changeValue(player.id, 'credit', -amount, reason);
-      if (change.ok) this.io.emit('server.valueChanged', { playerId: player.id, fieldId: 'credit', current: change.current, delta: change.delta });
-      return;
+  private applyJailCost(player: Player, cost: { player?: Record<string, number> } | undefined): void {
+    for (const [fieldId, delta] of Object.entries(cost?.player ?? {})) {
+      if (this.economy) {
+        const change = this.economy.changeValue(player.id, fieldId, delta, 'jail_entry');
+        if (change.ok) this.io.emit('server.valueChanged', { playerId: player.id, fieldId, current: change.current, delta: change.delta });
+        continue;
+      }
+      const field = player.values[fieldId];
+      if (!field) continue;
+      const previous = field.current;
+      field.current = Math.max(field.min ?? Number.NEGATIVE_INFINITY, Math.min(field.max ?? Number.POSITIVE_INFINITY, previous + delta));
+      this.world.updatePlayer(player as any);
+      this.io.emit('server.valueChanged', { playerId: player.id, fieldId, current: field.current, delta: field.current - previous });
     }
-    const creditField = player.values['credit'];
-    if (!creditField) {
-      logger.warn(`玩家 ${player.id} 没有 credit 字段，无法扣除信用值`);
-      return;
-    }
-
-    // 更新信用值（考虑最小值限制）
-    const oldValue = creditField.current;
-    const newValue = creditField.min !== undefined
-      ? Math.max(oldValue - amount, creditField.min)
-      : Math.max(oldValue - amount, 0);
-
-    creditField.current = newValue;
-    this.world.updatePlayer(player as any);
-
-    // 广播数值变化
-    const payload: ValueChangedPayload = {
-      playerId: player.id,
-      fieldId: 'credit',
-      current: newValue,
-      delta: newValue - oldValue,
-    };
-    this.io.emit('server.valueChanged', payload);
-
-    logger.debug(`玩家 ${player.id} 扣除 ${amount} 信用值（原因: ${reason}），当前: ${newValue}`);
   }
 
   /**

@@ -1,0 +1,13 @@
+{
+  "id": "region-value",
+  "effects": [
+    {
+      "weight": 1,
+      "exclusive": false,
+      "msg": { "zh-CN": "区域繁荣", "en-US": "Regional prosperity" },
+      "ops": [
+        { "type": "value", "target": "region", "delta": { "region": { "pros": 5 } } }
+      ]
+    }
+  ]
+}

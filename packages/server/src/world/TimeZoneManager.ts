@@ -117,7 +117,7 @@ export class TimeZoneManager {
     let coveredCells = 0;
     if (mapData) {
       for (const cell of mapData) {
-        const offset = cell.extra?.['timezone'];
+        const offset = cell.timezone;
         if (typeof offset !== 'number' || !Number.isFinite(offset)) continue;
 
         const id = offsetKey(offset);
@@ -135,22 +135,6 @@ export class TimeZoneManager {
     }
 
     // 2. 兼容旧配置：从 timezones 表补充（仅当其格子未被直接偏移覆盖）
-    for (const tz of mapMeta.timezones ?? []) {
-      if (!this.timezoneMap.has(tz.id)) {
-        this.timezoneMap.set(tz.id, { ...tz, cellIds: [...(tz.cellIds ?? [])] });
-      }
-      for (const cellId of tz.cellIds ?? []) {
-        if (!this.cellTimezoneMap.has(cellId)) {
-          this.cellTimezoneMap.set(cellId, tz.id);
-        }
-      }
-      if (tz.parentId) {
-        const siblings = this.childrenMap.get(tz.parentId) ?? [];
-        siblings.push(tz.id);
-        this.childrenMap.set(tz.parentId, siblings);
-      }
-    }
-
     if (this.timezoneMap.size === 0) {
       this.timezoneMap.set(this.defaultTimezoneId, {
         id: this.defaultTimezoneId,

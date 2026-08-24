@@ -14,13 +14,13 @@
  * - 服务端权威校验所有金钱操作
  */
 
-import type { AckResult, Cell, Player } from '@game/shared';
-import { getExtra, normalizeCellType, CellTypes, PlayerStatus, canReceiveInvestmentImpact, participatesInEconomy } from '@game/shared';
+import type { AckResult, Cell, Player, Uct } from '@game/shared';
+import { normalizeCellType, CellTypes, PlayerStatus, canReceiveInvestmentImpact, participatesInEconomy, formatUct } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
-import { DEFAULT_OWNERSHIP_CONFIG, addOwnership, getBuyInPrice, getOwnerships, type OwnershipConfig } from '../economy/index.js';
+import { DEFAULT_OWNERSHIP_CONFIG, addOwnership, getOwnerships, type OwnershipConfig } from '../economy/index.js';
 import type { PropertyOwnership } from './propertyHandler.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
 import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
@@ -35,9 +35,7 @@ export interface InvestmentResult {
   /** 玩家 ID */
   playerId: string;
   /** 收益/损失金额 */
-  amount: number;
-  /** 收益类型 */
-  type: 'profit' | 'loss';
+  amount: Uct;
 }
 
 /**
@@ -47,14 +45,12 @@ export interface EventTriggerResult {
   /** 投资项目 ID */
   investmentId: number;
   /** 收益/损失金额 */
-  amount: number;
-  /** 收益类型 */
-  type: 'profit' | 'loss';
+  amount: Uct;
   /** 受影响的玩家列表 */
   affectedPlayers: Array<{
     playerId: string;
     share: number;
-    amount: number;
+    amount: Uct;
   }>;
 }
 
@@ -102,9 +98,6 @@ export class InvestmentHandler {
       this.handleBuyInvestment(socket, payload, ack);
     });
 
-    socket.on('client.triggerInvestmentEvent', (payload, ack) => {
-      this.handleTriggerInvestmentEvent(socket, payload, ack);
-    });
   }
 
   /**
@@ -183,7 +176,8 @@ export class InvestmentHandler {
       }
 
       // 7. 获取价格
-      const price = ownerships.length > 0 ? getBuyInPrice(cell, this.ownershipConfig) : (getExtra<number>(cell, 'price', 0) ?? 0);
+      const priceUct = ownerships.length > 0 ? this.scaleUct(cell.price, this.ownershipConfig.buyInMultiplier) : cell.price;
+      const price = this.getUctCost(priceUct);
       if (price <= 0) {
         emitError(socket, ErrorCodes.InvalidPayload, '该投资项目无价格信息');
         ack?.({ ok: false, error: 'no_price' });
@@ -191,9 +185,8 @@ export class InvestmentHandler {
       }
 
       // 8. 检查玩家财产是否足够
-      const money = this.getPlayerMoney(player);
-      if (money < price) {
-        emitError(socket, ErrorCodes.InvalidPayload, `财产不足，需要 ${price}，当前 ${money}`);
+      if (!this.canApplyUct(player, priceUct)) {
+        emitError(socket, ErrorCodes.InvalidPayload, '投资费用字段余额不足');
         ack?.({ ok: false, error: 'insufficient_money' });
         return;
       }
@@ -204,7 +197,7 @@ export class InvestmentHandler {
       }
 
       // 9. 执行购买
-      const result = this.executeBuyInvestment(player, cell, price);
+      const result = this.executeBuyInvestment(player, cell, priceUct!);
       if (!result) {
         emitError(socket, ErrorCodes.InternalError, '购买失败');
         ack?.({ ok: false, error: 'buy_failed' });
@@ -215,7 +208,7 @@ export class InvestmentHandler {
       this.updateCell(result.cell);
 
       // 11. 检查是否有 behavior 字段（作为额外效果）
-      const behaviorId = cell.behavior ?? '';
+      const behaviorId = cell.behaviorLand ?? '';
       if (behaviorId && this.behaviorEngine) {
         const behaviorResult = this.behaviorEngine.executeBehavior(behaviorId, player, {
           cellType: CellTypes.Investment,
@@ -234,87 +227,15 @@ export class InvestmentHandler {
         cell: result.cell,
         playerId,
       });
-      this.io.emit('server.valueChanged', {
-        playerId,
-        fieldId: 'money',
-        current: this.getPlayerMoney(player),
-        delta: -price,
-      });
 
       // 13. 返回成功结果
       const response = { ok: true, data: { cell: result.cell } } as AckResult<{ cell: Cell }>;
       if (requestId) this.operationGuard.complete(requestId, response);
       ack?.(response);
-      logger.debug(`玩家 ${playerId} 购买了投资项目 ${payload.cellId}，价格 ${price}`);
+      logger.debug(`玩家 ${playerId} 购买了投资项目 ${payload.cellId}，费用 ${this.formatUct(priceUct)}`);
       } finally { this.operationGuard.unlock(lockKey); }
     } catch (err) {
       logger.error('购买投资项目处理错误', err);
-      emitError(socket, ErrorCodes.InternalError, err instanceof Error ? err.message : String(err));
-      ack?.({ ok: false, error: 'internal_error' });
-    }
-  }
-
-  /**
-   * 处理事件触发投资项目收益/损失
-   *
-   * 由事件系统调用，投资项目被事件触发时产生收益或损失
-   */
-  private handleTriggerInvestmentEvent(
-    socket: TypedSocket,
-    payload: { investmentId: number; eventId: string },
-    ack?: (result: AckResult<EventTriggerResult>) => void,
-  ): void {
-    try {
-      // 1. 获取地图数据
-      const mapIndex = this.world.getMapIndex();
-      if (!mapIndex) {
-        emitError(socket, ErrorCodes.InternalError, '地图未加载');
-        ack?.({ ok: false, error: 'map_not_loaded' });
-        return;
-      }
-
-      // 2. 获取投资项目格子
-      const cell = mapIndex.getById(payload.investmentId);
-      if (!cell) {
-        emitError(socket, ErrorCodes.InvalidPayload, `投资项目 ${payload.investmentId} 不存在`);
-        ack?.({ ok: false, error: 'investment_not_found' });
-        return;
-      }
-
-      // 3. 验证格子类型
-      const cellType = normalizeCellType(cell);
-      if (cellType !== CellTypes.Investment) {
-        emitError(socket, ErrorCodes.InvalidPayload, '该格子不是投资项目');
-        ack?.({ ok: false, error: 'not_investment' });
-        return;
-      }
-
-      // 4. 获取所有权信息
-      const ownerships = getOwnerships(cell);
-      if (ownerships.length === 0) {
-        // 无主投资项目，无收益/损失
-        ack?.({ ok: true, data: { investmentId: payload.investmentId, amount: 0, type: 'profit', affectedPlayers: [] } });
-        return;
-      }
-
-      // 5. 从事件模板获取收益/损失金额
-      const eventImpact = this.getEventImpact(cell, payload.eventId);
-      if (!eventImpact) {
-        ack?.({ ok: true, data: { investmentId: payload.investmentId, amount: 0, type: 'profit', affectedPlayers: [] } });
-        return;
-      }
-
-      // 6. 分配收益/损失给所有者（按持股比例）
-      const result = this.distributeInvestmentImpact(cell, eventImpact);
-
-      // 7. 广播事件触发结果
-      this.io.emit('server.investmentEventTriggered', result);
-
-      // 8. 返回成功结果
-      ack?.({ ok: true, data: result });
-      logger.debug(`投资项目 ${payload.investmentId} 被事件 ${payload.eventId} 触发，${eventImpact.type} ${eventImpact.amount}`);
-    } catch (err) {
-      logger.error('事件触发投资项目处理错误', err);
       emitError(socket, ErrorCodes.InternalError, err instanceof Error ? err.message : String(err));
       ack?.({ ok: false, error: 'internal_error' });
     }
@@ -325,7 +246,7 @@ export class InvestmentHandler {
    *
    * 由事件系统或 HandlerRegistry 调用
    */
-  triggerInvestmentEvent(investmentId: number, eventId: string): EventTriggerResult | null {
+  private applyInvestmentEvent(investmentId: number, eventName: string): EventTriggerResult | null {
     try {
       // 1. 获取地图数据
       const mapIndex = this.world.getMapIndex();
@@ -354,7 +275,7 @@ export class InvestmentHandler {
       }
 
       // 5. 从事件模板获取收益/损失金额
-      const eventImpact = this.getEventImpact(cell, eventId);
+      const eventImpact = this.getInvestmentTrigger(cell, eventName);
       if (!eventImpact) {
         return null;
       }
@@ -365,12 +286,28 @@ export class InvestmentHandler {
       // 7. 广播事件触发结果
       this.io.emit('server.investmentEventTriggered', result);
 
-      logger.debug(`投资项目 ${investmentId} 被事件 ${eventId} 触发，${eventImpact.type} ${eventImpact.amount}`);
+      logger.debug(`投资项目 ${investmentId} 被域事件 ${eventName} 触发：${this.formatUct(eventImpact)}`);
       return result;
     } catch (err) {
       logger.error('触发投资项目事件处理错误', err);
       return null;
     }
+  }
+
+  dispatchDomainEvent(eventName: string): EventTriggerResult[] {
+    const results: EventTriggerResult[] = [];
+    for (const cell of this.world.getMapData() ?? []) {
+      if (normalizeCellType(cell) !== CellTypes.Investment) continue;
+      if (!cell.investmentTriggers?.some((trigger) => trigger.on === eventName)) continue;
+      const result = this.applyInvestmentEvent(cell.id, eventName);
+      if (result) results.push(result);
+    }
+    return results;
+  }
+
+  private formatUct(uct: Uct | undefined): string {
+    const meta = this.world.getMapMeta();
+    return formatUct(uct, meta?.valueFieldDefinitions);
   }
 
   /**
@@ -381,14 +318,15 @@ export class InvestmentHandler {
   private executeBuyInvestment(
     player: Player,
     cell: Cell,
-    price: number,
+    price: Uct,
   ): { cell: Cell; ownership: PropertyOwnership } | null {
     try {
-      const buyerChange = this.economy.changeValue(player.id, 'money', -price, 'investment_purchase');
-      if (!buyerChange.ok) return null;
-      const ownership = addOwnership(cell, player.id, price, this.ownershipConfig);
+      const priceAmount = this.getUctCost(price);
+      const changes = this.applyUct(player, price, 'investment_purchase');
+      if (changes.length === 0) return null;
+      const ownership = addOwnership(cell, player.id, priceAmount, this.ownershipConfig);
       if (!ownership || ownership.share <= 0 || ownership.share > 1) {
-        this.economy.changeValue(player.id, 'money', price, 'investment_purchase_rollback');
+        this.rollbackUct(player, changes, 'investment_purchase_rollback');
         return null;
       }
       this.distributeBuyInToOwners(cell, player.id, price);
@@ -404,16 +342,15 @@ export class InvestmentHandler {
     }
   }
 
-  private distributeBuyInToOwners(cell: Cell, buyerId: string, amount: number): void {
+  private distributeBuyInToOwners(cell: Cell, buyerId: string, amount: Uct): void {
     const buyer = getOwnerships(cell).find((ownership) => ownership.playerId === buyerId);
     if (!buyer || buyer.share >= 1) return;
     for (const ownership of getOwnerships(cell)) {
       if (ownership.playerId === buyerId) continue;
       const owner = this.world.getPlayer(ownership.playerId);
       if (!owner || owner.status === PlayerStatus.Bankrupt) continue;
-      const payout = Math.floor(amount * (ownership.share / (1 - buyer.share)));
-      const change = this.economy.changeValue(owner.id, 'money', payout, 'investment_buy_in_payout');
-      if (change.ok) this.io.emit('server.valueChanged', { playerId: owner.id, fieldId: 'money', current: change.current, delta: change.delta });
+      const scale = ownership.share / (1 - buyer.share);
+      this.applyUct(owner, { player: Object.fromEntries(Object.entries(amount.player ?? {}).map(([fieldId, delta]) => [fieldId, -delta * scale])) }, 'investment_buy_in_payout');
     }
   }
 
@@ -422,27 +359,50 @@ export class InvestmentHandler {
    *
    * 事件模板定义了对投资项目的影响
    */
-  private getEventImpact(
+  private getInvestmentTrigger(
     cell: Cell,
-    eventId: string,
-  ): { amount: number; type: 'profit' | 'loss' } | null {
-    // 从投资项目格子获取事件影响配置
-    // 格式：eventImpacts: { eventId: { amount, type } }
-    const eventImpacts = getExtra<Record<string, { amount: number; type: 'profit' | 'loss' }>>(cell, 'eventImpacts', {});
+    domainEvent: string,
+  ): Uct | null {
+    return cell.investmentTriggers?.find((trigger) => trigger.on === domainEvent)?.delta ?? null;
+  }
 
-    if (!eventImpacts || !eventImpacts[eventId]) {
-      // 无特定事件配置，使用默认影响
-      const defaultImpact = getExtra<number>(cell, 'defaultEventImpact', 0) ?? 0;
-      if (defaultImpact !== 0) {
-        return {
-          amount: Math.abs(defaultImpact),
-          type: defaultImpact > 0 ? 'profit' : 'loss',
-        };
+  private getUctCost(uct: Uct | undefined): number {
+    return Object.values(uct?.player ?? {}).reduce((total, value) => total + Math.abs(value), 0);
+  }
+
+  private canApplyUct(player: Player, uct: Uct | undefined): boolean {
+    return Object.entries(uct?.player ?? {}).every(([fieldId, delta]) => {
+      const field = player.values[fieldId];
+      if (!field) return false;
+      const next = field.current + delta;
+      return next >= (field.min ?? Number.NEGATIVE_INFINITY) && next <= (field.max ?? Number.POSITIVE_INFINITY);
+    });
+  }
+
+  private applyUct(player: Player, uct: Uct | undefined, reason: string): Array<{ fieldId: string; delta: number }> {
+    const changes: Array<{ fieldId: string; delta: number }> = [];
+    for (const [fieldId, delta] of Object.entries(uct?.player ?? {})) {
+      const change = this.economy.changeValue(player.id, fieldId, delta, reason);
+      if (!change.ok) {
+        this.rollbackUct(player, changes, `${reason}_rollback`);
+        return [];
       }
-      return null;
+      changes.push({ fieldId, delta: change.delta });
+      this.io.emit('server.valueChanged', { playerId: player.id, fieldId, current: change.current, delta: change.delta });
     }
+    return changes;
+  }
 
-    return eventImpacts[eventId];
+  private rollbackUct(player: Player, changes: Array<{ fieldId: string; delta: number }>, reason: string): void {
+    for (const change of changes) this.economy.changeValue(player.id, change.fieldId, -change.delta, reason);
+  }
+
+  private scaleUct(uct: Uct | undefined, scale: number): Uct | undefined {
+    if (!uct) return undefined;
+    return {
+      player: Object.fromEntries(Object.entries(uct.player ?? {}).map(([fieldId, delta]) => [fieldId, delta * scale])),
+      region: Object.fromEntries(Object.entries(uct.region ?? {}).map(([fieldId, delta]) => [fieldId, delta * scale])),
+    };
   }
 
   /**
@@ -450,10 +410,14 @@ export class InvestmentHandler {
    */
   private distributeInvestmentImpact(
     cell: Cell,
-    impact: { amount: number; type: 'profit' | 'loss' },
+    impact: Uct,
   ): EventTriggerResult {
     const ownerships = getOwnerships(cell);
-    const affectedPlayers: Array<{ playerId: string; share: number; amount: number }> = [];
+    const affectedPlayers: Array<{ playerId: string; share: number; amount: Uct }> = [];
+
+    for (const [fieldId, delta] of Object.entries(impact.region ?? {})) {
+      this.world.changeRegionValue(cell.regionId, fieldId, delta);
+    }
 
     for (const ownership of ownerships) {
       const player = this.world.getPlayer(ownership.playerId);
@@ -462,36 +426,23 @@ export class InvestmentHandler {
       }
 
       // 计算每个所有者的收益/损失金额（按持股比例）
-      const playerAmount = Math.floor(impact.amount * ownership.share);
-
-      if (playerAmount === 0) {
+      const amount = this.scaleUct({ player: impact.player }, ownership.share) ?? {};
+      const changes = this.applyUct(player, amount, 'investment_impact');
+      if (changes.length === 0) {
         continue;
       }
-
-      // 更新玩家财产
-      const delta = impact.type === 'profit' ? playerAmount : -playerAmount;
-      const change = this.economy.changeValue(player.id, 'money', delta, `investment_${impact.type}`);
-      if (!change.ok) continue;
 
       affectedPlayers.push({
         playerId: ownership.playerId,
         share: ownership.share,
-        amount: playerAmount,
+        amount,
       });
 
-      // 广播数值变化
-      this.io.emit('server.valueChanged', {
-        playerId: ownership.playerId,
-        fieldId: 'money',
-        current: change.current,
-        delta: change.delta,
-      });
     }
 
     return {
       investmentId: cell.id,
-      amount: impact.amount,
-      type: impact.type,
+      amount: impact,
       affectedPlayers,
     };
   }
@@ -546,11 +497,6 @@ export class InvestmentHandler {
   /**
    * 获取玩家财产
    */
-  private getPlayerMoney(player: Player): number {
-    const moneyField = player.values['money'];
-    return moneyField?.current ?? 0;
-  }
-
   /**
    * 设置玩家财产
    */

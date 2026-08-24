@@ -121,6 +121,7 @@ export class GameWorld {
   private resourceVersion = 0;
   private readonly cellVersions = new Map<number, number>();
   private readonly playerPositions = new Map<string, number>();
+  private readonly regionValues = new Map<string, Record<string, number>>();
   private lastValidation: ValidationResult | null = null;
   private snapshotStateProvider: (() => Pick<WorldSnapshot, 'taxRecords' | 'jailStates'>) | null = null;
 
@@ -280,6 +281,10 @@ export class GameWorld {
     this.mapData = mapData;
     this.mapMeta = mapMeta;
     this.mapIndex = new MapIndex(mapData);
+    this.regionValues.clear();
+    for (const region of mapMeta.regions) {
+      this.regionValues.set(region.id, { ...(region.initial.region ?? {}) });
+    }
     this.lastValidation = result;
 
     this.emit(WorldEvents.MapLoaded, {
@@ -334,6 +339,20 @@ export class GameWorld {
    */
   getMapIndex(): MapIndex | null {
     return this.mapIndex;
+  }
+
+  getRegionValue(regionId: string, fieldId: string): number {
+    return this.regionValues.get(regionId)?.[fieldId] ?? 0;
+  }
+
+  changeRegionValue(regionId: string, fieldId: string, delta: number): number {
+    const values = this.regionValues.get(regionId);
+    if (!values || !Number.isFinite(delta)) throw new Error(`区域字段不可用: ${regionId}.${fieldId}`);
+    const definition = this.mapMeta?.valueFieldDefinitions.find((field) => field.id === fieldId);
+    if (!definition || definition.scope !== 'region') throw new Error(`区域字段未声明: ${fieldId}`);
+    const current = Math.min(definition.max ?? Number.POSITIVE_INFINITY, Math.max(definition.min ?? Number.NEGATIVE_INFINITY, (values[fieldId] ?? 0) + delta));
+    values[fieldId] = current;
+    return current;
   }
 
   /**

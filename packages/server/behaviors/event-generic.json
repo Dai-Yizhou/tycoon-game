@@ -1,0 +1,13 @@
+{
+  "id": "event-generic",
+  "effects": [
+    {
+      "weight": 1,
+      "exclusive": false,
+      "msg": { "zh-CN": "事件触发", "en-US": "Event triggered" },
+      "ops": [
+        { "type": "value", "target": "single", "delta": { "player": { "money": 20 } } }
+      ]
+    }
+  ]
+}

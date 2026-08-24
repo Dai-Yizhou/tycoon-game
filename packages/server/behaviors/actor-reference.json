@@ -1,0 +1,13 @@
+{
+  "id": "actor-reference",
+  "effects": [
+    {
+      "weight": 1,
+      "exclusive": false,
+      "msg": { "zh-CN": "引用", "en-US": "Reference" },
+      "ops": [
+        { "type": "value", "target": "single", "delta": { "player": { "credit": { "$ref": "$actor.money" } } } }
+      ]
+    }
+  ]
+}

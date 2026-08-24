@@ -1,0 +1,13 @@
+{
+  "id": "contract-test",
+  "effects": [
+    {
+      "weight": 1,
+      "exclusive": false,
+      "msg": { "zh-CN": "测试", "en-US": "Test" },
+      "ops": [
+        { "type": "value", "target": "single", "delta": { "player": { "credit": 5 } } }
+      ]
+    }
+  ]
+}

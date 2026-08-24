@@ -548,14 +548,14 @@ export class SocketManager {
           player,
           ownedProperties: (this.world.getMapData() ?? []).flatMap((cell: Cell) => {
             const ownerships = getExtra<Array<{ playerId: string; share: number }>>(cell, 'ownerships', []) ?? [];
-            return getExtra<string>(cell, 'type', '') === 'property' && ownerships.some((ownership) => ownership.playerId === player.id && ownership.share > 0)
+            return cell.type === 'property' && ownerships.some((ownership) => ownership.playerId === player.id && ownership.share > 0)
               ? [{ cellId: cell.id, level: getExtra<number>(cell, 'level', 0) ?? 0 }]
               : [];
           }),
           ownedInvestments: (this.world.getMapData() ?? []).flatMap((cell: Cell) => {
             const ownerships = getExtra<Array<{ playerId: string; share: number }>>(cell, 'ownerships', []) ?? [];
             const ownership = ownerships.find((item) => item.playerId === player.id && item.share > 0);
-            return getExtra<string>(cell, 'type', '') === 'investment' && ownership ? [{ cellId: cell.id, share: ownership.share }] : [];
+            return cell.type === 'investment' && ownership ? [{ cellId: cell.id, share: ownership.share }] : [];
           }),
           team: this.teamManager?.getPlayerTeam(player.id) ?? null,
           members: this.teamManager?.getPlayerTeam(player.id)?.memberIds.map((memberId) => {

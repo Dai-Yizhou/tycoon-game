@@ -25,10 +25,14 @@ function buildLinearMap(n: number): MapData {
       x: i * 10,
       y: 0,
       destinations: dests,
-      extra: {
-        type: i === 0 ? 'start' : 'property',
-        name: `cell-${i}`,
-      },
+      type: i === 0 ? CellTypes.Supply : CellTypes.Property,
+      name: { 'zh-CN': `格子-${i}`, 'en-US': `cell-${i}` },
+      description: { 'zh-CN': '测试', 'en-US': 'Test' },
+      teleportDestinations: [],
+      theme: 'northeast',
+      regionId: 'r1',
+      timezone: 0,
+      extra: {},
     });
   }
   return cells;
@@ -47,7 +51,7 @@ describe('MapIndex', () => {
       const map = buildLinearMap(5);
       const idx = new MapIndex(map);
       expect(idx.getById(0)?.id).toBe(0);
-      expect(idx.getById(3)?.extra['name']).toBe('cell-3');
+      expect(idx.getById(3)?.name['en-US']).toBe('cell-3');
       expect(idx.getById(99)).toBeUndefined();
     });
 
@@ -84,7 +88,7 @@ describe('MapIndex', () => {
     it('getByType 筛选指定类型', () => {
       const map = buildLinearMap(5);
       const idx = new MapIndex(map);
-      const starts = idx.getByType(CellTypes.Start);
+      const starts = idx.getByType(CellTypes.Supply);
       expect(starts).toHaveLength(1);
       expect(starts[0]?.id).toBe(0);
       const properties = idx.getByType(CellTypes.Property);

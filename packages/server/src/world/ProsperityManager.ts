@@ -162,10 +162,10 @@ export class ProsperityManager extends EventEmitter {
     for (const region of regions) {
       this.regionProsperities.set(region.id, {
         regionId: region.id,
-        regionName: region.name,
-        prosperity: region.prosperity ?? this.config.maxProsperity,
+        regionName: region.name['zh-CN'],
+        prosperity: region.initial.region?.pros ?? this.config.maxProsperity,
         lastUpdateTime: Date.now(),
-        cellIds: region.cellIds,
+        cellIds: this.world.getMapData()?.filter((cell) => cell.regionId === region.id).map((cell) => cell.id) ?? [],
         timezoneId: this.inferRegionTimezone(region),
       });
     }
@@ -178,8 +178,9 @@ export class ProsperityManager extends EventEmitter {
    */
   private inferRegionTimezone(region: Region): string | undefined {
     // 如果区域格子属于同一时区，返回该时区
-    if (region.cellIds.length > 0) {
-      const firstCellId = region.cellIds[0];
+    const cellIds = this.world.getMapData()?.filter((cell) => cell.regionId === region.id).map((cell) => cell.id) ?? [];
+    if (cellIds.length > 0) {
+      const firstCellId = cellIds[0];
       const tz = this.timeZoneManager.getCellTimezone(firstCellId);
       return tz?.id;
     }

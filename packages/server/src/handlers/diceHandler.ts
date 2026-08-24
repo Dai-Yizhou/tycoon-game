@@ -185,9 +185,8 @@ export class DiceHandler {
 
   private generateDice(): number {
     const mapMeta = this.world.getMapMeta();
-    const config = mapMeta?.config ?? {};
-    const diceMin = (config.diceMin as number) ?? this.cooldownConfig.diceMin;
-    const diceMax = (config.diceMax as number) ?? this.cooldownConfig.diceMax;
+    const diceMin = mapMeta?.dice.min ?? this.cooldownConfig.diceMin;
+    const diceMax = mapMeta?.dice.max ?? this.cooldownConfig.diceMax;
 
     return Math.floor(Math.random() * (diceMax - diceMin + 1)) + diceMin;
   }

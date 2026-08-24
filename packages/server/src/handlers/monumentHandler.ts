@@ -202,14 +202,14 @@ export class MonumentHandler {
       }
 
       // 5.1 本次停靠仅允许修缮一次
-      if (this.repairedThisVisit.get(playerId) === true) {
+      if (this.repairedThisVisit.get(this.repairVisitKey(playerId, payload.monumentId)) === true) {
         emitError(socket, ErrorCodes.InvalidPayload, '本次停靠已修缮过该纪念碑');
         ack?.({ ok: false, error: 'already_repaired_this_visit' });
         return;
       }
 
       // 6. 获取修缮费用
-      const cost = getExtra<number>(monumentCell, 'repairCost', 100) ?? 100;
+      const cost = Math.max(0, -(monumentCell.repairCost?.player?.money ?? 0));
 
       // 7. 检查玩家财产是否足够
       const money = this.getPlayerMoney(player);
@@ -220,7 +220,7 @@ export class MonumentHandler {
       }
 
       // 8. 执行修缮
-      const result = this.executeRepair(player, monumentCell, cost);
+      const result = this.executeRepair(player, monumentCell);
       if (!result) {
         emitError(socket, ErrorCodes.InternalError, '修缮失败');
         ack?.({ ok: false, error: 'repair_failed' });
@@ -228,7 +228,7 @@ export class MonumentHandler {
       }
 
       // 9. 检查是否有 behavior 字段（作为额外效果）
-      const behaviorId = monumentCell.behavior ?? '';
+      const behaviorId = monumentCell.behaviorLand ?? '';
       if (behaviorId && this.behaviorEngine) {
         const behaviorResult = this.behaviorEngine.executeBehavior(behaviorId, player, {
           cellType: CellTypes.Monument,
@@ -312,36 +312,49 @@ export class MonumentHandler {
   private executeRepair(
     player: Player,
     monumentCell: Cell,
-    cost: number,
+    legacyCost?: number,
   ): RepairResult | null {
     try {
-      // 1. 扣除玩家财产
-      const moneyChange = this.economy.changeValue(player.id, 'money', -cost, 'monument_repair');
-      if (!moneyChange.ok) return null;
+      const repairCost = monumentCell.repairCost ?? (legacyCost === undefined ? null : { player: { money: -legacyCost } });
+      if (!repairCost) return null;
+      const playerChanges = Object.entries(repairCost.player ?? {});
+      const appliedPlayerChanges: Array<[string, number]> = [];
+      for (const [fieldId, delta] of playerChanges) {
+        const change = this.economy.changeValue(player.id, fieldId, delta, 'monument_repair');
+        if (!change.ok) {
+          for (const [rollbackField, rollbackDelta] of appliedPlayerChanges) {
+            this.economy.changeValue(player.id, rollbackField, -rollbackDelta, 'monument_repair_rollback');
+          }
+          return null;
+        }
+        appliedPlayerChanges.push([fieldId, delta]);
+      }
 
-      // 2. 增加玩家信用值
-      const creditIncrease = getExtra<number>(monumentCell, 'creditIncrease', 10) ?? 10;
-      const creditChange = this.economy.changeValue(player.id, 'credit', creditIncrease, 'monument_repair');
-      if (!creditChange.ok) {
-        this.economy.changeValue(player.id, 'money', cost, 'monument_repair_rollback');
+      const regionId = monumentCell.regionId;
+      const appliedRegionChanges: Array<[string, number]> = [];
+      try {
+        for (const [fieldId, delta] of Object.entries(repairCost.region ?? {})) {
+          this.world.changeRegionValue(regionId, fieldId, delta);
+          appliedRegionChanges.push([fieldId, delta]);
+        }
+      } catch {
+        for (const [fieldId, delta] of appliedRegionChanges) {
+          this.world.changeRegionValue(regionId, fieldId, -delta);
+        }
+        for (const [fieldId, delta] of appliedPlayerChanges) {
+          this.economy.changeValue(player.id, fieldId, -delta, 'monument_repair_rollback');
+        }
         return null;
       }
 
-      // 3. 增加区域繁荣度（通过 ProsperityManager）
-      const prosperityIncrease = getExtra<number>(monumentCell, 'prosperityIncrease', 20) ?? 20;
+      const cost = Math.max(0, -(repairCost.player?.money ?? 0));
+      const creditIncrease = repairCost.player?.credit ?? 0;
+      const prosperityIncrease = repairCost.region?.pros ?? 0;
       const monumentState = this.monumentStates.get(monumentCell.id);
       if (monumentState) {
         monumentState.lastRepairTime = Date.now();
-        // 本次停靠已修缮，置位标记，直到再次离开后重新到达才允许再次修缮
-        this.repairedThisVisit.set(player.id, true);
       }
-      if (this.prosperityManager) {
-        // 通过 ProsperityManager 查找纪念碑所属区域并增加繁荣度
-        const regionId = this.prosperityManager.findRegionByCellId(monumentCell.id);
-        if (regionId) {
-          this.prosperityManager.increaseProsperity(regionId, prosperityIncrease, 'monument_repair');
-        }
-      }
+      this.repairedThisVisit.set(this.repairVisitKey(player.id, monumentCell.id), true);
 
       // 4. 更新纪念碑使用记录（可选，用于统计）
       const repairCount = getExtra<number>(monumentCell, 'repairCount', 0) ?? 0;
@@ -413,7 +426,7 @@ export class MonumentHandler {
 
     // 玩家本次停靠（到达）时重置修缮标记，实现"停一次只能修缮一次"：
     // 每次到达可修缮一次，修缮后置位，直到再次离开后重新到达才能再次修缮。
-    this.repairedThisVisit.set(playerId, false);
+    this.repairedThisVisit.set(this.repairVisitKey(playerId, monumentId), false);
 
     const monumentState = this.monumentStates.get(monumentId);
     if (!monumentState) {
@@ -427,7 +440,7 @@ export class MonumentHandler {
     }
 
     // 发送通知给玩家，显示修缮选项
-    const cost = getExtra<number>(monumentCell, 'repairCost', 100) ?? 100;
+    const cost = Math.max(0, -(monumentCell.repairCost?.player?.money ?? 0));
     const currentProsperity = this.getMonumentProsperity(monumentId);
 
     socket.emit('server.notification', {
@@ -451,6 +464,10 @@ export class MonumentHandler {
   private getPlayerMoney(player: Player): number {
     const moneyField = player.values['money'];
     return moneyField?.current ?? 0;
+  }
+
+  private repairVisitKey(playerId: string, monumentId: number): string {
+    return `${playerId}:${monumentId}`;
   }
 
   /**

@@ -82,10 +82,9 @@ export function syncOwnerships(cell: Cell, ownerships: Ownership[]): void {
 export function getAccumulatedValue(cell: Cell): number {
   const explicit = getExtra<number>(cell, 'accumulatedValue');
   if (typeof explicit === 'number' && Number.isFinite(explicit)) return explicit;
-  const price = getExtra<number>(cell, 'price', 0) ?? 0;
+  const uctMagnitude = (uct: Cell['price']): number => Object.values(uct?.player ?? {}).reduce((sum, value) => sum + Math.abs(value), 0);
   const level = getExtra<number>(cell, 'level', 0) ?? 0;
-  const costs = getExtra<number[]>(cell, 'upgradeCost', []) ?? [];
-  return price + costs.slice(0, level).reduce((sum, cost) => sum + cost, 0);
+  return uctMagnitude(cell.price) + (cell.upgradeCost ?? []).slice(0, level).reduce((sum, cost) => sum + uctMagnitude(cost), 0);
 }
 
 export function getBuyInPrice(cell: Cell, config: OwnershipConfig): number {

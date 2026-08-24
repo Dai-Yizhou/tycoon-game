@@ -171,7 +171,7 @@ export function createGamePage(controller: GameController): HTMLElement {
         interactiveMap.followPlayer(snapshot.currentPlayerPosition);
       }
       applyRegionTheme(page, snapshot.currentPlayerPosition);
-      const startCell = mapIndex!.getById(0);
+      const startCell = mapResult.mapData.find((cell) => cell.id === context.player?.position.cellId);
       if (startCell) {
         gameStore?.applySnapshot({ sequence: gameStore.nextSequence(), playerDisplayX: startCell.x, playerDisplayY: startCell.y, cameraTargetX: startCell.x, cameraTargetY: startCell.y });
       }
@@ -264,11 +264,11 @@ function applyRegionTheme(page: HTMLElement, cellId: number): void {
   const snapshot = gameStore?.getSnapshot();
   const cell = snapshot?.cells.get(cellId);
 
-  // 权威来源：格子 extra.theme 直接声明的 UI 主题令牌（northeast/south/midwest/west），
+  // 权威来源：格子 theme 直接声明的 UI 主题令牌（northeast/south/midwest/west），
   // 与 themeTokens 键一一对应。缺失/未知时回退到区域 themeId，再回退默认主题。
-  let themeId = getThemeId(cell?.extra.theme);
-  if (cell?.extra.theme == null) {
-    const cellRegionId = typeof cell?.extra.region === 'string' ? cell.extra.region : undefined;
+  let themeId = getThemeId(cell?.theme);
+  if (cell?.theme == null) {
+    const cellRegionId = cell?.regionId;
     const region = snapshot?.mapRegions.find(candidate => candidate.id === cellRegionId);
     themeId = getRegionThemeId(region ?? { id: 'default' });
   }
@@ -438,10 +438,9 @@ function syncCellActions(cellId: number): void {
     gameStore.setCellActions([]);
     return;
   }
-  const extra = cell.extra;
-  const type = String(extra.type ?? 'empty');
-  const price = Number(extra.price ?? 0);
-  const ownerships = Array.isArray(extra.ownerships) ? extra.ownerships as Array<{ playerId: string; share: number }> : [];
+  const type = cell.type;
+  const price = Object.values(cell.price?.player ?? {}).filter((value) => value < 0).reduce((total, value) => total + Math.abs(value), 0);
+  const ownerships = Array.isArray(cell.extra.ownerships) ? cell.extra.ownerships as Array<{ playerId: string; share: number }> : [];
   const currentPlayerId = snapshot.currentPlayer?.id;
   const owned = Boolean(currentPlayerId && ownerships.some(ownership => ownership.playerId === currentPlayerId && ownership.share > 0));
   const level = snapshot.propertyLevels.get(cellId) ?? 0;
@@ -450,8 +449,8 @@ function syncCellActions(cellId: number): void {
     ? owned
       ? snapshot.actionUsedThisTurn
         ? []
-        : Number((extra.upgradeCost as number[] | undefined)?.[level] ?? 0) > 0
-          ? [{ id: 'upgrade-property', label: t('property.upgradeTitle'), detail: `$${Number((extra.upgradeCost as number[] | undefined)?.[level] ?? 0)}`, enabled: !snapshot.isBankrupt }]
+        : (cell.upgradeCost?.[level] ? true : false)
+          ? [{ id: 'upgrade-property', label: t('property.upgradeTitle'), detail: `$${Object.values(cell.upgradeCost?.[level]?.player ?? {}).filter((value) => value < 0).reduce((total, value) => total + Math.abs(value), 0)}`, enabled: !snapshot.isBankrupt }]
           : []
       : [{ id: 'buy-property', label: t('property.buyTitle'), detail: `$${price}`, enabled: !snapshot.isBankrupt && canAfford }]
     : type === 'investment'
@@ -459,9 +458,9 @@ function syncCellActions(cellId: number): void {
         ? []
         : [{ id: 'invest', label: t('investment.invest'), detail: `$${price}`, enabled: !snapshot.isBankrupt && canAfford }]
       : type === 'transport'
-        ? [{ id: 'transport', label: t('transport.teleport'), detail: `$${Number(extra.transportCost ?? 0)}`, enabled: !snapshot.isBankrupt }]
+        ? [{ id: 'transport', label: t('transport.teleport'), detail: '', enabled: !snapshot.isBankrupt }]
         : type === 'monument'
-          ? [{ id: 'restore-monument', label: t('monument.repair'), detail: `$${Number(extra.monumentCost ?? 0)}`, enabled: !snapshot.isBankrupt }]
+          ? [{ id: 'restore-monument', label: t('monument.repair'), detail: '', enabled: !snapshot.isBankrupt }]
           : [];
   const currentActions = snapshot.cellActions;
   const unchanged = currentActions.length === actions.length && actions.every((action, index) => {

@@ -50,16 +50,19 @@ export class MovementHandler {
   private readonly world: GameWorld;
   private timeZoneManager: TimeZoneManager | null = null;
   private readonly settleLanding: ((playerId: string, cellId: number, socket: TypedSocket) => void) | null;
+  private readonly settlePass: ((playerId: string, cellId: number, socket: TypedSocket) => void) | null;
   private playerMovementStates: Map<string, PlayerMovementState> = new Map();
 
   constructor(
     io: TypedServer,
     world: GameWorld,
     settleLanding?: (playerId: string, cellId: number, socket: TypedSocket) => void,
+    settlePass?: (playerId: string, cellId: number, socket: TypedSocket) => void,
   ) {
     this.io = io;
     this.world = world;
     this.settleLanding = settleLanding ?? null;
+    this.settlePass = settlePass ?? null;
   }
 
   setTimeZoneManager(timeZoneManager: TimeZoneManager): void {
@@ -157,6 +160,7 @@ export class MovementHandler {
       if (!next || next.id === current.id) break;
 
       path.push(next.id);
+      if (step < steps - 1) this.settlePass?.(playerId, next.id, socket);
       visited.add(next.id);
       current = next;
       stepsTaken++;

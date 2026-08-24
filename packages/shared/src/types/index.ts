@@ -5,6 +5,7 @@
  */
 
 export * from './cell.js';
+export * from './uct.js';
 export * from './player.js';
 export * from './economy-rules.js';
 export * from './team.js';

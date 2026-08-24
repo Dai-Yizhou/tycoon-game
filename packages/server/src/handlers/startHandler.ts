@@ -12,7 +12,7 @@
  */
 
 import type { ValueChangedPayload } from '@game/shared';
-import { CellTypes, getExtra, t } from '@game/shared';
+import { CellTypes, t } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -143,8 +143,8 @@ export class StartHandler {
       }
 
       // 判断是否为起点格子
-      const cellType = getExtra<string>(cell, 'type', '');
-      if (cellType !== CellTypes.Start) {
+      const cellType = cell.type;
+      if (cellType !== CellTypes.Supply) {
         return 0;
       }
 
@@ -158,10 +158,10 @@ export class StartHandler {
       logger.info(`玩家 ${playerId} 经过起点，获得补充资金 ${bonus}`);
 
       // 检查是否有 behavior 字段（作为额外效果）
-      const behaviorId = cell.behavior ?? '';
+      const behaviorId = cell.behaviorPass ?? '';
       if (behaviorId && this.behaviorEngine) {
         const behaviorResult = this.behaviorEngine.executeBehavior(behaviorId, player, {
-          cellType: CellTypes.Start,
+          cellType: CellTypes.Supply,
           cell: cell,
           action: 'visit',
         });
@@ -198,8 +198,8 @@ export class StartHandler {
     const cell = mapIndex.getById(cellId);
     if (!cell) return false;
 
-    const cellType = getExtra<string>(cell, 'type', '');
-    return cellType === CellTypes.Start;
+    const cellType = cell.type;
+    return cellType === CellTypes.Supply;
   }
 
   /**
@@ -211,13 +211,7 @@ export class StartHandler {
     const mapMeta = this.world.getMapMeta();
     if (!mapMeta) return DEFAULT_START_CONFIG;
 
-    const customConfig = mapMeta.config as Record<string, unknown>;
-    if (!customConfig) return DEFAULT_START_CONFIG;
-
-    return {
-      startBonus: customConfig.startBonus as number | undefined,
-      passBonus: customConfig.passBonus as number | undefined,
-    };
+    return DEFAULT_START_CONFIG;
   }
 
   /**

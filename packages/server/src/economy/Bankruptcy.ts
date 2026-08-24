@@ -32,6 +32,7 @@ export class Bankruptcy {
   private readonly world: GameWorld;
   private readonly taxation: Taxation;
   private readonly bankruptcyRecords = new Map<string, BankruptcyRecord>();
+  private domainEventDispatcher: ((eventName: string) => void) | null = null;
   private readonly onPlayerUpdated = ({ player }: { player: import('@game/shared').Player }): void => {
     if (isBankruptcyCheckable(player.status) && player.values.money && player.values.money.current <= 0) {
       this.triggerBankruptcy(player.id, 'negative_net_worth');
@@ -76,7 +77,12 @@ export class Bankruptcy {
     this.bankruptcyRecords.set(playerId, record);
 
     this.io.emit('server.playerBankrupt', { playerId, bankruptcyId, bankruptcyTime, reason, netWorthAtBankruptcy: record.netWorthAtBankruptcy });
+    this.domainEventDispatcher?.('shareholder-bankrupt');
     return { success: true, bankruptcyId };
+  }
+
+  setDomainEventDispatcher(dispatcher: (eventName: string) => void): void {
+    this.domainEventDispatcher = dispatcher;
   }
 
   private clearPlayerAssets(playerId: string): void {
@@ -125,7 +131,7 @@ export class Bankruptcy {
   }
 
   private findStartCellId(): number {
-    return this.world.getMapData()?.find((cell) => getExtra<string>(cell, 'type', '') === 'start')?.id ?? 0;
+    return this.world.getMapMeta()?.startCellId ?? 0;
   }
 
   getBankruptcyRecord(playerId: string): BankruptcyRecord | undefined { return this.bankruptcyRecords.get(playerId); }
@@ -136,15 +142,11 @@ export class Bankruptcy {
   cleanup(): void {
     this.world.off('playerUpdated', this.onPlayerUpdated);
     this.bankruptcyRecords.clear();
+    this.domainEventDispatcher = null;
   }
-
 }
+
 
 export function createBankruptcy(io: TypedServer, world: GameWorld, taxation: Taxation, config?: BankruptcyConfig): Bankruptcy {
   return new Bankruptcy(io, world, taxation, config);
-}
-
-function getExtra<T>(cell: { extra: Record<string, unknown> }, key: string, defaultValue?: T): T {
-  const value = cell.extra[key];
-  return ((value as T) ?? defaultValue) as T;
 }

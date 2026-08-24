@@ -16,7 +16,6 @@
  */
 
 import type { Cell, CellType, MapData } from '../types/cell';
-import { getExtra } from '../types/cell';
 
 /**
  * 地图索引
@@ -92,7 +91,7 @@ export class MapIndex {
   getByType(type: CellType): Cell[] {
     const result: Cell[] = [];
     for (const cell of this.cells) {
-      if (getExtra<string>(cell, 'type') === type) {
+      if (cell.type === type) {
         result.push(cell);
       }
     }

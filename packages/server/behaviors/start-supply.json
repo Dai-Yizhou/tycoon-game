@@ -1,0 +1,13 @@
+{
+  "id": "start-supply",
+  "effects": [
+    {
+      "weight": 1,
+      "exclusive": false,
+      "msg": { "zh-CN": "获得补给", "en-US": "Received supplies" },
+      "ops": [
+        { "type": "value", "target": "single", "delta": { "player": { "money": 200 } } }
+      ]
+    }
+  ]
+}

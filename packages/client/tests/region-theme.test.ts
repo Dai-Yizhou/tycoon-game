@@ -22,19 +22,23 @@ describe('区域主题', () => {
 
   it('归一化地图格子时保留显式 theme 与数字时区偏移', () => {
     const [cell] = normalizeClientMapData([
-      { id: 1, x: 10, y: 20, destinations: [], extra: { type: 'property', theme: 'south', timezone: 330 } },
+      { id: 1, x: 10, y: 20, destinations: [], type: 'property', name: { 'zh-CN': '地产', 'en-US': 'Property' }, description: { 'zh-CN': '地产', 'en-US': 'Property' }, regionId: 'r1', theme: 'south', timezone: 330, teleportDestinations: [] },
     ]);
-    expect(cell.extra.theme).toBe('south');
-    expect(cell.extra.timezone).toBe(330);
+    expect(cell.theme).toBe('south');
+    expect(cell.timezone).toBe(330);
+  });
+
+  it('归一化地图格子时保留 v2 顶层类型和本地化名称', () => {
+    const [cell] = normalizeClientMapData([
+      { id: 2, x: 1, y: 2, destinations: [], type: 'supply', name: { 'zh-CN': '补给站', 'en-US': 'Supply' }, description: { 'zh-CN': '补给', 'en-US': 'Supply' }, regionId: 'r1', theme: 'south', timezone: 0, teleportDestinations: [] },
+    ]);
+    expect(cell.type).toBe('supply');
+    expect(cell.name['zh-CN']).toBe('补给站');
   });
 
   it('解析数字偏移优先，字符串时区 ID 回退查表', () => {
-    expect(resolveTimezoneOffsetMinutes({ extra: { timezone: 480 } }, [])).toBe(480);
-    expect(resolveTimezoneOffsetMinutes(
-      { extra: { timezone: 'tz-west' } },
-      [{ id: 'tz-west', offsetMinutes: -480 }],
-    )).toBe(-480);
-    expect(resolveTimezoneOffsetMinutes({ extra: {} }, [])).toBe(0);
+    expect(resolveTimezoneOffsetMinutes({ timezone: 480 }, [])).toBe(480);
+    expect(resolveTimezoneOffsetMinutes({ timezone: -480 }, [])).toBe(-480);
     expect(resolveTimezoneOffsetMinutes(undefined, [])).toBe(0);
   });
 });

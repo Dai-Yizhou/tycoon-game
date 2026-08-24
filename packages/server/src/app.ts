@@ -71,30 +71,14 @@ export interface AppDependencies {
 }
 
 function readTaxConfig(mapMeta: ReturnType<typeof parseMapMeta>): TaxConfig {
-  const raw = mapMeta.config?.taxConfig;
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new Error(`地图 ${mapMeta.id} 缺少完整 config.taxConfig`);
-  }
-
-  const config = raw as Record<string, unknown>;
-  const fields: Array<keyof TaxConfig> = [
-    'wealthTaxRate',
-    'propertyTaxRate',
-    'investmentTaxRate',
-    'minWealthForTax',
-    'minPropertyValueForTax',
-    'taxInterval',
-  ];
-  for (const field of fields) {
-    const value = config[field];
-    const invalidRate = field.endsWith('Rate') && (value as number) > 1;
-    const invalidInterval = field === 'taxInterval' && (value as number) <= 0;
-    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || invalidRate || invalidInterval) {
-      throw new Error(`地图 ${mapMeta.id} 的 config.taxConfig.${field} 非法`);
-    }
-  }
-
-  return config as unknown as TaxConfig;
+  return {
+    wealthTaxRate: mapMeta.tax.baseTax.rates.player?.money ?? 0,
+    propertyTaxRate: 0,
+    investmentTaxRate: 0,
+    minWealthForTax: mapMeta.tax.baseTax.exemptBelow?.player?.money ?? 0,
+    minPropertyValueForTax: 0,
+    taxInterval: mapMeta.tax.baseTax.taxInterval,
+  };
 }
 
 /**
@@ -231,19 +215,17 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
 
       // 尝试加载地图元数据（区域、时区、数值字段定义等）
       let regions: unknown[] = [];
-      let timezones: unknown[] = [];
       let valueFieldDefinitions: unknown[] = [];
       try {
         const rawMeta = JSON.parse(readFileSync(mapMetaPath, 'utf-8'));
         const mapMeta = parseMapMeta(rawMeta);
         regions = mapMeta.regions;
-        timezones = mapMeta.timezones ?? [];
         valueFieldDefinitions = mapMeta.valueFieldDefinitions;
       } catch {
         // map-meta.json 不存在时使用空数组
       }
 
-      res.json({ mapData, regions, timezones, valueFieldDefinitions });
+      res.json({ mapData, regions, valueFieldDefinitions });
     } catch (err) {
       logger.error('failed to load map', err);
       res.status(500).json({ error: 'Failed to load map data', detail: err instanceof Error ? err.message : String(err) });
@@ -283,7 +265,7 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   if (!mapMeta) {
     throw new Error('无法启动经济系统：地图元数据未加载');
   }
-  const ownershipConfig: OwnershipConfig = resolveOwnershipConfig(mapMeta.config?.ownership);
+  const ownershipConfig: OwnershipConfig = resolveOwnershipConfig(undefined);
   const economy = new EconomyService(world);
   const taxation = new Taxation(io, world, readTaxConfig(mapMeta), economy);
   const bankruptcy = new Bankruptcy(io, world, taxation);
@@ -303,6 +285,9 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   }));
 
   handlerRegistry.setBankruptcy(bankruptcy);
+  bankruptcy.setDomainEventDispatcher((eventName) => {
+    handlerRegistry.getInvestmentHandler().dispatchDomainEvent(eventName);
+  });
 
   let socketManager: SocketManager | undefined;
   if (deps.socketManagerOptions) {
@@ -351,7 +336,6 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
 
   // 初始化行为执行引擎（FR-1/FR-4）
   const behaviorEngine = new BehaviorEngine(io, world, {
-    prosperityManager,
     economy,
   });
   handlerRegistry.setBehaviorEngine(behaviorEngine);
