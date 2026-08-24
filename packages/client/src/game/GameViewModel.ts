@@ -108,21 +108,7 @@ export interface RegionSlice {
   mapRegions: RegionInfo[];
   valueFieldDefs: ValueFieldDef[];
   regionProsperityMap: Map<string, number>;
-}
-
-/** 行为事件配置 */
-export interface BehaviorEvent {
-  msg: string;
-  money?: number;
-  credit?: number;
-  env?: number;
-}
-
-export interface BehaviorConfig {
-  id: string;
-  name: string;
-  description: string;
-  events: BehaviorEvent[];
+  regionValues: Map<string, Record<string, number>>;
 }
 
 /** 聊天消息 */
@@ -161,9 +147,7 @@ export interface CellActionOption {
 export interface TeamMember {
   id: string;
   username: string;
-  money: number;
-  credit: number;
-  env: number;
+  values: Record<string, number>;
   status: string;
 }
 
@@ -190,11 +174,6 @@ export interface OtherPlayersSlice {
 export interface TutorialSlice {
   step: number;
   active: boolean;
-}
-
-/** 行为配置状态 */
-export interface BehaviorSlice {
-  configs: Map<string, BehaviorConfig>;
 }
 
 // ===== 常量 =====
@@ -336,7 +315,7 @@ export class GameViewModel {
   // ===== Regions =====
   getRegions(): RegionSlice {
     const snapshot = this.projectedSnapshot();
-    return { mapRegions: snapshot.mapRegions, valueFieldDefs: snapshot.valueFieldDefs, regionProsperityMap: snapshot.regionProsperityMap };
+    return { mapRegions: snapshot.mapRegions, valueFieldDefs: snapshot.valueFieldDefs, regionProsperityMap: snapshot.regionProsperityMap, regionValues: snapshot.regionValues };
   }
 
   // ===== Chat =====
@@ -361,6 +340,10 @@ export class GameViewModel {
     return this.projectedSnapshot().cells.get(cellId) ?? null;
   }
 
+  getCellRuntimeState(cellId: number): { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number; repairedBy?: string; repairedAt?: number } | null {
+    return this.projectedSnapshot().cellRuntimeStates.get(cellId) ?? null;
+  }
+
   getCellActions(): CellActionOption[] { return [...this.projectedSnapshot().cellActions]; }
 
   // ===== Team =====
@@ -371,9 +354,6 @@ export class GameViewModel {
 
   // ===== Other Players =====
   getOtherPlayers(): OtherPlayersSlice { return { players: this.projectedSnapshot().otherPlayers }; }
-
-  // ===== Behavior =====
-  getBehavior(): BehaviorSlice { return { configs: new Map() }; }
 
   // ===== 工具方法 =====
 

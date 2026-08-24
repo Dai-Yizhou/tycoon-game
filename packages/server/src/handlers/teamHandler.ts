@@ -42,9 +42,7 @@ import { TeamManager, type TeamInvite } from '../team/index.js';
 interface TeamMemberView {
   id: string;
   username: string;
-  money: number;
-  credit: number;
-  env: number;
+  values: Record<string, number>;
   status: string;
 }
 
@@ -487,13 +485,11 @@ export class TeamHandler {
   private buildMemberViews(team: Team): TeamMemberView[] {
     return team.memberIds.map(id => {
       const player = this.world.getPlayer(id);
-      const v = player?.values ?? {};
+      const values = Object.fromEntries(Object.entries(player?.values ?? {}).map(([fieldId, field]) => [fieldId, field.current]));
       return {
         id,
         username: player?.username ?? '未知玩家',
-        money: v.money?.current ?? 0,
-        credit: v.credit?.current ?? 0,
-        env: v.environment?.current ?? v.env?.current ?? 0,
+        values,
         status: player?.status ?? 'normal',
       };
     });

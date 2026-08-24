@@ -12,27 +12,20 @@
  * - 事件效果在服务端权威执行
  */
 
-import type { EventDefinition, Player } from '@game/shared';
+import type { Player } from '@game/shared';
 import { CellTypes, EventTriggers, normalizeCellType, t } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
-import { EventRegistry, type EventRegistryConfig } from './EventRegistry.js';
-import { EventEffectsHandler, type EventEffectResult } from './EventEffects.js';
-import { BUILTIN_EVENT_TEMPLATES } from './eventTemplates.js';
 import type { BehaviorEngine, BehaviorExecuteResult } from '../behavior/BehaviorEngine.js';
-import type { EconomyService } from '../economy/EconomyService.js';
 
 /**
  * 事件触发结果
  */
 export interface EventTriggerResult {
-  /** 触发的事件定义 */
-  event: EventDefinition;
-  /** 效果结果列表 */
-  effects: EventEffectResult[];
-  /** behavior 执行结果（当通过 behavior 配置触发时） */
-  behaviorResult?: BehaviorExecuteResult;
+  event: { id: string; name: string; trigger: typeof EventTriggers.OnLand; effects: []; weight: number };
+  effects: [];
+  behaviorResult: BehaviorExecuteResult;
 }
 
 /**
@@ -41,24 +34,16 @@ export interface EventTriggerResult {
 export class EventHandler {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
-  private readonly registry: EventRegistry;
-  private readonly effectsHandler: EventEffectsHandler;
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
 
   constructor(
     io: TypedServer,
     world: GameWorld,
-    registryConfig?: EventRegistryConfig,
-    economy?: EconomyService,
+    _registryConfig?: unknown,
   ) {
     this.io = io;
     this.world = world;
-    this.registry = new EventRegistry(registryConfig);
-    this.effectsHandler = new EventEffectsHandler(io, world, economy);
-
-    // 注册内置事件模板
-    this.registerBuiltinEvents();
   }
 
   /**
@@ -84,34 +69,6 @@ export class EventHandler {
     this.broadcastBehaviorNotification(player, result, socket);
     logger.info(`玩家 ${playerId} 经过格子 ${cell.id} 触发 behavior ${behaviorId}`);
     return result;
-  }
-
-  /**
-   * 注册内置事件模板
-   */
-  private registerBuiltinEvents(): void {
-    const count = this.registry.registerBatch(BUILTIN_EVENT_TEMPLATES);
-    logger.info(`注册 ${count} 个内置事件`);
-  }
-
-  /**
-   * 注册自定义事件
-   *
-   * @param event 事件定义
-   * @returns 是否注册成功
-   */
-  registerEvent(event: EventDefinition): boolean {
-    return this.registry.register(event);
-  }
-
-  /**
-   * 批量注册自定义事件
-   *
-   * @param events 事件定义数组
-   * @returns 成功注册的数量
-   */
-  registerEvents(events: EventDefinition[]): number {
-    return this.registry.registerBatch(events);
   }
 
   /**
@@ -192,28 +149,7 @@ export class EventHandler {
         };
       }
 
-      // 4. 原有随机事件逻辑
-      const creditValue = this.getPlayerCreditValue(player);
-
-      // 5. 随机选择事件
-      const event = this.registry.selectRandomEvent(EventTriggers.OnLand, creditValue);
-      if (!event) {
-        logger.warn(`事件格 ${cellId} 没有可用事件`);
-        return null;
-      }
-
-      // 6. 应用事件效果
-      const effects = this.effectsHandler.applyEffects(event.effects, playerId);
-
-      // 7. 广播事件通知
-      this.broadcastEventNotification(player, event, effects, socket);
-
-      logger.info(`玩家 ${playerId} 触发事件 ${event.id}: ${event.name}`);
-
-      return {
-        event,
-        effects,
-      };
+      throw new Error(`事件格 ${cellId} 缺少 behaviorLand 配置`);
     } catch (err) {
       logger.error('事件格处理错误', err);
       return null;
@@ -271,130 +207,6 @@ export class EventHandler {
     });
   }
 
-  /**
-   * 手动触发事件（用于调试或特殊逻辑）
-   *
-   * @param eventId 事件 ID
-   * @param playerId 玩家 ID
-   * @param socket Socket 连接
-   * @returns 事件触发结果或 null
-   */
-  triggerEventById(eventId: string, playerId: string, socket: TypedSocket): EventTriggerResult | null {
-    const event = this.registry.get(eventId);
-    if (!event) {
-      logger.warn(`事件 ${eventId} 不存在`);
-      return null;
-    }
-
-    const player = this.world.getPlayer(playerId);
-    if (!player) {
-      logger.warn(`玩家 ${playerId} 不存在`);
-      return null;
-    }
-
-    // 应用事件效果
-    const effects = this.effectsHandler.applyEffects(event.effects, playerId);
-
-    // 广播事件通知
-    this.broadcastEventNotification(player, event, effects, socket);
-
-    logger.info(`玩家 ${playerId} 手动触发事件 ${event.id}: ${event.name}`);
-
-    return {
-      event,
-      effects,
-    };
-  }
-
-  /**
-   * 获取玩家信用值
-   */
-  private getPlayerCreditValue(player: Player): number | undefined {
-    const creditField = player.values?.['credit'];
-    return creditField?.current;
-  }
-
-  /**
-   * 广播事件通知
-   *
-   * @param player 玩家
-   * @param event 事件定义
-   * @param effects 效果结果
-   * @param socket Socket 连接
-   */
-  private broadcastEventNotification(
-    player: Player,
-    event: EventDefinition,
-    effects: EventEffectResult[],
-    socket: TypedSocket,
-  ): void {
-    // 构建效果描述
-    const effectDescriptions = effects.map(e => {
-      const sign = e.delta >= 0 ? '+' : '';
-      return `${e.fieldId} ${sign}${e.delta}`;
-    }).join(', ');
-
-    // 发送事件通知弹窗给触发玩家
-    socket.emit('server.notification', {
-      id: `event-${event.id}-${Date.now()}`,
-      type: this.getNotificationType(effects),
-      title: event.name,
-      content: `${event.effects[0]?.message ?? t('server.eventTitle')}\n\n${t('server.eventEffect', { effect: effectDescriptions })}`,
-      durationMs: 5000, // 5秒后自动关闭
-    });
-
-    // 广播给所有玩家（简化：仅通知）
-    this.io.emit('server.notification', {
-      id: `event-global-${event.id}-${Date.now()}`,
-      type: 'info',
-      title: t('server.eventTitle'),
-      content: `玩家 ${player.username} 触发了事件「${event.name}」`,
-      durationMs: 3000,
-    });
-  }
-
-  /**
-   * 根据效果结果确定通知类型
-   */
-  private getNotificationType(effects: EventEffectResult[]): 'success' | 'warning' | 'info' {
-    const totalDelta = effects.reduce((sum, e) => sum + e.delta, 0);
-
-    if (totalDelta > 0) {
-      return 'success';
-    } else if (totalDelta < 0) {
-      return 'warning';
-    } else {
-      return 'info';
-    }
-  }
-
-  /**
-   * 获取事件注册表（用于测试或高级查询）
-   */
-  getRegistry(): EventRegistry {
-    return this.registry;
-  }
-
-  /**
-   * 获取效果处理器（用于测试或高级操作）
-   */
-  getEffectsHandler(): EventEffectsHandler {
-    return this.effectsHandler;
-  }
-
-  /**
-   * 获取所有已注册的事件
-   */
-  getAllEvents(): EventDefinition[] {
-    return this.registry.getAll();
-  }
-
-  /**
-   * 获取事件数量
-   */
-  getEventCount(): number {
-    return this.registry.getEventCount();
-  }
 }
 
 /**
@@ -403,7 +215,7 @@ export class EventHandler {
 export function createEventHandler(
   io: TypedServer,
   world: GameWorld,
-  config?: EventRegistryConfig,
+  config?: unknown,
 ): EventHandler {
   return new EventHandler(io, world, config);
 }

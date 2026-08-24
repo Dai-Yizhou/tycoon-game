@@ -6,11 +6,11 @@ describe('GameStore server sequence', () => {
     store.applySnapshot({
       sequence: 1,
       currentPlayer: { id: 'p1', position: { cellId: 0 }, values: {}, status: 'normal' } as never,
-      teamMembers: [{ id: 'p2', username: 'P2', money: 300, credit: 40, env: 2, status: 'normal' }],
+      teamMembers: [{ id: 'p2', username: 'P2', values: { money: 300, credit: 40, env: 2 }, status: 'normal' }],
     });
 
     expect(store.getSnapshot().teamMembers).toEqual([
-      { id: 'p2', username: 'P2', money: 300, credit: 40, env: 2, status: 'normal' },
+      { id: 'p2', username: 'P2', values: { money: 300, credit: 40, env: 2 }, status: 'normal' },
     ]);
   });
 

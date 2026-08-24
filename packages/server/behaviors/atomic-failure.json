@@ -1,0 +1,13 @@
+{
+  "id": "atomic-failure",
+  "effects": [
+    {
+      "weight": 1,
+      "msg": { "zh-CN": "原子性测试", "en-US": "Atomicity Test" },
+      "ops": [
+        { "type": "value", "target": "single", "delta": { "player": { "money": 10 } } },
+        { "type": "value", "target": "single", "delta": { "player": { "missing": 1 } } }
+      ]
+    }
+  ]
+}

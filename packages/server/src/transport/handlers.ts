@@ -114,7 +114,7 @@ export class HandlerRegistry {
     this.startHandler = new StartHandler(io, world, this, economy ?? null);
     this.jailHandler = new JailHandler(io, world, this, jailCooldownMs ?? 10_000, economy ?? null);
     // 初始化事件处理器
-    this.eventHandler = new EventHandler(io, world, undefined, economy);
+    this.eventHandler = new EventHandler(io, world);
     // 初始化投资项目处理器
     this.investmentHandler = new InvestmentHandler(io, world, resolvedOwnershipConfig, economy ?? new EconomyService(world));
     // 初始化交通枢纽处理器

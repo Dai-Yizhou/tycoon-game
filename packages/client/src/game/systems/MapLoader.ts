@@ -28,6 +28,9 @@ export async function loadMapData(): Promise<{
       prosperity: typeof region['initial'] === 'object' && region['initial'] !== null
         ? Number(((region['initial'] as Record<string, unknown>)['region'] as Record<string, unknown> | undefined)?.['pros'] ?? 0)
         : 0,
+      initialValues: typeof region['initial'] === 'object' && region['initial'] !== null
+        ? Object.fromEntries(Object.entries(((region['initial'] as Record<string, unknown>)['region'] as Record<string, unknown> | undefined) ?? {}).map(([id, value]) => [id, Number(value)]))
+        : {},
     }));
     const timezones: TimeZoneInfo[] = [];
     const valueFields: ValueFieldDef[] = (data.valueFieldDefinitions || []).map((field: Record<string, unknown>) => ({

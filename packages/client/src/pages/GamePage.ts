@@ -167,7 +167,13 @@ export function createGamePage(controller: GameController): HTMLElement {
       gameStore?.setCells(mapData);
       const snapshot = gameStore!.getSnapshot();
       if (snapshot.currentPlayer) {
-        interactiveMap.render(mapData, toInteractivePlayers(snapshot));
+        interactiveMap.render(mapData, toInteractivePlayers(snapshot), mapResult.valueFields.map((field) => ({
+          id: field.id,
+          name: { 'zh-CN': field.name, 'en-US': field.name },
+          scope: field.scope,
+          min: field.min,
+          max: field.max,
+        })));
         interactiveMap.followPlayer(snapshot.currentPlayerPosition);
       }
       applyRegionTheme(page, snapshot.currentPlayerPosition);
@@ -392,7 +398,7 @@ window.showTeamManagement = function(): void {
             <div class="management-item">
               <div style="display:flex; flex-direction:column; gap:4px;">
                 <span>${m.username}</span>
-                <span style="font-size:0.75rem; color:var(--secondary);">金钱 ${m.money} · 信用 ${m.credit} · 环保 ${m.env} · ${m.status}</span>
+                <span style="font-size:0.75rem; color:var(--secondary);">${formatTeamValues(m.values, gameStore?.getSnapshot().valueFieldDefs ?? [])} · ${m.status}</span>
               </div>
               <button type="button" class="modal-btn btn-secondary" onclick="window.removeTeamMember('${m.id}')">${t('team.removeMember')}</button>
             </div>
@@ -439,24 +445,24 @@ function syncCellActions(cellId: number): void {
     return;
   }
   const type = cell.type;
-  const price = Object.values(cell.price?.player ?? {}).filter((value) => value < 0).reduce((total, value) => total + Math.abs(value), 0);
-  const ownerships = Array.isArray(cell.extra.ownerships) ? cell.extra.ownerships as Array<{ playerId: string; share: number }> : [];
+  const price = formatClientUct(cell.price, snapshot.valueFieldDefs);
+  const ownerships = snapshot.cellRuntimeStates.get(cellId)?.ownerships ?? [];
   const currentPlayerId = snapshot.currentPlayer?.id;
   const owned = Boolean(currentPlayerId && ownerships.some(ownership => ownership.playerId === currentPlayerId && ownership.share > 0));
   const level = snapshot.propertyLevels.get(cellId) ?? 0;
-  const canAfford = snapshot.currentMoney >= price;
+  const canAfford = canApplyClientUct(snapshot.currentPlayer, cell.price);
   const actions = type === 'property'
     ? owned
       ? snapshot.actionUsedThisTurn
         ? []
         : (cell.upgradeCost?.[level] ? true : false)
-          ? [{ id: 'upgrade-property', label: t('property.upgradeTitle'), detail: `$${Object.values(cell.upgradeCost?.[level]?.player ?? {}).filter((value) => value < 0).reduce((total, value) => total + Math.abs(value), 0)}`, enabled: !snapshot.isBankrupt }]
+          ? [{ id: 'upgrade-property', label: t('property.upgradeTitle'), detail: formatClientUct(cell.upgradeCost?.[level], snapshot.valueFieldDefs), enabled: !snapshot.isBankrupt && canApplyClientUct(snapshot.currentPlayer, cell.upgradeCost?.[level]) }]
           : []
-      : [{ id: 'buy-property', label: t('property.buyTitle'), detail: `$${price}`, enabled: !snapshot.isBankrupt && canAfford }]
+      : [{ id: 'buy-property', label: t('property.buyTitle'), detail: price, enabled: !snapshot.isBankrupt && canAfford }]
     : type === 'investment'
       ? snapshot.ownedInvestments.has(cellId)
         ? []
-        : [{ id: 'invest', label: t('investment.invest'), detail: `$${price}`, enabled: !snapshot.isBankrupt && canAfford }]
+        : [{ id: 'invest', label: t('investment.invest'), detail: price, enabled: !snapshot.isBankrupt && canAfford }]
       : type === 'transport'
         ? [{ id: 'transport', label: t('transport.teleport'), detail: '', enabled: !snapshot.isBankrupt }]
         : type === 'monument'
@@ -468,6 +474,26 @@ function syncCellActions(cellId: number): void {
     return current.id === action.id && current.label === action.label && current.detail === action.detail && current.enabled === action.enabled;
   });
   if (!unchanged) gameStore.setCellActions(actions);
+}
+
+function formatClientUct(uct: import('@game/shared').Uct | undefined, definitions: Array<{ id: string; name: string }>): string {
+  if (!uct) return '';
+  return Object.entries(uct.player ?? {}).concat(Object.entries(uct.region ?? {})).map(([fieldId, value]) => {
+    const name = definitions.find((definition) => definition.id === fieldId)?.name ?? fieldId;
+    return `${name} ${value >= 0 ? '+' : ''}${value}`;
+  }).join(', ');
+}
+
+function canApplyClientUct(player: Player | null, uct: import('@game/shared').Uct | undefined): boolean {
+  if (!player || !uct) return false;
+  return Object.entries(uct.player ?? {}).every(([fieldId, delta]) => {
+    const field = player.values[fieldId];
+    return Boolean(field) && field.current + delta >= (field.min ?? Number.NEGATIVE_INFINITY) && field.current + delta <= (field.max ?? Number.POSITIVE_INFINITY);
+  });
+}
+
+function formatTeamValues(values: Record<string, number>, definitions: Array<{ id: string; name: string }>): string {
+  return Object.entries(values).map(([fieldId, value]) => `${definitions.find((definition) => definition.id === fieldId)?.name ?? fieldId} ${value}`).join(' · ');
 }
 
 export function cleanupGamePage(page: HTMLElement): void {

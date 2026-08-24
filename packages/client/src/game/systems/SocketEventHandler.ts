@@ -104,19 +104,22 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 
   socket.on('server.propertyBought', (payload) => {
     store.setCell(payload.cell);
+    store.setCellRuntimeState(payload.cell.id, payload.runtime);
     store.applyEvent({ sequence: store.nextSequence(), type: 'property', playerId: payload.playerId, cellId: payload.cell.id, level: 0 });
     requestHudRefresh();
   });
 
   socket.on('server.propertyUpgraded', (payload) => {
     store.setCell(payload.cell);
+    store.setCellRuntimeState(payload.cell.id, payload.runtime);
     store.applyEvent({ sequence: store.nextSequence(), type: 'property', playerId: payload.playerId, cellId: payload.cell.id, level: payload.newLevel });
     requestHudRefresh();
   });
 
   socket.on('server.investmentBought', (payload) => {
     store.setCell(payload.cell);
-    const ownerships = Array.isArray(payload.cell.extra?.ownerships) ? payload.cell.extra.ownerships as Array<{ playerId: string; share: number }> : [];
+    store.setCellRuntimeState(payload.cell.id, payload.runtime);
+    const ownerships = payload.runtime.ownerships;
     const ownership = ownerships.find((item) => item.playerId === payload.playerId);
     if (ownership) store.applyEvent({ sequence: store.nextSequence(), type: 'investment', playerId: payload.playerId, cellId: payload.cell.id, share: ownership.share });
     requestHudRefresh();
@@ -341,7 +344,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   // 监听队伍状态更新（服务端权威：完整重建本地队伍视图）
-  socket.on('server.teamUpdated', (payload: { team?: { id: string }; members?: Array<{ id: string; username: string; money: number; credit: number; env: number; status: string }> }) => {
+  socket.on('server.teamUpdated', (payload) => {
     if (payload.team && store.getSnapshot().currentPlayer) {
       // 用服务端推送的成员显示数据完整重建 teamMembers
       if (payload.members) {

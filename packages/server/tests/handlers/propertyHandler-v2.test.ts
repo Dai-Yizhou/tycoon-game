@@ -94,7 +94,7 @@ describe('PropertyHandler v2', () => {
       credit: { id: 'credit', name: 'credit', current: 1, min: 0 },
     } } as any;
     world.addPlayer(owner);
-    property.extra.ownerships = [{ playerId: 'owner', share: 1, purchasePrice: 100 }];
+    world.getRuntimeState().replaceOwnerships(1, [{ playerId: 'owner', share: 1, purchasePrice: 100 }]);
     const handler = new PropertyHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
 
     (handler as any).distributeRentToOwners(property, { player: { money: -4, credit: -2 } }, 1);
@@ -117,12 +117,12 @@ describe('PropertyHandler v2', () => {
     world.addPlayer(payer);
     world.addPlayer(owner);
     property.rent = [{ player: { money: -10, credit: -2 } }];
-    property.extra.ownerships = [{ playerId: 'owner', share: 1, purchasePrice: 100 }];
+    world.getRuntimeState().replaceOwnerships(1, [{ playerId: 'owner', share: 1, purchasePrice: 100 }]);
     const handler = new PropertyHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
 
     const result = handler.handleRentPayment('payer', 1, {} as any);
 
-    expect(result?.rent).toBe(12);
+    expect(result?.rent).toEqual({ player: { money: -10, credit: -2 } });
     expect(payer.values.money.current).toBe(10);
     expect(payer.values.credit.current).toBe(3);
     expect(owner.values.money.current).toBe(10);

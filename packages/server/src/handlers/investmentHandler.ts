@@ -226,6 +226,7 @@ export class InvestmentHandler {
       this.io.emit('server.investmentBought', {
         cell: result.cell,
         playerId,
+        runtime: this.world.getRuntimeState().getCellState(result.cell.id),
       });
 
       // 13. 返回成功结果

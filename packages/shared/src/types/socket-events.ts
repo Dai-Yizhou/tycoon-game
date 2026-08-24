@@ -114,7 +114,7 @@ export interface ClientToServerEvents {
   /** 升级地产 */
   'client.upgradeProperty': (
     payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
-    ack?: (result: AckResult<{ cell: Cell; cost: number }>) => void,
+    ack?: (result: AckResult<{ cell: Cell; cost: import('./cell.js').Uct }>) => void,
   ) => void;
 
 
@@ -242,14 +242,15 @@ export interface ServerToClientEvents {
   }) => void;
 
   /** 地产被购买 */
-  'server.propertyBought': (payload: { cell: Cell; playerId: string }) => void;
+  'server.propertyBought': (payload: { cell: Cell; playerId: string; runtime: { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number } }) => void;
 
   /** 地产被升级 */
   'server.propertyUpgraded': (payload: {
     cell: Cell;
     playerId: string;
     newLevel: number;
-    cost: number;
+    cost: import('./cell.js').Uct;
+    runtime: { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number };
   }) => void;
 
   /** 玩家进入监狱 */
@@ -271,8 +272,7 @@ export interface ServerToClientEvents {
     playerId: string;
     restartTime: number;
     player: Player;
-    startingMoney?: number;
-    startingCredit?: number;
+    startingValues?: import('./cell.js').Uct;
   }) => void;
 
 
@@ -401,7 +401,7 @@ export interface ServerToClientEvents {
   }) => void;
 
   /** 投资项目被购买 */
-  'server.investmentBought': (payload: { cell: Cell; playerId: string }) => void;
+  'server.investmentBought': (payload: { cell: Cell; playerId: string; runtime: { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number } }) => void;
 
   /** 投资项目事件被触发 */
   'server.investmentEventTriggered': (payload: {

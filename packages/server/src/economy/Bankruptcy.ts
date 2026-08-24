@@ -22,8 +22,7 @@ export interface BankruptcyResult {
 
 export interface BankruptcyRestartResult {
   success: boolean;
-  startingMoney?: number;
-  startingCredit?: number;
+  startingValues?: import('@game/shared').Uct;
   error?: string;
 }
 
@@ -34,7 +33,7 @@ export class Bankruptcy {
   private readonly bankruptcyRecords = new Map<string, BankruptcyRecord>();
   private domainEventDispatcher: ((eventName: string) => void) | null = null;
   private readonly onPlayerUpdated = ({ player }: { player: import('@game/shared').Player }): void => {
-    if (isBankruptcyCheckable(player.status) && player.values.money && player.values.money.current <= 0) {
+    if (isBankruptcyCheckable(player.status) && Object.values(player.values).some((field) => field.current <= (field.min ?? Number.NEGATIVE_INFINITY))) {
       this.triggerBankruptcy(player.id, 'negative_net_worth');
     }
   };
@@ -101,10 +100,9 @@ export class Bankruptcy {
     this.world.updatePlayer(player);
     this.bankruptcyRecords.delete(playerId);
 
-    const startingMoney = player.values.money?.current;
-    const startingCredit = player.values.credit?.current;
-    this.io.emit('server.playerRestarted', { playerId, restartTime: Date.now(), player: { ...player, values: { ...player.values }, position: { ...player.position } }, startingMoney, startingCredit });
-    return { success: true, startingMoney, startingCredit };
+    const startingValues = { player: Object.fromEntries(Object.entries(player.values).map(([fieldId, field]) => [fieldId, field.current])) };
+    this.io.emit('server.playerRestarted', { playerId, restartTime: Date.now(), player: { ...player, values: { ...player.values }, position: { ...player.position } }, startingValues });
+    return { success: true, startingValues };
   }
 
   private findStartCellId(): number {

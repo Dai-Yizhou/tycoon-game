@@ -34,7 +34,7 @@ import type { DayNightCycle } from '../world/DayNightCycle.js';
 import type { PlayerStore } from '../storage/PlayerStore.js';
 import type { TeamManager } from '../team/TeamManager.js';
 import type { JWTService } from '../auth/JWTService.js';
-import { getExtra, type Cell } from '@game/shared';
+import type { Cell } from '@game/shared';
 
 /**
  * Socket.IO 类型化 Server
@@ -547,26 +547,24 @@ export class SocketManager {
         socket.emit('server.gameState', {
           player,
           ownedProperties: (this.world.getMapData() ?? []).flatMap((cell: Cell) => {
-            const ownerships = getExtra<Array<{ playerId: string; share: number }>>(cell, 'ownerships', []) ?? [];
+            const ownerships = this.world.getRuntimeState().getOwnerships(cell.id);
             return cell.type === 'property' && ownerships.some((ownership) => ownership.playerId === player.id && ownership.share > 0)
-              ? [{ cellId: cell.id, level: getExtra<number>(cell, 'level', 0) ?? 0 }]
+              ? [{ cellId: cell.id, level: this.world.getRuntimeState().getCellState(cell.id).level }]
               : [];
           }),
           ownedInvestments: (this.world.getMapData() ?? []).flatMap((cell: Cell) => {
-            const ownerships = getExtra<Array<{ playerId: string; share: number }>>(cell, 'ownerships', []) ?? [];
+            const ownerships = this.world.getRuntimeState().getOwnerships(cell.id);
             const ownership = ownerships.find((item) => item.playerId === player.id && item.share > 0);
             return cell.type === 'investment' && ownership ? [{ cellId: cell.id, share: ownership.share }] : [];
           }),
           team: this.teamManager?.getPlayerTeam(player.id) ?? null,
           members: this.teamManager?.getPlayerTeam(player.id)?.memberIds.map((memberId) => {
             const member = this.world.getPlayer(memberId);
-            const values = member?.values ?? {};
+            const values = Object.fromEntries(Object.entries(member?.values ?? {}).map(([fieldId, field]) => [fieldId, field.current]));
             return {
               id: memberId,
               username: member?.username ?? '未知玩家',
-              money: values.money?.current ?? 0,
-              credit: values.credit?.current ?? 0,
-              env: values.environment?.current ?? values.env?.current ?? 0,
+              values,
               status: member?.status ?? 'normal',
             };
           }) ?? [],

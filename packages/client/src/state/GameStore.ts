@@ -10,7 +10,7 @@ export interface OtherPlayerInfo {
   primaryValue: number;
 }
 
-export interface RegionInfo { id: string; name: string; cellIds: number[]; prosperity: number; environmentValue?: number; themeId?: 'northeast' | 'south' | 'midwest' | 'west'; }
+export interface RegionInfo { id: string; name: string; cellIds: number[]; prosperity: number; initialValues: Record<string, number>; themeId?: 'northeast' | 'south' | 'midwest' | 'west'; }
 export interface TimeZoneInfo { id: string; name?: string; offsetMinutes: number; }
 
 export interface ValueFieldDef {
@@ -18,10 +18,7 @@ export interface ValueFieldDef {
   min?: number; max?: number;
 }
 
-export interface TeamMember {
-  id: string; username: string; money: number; credit: number;
-  env: number; status: string;
-}
+export interface TeamMember { id: string; username: string; values: Record<string, number>; status: string; }
 
 export interface ClientGameSnapshot {
   sequence: number;
@@ -70,9 +67,11 @@ export interface ClientGameSnapshot {
   cellActions: Array<{ id: string; label: string; detail?: string; enabled: boolean }>;
   prosperity: number;
   regionProsperityMap: Map<string, number>;
+  regionValues: Map<string, Record<string, number>>;
   mapRegions: RegionInfo[];
   mapTimezones: TimeZoneInfo[];
   valueFieldDefs: ValueFieldDef[];
+  cellRuntimeStates: Map<number, { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number; repairedBy?: string; repairedAt?: number }>;
 }
 
 export type ClientGameEvent =
@@ -107,7 +106,7 @@ export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     currentMoney: 2000, currentCredit: 50, currentEnv: 0, isBankrupt: false,
-    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], prosperity: 100, regionProsperityMap: new Map(), mapRegions: [], mapTimezones: [], valueFieldDefs: [],
+    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], prosperity: 100, regionProsperityMap: new Map(), regionValues: new Map(), mapRegions: [], mapTimezones: [], valueFieldDefs: [], cellRuntimeStates: new Map(),
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
 
@@ -154,8 +153,12 @@ export class GameStore {
 
   setProsperity(regionId: string | null, value: number): void {
     const regionProsperityMap = new Map(this.snapshot.regionProsperityMap);
-    if (regionId) regionProsperityMap.set(regionId, value);
-    this.snapshot = { ...this.snapshot, prosperity: value, regionProsperityMap };
+    const regionValues = new Map(this.snapshot.regionValues);
+    if (regionId) {
+      regionProsperityMap.set(regionId, value);
+      regionValues.set(regionId, { ...(regionValues.get(regionId) ?? {}), pros: value });
+    }
+    this.snapshot = { ...this.snapshot, prosperity: value, regionProsperityMap, regionValues };
     this.publish();
   }
 
@@ -165,6 +168,7 @@ export class GameStore {
       mapRegions: regions.map(region => ({ ...region, cellIds: [...region.cellIds] })),
       mapTimezones: timezones.map(timezone => ({ ...timezone })),
       valueFieldDefs: valueFields.map(field => ({ ...field })),
+      regionValues: new Map(regions.map((region) => [region.id, { ...region.initialValues }])),
     };
     this.publish();
   }
@@ -197,6 +201,13 @@ export class GameStore {
 
   getCell(cellId: number): Cell | null {
     return this.snapshot.cells.get(cellId) ?? null;
+  }
+
+  setCellRuntimeState(cellId: number, state: { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number; repairedBy?: string; repairedAt?: number }): void {
+    const cellRuntimeStates = new Map(this.snapshot.cellRuntimeStates);
+    cellRuntimeStates.set(cellId, { ...state, ownerships: state.ownerships.map((ownership) => ({ ...ownership })) });
+    this.snapshot = { ...this.snapshot, cellRuntimeStates };
+    this.publish();
   }
 
   subscribe(listener: (snapshot: ClientGameSnapshot) => void): () => void {
@@ -334,6 +345,8 @@ export class GameStore {
       mapRegions: [],
       mapTimezones: [],
       valueFieldDefs: [],
+      regionValues: new Map(),
+      cellRuntimeStates: new Map(),
     };
     this.publish();
   }

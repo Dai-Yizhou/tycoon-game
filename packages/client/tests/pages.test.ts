@@ -14,10 +14,22 @@ import {
   cleanupLoadingPage,
   createGamePage,
   cleanupGamePage,
+  createBankruptcyPage,
 } from '../src/pages/index.js';
 const styleSource = readFileSync(resolve(__dirname, '../src/style.css'), 'utf8');
 
 describe('Pages', () => {
+  test('破产页面提供重开按钮并请求服务端重开', () => {
+    const socket = { emit: jest.fn((_event, _payload, ack) => ack({ ok: true })) } as any;
+    const bankruptcyController = new GameController(mockContainer);
+    jest.spyOn(bankruptcyController, 'getSocket').mockReturnValue(socket);
+    const page = createBankruptcyPage(bankruptcyController);
+
+    const button = page.querySelector<HTMLButtonElement>('.bankruptcy-restart-button');
+    expect(button).toBeTruthy();
+    button?.click();
+    expect(socket.emit).toHaveBeenCalledWith('client.bankruptRestart', {}, expect.any(Function));
+  });
   test('游戏控件使用主题变量且返回按钮位于顶部中央', () => {
     expect(styleSource).toContain('.cell-hover-card');
     expect(styleSource).toContain('background: var(--gp-card)');

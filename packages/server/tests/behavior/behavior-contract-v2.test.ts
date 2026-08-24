@@ -96,6 +96,7 @@ describe('BehaviorEngine contract v2', () => {
     expect(world.getPlayer('p2')?.values.money.current).toBe(110);
     expect(world.getPlayer('p1')?.values.credit.current).toBe(5);
     expect(world.getPlayer('p2')?.values.credit.current).toBe(5);
+    expect(engine.executeBehavior('target-modes', first).resolvedTargetIds).toContain('p2');
   });
 
   it('resolves an actor field reference in a UCT delta', () => {
@@ -107,5 +108,29 @@ describe('BehaviorEngine contract v2', () => {
     engine.executeBehavior('actor-reference', world.getPlayer('p1')!);
 
     expect(world.getPlayer('p1')?.values.credit.current).toBe(100);
+  });
+
+  it('executes ownership and teleport operations with their own targets', () => {
+    const world = new GameWorld();
+    const secondCell = { ...cell(), id: 1, type: 'property' as const, regionId: 'r1' };
+    world.loadMap([cell(), secondCell], meta());
+    world.addPlayer(player());
+    const engine = new BehaviorEngine({ emit: jest.fn() } as never, world, { configDir: path.resolve(__dirname, '../../behaviors') });
+
+    engine.executeBehavior('ownership-position', world.getPlayer('p1')!);
+
+    expect(world.getPlayer('p1')?.position.cellId).toBe(1);
+    expect(world.getRuntimeState().getOwnerships(1)).toEqual([{ playerId: 'p1', share: 1, purchasePrice: 0 }]);
+  });
+
+  it('rolls back every operation when a later operation in the effect fails', () => {
+    const world = new GameWorld();
+    world.loadMap([cell()], meta());
+    world.addPlayer(player());
+    const engine = new BehaviorEngine({ emit: jest.fn() } as never, world, { configDir: path.resolve(__dirname, '../../behaviors') });
+
+    expect(() => engine.executeBehavior('atomic-failure', world.getPlayer('p1')!)).toThrow('行为引用未声明玩家字段');
+    expect(world.getPlayer('p1')?.values.money.current).toBe(100);
+    expect(world.getPlayer('p1')?.values.credit.current).toBe(0);
   });
 });

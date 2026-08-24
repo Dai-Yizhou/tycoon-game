@@ -52,41 +52,42 @@ function createTestTransportCell(id: number, destinations: number[] = [], cost: 
     x: id * 100,
     y: id * 100,
     destinations,
-    extra: {
-      name: `Transport ${id}`,
-      type: 'transport',
-      transportCost: cost,
-      transportDestinations: destinations,
-    },
+    type: 'transport',
+    name: { 'zh-CN': `Transport ${id}`, 'en-US': `Transport ${id}` },
+    description: { 'zh-CN': '交通', 'en-US': 'Transport' },
+    teleportDestinations: destinations.map((cellId) => ({ cellId, cost: { player: { money: -cost } } })),
+    regionId: 'r1',
+    timezone: 0,
+    theme: 'northeast',
+    extra: {},
   };
 }
 
 function createTestMapData(): MapData {
   return [
-    { id: 0, x: 0, y: 0, destinations: [1], extra: { type: 'start' } },
+    { id: 0, x: 0, y: 0, destinations: [1], type: 'supply', name: { 'zh-CN': '起点', 'en-US': 'Start' }, description: { 'zh-CN': '起点', 'en-US': 'Start' }, regionId: 'r1', timezone: 0, theme: 'northeast', extra: {} },
     createTestTransportCell(1, [2, 3, 4], 50),
-    { id: 2, x: 200, y: 200, destinations: [], extra: { type: 'empty', name: 'Cell 2' } },
-    { id: 3, x: 300, y: 300, destinations: [], extra: { type: 'empty', name: 'Cell 3' } },
-    { id: 4, x: 400, y: 400, destinations: [], extra: { type: 'empty', name: 'Cell 4' } },
+    { id: 2, x: 200, y: 200, destinations: [], type: 'empty', name: { 'zh-CN': '格子 2', 'en-US': 'Cell 2' }, description: { 'zh-CN': '空地', 'en-US': 'Empty' }, regionId: 'r1', timezone: 0, theme: 'northeast', extra: {} },
+    { id: 3, x: 300, y: 300, destinations: [], type: 'empty', name: { 'zh-CN': '格子 3', 'en-US': 'Cell 3' }, description: { 'zh-CN': '空地', 'en-US': 'Empty' }, regionId: 'r1', timezone: 0, theme: 'northeast', extra: {} },
+    { id: 4, x: 400, y: 400, destinations: [], type: 'empty', name: { 'zh-CN': '格子 4', 'en-US': 'Cell 4' }, description: { 'zh-CN': '空地', 'en-US': 'Empty' }, regionId: 'r1', timezone: 0, theme: 'northeast', extra: {} },
   ];
 }
 
 function createTestMapMeta(): MapMeta {
   return {
     id: 'test-map',
-    name: 'Test Map',
+    name: { 'zh-CN': '测试地图', 'en-US': 'Test Map' },
     version: '1.0.0',
-    templateName: 'default',
-    timezones: [
-      { id: 'tz-1', offsetMinutes: 0, cellIds: [0, 1, 2, 3, 4] },
-    ],
-    regions: [],
+    regions: [{ id: 'r1', name: { 'zh-CN': '一区', 'en-US': 'Region 1' }, initial: { region: {} } }],
     valueFieldDefinitions: [
-      { id: 'money', name: '财产', current: 1000, min: 0 },
+      { id: 'money', name: { 'zh-CN': '财产', 'en-US': 'Money' }, scope: 'player', min: 0 },
     ],
-    dayNightCycleMinutes: 15,
+    uct: { player: ['money'], region: [] },
+    playerInitial: { player: { money: 1000 } },
+    dayNightCycle: 15,
+    dice: { cooldownMs: 3000, min: 1, max: 6 },
+    tax: { baseTax: { rates: { player: {} }, taxInterval: 900000 }, shareTax: { rates: { player: {} }, taxInterval: 900000 } },
     startCellId: 0,
-    config: {},
   };
 }
 
@@ -116,7 +117,7 @@ describe('TransportHandler', () => {
 
       const hubCell = world.getMapIndex()!.getById(1)!;
       const targetCell = world.getMapIndex()!.getById(2)!;
-      const cost = 50;
+      const cost = { player: { money: -50 } };
 
       // 执行传送逻辑
       const result = (handler as any).executeTransport(player, hubCell, targetCell, cost);
@@ -125,7 +126,7 @@ describe('TransportHandler', () => {
       expect(result!.playerId).toBe('player1');
       expect(result!.fromCellId).toBe(1);
       expect(result!.toCellId).toBe(2);
-      expect(result!.cost).toBe(50);
+      expect(result!.cost).toEqual(cost);
     });
 
     it('传送后财产正确扣减', () => {
@@ -135,7 +136,7 @@ describe('TransportHandler', () => {
 
       const hubCell = world.getMapIndex()!.getById(1)!;
       const targetCell = world.getMapIndex()!.getById(2)!;
-      const cost = 50;
+      const cost = { player: { money: -50 } };
 
       (handler as any).executeTransport(player, hubCell, targetCell, cost);
 
@@ -149,7 +150,7 @@ describe('TransportHandler', () => {
 
       const hubCell = world.getMapIndex()!.getById(1)!;
       const targetCell = world.getMapIndex()!.getById(3)!;
-      const cost = 50;
+      const cost = { player: { money: -50 } };
 
       (handler as any).executeTransport(player, hubCell, targetCell, cost);
 
@@ -214,14 +215,14 @@ describe('TransportHandler', () => {
 
       const hubCell = world.getMapIndex()!.getById(1)!;
       const targetCell = world.getMapIndex()!.getById(2)!;
-      const cost = 50;
+      const cost = { player: { money: -50 } };
 
       // 执行传送（由于财产不足，会失败）
       const result = (handler as any).executeTransport(player, hubCell, targetCell, cost);
 
       // 结果应该为 null（因为财产不足）
       expect(result).not.toBeNull(); // executeTransport 不检查财产，只执行操作
-      expect(player.values['money'].current).toBe(0); // 财产不足时被 clamp 到 0
+      expect(player.values['money'].current).toBe(0);
     });
   });
 

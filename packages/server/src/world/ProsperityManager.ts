@@ -383,7 +383,7 @@ export class ProsperityManager extends EventEmitter {
    * - 数值升高（delta > 0）→ 繁荣度升高
    * - 数值降低（delta < 0）→ 繁荣度降低
    *
-   * 可被 EventEffects 或 PropertyHandler 调用。
+   * 可被纪念碑处理器或 PropertyHandler 调用。
    *
    * @param regionId 区域 ID
    * @param fieldId 数值字段 ID（如 'environmental'）

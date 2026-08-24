@@ -38,14 +38,14 @@ function buildLinearMap(n: number): MapData {
       x: i * 10,
       y: 0,
       destinations: dests,
-      extra: {
-        type: i === 0 ? 'start' : 'property',
-        region: 'test-region',
-        theme: 'northeast',
-        timezone: 480,
-        name: { 'zh-CN': `格子${i}`, 'en-US': `Cell ${i}` },
-        description: { 'zh-CN': `格子${i}描述`, 'en-US': `Cell ${i} description` },
-      },
+      teleportDestinations: [],
+      type: i === 0 ? 'supply' : 'property',
+      name: { 'zh-CN': `格子${i}`, 'en-US': `Cell ${i}` },
+      description: { 'zh-CN': `格子${i}描述`, 'en-US': `Cell ${i} description` },
+      theme: 'northeast',
+      regionId: 'test-region',
+      timezone: 480,
+      extra: {},
     });
   }
   return cells;
@@ -54,17 +54,19 @@ function buildLinearMap(n: number): MapData {
 function buildMapMeta(id: string = 'map-1', cellIds: number[] = []): MapMeta {
   return {
     id,
-    name: `Map ${id}`,
+  name: { 'zh-CN': `地图 ${id}`, 'en-US': `Map ${id}` },
     version: '1.0.0',
-    templateName: 'default',
-    timezones: [],
-    regions: [{ id: 'test-region', name: 'Test Region', cellIds, prosperity: 100 }],
+  regions: [{ id: 'test-region', name: { 'zh-CN': '测试区域', 'en-US': 'Test Region' }, initial: { region: { prosperity: 100 } } }],
     valueFieldDefinitions: [
-      { id: 'money', name: '金钱', current: 1000 },
+      { id: 'money', name: { 'zh-CN': '金钱', 'en-US': 'Money' }, scope: 'player', min: 0 },
+      { id: 'prosperity', name: { 'zh-CN': '繁荣', 'en-US': 'Prosperity' }, scope: 'region', min: 0 },
     ],
-    dayNightCycleMinutes: 15,
+  uct: { player: ['money'], region: ['prosperity'] },
+  playerInitial: { player: { money: 1000 } },
     startCellId: 0,
-    config: {},
+  dayNightCycle: 15,
+  dice: { cooldownMs: 1000, min: 1, max: 3 },
+  tax: { baseTax: { rates: {}, taxInterval: 1000 }, shareTax: { rates: {}, taxInterval: 1000 } },
   };
 }
 

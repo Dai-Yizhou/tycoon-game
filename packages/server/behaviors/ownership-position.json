@@ -1,0 +1,13 @@
+{
+  "id": "ownership-position",
+  "effects": [
+    {
+      "weight": 1,
+      "msg": { "zh-CN": "操作", "en-US": "Operation" },
+      "ops": [
+        { "type": "ownership", "target": "single", "action": "acquireShare", "cells": [{ "cellId": 1 }], "share": 0.5 },
+        { "type": "position", "target": "single", "action": "teleport", "cellId": 1 }
+      ]
+    }
+  ]
+}

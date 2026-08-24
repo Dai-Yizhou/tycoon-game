@@ -66,7 +66,7 @@ export interface BuyResult {
  */
 export interface UpgradeResult {
   cell: Cell;
-  cost: number;
+  cost: Uct;
   newLevel: number;
 }
 
@@ -74,7 +74,7 @@ export interface UpgradeResult {
  * 租金结果
  */
 export interface RentResult {
-  rent: number;
+  rent: Uct;
   payerId: string;
   ownerId: string;
 }
@@ -248,6 +248,7 @@ export class PropertyHandler {
       this.io.emit('server.propertyBought', {
         cell: result.cell,
         playerId,
+        runtime: this.world.getRuntimeState().getCellState(result.cell.id),
       });
 
       // 13. 返回成功结果
@@ -269,13 +270,13 @@ export class PropertyHandler {
   private handleUpgradeProperty(
     socket: TypedSocket,
     payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
-    ack?: (result: AckResult<{ cell: Cell; cost: number }>) => void,
+    ack?: (result: AckResult<{ cell: Cell; cost: Uct }>) => void,
   ): void {
     try {
       const requestId = payload.requestId;
       if (requestId) {
         const previous = this.operationGuard.getResult(requestId);
-        if (previous) { ack?.(previous as AckResult<{ cell: Cell; cost: number }>); return; }
+        if (previous) { ack?.(previous as AckResult<{ cell: Cell; cost: Uct }>); return; }
       }
       const lockKey = `property-upgrade:${payload.cellId}`;
       if (!this.operationGuard.tryLock(lockKey)) { ack?.({ ok: false, error: 'operation_in_progress' }); return; }
@@ -370,10 +371,11 @@ export class PropertyHandler {
         playerId,
         newLevel: result.newLevel,
         cost: result.cost,
+        runtime: this.world.getRuntimeState().getCellState(result.cell.id),
       });
 
       // 13. 返回成功结果
-      const response = { ok: true, data: { cell: result.cell, cost: result.cost } } as AckResult<{ cell: Cell; cost: number }>;
+      const response = { ok: true, data: { cell: result.cell, cost: result.cost } } as AckResult<{ cell: Cell; cost: Uct }>;
       if (requestId) this.operationGuard.complete(requestId, response as never);
       ack?.(response);
       logger.debug(`玩家 ${playerId} 升级格子 ${payload.cellId} 到等级 ${result.newLevel}，费用 ${result.cost}`);
@@ -480,7 +482,7 @@ export class PropertyHandler {
       logger.debug(`玩家 ${payerId} 向格子 ${cellId} 的所有者支付 UCT 租金`);
 
       return {
-        rent,
+        rent: rentUct,
         payerId,
         ownerId: mainOwner,
       };
@@ -548,14 +550,14 @@ export class PropertyHandler {
     upgradeCost: import('@game/shared').Uct,
   ): UpgradeResult | null {
     try {
-      const cost = this.getUctCost(upgradeCost);
+      const cost = upgradeCost;
       const changes = this.applyUct(player, upgradeCost, 'property_upgrade');
       if (changes.length === 0) return null;
 
       // 2. 增加格子等级
       const currentLevel = this.world.getRuntimeState().getCellState(cell.id).level;
       const newLevel = currentLevel + 1;
-      this.world.getRuntimeState().updateCellState(cell.id, (state) => ({ ...state, level: newLevel, accumulatedValue: state.accumulatedValue + cost }));
+      this.world.getRuntimeState().updateCellState(cell.id, (state) => ({ ...state, level: newLevel, accumulatedValue: state.accumulatedValue + this.getUctCost(upgradeCost) }));
 
       this.world.updatePlayer(player);
 

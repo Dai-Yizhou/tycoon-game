@@ -204,35 +204,40 @@ export class GameHudShell {
     const type = cell.type;
     const name = localizedText(cell.name, t("cell." + type));
     const description = localizedText(cell.description, '');
-    const price = Object.values(cell.price?.player ?? {}).filter((value) => value < 0).reduce((total, value) => total + Math.abs(value), 0);
-    const level = 0;
+    const definitions = this.vm.getRegions().valueFieldDefs;
+    const priceUct = cell.price;
+    const price = priceUct ? formatUctText(priceUct, definitions) : '';
+    const runtime = this.vm.getCellRuntimeState(cell.id);
+    const level = runtime?.level ?? 0;
+    const holderText = runtime?.ownerships.length
+      ? runtime.ownerships.map((ownership) => `${ownership.playerId} ${(ownership.share * 100).toFixed(0)}%`).join(', ')
+      : t("hud.noOwners");
     const typeLabel = this.escapeHtml(t("cell." + type));
-    const holderText = t("hud.noOwners");
 
     // 当前档位租金
     const rentRaw = cell.rent;
     let rentText = "";
     if (Array.isArray(rentRaw) && rentRaw.length > 0) {
-      const rent = Object.values(rentRaw[Math.min(level, rentRaw.length - 1)]?.player ?? {}).filter((value) => value < 0).reduce((total, value) => total + Math.abs(value), 0);
-      if (rent > 0) rentText = `$${rent}`;
+      const rent = rentRaw[Math.min(level, rentRaw.length - 1)];
+      if (rent) rentText = formatUctText(rent, this.vm.getRegions().valueFieldDefs);
     }
 
     // 下一级升级费用
     const upgradeRaw = cell.upgradeCost;
     let upgradeText = "";
     if (Array.isArray(upgradeRaw) && upgradeRaw.length > 0) {
-      const next = Object.values(upgradeRaw[Math.min(level, upgradeRaw.length - 1)]?.player ?? {}).filter((value) => value < 0).reduce((total, value) => total + Math.abs(value), 0);
-      if (next > 0) upgradeText = `$${next}`;
+      const next = upgradeRaw[Math.min(level, upgradeRaw.length - 1)];
+      if (next) upgradeText = formatUctText(next, this.vm.getRegions().valueFieldDefs);
     }
 
     // 时区偏移（分钟）→ UTC±H:MM
     const tzText = formatTimezoneOffset(cell.timezone);
 
     // 根据格子能力决定展示字段：仅价格>0（可购买）的格子显示价格，仅具备升级档位（可升级）的格子显示等级
-    const purchasable = price > 0;
+    const purchasable = Boolean(priceUct && Object.values(priceUct.player ?? {}).some((value) => value < 0));
     const upgradeable = (upgradeRaw?.length ?? 0) > 0;
     const rows: Array<[string, string]> = [];
-    if (purchasable) rows.push([t("hud.price"), `$${price}`]);
+    if (purchasable) rows.push([t("hud.price"), price]);
     if (upgradeable) rows.push([t("hud.level"), level > 0 ? `Lv.${level}` : "—"]);
     if (rentText) rows.push([t("hud.rent"), rentText]);
     if (upgradeText) rows.push([t("hud.upgrade"), upgradeText]);
@@ -307,7 +312,7 @@ export class GameHudShell {
       const num = document.createElement("span");
       num.className = "value-pill__num";
       const raw = def.scope === "region"
-        ? this.vm.getRegions().regionProsperityMap.get(regionId) ?? 0
+        ? this.vm.getRegions().regionValues.get(regionId)?.[def.id] ?? 0
         : playerValues[def.id]?.current ?? 0;
       const value = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
       num.textContent = String(Math.round(value));
@@ -443,4 +448,12 @@ export class GameHudShell {
     div.textContent = s;
     return div.innerHTML;
   }
+}
+
+function formatUctText(uct: import('@game/shared').Uct, definitions: ValueFieldDef[]): string {
+  return Object.entries(uct.player ?? {}).concat(Object.entries(uct.region ?? {})).map(([fieldId, value]) => {
+    const definition = definitions.find((field) => field.id === fieldId);
+    const label = localizedText(definition?.name, fieldId);
+    return `${label} ${value >= 0 ? '+' : ''}${value}`;
+  }).join(', ');
 }

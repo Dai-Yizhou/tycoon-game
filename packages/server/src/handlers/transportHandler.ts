@@ -15,7 +15,7 @@
  */
 
 import type { AckResult, Cell, Player, PositionChangedPayload } from '@game/shared';
-import { getExtra, normalizeCellType, CellTypes, t, type Uct } from '@game/shared';
+import { formatUct, getExtra, normalizeCellType, CellTypes, t, type Uct } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -34,7 +34,7 @@ export interface TransportResult {
   /** 目标格子 ID */
   toCellId: number;
   /** 传送费用 */
-  cost: number;
+  cost: Uct;
   /** 交通枢纽格子数据 */
   cell: Cell;
 }
@@ -209,12 +209,11 @@ export class TransportHandler {
         ack?.({ ok: false, error: 'transport_cost_not_found' });
         return;
       }
-      const cost = Math.max(0, -(teleportCost.player?.money ?? 0));
+      const cost = teleportCost;
 
       // 10. 检查玩家财产是否足够
-      const money = this.getPlayerMoney(player);
-      if (money < cost) {
-        emitError(socket, ErrorCodes.InvalidPayload, `财产不足，需要 ${cost}，当前 ${money}`);
+      if (!this.canApplyUct(player, cost)) {
+        emitError(socket, ErrorCodes.InvalidPayload, `数值不足，需要 ${this.formatUct(cost)}`);
         ack?.({ ok: false, error: 'insufficient_money' });
         return;
       }
@@ -232,7 +231,7 @@ export class TransportHandler {
 
       // 13. 返回成功结果
       ack?.({ ok: true, data: result });
-      logger.debug(`玩家 ${playerId} 通过交通枢纽 ${payload.hubCellId} 传送到 ${payload.targetCellId}，费用 ${cost}`);
+      logger.debug(`玩家 ${playerId} 通过交通枢纽 ${payload.hubCellId} 传送到 ${payload.targetCellId}，费用 ${this.formatUct(cost)}`);
     } catch (err) {
       logger.error('使用交通枢纽处理错误', err);
       emitError(socket, ErrorCodes.InternalError, err instanceof Error ? err.message : String(err));
@@ -246,7 +245,7 @@ export class TransportHandler {
   private handleGetDestinations(
     socket: TypedSocket,
     payload: { hubCellId: number },
-    ack?: (result: AckResult<{ destinations: Array<{ cellId: number; name: string; cost: number }> }>) => void,
+    ack?: (result: AckResult<{ destinations: Array<{ cellId: number; name: string; cost: Uct }> }>) => void,
   ): void {
     try {
       const mapIndex = this.world.getMapIndex();
@@ -282,7 +281,7 @@ export class TransportHandler {
         return {
           cellId,
           name: cell ? (getExtra<string>(cell, 'name', `格子 ${cellId}`) ?? `格子 ${cellId}`) : `格子 ${cellId}`,
-          cost: Math.max(0, -(this.getTeleportCost(hubCell, cellId)?.player?.money ?? 0)),
+          cost: this.getTeleportCost(hubCell, cellId) ?? {},
         };
       });
 
@@ -301,16 +300,15 @@ export class TransportHandler {
     player: Player,
     hubCell: Cell,
     targetCell: Cell,
-    cost: number,
+    cost: Uct,
   ): TransportResult | null {
     try {
       // 1. 扣除玩家财产
-      if (this.economy) {
-        const change = this.economy.changeValue(player.id, 'money', -cost, 'transport');
-        if (!change.ok) return null;
-      } else {
-        const currentMoney = this.getPlayerMoney(player);
-        this.setPlayerMoney(player, currentMoney - cost);
+      for (const [fieldId, delta] of Object.entries(cost.player ?? {})) {
+        const change = this.economy
+          ? this.economy.changeValue(player.id, fieldId, delta, 'transport')
+          : this.changePlayerValue(player, fieldId, delta);
+        if (!change) return null;
       }
 
       // 2. 更新玩家位置
@@ -318,10 +316,6 @@ export class TransportHandler {
       player.position.cellId = targetCell.id;
       player.lastActiveAt = Date.now();
       this.world.updatePlayer(player);
-
-      // 3. 更新交通枢纽使用记录（可选，用于统计）
-      const usageCount = getExtra<number>(hubCell, 'usageCount', 0) ?? 0;
-      hubCell.extra.usageCount = usageCount + 1;
 
       return {
         playerId: player.id,
@@ -360,12 +354,14 @@ export class TransportHandler {
     // 3. 广播数值变化
     const player = this.world.getPlayer(result.playerId);
     if (player) {
-      this.io.emit('server.valueChanged', {
-        playerId: result.playerId,
-        fieldId: 'money',
-        current: this.getPlayerMoney(player),
-        delta: -result.cost,
-      });
+      for (const [fieldId, delta] of Object.entries(result.cost.player ?? {})) {
+        this.io.emit('server.valueChanged', {
+          playerId: result.playerId,
+          fieldId,
+          current: player.values[fieldId]?.current ?? 0,
+          delta,
+        });
+      }
     }
   }
 
@@ -520,13 +516,13 @@ export class TransportHandler {
 
     // 发送通知给玩家，显示可用目的地
     const currentDestinations = this.hubStates.get(hubId)?.currentDestinations ?? [];
-    const costs = currentDestinations.map((destination) => this.getTeleportCost(hubCell, destination)?.player?.money ?? 0);
+    const costs = currentDestinations.map((destination) => this.getTeleportCost(hubCell, destination) ?? {});
 
     socket.emit('server.notification', {
       id: `transport_${hubId}`,
       type: 'info',
       title: t('server.transportTitle'),
-      content: t('server.transportPrompt', { cost: costs.length === 1 ? Math.abs(costs[0] ?? 0) : '各目的地费用不同' }),
+      content: t('server.transportPrompt', { cost: costs.length === 1 ? this.formatUct(costs[0]) : '各目的地费用不同' }),
       actions: currentDestinations.map(dest => ({
         label: `传送到 ${dest}`,
         action: 'useTransport',
@@ -541,25 +537,23 @@ export class TransportHandler {
   /**
    * 获取玩家财产
    */
-  private getPlayerMoney(player: Player): number {
-    const moneyField = player.values['money'];
-    return moneyField?.current ?? 0;
+  private canApplyUct(player: Player, uct: Uct): boolean {
+    return Object.entries(uct.player ?? {}).every(([fieldId, delta]) => {
+      const field = player.values[fieldId];
+      return Boolean(field) && field.current + delta >= (field.min ?? Number.NEGATIVE_INFINITY) && field.current + delta <= (field.max ?? Number.POSITIVE_INFINITY);
+    });
   }
 
-  /**
-   * 设置玩家财产
-   */
-  private setPlayerMoney(player: Player, value: number): void {
-    if (player.values['money']) {
-      player.values['money'].current = Math.max(0, value); // 防止负数
-    } else {
-      player.values['money'] = {
-        id: 'money',
-        name: '财产',
-        current: Math.max(0, value),
-        min: 0,
-      };
-    }
+  private changePlayerValue(player: Player, fieldId: string, delta: number): boolean {
+    const field = player.values[fieldId];
+    if (!field || !Number.isFinite(delta)) return false;
+    field.current = Math.min(field.max ?? Number.POSITIVE_INFINITY, Math.max(field.min ?? Number.NEGATIVE_INFINITY, field.current + delta));
+    this.world.updatePlayer(player);
+    return true;
+  }
+
+  private formatUct(uct: Uct | undefined): string {
+    return formatUct(uct, this.world.getMapMeta()?.valueFieldDefinitions ?? []);
   }
 
   /**

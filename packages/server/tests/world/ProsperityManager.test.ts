@@ -17,28 +17,37 @@ const mockIO = {
 // Mock MapMeta with regions
 const mockMapMeta: MapMeta = {
   id: 'test-map',
-  name: 'Test Map',
+  name: { 'zh-CN': '测试地图', 'en-US': 'Test Map' },
   version: '1.0.0',
-  templateName: 'default',
-  timezones: [
-    { id: 'tz-default', offsetMinutes: 0, cellIds: [] },
+  valueFieldDefinitions: [
+    { id: 'pros', name: { 'zh-CN': '繁荣度', 'en-US': 'Prosperity' }, scope: 'region', min: 0, max: 100 },
   ],
   regions: [
-    { id: 'region-1', name: 'Region 1', cellIds: [1, 2, 3], prosperity: 80 },
-    { id: 'region-2', name: 'Region 2', cellIds: [4, 5, 6], prosperity: 50 },
-    { id: 'region-3', name: 'Region 3', cellIds: [7, 8, 9], prosperity: 20 },
+    { id: 'region-1', name: { 'zh-CN': '区域 1', 'en-US': 'Region 1' }, initial: { region: { pros: 80 } } },
+    { id: 'region-2', name: { 'zh-CN': '区域 2', 'en-US': 'Region 2' }, initial: { region: { pros: 50 } } },
+    { id: 'region-3', name: { 'zh-CN': '区域 3', 'en-US': 'Region 3' }, initial: { region: { pros: 20 } } },
   ],
-  valueFieldDefinitions: [],
-  dayNightCycleMinutes: 15,
+  uct: { player: [], region: ['pros'] },
+  playerInitial: { player: {} },
+  dayNightCycle: 15,
+  dice: { cooldownMs: 3000, min: 1, max: 6 },
+  tax: { baseTax: { rates: { player: {} }, taxInterval: 900000 }, shareTax: { rates: { player: {} }, taxInterval: 900000 } },
   startCellId: 0,
-  config: {},
 };
 
 // Mock GameWorld
 const mockWorld = {
   getAllPlayers: jest.fn(() => []),
   getMapMeta: jest.fn(() => mockMapMeta),
-  getMapData: jest.fn(() => []),
+  getMapData: jest.fn(() => Array.from({ length: 9 }, (_, index) => ({
+    id: index + 1,
+    x: 0,
+    y: 0,
+    destinations: [],
+    regionId: `region-${Math.floor(index / 3) + 1}`,
+    timezone: 0,
+    extra: {},
+  }))),
   getMapIndex: jest.fn(() => ({
     getById: jest.fn((id: number) => ({
       id,
@@ -91,6 +100,7 @@ describe('ProsperityManager', () => {
     });
 
     it('应该在夜晚降低繁荣度', () => {
+      jest.spyOn(timeZoneManager, 'getLocalTime').mockReturnValue({ isNight: true } as never);
       dayNight.forceNight();
 
       // 模拟繁荣度更新
@@ -102,6 +112,7 @@ describe('ProsperityManager', () => {
     });
 
     it('应该在白天恢复繁荣度', () => {
+      jest.spyOn(timeZoneManager, 'getLocalTime').mockReturnValue({ isNight: false } as never);
       // 先降低繁荣度
       prosperityManager.decreaseProsperity('region-1', 30);
 

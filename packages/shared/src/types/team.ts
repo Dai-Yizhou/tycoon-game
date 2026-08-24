@@ -65,12 +65,8 @@ export interface TeamMemberView {
   id: string;
   /** 用户名 */
   username: string;
-  /** 金钱 */
-  money: number;
-  /** 信用值 */
-  credit: number;
-  /** 环保值 */
-  env: number;
+  /** 玩家实时数值 */
+  values: Record<string, number>;
   /** 玩家状态（normal / bankrupt / jail 等） */
   status: string;
 }

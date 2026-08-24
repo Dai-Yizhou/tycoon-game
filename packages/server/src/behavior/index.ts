@@ -10,9 +10,7 @@
 export {
   BehaviorEngine,
   createBehaviorEngine,
-  type BehaviorEvent,
   type BehaviorConfig,
-  type BehaviorEventTarget,
   type BehaviorExecuteResult,
   type BehaviorValueChange,
 } from './BehaviorEngine.js';

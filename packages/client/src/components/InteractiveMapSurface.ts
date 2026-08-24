@@ -1,5 +1,5 @@
-import type { MapData, Player } from "@game/shared";
-import { localizedText } from "../game/i18n.js";
+import { formatUct, type MapData, type Player, type ValueFieldDefinition } from "@game/shared";
+import { getLanguage, localizedText } from "../game/i18n.js";
 
 export class InteractiveMapSurface {
   private root = document.createElement("div");
@@ -7,6 +7,7 @@ export class InteractiveMapSurface {
   private players: Player[] = [];
   private bounds: { minX: number; minY: number; maxX: number; maxY: number } | null = null;
   private followedCellId: number | null = null;
+  private valueFieldDefinitions: ValueFieldDefinition[] = [];
 
   constructor() {
     this.root.className = "interactive-map-surface";
@@ -17,9 +18,14 @@ export class InteractiveMapSurface {
     return this.root;
   }
 
-  render(map: MapData, players: Player[] = this.players): void {
+  render(
+    map: MapData,
+    players: Player[] = this.players,
+    valueFieldDefinitions: ValueFieldDefinition[] = this.valueFieldDefinitions,
+  ): void {
     this.map = map;
     this.players = players;
+    this.valueFieldDefinitions = valueFieldDefinitions;
     const ns = "http://www.w3.org/2000/svg";
     const cells = [...map];
     if (!cells.length) return;
@@ -67,7 +73,7 @@ export class InteractiveMapSurface {
       const g = document.createElementNS(ns, "g");
       const type = String(c.type ?? c.extra?.type ?? "property");
       const name = localizedText(c.name ?? c.extra?.name, `格子 ${c.id}`);
-      const price = Object.values(c.price?.player ?? {}).filter((value) => value < 0).reduce((total, value) => total + Math.abs(value), 0);
+      const price = c.price ? formatUct(c.price, this.valueFieldDefinitions, getLanguage()) : "";
       g.classList.add("map-node", `map-node--${type}`);
       g.dataset.cellId = String(c.id);
       g.setAttribute("transform", `translate(${c.x} ${c.y})`);
@@ -96,7 +102,7 @@ export class InteractiveMapSurface {
       pr.setAttribute("x", "-45");
       pr.setAttribute("y", "29");
       pr.classList.add("map-node__price");
-      pr.textContent = price ? `$${price}` : "—";
+      pr.textContent = price || "—";
 
       g.append(r, t, n, pr);
 
@@ -156,12 +162,12 @@ export class InteractiveMapSurface {
 
   updatePlayers(players: Player[]): void {
     this.players = players;
-    if (this.map.length) this.render(this.map, players);
+    if (this.map.length) this.render(this.map, players, this.valueFieldDefinitions);
   }
 
   followPlayer(cellId: number): void {
     this.followedCellId = cellId;
-    if (this.map.length) this.render(this.map, this.players);
+    if (this.map.length) this.render(this.map, this.players, this.valueFieldDefinitions);
   }
 
   private applyViewBox(svg: SVGSVGElement, followedCell: MapData[number] | undefined): void {
