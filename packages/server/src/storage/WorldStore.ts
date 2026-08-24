@@ -1,23 +1,25 @@
-import type { Cell, EraInfo, MapMeta, Player, Team } from '@game/shared';
+import type { EraInfo, Player, Team } from '@game/shared';
 import type { TaxRecord } from '../economy/Taxation.js';
+import type { SerializedWorldRuntimeState } from '../state/WorldRuntimeState.js';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 export interface WorldSnapshot {
-  version: number;
+  version: 2;
+  revision: number;
   savedAt: number;
-  mapData: Cell[];
-  mapMeta: MapMeta;
+  mapId: string;
   players: Player[];
   teams: Team[];
+  runtime: SerializedWorldRuntimeState;
   era: EraInfo | null;
   taxRecords: Record<string, TaxRecord[]>;
-  jailStates?: Record<string, { jailedAt: number; expiresAt: number; jailCellId: number }>;
+  jailStates: Record<string, { jailedAt: number; expiresAt: number; jailCellId: number }>;
 }
 
 export interface WorldStore {
   load(): WorldSnapshot | null;
-  save(snapshot: WorldSnapshot): void;
+  save(snapshot: WorldSnapshot, expectedRevision?: number): void;
 }
 
 function clone<T>(value: T): T {
@@ -35,7 +37,8 @@ export class InMemoryWorldStore implements WorldStore {
     return this.snapshot ? clone(this.snapshot) : null;
   }
 
-  save(snapshot: WorldSnapshot): void {
+  save(snapshot: WorldSnapshot, expectedRevision?: number): void {
+    if (expectedRevision !== undefined && this.snapshot && this.snapshot.revision !== expectedRevision) throw new Error('world snapshot revision conflict');
     this.snapshot = clone(snapshot);
   }
 }
@@ -56,8 +59,10 @@ export class FileWorldStore implements WorldStore {
     return null;
   }
 
-  save(snapshot: WorldSnapshot): void {
+  save(snapshot: WorldSnapshot, expectedRevision?: number): void {
     if (!isWorldSnapshot(snapshot)) throw new Error('invalid world snapshot');
+    const current = this.load();
+    if (expectedRevision !== undefined && current && current.revision !== expectedRevision) throw new Error('world snapshot revision conflict');
     mkdirSync(dirname(this.filePath), { recursive: true });
     const temporaryPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
     if (existsSync(this.filePath)) copyFileSync(this.filePath, `${this.filePath}.bak`);
@@ -69,9 +74,9 @@ export class FileWorldStore implements WorldStore {
 function isWorldSnapshot(value: unknown): value is WorldSnapshot {
   if (!value || typeof value !== 'object') return false;
   const snapshot = value as Partial<WorldSnapshot>;
-  return snapshot.version === 1 && typeof snapshot.savedAt === 'number'
-    && Array.isArray(snapshot.mapData) && Boolean(snapshot.mapMeta)
+  return snapshot.version === 2 && typeof snapshot.revision === 'number' && typeof snapshot.savedAt === 'number'
+    && typeof snapshot.mapId === 'string' && Boolean(snapshot.runtime)
     && Array.isArray(snapshot.players) && Array.isArray(snapshot.teams)
     && (snapshot.era === null || typeof snapshot.era === 'object')
-    && Boolean(snapshot.taxRecords);
+    && Boolean(snapshot.taxRecords) && Boolean(snapshot.jailStates);
 }

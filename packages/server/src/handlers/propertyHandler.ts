@@ -16,7 +16,7 @@
  */
 
 import type { AckResult, Cell, Player } from '@game/shared';
-import { getExtra, normalizeCellType, CellTypes, PlayerStatus, canCollectRent, type Uct } from '@game/shared';
+import { normalizeCellType, CellTypes, PlayerStatus, canCollectRent, type Uct } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -25,7 +25,6 @@ import type { BehaviorEngine, BehaviorExecuteResult } from '../behavior/Behavior
 import {
   DEFAULT_OWNERSHIP_CONFIG,
   addOwnership,
-  getAccumulatedValue,
   getOwnerships,
   type Ownership,
   type OwnershipConfig,
@@ -192,7 +191,7 @@ export class PropertyHandler {
       }
 
       // 6. 验证格子是否已被购买
-      const ownerships = getOwnerships(cell);
+      const ownerships = getOwnerships(cell, this.world.getRuntimeState());
       const alreadyOwned = ownerships.some(o => o.playerId === playerId && o.share > 0);
       
       if (alreadyOwned) {
@@ -322,7 +321,7 @@ export class PropertyHandler {
       }
 
       // 6. 验证所有权
-      const ownerships = getOwnerships(cell);
+      const ownerships = getOwnerships(cell, this.world.getRuntimeState());
       
       const isOwner = ownerships.some(o => o.playerId === playerId && o.share > 0);
       if (!isOwner) {
@@ -332,7 +331,7 @@ export class PropertyHandler {
       }
 
       // 7. 获取当前等级和升级费用
-      const currentLevel = getExtra<number>(cell, 'level', 0) ?? 0;
+      const currentLevel = this.world.getRuntimeState().getCellState(cell.id).level;
       const upgradeCosts = cell.upgradeCost ?? [];
       
       // 验证是否可升级（等级上限检查）
@@ -426,7 +425,7 @@ export class PropertyHandler {
       }
 
       // 5. 验证所有权
-      const ownerships = getOwnerships(cell);
+      const ownerships = getOwnerships(cell, this.world.getRuntimeState());
       
       // 空格子不收租
       if (ownerships.length === 0) {
@@ -448,7 +447,7 @@ export class PropertyHandler {
       }
 
       // 6. 获取租金
-      const level = getExtra<number>(cell, 'level', 0) ?? 0;
+      const level = this.world.getRuntimeState().getCellState(cell.id).level;
       const rentUct = cell.rent?.[level];
       const rent = this.getUctCost(rentUct);
 
@@ -505,15 +504,15 @@ export class PropertyHandler {
       const priceAmount = this.getUctCost(price);
       const buyerChanges = this.applyUct(player, price, 'property_purchase');
       if (buyerChanges.length === 0) return null;
-      const ownership = addOwnership(cell, player.id, priceAmount, this.ownershipConfig);
+      const ownership = addOwnership(cell, player.id, priceAmount, this.ownershipConfig, this.world.getRuntimeState());
       if (!ownership || ownership.share <= 0 || ownership.share > 1) {
         this.rollbackUct(player, buyerChanges, 'property_purchase_rollback');
         return null;
       }
       this.distributeBuyInToOwners(cell, player.id, price);
-      if (getOwnerships(cell).length === 1) cell.extra.level = 0;
+      if (getOwnerships(cell, this.world.getRuntimeState()).length === 1) this.world.getRuntimeState().updateCellState(cell.id, (state) => ({ ...state, level: 0 }));
       this.world.updatePlayer(player);
-      for (const owner of getOwnerships(cell)) {
+      for (const owner of getOwnerships(cell, this.world.getRuntimeState())) {
         const ownerPlayer = this.world.getPlayer(owner.playerId);
         if (ownerPlayer) this.world.updatePlayer(ownerPlayer);
       }
@@ -525,9 +524,9 @@ export class PropertyHandler {
   }
 
   private distributeBuyInToOwners(cell: Cell, buyerId: string, amount: Uct): void {
-    const buyer = getOwnerships(cell).find((ownership) => ownership.playerId === buyerId);
+    const buyer = getOwnerships(cell, this.world.getRuntimeState()).find((ownership) => ownership.playerId === buyerId);
     if (!buyer || buyer.share >= 1) return;
-    for (const ownership of getOwnerships(cell)) {
+    for (const ownership of getOwnerships(cell, this.world.getRuntimeState())) {
       if (ownership.playerId === buyerId) continue;
       const owner = this.world.getPlayer(ownership.playerId);
       if (!owner || owner.status === PlayerStatus.Bankrupt) continue;
@@ -554,10 +553,9 @@ export class PropertyHandler {
       if (changes.length === 0) return null;
 
       // 2. 增加格子等级
-      const currentLevel = getExtra<number>(cell, 'level', 0) ?? 0;
+      const currentLevel = this.world.getRuntimeState().getCellState(cell.id).level;
       const newLevel = currentLevel + 1;
-      cell.extra.level = newLevel;
-      cell.extra.accumulatedValue = getAccumulatedValue(cell) + cost;
+      this.world.getRuntimeState().updateCellState(cell.id, (state) => ({ ...state, level: newLevel, accumulatedValue: state.accumulatedValue + cost }));
 
       this.world.updatePlayer(player);
 
@@ -576,7 +574,7 @@ export class PropertyHandler {
    * 分配租金给所有者（按持股比例）
    */
   private distributeRentToOwners(cell: Cell, rent: Uct, scale: number): void {
-    for (const ownership of getOwnerships(cell)) {
+    for (const ownership of getOwnerships(cell, this.world.getRuntimeState())) {
       const owner = this.world.getPlayer(ownership.playerId);
       if (!owner || !canCollectRent(owner.status)) continue;
       const shareScale = ownership.share * scale;

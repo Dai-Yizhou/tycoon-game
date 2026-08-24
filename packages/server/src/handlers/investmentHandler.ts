@@ -166,7 +166,7 @@ export class InvestmentHandler {
       }
 
       // 6. 验证格子是否已被购买
-      const ownerships = getOwnerships(cell);
+      const ownerships = getOwnerships(cell, this.world.getRuntimeState());
       const alreadyOwned = ownerships.some(o => o.playerId === playerId && o.share > 0);
 
       if (alreadyOwned) {
@@ -269,7 +269,7 @@ export class InvestmentHandler {
       }
 
       // 4. 获取所有权信息
-      const ownerships = getOwnerships(cell);
+      const ownerships = getOwnerships(cell, this.world.getRuntimeState());
       if (ownerships.length === 0) {
         return null;
       }
@@ -324,14 +324,14 @@ export class InvestmentHandler {
       const priceAmount = this.getUctCost(price);
       const changes = this.applyUct(player, price, 'investment_purchase');
       if (changes.length === 0) return null;
-      const ownership = addOwnership(cell, player.id, priceAmount, this.ownershipConfig);
+      const ownership = addOwnership(cell, player.id, priceAmount, this.ownershipConfig, this.world.getRuntimeState());
       if (!ownership || ownership.share <= 0 || ownership.share > 1) {
         this.rollbackUct(player, changes, 'investment_purchase_rollback');
         return null;
       }
       this.distributeBuyInToOwners(cell, player.id, price);
       this.world.updatePlayer(player);
-      for (const current of getOwnerships(cell)) {
+      for (const current of getOwnerships(cell, this.world.getRuntimeState())) {
         const owner = this.world.getPlayer(current.playerId);
         if (owner) this.world.updatePlayer(owner);
       }
@@ -343,9 +343,9 @@ export class InvestmentHandler {
   }
 
   private distributeBuyInToOwners(cell: Cell, buyerId: string, amount: Uct): void {
-    const buyer = getOwnerships(cell).find((ownership) => ownership.playerId === buyerId);
+    const buyer = getOwnerships(cell, this.world.getRuntimeState()).find((ownership) => ownership.playerId === buyerId);
     if (!buyer || buyer.share >= 1) return;
-    for (const ownership of getOwnerships(cell)) {
+    for (const ownership of getOwnerships(cell, this.world.getRuntimeState())) {
       if (ownership.playerId === buyerId) continue;
       const owner = this.world.getPlayer(ownership.playerId);
       if (!owner || owner.status === PlayerStatus.Bankrupt) continue;
@@ -412,7 +412,7 @@ export class InvestmentHandler {
     cell: Cell,
     impact: Uct,
   ): EventTriggerResult {
-    const ownerships = getOwnerships(cell);
+    const ownerships = getOwnerships(cell, this.world.getRuntimeState());
     const affectedPlayers: Array<{ playerId: string; share: number; amount: Uct }> = [];
 
     for (const [fieldId, delta] of Object.entries(impact.region ?? {})) {
@@ -466,7 +466,7 @@ export class InvestmentHandler {
       return null;
     }
 
-    return getOwnerships(cell);
+    return getOwnerships(cell, this.world.getRuntimeState());
   }
 
   /**

@@ -242,9 +242,9 @@ export class Taxation {
       const cellType = normalizeCellType(cell);
       if (cellType !== CellTypes.Property) continue;
 
-      const ownership = getOwnerships(cell).find((current) => current.playerId === playerId);
+      const ownership = getOwnerships(cell, this.world.getRuntimeState()).find((current) => current.playerId === playerId);
       if (!ownership) continue;
-      totalPropertyValue += getAccumulatedValue(cell) * ownership.share;
+      totalPropertyValue += getAccumulatedValue(cell, this.world.getRuntimeState()) * ownership.share;
     }
 
     if (totalPropertyValue <= this.config.minPropertyValueForTax) {
@@ -269,9 +269,9 @@ export class Taxation {
       const cellType = normalizeCellType(cell);
       if (cellType !== CellTypes.Investment) continue;
 
-      const ownership = getOwnerships(cell).find((current) => current.playerId === playerId);
+      const ownership = getOwnerships(cell, this.world.getRuntimeState()).find((current) => current.playerId === playerId);
       if (!ownership) continue;
-      totalInvestmentValue += getAccumulatedValue(cell) * ownership.share;
+      totalInvestmentValue += getAccumulatedValue(cell, this.world.getRuntimeState()) * ownership.share;
     }
 
     return Math.floor(totalInvestmentValue * this.config.investmentTaxRate);

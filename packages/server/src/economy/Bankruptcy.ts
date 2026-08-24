@@ -64,14 +64,6 @@ export class Bankruptcy {
     this.taxation.clearTaxRecords(playerId);
     this.world.getPlayerManager().updateStatus(playerId, PlayerStatus.Bankrupt);
     this.clearPlayerAssets(playerId);
-    const mutablePlayer = player as import('@game/shared').Player & { extra?: Record<string, unknown> };
-    if (mutablePlayer.extra) {
-      delete mutablePlayer.extra.jail;
-      delete mutablePlayer.extra.economy;
-      delete mutablePlayer.extra.projectOwner;
-      delete mutablePlayer.extra.projectState;
-      delete mutablePlayer.extra.assets;
-    }
     this.world.updatePlayer(player);
     this.world.saveSnapshot(this.taxation.getAllTaxRecords(), {});
     this.bankruptcyRecords.set(playerId, record);
@@ -87,25 +79,10 @@ export class Bankruptcy {
 
   private clearPlayerAssets(playerId: string): void {
     for (const cell of this.world.getMapData() ?? []) {
-      const ownerships = Array.isArray(cell.extra.ownerships) ? cell.extra.ownerships as Array<{ playerId: string }> : [];
-      const owners = Array.isArray(cell.extra.owners) ? cell.extra.owners as string[] : [];
-      const ownsProject = cell.extra.projectOwner === playerId || cell.extra.projectOwnerId === playerId;
-      if (!ownerships.some((ownership) => ownership.playerId === playerId) && !owners.includes(playerId) && !ownsProject) continue;
-      const remaining = ownerships.filter((ownership) => ownership.playerId !== playerId);
-      cell.extra.ownerships = remaining;
-      cell.extra.owners = owners.filter((ownerId) => ownerId !== playerId);
-      if (ownsProject) {
-        delete cell.extra.projectOwner;
-        delete cell.extra.projectOwnerId;
-        delete cell.extra.projectState;
-      }
-      if (remaining.length === 0) {
-        cell.extra.level = 0;
-        cell.extra.accumulatedValue = 0;
-      }
-      if (Array.isArray(cell.extra.investments)) {
-        cell.extra.investments = (cell.extra.investments as Array<{ playerId?: string }>).filter((investment) => investment.playerId !== playerId);
-      }
+      const runtime = this.world.getRuntimeState();
+      const ownerships = runtime.getOwnerships(cell.id);
+      if (!ownerships.some((ownership) => ownership.playerId === playerId)) continue;
+      runtime.replaceOwnerships(cell.id, ownerships.filter((ownership) => ownership.playerId !== playerId));
     }
   }
 

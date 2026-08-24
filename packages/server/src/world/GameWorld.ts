@@ -26,6 +26,7 @@ import { buildPlayerValues, type EraInfo, type MapData, type MapMeta, type Playe
 import { MapIndex, type ValidationResult, validateMapData, validateMapMeta } from '@game/shared';
 import { PlayerEvents, PlayerManager, type PlayerEventName, type PlayerEventListener, type PlayerRemovedEvent } from './PlayerManager.js';
 import type { WorldSnapshot, WorldStore } from '../storage/WorldStore.js';
+import { WorldRuntimeStateStore } from '../state/WorldRuntimeStateStore.js';
 
 /**
  * 游戏世界事件类型
@@ -121,7 +122,7 @@ export class GameWorld {
   private resourceVersion = 0;
   private readonly cellVersions = new Map<number, number>();
   private readonly playerPositions = new Map<string, number>();
-  private readonly regionValues = new Map<string, Record<string, number>>();
+  private runtimeState: WorldRuntimeStateStore | null = null;
   private lastValidation: ValidationResult | null = null;
   private snapshotStateProvider: (() => Pick<WorldSnapshot, 'taxRecords' | 'jailStates'>) | null = null;
 
@@ -281,10 +282,7 @@ export class GameWorld {
     this.mapData = mapData;
     this.mapMeta = mapMeta;
     this.mapIndex = new MapIndex(mapData);
-    this.regionValues.clear();
-    for (const region of mapMeta.regions) {
-      this.regionValues.set(region.id, { ...(region.initial.region ?? {}) });
-    }
+    this.runtimeState = new WorldRuntimeStateStore(mapData, mapMeta);
     this.lastValidation = result;
 
     this.emit(WorldEvents.MapLoaded, {
@@ -299,13 +297,14 @@ export class GameWorld {
   saveSnapshot(taxRecords: WorldSnapshot['taxRecords'] = {}, jailStates: WorldSnapshot['jailStates'] = {}): void {
     if (!this.worldStore || !this.mapData || !this.mapMeta) return;
     const state = this.snapshotStateProvider?.() ?? { taxRecords, jailStates };
-    this.worldStore.save({ version: 1, savedAt: Date.now(), mapData: this.mapData, mapMeta: this.mapMeta, players: this.getAllPlayers(), teams: this.getAllTeams(), era: this.currentEra, taxRecords: state.taxRecords, jailStates: state.jailStates });
+    this.worldStore.save({ version: 2, revision: this.resourceVersion, savedAt: Date.now(), mapId: this.mapMeta.id, players: this.getAllPlayers(), teams: this.getAllTeams(), runtime: this.getRuntimeState().snapshot(), era: this.currentEra, taxRecords: state.taxRecords, jailStates: state.jailStates ?? {} });
   }
 
   restoreSnapshot(): WorldSnapshot | null {
     const snapshot = this.worldStore?.load() ?? null;
     if (!snapshot) return null;
-    this.loadMap(snapshot.mapData, snapshot.mapMeta, { skipValidation: true });
+    if (snapshot.version !== 2 || snapshot.mapId !== this.mapMeta?.id) throw new Error('world snapshot map mismatch');
+    this.getRuntimeState().restore(snapshot.runtime);
     this.playerManager.clear();
     for (const player of snapshot.players) this.playerManager.addPlayer(player);
     this.teams.clear();
@@ -317,7 +316,7 @@ export class GameWorld {
   getSnapshot(): WorldSnapshot | null {
     if (!this.mapData || !this.mapMeta) return null;
     const state = this.snapshotStateProvider?.() ?? { taxRecords: {}, jailStates: {} };
-    return { version: 1, savedAt: Date.now(), mapData: this.mapData, mapMeta: this.mapMeta, players: this.getAllPlayers(), teams: this.getAllTeams(), era: this.currentEra, taxRecords: state.taxRecords, jailStates: state.jailStates };
+    return { version: 2, revision: this.resourceVersion, savedAt: Date.now(), mapId: this.mapMeta.id, players: this.getAllPlayers(), teams: this.getAllTeams(), runtime: this.getRuntimeState().snapshot(), era: this.currentEra, taxRecords: state.taxRecords, jailStates: state.jailStates ?? {} };
   }
 
   /**
@@ -342,17 +341,16 @@ export class GameWorld {
   }
 
   getRegionValue(regionId: string, fieldId: string): number {
-    return this.regionValues.get(regionId)?.[fieldId] ?? 0;
+    return this.getRuntimeState().getRegionValue(regionId, fieldId);
   }
 
   changeRegionValue(regionId: string, fieldId: string, delta: number): number {
-    const values = this.regionValues.get(regionId);
-    if (!values || !Number.isFinite(delta)) throw new Error(`区域字段不可用: ${regionId}.${fieldId}`);
-    const definition = this.mapMeta?.valueFieldDefinitions.find((field) => field.id === fieldId);
-    if (!definition || definition.scope !== 'region') throw new Error(`区域字段未声明: ${fieldId}`);
-    const current = Math.min(definition.max ?? Number.POSITIVE_INFINITY, Math.max(definition.min ?? Number.NEGATIVE_INFINITY, (values[fieldId] ?? 0) + delta));
-    values[fieldId] = current;
-    return current;
+    return this.getRuntimeState().changeRegionValue(regionId, fieldId, delta);
+  }
+
+  getRuntimeState(): WorldRuntimeStateStore {
+    if (!this.runtimeState) throw new Error('运行时状态尚未初始化');
+    return this.runtimeState;
   }
 
   /**

@@ -14,7 +14,7 @@
  * - 服务端权威校验所有修缮操作
  */
 
-import type { AckResult, Cell, Player } from '@game/shared';
+import type { AckResult, Cell, Player, Uct } from '@game/shared';
 import { getExtra, normalizeCellType, CellTypes, t } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
@@ -33,11 +33,7 @@ export interface RepairResult {
   /** 纪念碑格子 ID */
   monumentId: number;
   /** 修缮费用 */
-  cost: number;
-  /** 信用值增加 */
-  creditIncrease: number;
-  /** 繁荣度增加 */
-  prosperityIncrease: number;
+  cost: Uct;
   /** 纪念碑格子数据 */
   cell: Cell;
 }
@@ -247,7 +243,7 @@ export class MonumentHandler {
 
       // 11. 返回成功结果
       ack?.({ ok: true, data: result });
-      logger.debug(`玩家 ${playerId} 修缮了纪念碑 ${payload.monumentId}，费用 ${cost}，信用值增加 ${result.creditIncrease}`);
+      logger.debug(`玩家 ${playerId} 修缮了纪念碑 ${payload.monumentId}`);
     } catch (err) {
       logger.error('修缮纪念碑处理错误', err);
       emitError(socket, ErrorCodes.InternalError, err instanceof Error ? err.message : String(err));
@@ -347,9 +343,6 @@ export class MonumentHandler {
         return null;
       }
 
-      const cost = Math.max(0, -(repairCost.player?.money ?? 0));
-      const creditIncrease = repairCost.player?.credit ?? 0;
-      const prosperityIncrease = repairCost.region?.pros ?? 0;
       const monumentState = this.monumentStates.get(monumentCell.id);
       if (monumentState) {
         monumentState.lastRepairTime = Date.now();
@@ -357,18 +350,13 @@ export class MonumentHandler {
       this.repairedThisVisit.set(this.repairVisitKey(player.id, monumentCell.id), true);
 
       // 4. 更新纪念碑使用记录（可选，用于统计）
-      const repairCount = getExtra<number>(monumentCell, 'repairCount', 0) ?? 0;
-      monumentCell.extra.repairCount = repairCount + 1;
-      monumentCell.extra.lastRepairBy = player.id;
-      monumentCell.extra.lastRepairTime = Date.now();
+      this.world.getRuntimeState().updateCellState(monumentCell.id, (state) => ({ ...state, repairedBy: player.id, repairedAt: Date.now() }));
 
       // 5. 更新玩家数据
       return {
         playerId: player.id,
         monumentId: monumentCell.id,
-        cost,
-        creditIncrease,
-        prosperityIncrease,
+        cost: repairCost,
         cell: monumentCell,
       };
     } catch (err) {
@@ -386,7 +374,7 @@ export class MonumentHandler {
       id: `repair_${result.playerId}_${Date.now()}`,
       type: 'success',
       title: t('server.monumentRepairSuccess'),
-      content: t('server.monumentRepairContent', { player: result.playerId.slice(0, 8), id: result.monumentId, credit: result.creditIncrease }),
+      content: t('server.monumentRepairContent', { player: result.playerId.slice(0, 8), id: result.monumentId, credit: result.cost.player?.credit ?? 0 }),
       durationMs: 3000,
     });
 
@@ -397,7 +385,7 @@ export class MonumentHandler {
         playerId: result.playerId,
         fieldId: 'money',
         current: this.getPlayerMoney(player),
-        delta: -result.cost,
+        delta: result.cost.player?.money ?? 0,
       });
 
       // 3. 广播数值变化（信用值）
@@ -405,7 +393,7 @@ export class MonumentHandler {
         playerId: result.playerId,
         fieldId: 'credit',
         current: this.getPlayerCredit(player),
-        delta: result.creditIncrease,
+        delta: result.cost.player?.credit ?? 0,
       });
     }
 

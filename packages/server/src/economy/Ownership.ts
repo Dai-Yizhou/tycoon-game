@@ -1,5 +1,6 @@
 import type { Cell, Player, PlayerStatus } from '@game/shared';
-import { getExtra, participatesInEconomy } from '@game/shared';
+import { participatesInEconomy } from '@game/shared';
+import type { WorldRuntimeStateStore } from '../state/WorldRuntimeStateStore.js';
 
 export interface Ownership {
   playerId: string;
@@ -29,16 +30,9 @@ export function resolveOwnershipConfig(raw: unknown): OwnershipConfig {
   };
 }
 
-export function getOwnerships(cell: Cell): Ownership[] {
-  const rawOwnerships = getExtra<Ownership[]>(cell, 'ownerships', []) ?? [];
-  const owners = getExtra<string[]>(cell, 'owners', []) ?? [];
-  const ownerships = rawOwnerships.length > 0
-    ? rawOwnerships
-    : owners.map((playerId) => ({ playerId, share: 1 / owners.length, purchasePrice: getAccumulatedValue(cell) / owners.length }));
-  const normalized = normalizeOwnerships(ownerships, getAccumulatedValue(cell));
-  cell.extra.ownerships = normalized;
-  cell.extra.owners = normalized.map((ownership) => ownership.playerId);
-  return normalized;
+export function getOwnerships(cell: Cell, runtime: WorldRuntimeStateStore): Ownership[] {
+  const state = runtime.getCellState(cell.id);
+  return normalizeOwnerships(state.ownerships, state.accumulatedValue);
 }
 
 function normalizeOwnerships(ownerships: Ownership[], accumulatedValue: number): Ownership[] {
@@ -63,45 +57,40 @@ function normalizeOwnerships(ownerships: Ownership[], accumulatedValue: number):
   }));
 }
 
-export function getOwners(cell: Cell): string[] {
-  return getOwnerships(cell).map((ownership) => ownership.playerId);
+export function getOwners(cell: Cell, runtime: WorldRuntimeStateStore): string[] {
+  return getOwnerships(cell, runtime).map((ownership) => ownership.playerId);
 }
 
-export function syncOwnerships(cell: Cell, ownerships: Ownership[]): void {
+export function syncOwnerships(cell: Cell, ownerships: Ownership[], runtime: WorldRuntimeStateStore): void {
   const normalized = ownerships.filter((ownership) => ownership.share > 0 && Number.isFinite(ownership.share));
   const total = normalized.reduce((sum, ownership) => sum + ownership.share, 0);
   const shares = total > 0 ? normalized.map((ownership) => ({ ...ownership, share: ownership.share / total })) : [];
-  cell.extra.ownerships = shares;
-  cell.extra.owners = shares.map((ownership) => ownership.playerId);
-  if (shares.length === 0) {
-    cell.extra.level = 0;
-    cell.extra.accumulatedValue = 0;
-  }
+  runtime.replaceOwnerships(cell.id, shares);
 }
 
-export function getAccumulatedValue(cell: Cell): number {
-  const explicit = getExtra<number>(cell, 'accumulatedValue');
-  if (typeof explicit === 'number' && Number.isFinite(explicit)) return explicit;
+export function getAccumulatedValue(cell: Cell, runtime: WorldRuntimeStateStore): number {
   const uctMagnitude = (uct: Cell['price']): number => Object.values(uct?.player ?? {}).reduce((sum, value) => sum + Math.abs(value), 0);
-  const level = getExtra<number>(cell, 'level', 0) ?? 0;
-  return uctMagnitude(cell.price) + (cell.upgradeCost ?? []).slice(0, level).reduce((sum, cost) => sum + uctMagnitude(cost), 0);
+  const level = runtime.getCellState(cell.id).level;
+  const calculated = uctMagnitude(cell.price) + (cell.upgradeCost ?? []).slice(0, level).reduce((sum, cost) => sum + uctMagnitude(cost), 0);
+  const state = runtime.getCellState(cell.id);
+  return state.accumulatedValue > 0 ? state.accumulatedValue : calculated;
 }
 
-export function getBuyInPrice(cell: Cell, config: OwnershipConfig): number {
-  return Math.floor(getAccumulatedValue(cell) * config.buyInMultiplier);
+export function getBuyInPrice(cell: Cell, config: OwnershipConfig, runtime: WorldRuntimeStateStore): number {
+  return Math.floor(getAccumulatedValue(cell, runtime) * config.buyInMultiplier);
 }
 
-export function addOwnership(cell: Cell, playerId: string, price: number, config: OwnershipConfig): Ownership | null {
-  const existing = getOwnerships(cell);
+export function addOwnership(cell: Cell, playerId: string, price: number, config: OwnershipConfig, runtime: WorldRuntimeStateStore): Ownership | null {
+  const existing = getOwnerships(cell, runtime);
   if (existing.some((ownership) => ownership.playerId === playerId)) return null;
   if (existing.length >= config.maxShareholders) return null;
   if (existing.length === 0) {
     const ownership = { playerId, share: 1, purchasePrice: price };
-    syncOwnerships(cell, [ownership]);
-    cell.extra.accumulatedValue = price;
+    syncOwnerships(cell, [ownership], runtime);
+    runtime.updateCellState(cell.id, (state) => ({ ...state, accumulatedValue: price }));
     return ownership;
   }
-  const oldValue = getAccumulatedValue(cell);
+  const oldValue = getAccumulatedValue(cell, runtime);
   const nextValue = oldValue + price;
   const newShare = nextValue > 0 ? price / nextValue : 0;
   const next = existing.map((ownership) => ({
@@ -109,25 +98,26 @@ export function addOwnership(cell: Cell, playerId: string, price: number, config
     share: ownership.share * (oldValue / nextValue),
   }));
   const ownership = { playerId, share: newShare, purchasePrice: price };
-  syncOwnerships(cell, [...next, ownership]);
-  cell.extra.accumulatedValue = nextValue;
+  syncOwnerships(cell, [...next, ownership], runtime);
+  runtime.updateCellState(cell.id, (state) => ({ ...state, accumulatedValue: nextValue }));
   return ownership;
 }
 
 export function distributeByShare(
   cell: Cell,
+  runtime: WorldRuntimeStateStore,
   amount: number,
   getPlayer: (id: string) => Player | undefined,
   pay: (player: Player, delta: number) => void,
   excludedStatus?: PlayerStatus,
 ): void {
-  for (const ownership of getOwnerships(cell)) {
+  for (const ownership of getOwnerships(cell, runtime)) {
     const player = getPlayer(ownership.playerId);
     if (!player || player.status === excludedStatus || !participatesInEconomy(player.status)) continue;
     pay(player, Math.floor(amount * ownership.share));
   }
 }
 
-export function releaseOwnership(cell: Cell, playerId: string): void {
-  syncOwnerships(cell, getOwnerships(cell).filter((ownership) => ownership.playerId !== playerId));
+export function releaseOwnership(cell: Cell, playerId: string, runtime: WorldRuntimeStateStore): void {
+  syncOwnerships(cell, getOwnerships(cell, runtime).filter((ownership) => ownership.playerId !== playerId), runtime);
 }

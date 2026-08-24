@@ -2,19 +2,20 @@ import { FileWorldStore, InMemoryWorldStore, type WorldSnapshot } from '../../sr
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Cell, EraInfo, Player, Team } from '@game/shared';
+import type { EraInfo, Player, Team } from '@game/shared';
 import { GameWorld } from '../../src/world/GameWorld.js';
 
 describe('WorldStore', () => {
   it('保存并恢复世界关键快照且隔离可变引用', () => {
     const store = new InMemoryWorldStore();
     const snapshot: WorldSnapshot = {
-      version: 1,
+      version: 2,
+      revision: 0,
       savedAt: Date.now(),
-      mapData: [{ id: 1, x: 0, y: 0, destinations: [], extra: { type: 'property', owners: ['p1'], ownerships: [{ playerId: 'p1', share: 1, purchasePrice: 100 }], level: 2, accumulatedValue: 300 } } as Cell],
-      mapMeta: { id: 'map', valueFieldDefinitions: [] } as never,
+      mapId: 'map',
       players: [{ id: 'p1', username: 'P1', teamId: 'team', position: { cellId: 1 }, values: {}, status: 'jail', createdAt: 1, lastActiveAt: 1, extra: { jail: { expiresAt: 123 } } } as Player],
       teams: [{ id: 'team', name: 'T', memberIds: ['p1'], disbanded: false } as Team],
+      runtime: { cells: [{ cellId: 1, state: { ownerships: [{ playerId: 'p1', share: 1, purchasePrice: 100 }], level: 2, accumulatedValue: 300 } }], regions: [] },
       era: { id: 'era', name: 'E', mapId: 'map', startedAt: 1, endsAt: 2, monumentRecords: [], settled: false } as EraInfo,
       taxRecords: { p1: [{ id: 'tax', playerId: 'p1', wealthTax: 1, propertyTax: 2, investmentTax: 3, totalTax: 6, timestamp: 1 }] },
     };
@@ -22,14 +23,14 @@ describe('WorldStore', () => {
     store.save(snapshot);
     const restored = store.load();
     expect(restored).toEqual(snapshot);
-    restored!.mapData[0].extra.owners = [];
-    expect(store.load()!.mapData[0].extra.owners).toEqual(['p1']);
+    restored!.runtime.cells[0].state.ownerships = [];
+    expect(store.load()!.runtime.cells[0].state.ownerships).toHaveLength(1);
   });
 
   it('使用文件存储跨实例恢复世界快照', () => {
     const directory = mkdtempSync(join(tmpdir(), 'world-store-'));
     const file = join(directory, 'world.json');
-    const snapshot = { version: 1, savedAt: 1, mapData: [], mapMeta: { id: 'map', valueFieldDefinitions: [] }, players: [], teams: [], era: null, taxRecords: {} } as WorldSnapshot;
+    const snapshot = { version: 2, revision: 0, savedAt: 1, mapId: 'map', runtime: { cells: [], regions: [] }, players: [], teams: [], era: null, taxRecords: {}, jailStates: {} } as WorldSnapshot;
     try {
       new FileWorldStore(file).save(snapshot);
       expect(new FileWorldStore(file).load()).toEqual(snapshot);
@@ -41,7 +42,7 @@ describe('WorldStore', () => {
   it('损坏主文件时回退到备份快照', () => {
     const directory = mkdtempSync(join(tmpdir(), 'world-store-'));
     const file = join(directory, 'world.json');
-    const snapshot = { version: 1, savedAt: 1, mapData: [], mapMeta: { id: 'map', valueFieldDefinitions: [] }, players: [], teams: [], era: null, taxRecords: {} } as WorldSnapshot;
+    const snapshot = { version: 2, revision: 0, savedAt: 1, mapId: 'map', runtime: { cells: [], regions: [] }, players: [], teams: [], era: null, taxRecords: {}, jailStates: {} } as WorldSnapshot;
     try {
       const store = new FileWorldStore(file);
       store.save(snapshot);

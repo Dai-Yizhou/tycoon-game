@@ -19,6 +19,18 @@
 - `packages/server/tests/state/WorldRuntimeStateStore.test.ts`：状态隔离、默认值、产权和区域值测试。
 - `packages/server/tests/storage/WorldStore-v2.test.ts`：v2 快照保存、读取和非法快照拒绝测试。
 
+### 已定设计约束
+
+- 纪念碑本次停靠修缮状态统一放入 `CellRuntimeState`，不新增独立 `monuments` Map。`repairedBy` 表示本次停靠已修缮的玩家，开始下一次停靠时由结算边界清除；`repairedAt` 仅作为审计时间，不参与是否可修缮判断。
+- `Cell.extra` 只保留静态扩展配置，不得保存产权、等级、累计价值、项目状态或纪念碑修缮状态。UCT 配置字段仍属于静态 `Cell` 顶层配置，不能混入运行时状态。
+- `SerializedWorldRuntimeState` 使用数组而非 JSON 对象键：`cells: Array<{ cellId, state }>`、`regions: Array<{ regionId, state }>`，避免数字键转换和原型对象问题；读取时拒绝重复 ID、未知 ID、非法数值和缺少必需字段。
+- 状态服务统一执行区域值的 `min/max` 截断；缺少字段按 0 处理，未声明字段拒绝写入。玩家值和区域值的字段约束来自 `valueFieldDefinitions`。
+- 一个 effect 的 `ops[]` 是原子结算单元：任一 op 失败，回滚该 effect 已完成的全部 op；不同 effect 之间不跨 effect 回滚。状态服务提供事务快照/恢复接口，行为引擎不得直接修改玩家、区域或格子状态。
+- 单实例运行时由 `GameWorld` 串行化状态写入；`WorldStore` 使用临时文件、备份和原子替换。v2 快照带 `revision`，保存时要求期望版本匹配；不宣称支持多实例并发，检测到版本冲突必须失败而非覆盖。
+- 产权购买使用静态 `price` UCT：单人购买金额按 `buyInMultiplier` 乘以完整 UCT 各字段，未配置时乘数为 1；`maxOwnerCount` 按实际持股玩家数量判断，达到上限即满员，不允许新股东进入。
+- `loseShare` 的 `cells` 与 `scope` 互斥；`cells` 可包含多个明确格子，`scope` 支持 `all`、`all-property`、`all-investment`。`acquireShare` 必须指定单个来源格，不接受 scope。
+- 税收记录保存完整 `uct`：基础税按 `rates.player[fieldId]` 逐字段计算，股份税按每股 `rates.player[fieldId]` 逐字段计算；免税阈值和最小值按字段应用，不能恢复 money 专用字段。
+
 ### 修改文件
 
 - `packages/server/src/world/GameWorld.ts`：持有并暴露运行时状态，加载地图时初始化，保存/恢复快照时接入状态。
@@ -81,11 +93,16 @@ export interface WorldRuntimeState {
   cells: Map<number, CellRuntimeState>;
   regions: Map<string, RegionRuntimeState>;
 }
+
+export interface SerializedWorldRuntimeState {
+  cells: Array<{ cellId: number; state: CellRuntimeState }>;
+  regions: Array<{ regionId: string; state: RegionRuntimeState }>;
+}
 ```
 
 提供 `createWorldRuntimeState(cellIds, regionIds)`，所有集合使用新实例。
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 运行：`npx jest tests/state/WorldRuntimeStateStore.test.ts --runInBand`
 
@@ -139,7 +156,7 @@ restore(snapshot: SerializedWorldRuntimeState): void;
 
 在 `GameWorld.loadMap()` 中根据地图格子 ID 和 `mapMeta.regions` 初始化状态；保留 `GameWorld.getRegionValue/changeRegionValue` 作为外部入口，但实现委托给状态服务。
 
-- [ ] **Step 5: 运行测试确认通过**
+- [x] **Step 5: 运行测试确认通过**
 
 运行：`npx jest tests/state/WorldRuntimeStateStore.test.ts --runInBand` 和 `npx tsc -p packages/server/tsconfig.json --noEmit`。
 
@@ -198,7 +215,7 @@ expect(runtimeState.getOwnerships(cell.id)).toHaveLength(1);
 
 - [ ] **Step 2: 迁移实现**
 
-纪念碑状态使用 `CellRuntimeState.repairedBy/repairedAt` 或独立 `monuments` Map；破产清算通过 `getOwnerships/replaceOwnerships` 清除产权，并在无股东时重置 level 和 accumulatedValue。
+纪念碑状态使用 `CellRuntimeState.repairedBy/repairedAt`；每次新的停靠结算开始时清除上一停靠的修缮标记，当前停靠期间第二次修缮必须拒绝。破产清算通过 `getOwnerships/replaceOwnerships` 清除产权，并在无股东时重置 level 和 accumulatedValue。
 
 - [ ] **Step 3: 统一结果类型**
 
@@ -236,6 +253,7 @@ expect(loaded?.runtime.cells[7].level).toBe(2);
 ```ts
 interface WorldSnapshotV2 {
   version: 2;
+  revision: number;
   savedAt: number;
   mapId: string;
   players: Player[];
@@ -247,7 +265,7 @@ interface WorldSnapshotV2 {
 }
 ```
 
-将 Map 序列化为数组，读取时校验版本、mapId、玩家、runtime cells/regions 和税收记录。
+将 Map 序列化为数组，读取时校验版本、revision、mapId、玩家、runtime cells/regions 和完整 UCT 税收记录。保存时要求调用方提供期望 revision；版本冲突直接失败，不覆盖其他实例写入。当前 `FileWorldStore` 明确只保证单进程串行写入，不实现跨实例锁。
 
 - [ ] **Step 3: 接入 GameWorld 保存与恢复**
 
@@ -293,7 +311,7 @@ interface WorldSnapshotV2 {
 
 - [ ] **Step 1: 先迁移行为操作测试**
 
-增加 ownership acquire/lose、position moveTo/teleport、region UCT 和真实 target 结果测试。
+增加 ownership acquire/lose、position moveTo/teleport、region UCT 和真实 target 结果测试。每个 op 从自身 `target` 解析目标；`loseShare` 覆盖单格、多格和三种 scope，`acquireShare` 拒绝 scope；所有 op 在一个 effect 事务内原子提交，失败完整回滚。
 
 - [ ] **Step 2: 删除 EventHandler 的旧随机回退**
 
@@ -312,6 +330,7 @@ interface WorldSnapshotV2 {
 - 地图静态配置在一局游戏中不被修改。
 - `Cell.extra` 不再保存产权、等级、累计价值、项目所有者或纪念碑修缮状态。
 - WorldStore v2 可在重启后恢复玩家、队伍、区域值、产权、等级、纪念碑状态、税收、监狱和时代。
+- WorldStore v2 使用数组序列化运行时 Map，并通过 revision 检测并发覆盖；状态写入遵守单实例串行约束。
 - 所有费用、收益和行为数值仍按完整 UCT 字段结算。
 - 行为 `value`、`ownership`、`position` 三类操作都通过统一状态/结算边界执行。
 - 生产代码不再引用旧随机事件注册表、旧事件效果处理器、旧投资事件入口或旧固定 UCT 字段。

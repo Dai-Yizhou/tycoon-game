@@ -16,11 +16,15 @@ const cell: Cell = {
   timezone: 0,
   price: { player: { money: -100, credit: -2 } },
   upgradeCost: [{ player: { money: -20, credit: -1 } }],
-  extra: { level: 1 },
+  extra: {},
 };
+
+const runtime = {
+  getCellState: () => ({ ownerships: [], level: 1, accumulatedValue: 0 }),
+} as never;
 
 describe('Ownership v2', () => {
   it('calculates accumulated value from every player UCT field', () => {
-    expect(getAccumulatedValue(cell)).toBe(123);
+    expect(getAccumulatedValue(cell, runtime)).toBe(123);
   });
 });
