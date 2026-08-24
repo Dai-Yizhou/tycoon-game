@@ -39,8 +39,8 @@
 - 地图在 map-meta 中**约定当前地图使用的数值字段**（单玩家字段 + 区域字段），决定通用费用类型的字段全集：
 
 ```jsonc
-// map-meta.json 中的约定（示例）
-"extra": { "player": ["money", "credit", "env"], "region": ["pros"] }
+// map-meta.json 中的约定（示例）：uct 键声明 UCT 字段全集
+"uct": { "player": ["money", "credit", "env"], "region": ["pros"] }
 ```
 
 - 由此推导的 UCT 形状：
@@ -162,7 +162,7 @@
     { "id": "pros",   "name": { "zh-CN": "繁荣", "en-US": "Prosperity" }, "scope": "region", "min": 0, "max": 100 }
   ],
   // 通用费用类型字段全集约定（UCT 可出现哪些键，与 valueFieldDefinitions 一并校验）
-  "extra": { "player": ["money", "credit", "env"], "region": ["pros"] },
+  "uct": { "player": ["money", "credit", "env"], "region": ["pros"] },
 
   // —— 玩家初始状态（UCT，仅 player 键）+ 初始格 ——
   "playerInitial": { "player": { "money": 1000, "credit": 50, "env": 10 } },
@@ -179,17 +179,11 @@
 
   // —— 计时/税率配置（顶层显式，替代原 config 子对象）——
   "dice":    { "cooldownMs": 5000, "min": 1, "max": 3 },
-  "jail":    { "cooldownMs": 10000, "durationTurns": 3 },
-  "tax": {
-    "wealthTaxRate": 0.02,           // 财产税率（小数）
-    "propertyTaxRate": 0.01,         // 地产税率（小数）
-    "investmentTaxRate": 0.015,      // 投资税率（小数）
-    "minWealthForTax": 1000,         // 财产免税阈值
-    "minPropertyValueForTax": 500,   // 地产免税阈值
-    "taxInterval": 900000            // 计税周期（毫秒，通常等于一昼夜）
-  },
-  // 合租参数（原 config.ownership；startBonus/passBonus 等格子行为参数改在对应格子 map.json 声明，不再放全局）
-  "ownership": { "buyInMultiplier": 1, "maxShareholders": 8 }
+  "tax": {                            // 计税：税基=玩家 UCT 各 player 字段，逐字段征税率（见 §3.3）
+    "rates":       { "money": 0.02, "credit": 0.01 },  // 字段→税率（小数）；未列字段不征
+    "exemptBelow": { "money": 1000 },                  // 字段低于该值免税
+    "taxInterval": 900000                              // 计税周期（毫秒，通常等于一昼夜）
+  }
 }
 ```
 
@@ -217,7 +211,8 @@
   "timezone": -60,                        // UTC 偏移分钟（字面量，不写表达式）
 
   // —— 类型相关费用字段（均为 UCT，符号写在数据里，代码统一 +=）——
-  "maxOwnerCount": 5,
+  "maxOwnerCount": 5,   // property/investment 最大持股人数
+  "buyInMultiplier": 1,  // property/investment 合租买入乘数（可选）；单人持股价 = price×乘数
   "price":  { "player": { "money": -10, "credit": -2 } },   // property/investment 购买支付（负号）
   "maxLevel": 3,
   "rent": [ { "player": { "money": -1 } }, { "player": { "money": -2 } }, { "player": { "money": -3 } }, { "player": { "money": -4 } } ],   // property：踩中者支付（负号）
@@ -239,6 +234,7 @@
 
 - 运行时在 schema 校验后**补零**成完整 UCT（结构零元，非行为回退），仅保留 map-meta 声明过的字段。
 - **运算**：对目标对象逐字段 `field += uct.field`（单玩家字段 → 目标玩家；区域字段 → 目标区域），随后按 `valueFieldDefinitions` 的 `[min,max]` 截断。
+- **计税（UCT）**：税基 = 玩家 UCT 各 player 字段。对每个字段，若 `tax.rates` 未列则不征；若 `tax.exemptBelow[field]` 存在且当前值低于该阈值亦免。对应征字段 `tax扣减 = floor(current × rate)`，以负增量 `+=` 应用（代码统一 `+=`），逐字段扣减且不低于 `min`。不再有基于持股资产的"地产/投资资产税"。
 - **符号**：**代码层统一加号**，**正负号由配置数据承载**。允许同一 UCT 内混合符号（如 `repairCost` 的 money 负、credit 正），这是预期用法，schema **不拒绝**。仅当字段不在 UCT 全集或类型不符时报错。
 - **股份分配**：分红/扣款时逐单玩家字段 `owner.field += floor(delta.field × share)`（`floor` 保留 `delta.field` 符号）；区域字段不按股比拆分。
 
@@ -325,7 +321,7 @@
   - `map-parser.ts`：提取 `teleportDestinations/behaviorPass/behaviorLand/regionId` 为顶层字段（不入 `extra`、不重复存区域 i18n）；**先吃 map-meta** 的 UCT 契约再解析格子；schema 校验器。
   - 初始状态构造：玩家 `player.values` 自 `playerInitial`（UCT，player 键），各区域初始值自 `regions[].initial`；`valueFieldDefinitions` 仅作字段架构（`min/max` 用于截断），不再承载 `current`。
 - **服务端**：
-  - `map-meta-loader` 先加载：暴露 UCT 全集、`playerInitial` 与 `regions[].initial` 初始值、region 框架，以及顶层 `dice/jail/tax/ownership` 配置。
+  - `map-meta-loader` 先加载：暴露 UCT 全集、`playerInitial` 与 `regions[].initial` 初始值、region 框架，以及顶层 `dice/tax` 配置。
   - `BehaviorEngine`：UCT 化 Evaluate（逐字段 `+=`，不再区分方向）、4 态目标、`ops` 数组 + exclusive 容斥（独立/互斥分开触发）、运行时引用求值器、白名单解析器。
   - `MovementHandler`：经过钩子走路径按序 + 踩中分发器（`settleLanding`）。
   - `propertyHandler`：不持股者踩中支付 → 股东按股比分配（逐字段 `floor`，保留符号）→ 排除禁用收款。
@@ -347,7 +343,7 @@
 | Q2 | 能否在 JSON 引用运行时变量（信用参与概率、取最近玩家位置） | **能**。受限 `$ref` 表达式 + 白名单解析器（`$actor/$target/$map/$cell/$region`、字段读取、受限算术、`$nearestPlayer` 等），仅服务端求值 | §4 |
 | Q3 | investment 的条件触发如何建模（任意玩家踩 event 分红 / 持股人破产扣款） | **格内声明触发器** `investmentTriggers[]`，订阅全局域事件（`on`）；作用股东集合**固化**为「全部持有股份且未被禁用收款」（破产即失股、天然排除），`delta` 为 UCT 总值按股拆 | §2.5 / §3.2 |
 | Q4 | effects.op 如何携带三类操作 | 每效果可**同时携带多种类型**：`ops[]` 数组，每项 `{type: value|ownership|position}` + 细分 `action` 与参数；数值/股比/目标格均可 `$ref` | §3.4 |
-| Q5 | map-meta.json 的写法 | 顶层含 `id/version/templateName/name`、`valueFieldDefinitions`（字段架构：`id/name(i18n)/scope/min/max`，**不含 current**）、`extra`（UCT 字段约定）、`playerInitial`（玩家初始 UCT）+ `startCellId`、`regions[]`（每行含 `initial` 区域 UCT，**不记 cellIds/color**）、顶层 `dice/jail/tax/ownership` 配置 | §3.1 |
+| Q5 | map-meta.json 的写法 | 顶层含 `id/version/templateName/name`、`valueFieldDefinitions`（字段架构：`id/name(i18n)/scope/min/max`，**不含 current**）、`uct`（UCT 字段约定）、`playerInitial`（玩家初始 UCT）+ `startCellId`、`regions[]`（每行含 `initial` 区域 UCT，**不记 cellIds/color**）、顶层 `dice/tax` 配置 | §3.1 |
 | 容斥 | event 多效果的容斥/选中方式 | 每个效果 `weight` 之外带 `exclusive`（bool）：「独立计算」的各自独立判定；「互斥计算」的分组归一后仅命中其一；两类**分开触发** | §3.4 / §1.4 |
 
 > 「符号/方向」专项决策：**代码层对 UCT 统一 `field += uct.field`（加号），正负号由配置数据承载**；允许同一 UCT 内混合符号，schema 不拒绝。删除原 `direction` 字段（方向已内嵌于符号）。
@@ -359,7 +355,7 @@
 ### 通用
 - [ ] map-meta → map.json 按 UCT 契约解析；字段全集一致。
 - [ ] 初始状态来源单一不重复：玩家 `player.values` 自 `playerInitial`（player 键）、各区域自 `regions[].initial`（region 键）；`valueFieldDefinitions` 仅架构（`min/max`）不再承载 `current`；`regions[]` 无 `cellIds`/`color`。
-- [ ] 顶层 `dice/jail/tax/ownership` 配置齐全且合法（税率为 [0,1] 小数、`taxInterval` 为正、免税阈值为非负数，缺失非法阻止加载）。
+- [ ] 顶层 `dice/tax` 配置齐全且合法：`dice.min ≤ dice.max`；`tax.rates` 各键均在 UCT 全集内且值为 [0,1] 小数、`tax.exemptBelow` 为可选非负阈值、`tax.taxInterval` 为正；缺失非法阻止加载。
 - [ ] UCT 校验：缺失键补 0（零元）；未声明字段不出现；`ops[].value.delta` 字段在 UCT 内；字段值带符号且合法数值。
 - [ ] UCT 应用：逐字段 `+=` 后按 `valueFieldDefinitions.[min,max]` 截断；`floor` 保留符号。
 - [ ] `behavior*`/`teleportDestinations`/`investmentTriggers.on` 指向无效 → 快速失败。
