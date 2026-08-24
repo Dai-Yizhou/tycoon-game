@@ -111,17 +111,15 @@
 ```jsonc
 "investmentTriggers": [
   { "id": "div-on-event",
-    "on": "any-player-lands-event",         // 任意玩家踩中任意 event 格
-    "shareholders": "all-not-banned",        // 作用股东范围
-    "delta": { "player": { "money": 5, "env": 1 }, "region": { "pros": 1 } } },   // 正号=分红（股东收益为加）
+    "on": "any-player-lands-event",          // 任意玩家踩中任意 event 格
+    "delta": { "player": { "money": 5, "env": 1 }, "region": { "pros": 1 } } },   // 正号=分红；作用=全部持股且未被禁用收款股东
   { "id": "loss-on-bankrupt",
     "on": "shareholder-bankrupt",            // 任意持股人破产
-    "shareholders": "remaining-not-banned",  // 剩余未被禁用收款的股东
-    "delta": { "player": { "money": -3 } } } ]                                  // 负号=扣款（股东收益为减）
+    "delta": { "player": { "money": -3 } } } ]                                    // 负号=扣款（对剩余股东）
 ```
   - `on`：触发条件（如 `any-player-lands-event`、`shareholder-bankrupt`），由服务端**域事件**驱动（踩中 event / 破产）。
-  - `shareholders`：作用股东范围（`all-not-banned` / `remaining-not-banned`）。
-  - `delta`：UCT，**符号写在数据里**（正=分红、负=扣款）；按股东持股比例拆分 `owner.field += floor(delta.field×share)`，逐字段同一股比。**不再用 `direction` 字段**（方向已内嵌于符号）。
+  - **作用股东集合（固化）**：**全部持有股份且未被禁用收款的股东**。不再提供 `shareholders` 枚举——破产玩家已立刻失去全部股份，天然被排除；`jail` 玩家仍持股但禁用收款，同样被排除。
+  - `delta`：UCT，**符号写在数据里**（正=分红、负=扣款）；对上述集合按持股比例拆分 `owner.field += floor(delta.field×share)`，逐字段同一股比。**不再用 `direction` 字段**（方向已内嵌于符号）。
   - 机制接口 `InvestmentHandler.triggerInvestmentEvent` **泛化为"域事件 → 投资订阅"分发**。
 
 ### 2.6 `jail`
@@ -154,24 +152,49 @@
   "version": "1.0.0",
   "templateName": "tycoon",
   "name": { "zh-CN": "示例地图", "en-US": "Demo Map" },
-  // 数值字段全集（同时是"通用费用类型"的字段来源）
+
+  // —— 数值字段架构（UCT 的字段全集来源）——
+  // 仅声明字段 id/scope/min/max，不含 current：初始值由 playerInitial 与各区域行 initial 提供
   "valueFieldDefinitions": [
-    { "id": "money", "name": { "zh-CN": "财产", "en-US": "Money" }, "scope": "player", "current": 1000, "min": 0 },
-    { "id": "credit", "name": { "zh-CN": "信用", "en-US": "Credit" }, "scope": "player", "current": 50,  "min": 0 },
-    { "id": "env",    "name": { "zh-CN": "环保", "en-US": "Env" }, "scope": "player", "current": 10,  "min": 0 },
-    { "id": "pros",   "name": { "zh-CN": "繁荣", "en-US": "Prosperity" }, "scope": "region", "current": 50,  "min": 0, "max": 100 }
+    { "id": "money",  "name": { "zh-CN": "财产", "en-US": "Money"      }, "scope": "player", "min": 0 },
+    { "id": "credit", "name": { "zh-CN": "信用", "en-US": "Credit"     }, "scope": "player", "min": 0 },
+    { "id": "env",    "name": { "zh-CN": "环保", "en-US": "Env"        }, "scope": "player", "min": 0 },
+    { "id": "pros",   "name": { "zh-CN": "繁荣", "en-US": "Prosperity" }, "scope": "region", "min": 0, "max": 100 }
   ],
-  // 通用费用类型字段约定（与 valueFieldDefinitions 一并解析）
+  // 通用费用类型字段全集约定（UCT 可出现哪些键，与 valueFieldDefinitions 一并校验）
   "extra": { "player": ["money", "credit", "env"], "region": ["pros"] },
+
+  // —— 玩家初始状态（UCT，仅 player 键）+ 初始格 ——
+  "playerInitial": { "player": { "money": 1000, "credit": 50, "env": 10 } },
+  "startCellId": 0,
+
+  // —— 区域表：每行携带自身初始状态（UCT，仅 region 键）——
+  // 不再重复记录所辖格子（由各格 regionId 聚合），也无区域颜色概念
   "regions": [
-    { "id": "r1", "name": { "zh-CN": "东区", "en-US": "East" }, "cellIds": [0, 1, 2], "prosperity": 50 }
+    { "id": "r1", "name": { "zh-CN": "东区", "en-US": "East" }, "initial": { "region": { "pros": 50 } } }
   ],
+
+  // —— 昼夜周期（分钟）——
   "dayNightCycle": 24,
-  "startCellId": 0
+
+  // —— 计时/税率配置（顶层显式，替代原 config 子对象）——
+  "dice":    { "cooldownMs": 5000, "min": 1, "max": 3 },
+  "jail":    { "cooldownMs": 10000, "durationTurns": 3 },
+  "tax": {
+    "wealthTaxRate": 0.02,           // 财产税率（小数）
+    "propertyTaxRate": 0.01,         // 地产税率（小数）
+    "investmentTaxRate": 0.015,      // 投资税率（小数）
+    "minWealthForTax": 1000,         // 财产免税阈值
+    "minPropertyValueForTax": 500,   // 地产免税阈值
+    "taxInterval": 900000            // 计税周期（毫秒，通常等于一昼夜）
+  },
+  // 合租参数（原 config.ownership；startBonus/passBonus 等格子行为参数改在对应格子 map.json 声明，不再放全局）
+  "ownership": { "buyInMultiplier": 1, "maxShareholders": 8 }
 }
 ```
 
 > 解析顺序：**先解析 map-meta**，取得 UCT 字段全集，**再按此约定解析 map.json 格子的字段**。与某格子不相关的字段运行时不会读取。
+> 初始值来源（单一、不重复）：**玩家初始 = 顶层 `playerInitial`（UCT，仅 player 键）**；**各区域初始 = `regions[].initial`（UCT，仅 region 键）**；`valueFieldDefinitions` 仅作字段架构（`min/max` 用于数值截断），**不再承载 current**。
 
 ### 3.2 map.json（每格固定字段 + 类型相关费用字段）【修正2·已定】
 
@@ -201,11 +224,11 @@
   "upgradeCost": [ { "player": { "money": -1 } }, { "player": { "money": -2 } }, { "player": { "money": -3 } } ],   // property 升级支付（负号）
   "repairCost": { "player": { "money": -20, "credit": 5 }, "region": { "pros": 10 } },   // monument：扣钱 + 加信用 + 升区域繁荣（符号内嵌）；踩中仅可修缮一次
   "jailCooldown": 8000, "jailCost": { "player": { "credit": -3 } },   // jail：扣信用
-  "investmentTriggers": [                 // 仅 investment：条件触发（格内声明触发器，见 §2.5）
+  "investmentTriggers": [                 // 仅 investment：条件触发（格内声明触发器，见 §2.5）；作用=全部持股且未被禁用收款股东
     { "id": "div-on-event",   "on": "any-player-lands-event",
-      "shareholders": "all-not-banned",        "delta": { "player": { "money": 5, "env": 1 }, "region": { "pros": 1 } } },
+      "delta": { "player": { "money": 5, "env": 1 }, "region": { "pros": 1 } } },
     { "id": "loss-on-bankrupt", "on": "shareholder-bankrupt",
-      "shareholders": "remaining-not-banned",  "delta": { "player": { "money": -3 } } }
+      "delta": { "player": { "money": -3 } } }
   ]
 }
 ```
@@ -300,8 +323,9 @@
 - **共享层 `@game/shared`**：
   - `types`：新增 UCT、新增/改名 `CellTypes.supply`；`Cell` 增 `teleportDestinations`、`behaviorPass`、`behaviorLand`、`regionId`（原 `region` 名称改为引用 map-meta）；`destinations` 注释改"有向边"。
   - `map-parser.ts`：提取 `teleportDestinations/behaviorPass/behaviorLand/regionId` 为顶层字段（不入 `extra`、不重复存区域 i18n）；**先吃 map-meta** 的 UCT 契约再解析格子；schema 校验器。
+  - 初始状态构造：玩家 `player.values` 自 `playerInitial`（UCT，player 键），各区域初始值自 `regions[].initial`；`valueFieldDefinitions` 仅作字段架构（`min/max` 用于截断），不再承载 `current`。
 - **服务端**：
-  - `map-meta-loader` 先加载，暴露 UCT 全集与 region 框架。
+  - `map-meta-loader` 先加载：暴露 UCT 全集、`playerInitial` 与 `regions[].initial` 初始值、region 框架，以及顶层 `dice/jail/tax/ownership` 配置。
   - `BehaviorEngine`：UCT 化 Evaluate（逐字段 `+=`，不再区分方向）、4 态目标、`ops` 数组 + exclusive 容斥（独立/互斥分开触发）、运行时引用求值器、白名单解析器。
   - `MovementHandler`：经过钩子走路径按序 + 踩中分发器（`settleLanding`）。
   - `propertyHandler`：不持股者踩中支付 → 股东按股比分配（逐字段 `floor`，保留符号）→ 排除禁用收款。
@@ -321,9 +345,9 @@
 |---|---|---|---|
 | Q1 | 能否省略与当前格子无关的 UCT 键以省内存 | **能**。允许稀疏省略，缺省字段按 0 处理（UCT 零元，非行为回退）；运行时只读取 map-meta 声明过的字段 | §1.2 / §3.3 |
 | Q2 | 能否在 JSON 引用运行时变量（信用参与概率、取最近玩家位置） | **能**。受限 `$ref` 表达式 + 白名单解析器（`$actor/$target/$map/$cell/$region`、字段读取、受限算术、`$nearestPlayer` 等），仅服务端求值 | §4 |
-| Q3 | investment 的条件触发如何建模（任意玩家踩 event 分红 / 持股人破产扣款） | **格内声明触发器** `investmentTriggers[]`，订阅全局域事件（`on`），`shareholders` 指定作用股东范围，`delta` 为 UCT 总值按股拆 | §2.5 / §3.2 |
+| Q3 | investment 的条件触发如何建模（任意玩家踩 event 分红 / 持股人破产扣款） | **格内声明触发器** `investmentTriggers[]`，订阅全局域事件（`on`）；作用股东集合**固化**为「全部持有股份且未被禁用收款」（破产即失股、天然排除），`delta` 为 UCT 总值按股拆 | §2.5 / §3.2 |
 | Q4 | effects.op 如何携带三类操作 | 每效果可**同时携带多种类型**：`ops[]` 数组，每项 `{type: value|ownership|position}` + 细分 `action` 与参数；数值/股比/目标格均可 `$ref` | §3.4 |
-| Q5 | map-meta.json 的写法 | 顶层含 `id/version/templateName/name`、`valueFieldDefinitions`（全字段 + scope/current/min/max，`name` 为 i18n）、`extra`（UCT 字段约定）、`regions`、`startCellId` | §3.1 |
+| Q5 | map-meta.json 的写法 | 顶层含 `id/version/templateName/name`、`valueFieldDefinitions`（字段架构：`id/name(i18n)/scope/min/max`，**不含 current**）、`extra`（UCT 字段约定）、`playerInitial`（玩家初始 UCT）+ `startCellId`、`regions[]`（每行含 `initial` 区域 UCT，**不记 cellIds/color**）、顶层 `dice/jail/tax/ownership` 配置 | §3.1 |
 | 容斥 | event 多效果的容斥/选中方式 | 每个效果 `weight` 之外带 `exclusive`（bool）：「独立计算」的各自独立判定；「互斥计算」的分组归一后仅命中其一；两类**分开触发** | §3.4 / §1.4 |
 
 > 「符号/方向」专项决策：**代码层对 UCT 统一 `field += uct.field`（加号），正负号由配置数据承载**；允许同一 UCT 内混合符号，schema 不拒绝。删除原 `direction` 字段（方向已内嵌于符号）。
@@ -334,6 +358,8 @@
 
 ### 通用
 - [ ] map-meta → map.json 按 UCT 契约解析；字段全集一致。
+- [ ] 初始状态来源单一不重复：玩家 `player.values` 自 `playerInitial`（player 键）、各区域自 `regions[].initial`（region 键）；`valueFieldDefinitions` 仅架构（`min/max`）不再承载 `current`；`regions[]` 无 `cellIds`/`color`。
+- [ ] 顶层 `dice/jail/tax/ownership` 配置齐全且合法（税率为 [0,1] 小数、`taxInterval` 为正、免税阈值为非负数，缺失非法阻止加载）。
 - [ ] UCT 校验：缺失键补 0（零元）；未声明字段不出现；`ops[].value.delta` 字段在 UCT 内；字段值带符号且合法数值。
 - [ ] UCT 应用：逐字段 `+=` 后按 `valueFieldDefinitions.[min,max]` 截断；`floor` 保留符号。
 - [ ] `behavior*`/`teleportDestinations`/`investmentTriggers.on` 指向无效 → 快速失败。
