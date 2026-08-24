@@ -65,11 +65,11 @@
 
 ### 1.4 行为目标与操作（BehaviorEngine 契约）
 
-- **目标 `target`**：`single`（触发者）| `team`（触发者队伍）| `region`（触发者所在区域全部玩家）| `globe`（全部玩家）。`target` **必填，无默认掩盖**；`region`/`globe` 展开为玩家列表，逐个按 `ops` 应用。
 - **操作 `ops`**（数组，每效果可**同时携带多种类型**，见 §3.4）：
   - `value`：对一个 UCT 做数值增减（代码统一 `+=`，符号在数据里），作用于解析后的目标玩家/区域。
   - `ownership`：股份持有权变更（`acquireShare`/`loseShare`），需额外数据。
   - `position`：位置变更（`moveTo`/`teleport`），需额外数据。
+  - **目标 `target`**：`single`（触发者 = `$actor`）| `team`（触发者队伍）| `region`（触发者触发时所在区域全部玩家）| `globe`（全部玩家）|`{"$ref":"…"}`（运行时变量）。`target` **必填，无默认掩盖**；`region`/`globe` 展开为玩家列表，逐个按 `op` 应用。
 - **效果选中（【已决】独立/互斥两类分开触发）**：每效果含 `weight`(可为 `number | {$ref}`) 与 `exclusive`(bool)。
   - `exclusive:false`（缺省）＝独立，各按 `weight`（可为 `$ref`）独立判定，可同时命中多个；
   - `exclusive:true`＝互斥，同组归一后仅命中其一；
@@ -136,9 +136,9 @@
 
 ### 2.8 `event`
 - **触发（踩中）**：对 `behaviorLand` 行为 JSON 的 `effects` 按**独立/互斥两类分开**执行选中：先独立效果（`exclusive:false` 各按 `weight` 独立判定，可多命中），再互斥分组（`exclusive:true` 归一后仅命中其一）。
-- **目标**：`single/team/region/globe`；**操作**：每个命中的效果执行其 `ops[]`，可同时含 `value`(UCT)/`ownership`/`position`。
+- **操作**：每个命中的效果执行其 `ops[]`，可同时含 `value`(UCT)/`ownership`/`position`。**操作目标**：`single/team/region/globe/{"$ref":""}`。
 - **配置**：`behaviorLand`。
-- **澄清**：已实现但需按新契约核对（target 四态、`ops` 数组 + exclusive 容斥、UCT 字段ID驱动、无静默回退）。`position`的参数含义是：`moveTo`：沿有向边走动到目标格（会触发途经格的 `behaviorPass` 经过钩子）；`teleport`：瞬移到目标格（不触发经过钩子，到达后作为一次新的"踩中"结算 `behaviorLand`/原生逻辑）。
+- **澄清**：已实现但需按新契约核对（`ops` 数组 + exclusive 容斥、UCT 字段ID驱动、无静默回退）。`position`的参数含义是：`moveTo`：沿有向边走动到目标格（会触发途经格的 `behaviorPass` 经过钩子）；`teleport`：瞬移到目标格（不触发经过钩子，到达后作为一次新的"踩中"结算 `behaviorLand`/原生逻辑）。
 
 ---
 
@@ -150,7 +150,6 @@
 {
   "id": "map-demo",
   "version": "1.0.0",
-  "templateName": "tycoon",
   "name": { "zh-CN": "示例地图", "en-US": "Demo Map" },
 
   // —— 数值字段架构（UCT 的字段全集来源）——
@@ -178,12 +177,20 @@
   "dayNightCycle": 24,
 
   // —— 计时/税率配置（顶层显式，替代原 config 子对象）——
-  "dice":    { "cooldownMs": 5000, "min": 1, "max": 3 },
-  "tax": {                            // 计税：税基=玩家 UCT 各 player 字段，逐字段征税率（见 §3.3）
-    "rates":       { "money": 0.02, "credit": 0.01 },  // 字段→税率（小数）；未列字段不征
-    "exemptBelow": { "money": 1000 },                  // 字段低于该值免税
-    "taxInterval": 900000                              // 计税周期（毫秒，通常等于一昼夜）
+  "dice":    { "cooldownMs": 3000, "min": 1, "max": 3 },
+  // —— map-meta.json 顶层 tax（新增 shares 段）——
+  "tax": {
+    "baseTax": {
+      "rates": {"player": { "money": 0.02, "credit": 0.01 }},   // 逐字段税率；未列字段不征
+      "exemptBelow": {"player": { "money": 1000 }},                   // 字段低于该值免税
+      "taxInterval": 900000,                              // 计税周期（毫秒）
+    },
+    "shareTax": {                                          // 按股份数量计税
+      "rates": {"player": {"money": 10, "env": 1}},                                  // 每股应税额
+      "exemptBelow": 0,                                   // 总持股量低于该值免股份税（缺省 0=不免）
+      "taxInterval": 900000
   }
+}
 }
 ```
 
@@ -245,25 +252,39 @@
   "id": "event-example",
   "effects": [
     {
-      "target": "team",           // single|team|region|globe（必填，无默认掩盖）
       "weight": 0.4,              // [0,1] 小数 或 {"$ref": ...}；见「容斥」判定
       "exclusive": true,          // 容斥分组：true=互斥（组内归一、仅命中其一），false/缺省=独立（各自独立判定）
+      // target 已下移到每个 op
       "msg": { "zh-CN": "", "en-US": "" },
       "ops": [                    // 允许同时携带多种类型的效果（数组）
-        { "type": "value",        // value：UCT 数值增减，代码 +=，符号在数据/引用求值结果里
-          "delta": { "player": { "money": { "$ref": "$actor.money" }, "env": -5 }, "region": { "pros": 1 } } },
-        { "type": "ownership", "action": "loseshare",     // ownership：acquireShare | loseShare
-          "cellId": { "$ref": "$cell.id" }, "share": 0.1 },  // share: number | {$ref}
-        { "type": "position", "action": "teleport",          // position：moveTo | teleport
-          "cellId": { "$ref": "$nearestPlayer.cellId" } }    // cellId: number | {$ref}
+        {
+          "type": "value",        // value：UCT 数值增减，代码 +=，符号在数据/引用求值结果里
+          "target": "team",       // 必填：single|team|region|globe（keyword），或 {"$ref": 指向某玩家}
+          "delta": { "player": { "money": { "$ref": "$actor.money" }, "env": -5 }, "region": { "pros": 1 } }
+        },
+        {
+          "type": "ownership",
+          "target": { "$ref": "$randomShareholder" },   // 目标玩家：可由 $ref 指定其它/任一股东
+          "action": "loseshare",                        // acquireShare | loseShare
+          "cells": [
+            { "$ref": "$cell.id" }
+          ]
+        },
+        {
+          "type": "position",
+          "target": { "$ref": "$nearestPlayer" },       // 作用于「最近玩家」，实现“影响其他玩家”
+          "action": "teleport",                         // moveTo | teleport
+          "cellId": { "$ref": "$nearestPlayer.cellId" }
+        }
       ]
     },
     {
-      "target": "single",
       "weight": 0.6,
-      "exclusive": true,          // 与上一条同为 exclusive:true，故同组互斥
+      "exclusive": true,
       "msg": { "zh-CN": "", "en-US": "" },
-      "ops": [ { "type": "value", "delta": { "player": { "money": -20 } } } ]
+      "ops": [
+        { "type": "value", "target": "single", "delta": { "player": { "money": -20 } } }
+      ]
     }
   ]
 }
@@ -286,6 +307,39 @@
 - **位置**：`ops[].type=position` 给定目标格，可经白名单解析器引用（如 `$nearestPlayer`）。
 
 - **运行时引用 `{$ref:"<path>"}`**：在**求值时**解析到运行时上下文（见 §4）。
+
+**股份所有权操作**
+- scope 全量：忽略 cells，枚举 target 玩家在 scope 范围内持有的全部股份并全部失去：
+  - "all"：property + investment 的所有持股；
+  - "all-property"：仅地产格；
+  - "all-investment"：仅投资格。
+- scope 与 cellId/cells 互斥（同时出现=配置错误，快速失败）。
+- acquireShare 无需 scope（获股必须有明确来源格，不适用全量）。
+- target 仍是 op 级（keyword 或 {$ref}），表示"谁"失去；cells/scope 表示"哪些地产"。
+```jsonc
+{
+  // —— 定位方式三选一，作用于 ops.target 玩家 ——
+  "type": "ownership",
+
+  // 方式1：单格（原样），share 省略=失去 target 在该格的全部股份
+  "action": "loseshare",                 // acquireShare | loseshare
+  "cells": [
+    { "$ref": "$cell.id" }
+  ],
+
+  "type": "ownership",
+  "action": "loseshare",
+  "cells": [                             // 方式1：多格数组，逐格失去
+    { "cellId": 3 },  // 失去 3 号格
+    { "cellId": 6 },  // 失去 6 号格
+    { "cellId": { "$ref": "$cell.id" } }  // share 可 $ref
+  ],
+
+  "type": "ownership",
+  "action": "loseshare",
+  "scope": "all-property"                // 方式2：全量范围，失去 target 持有的全部该类股份
+};                                       // scope ∈ "all" | "all-property" | "all-investment"
+```
 
 ---
 
