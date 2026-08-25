@@ -14,7 +14,7 @@ import { startServerPathAnimation } from './MovementSystem.js';
 import { requestHudRefresh } from '../ClientHudBridge.js';
 import type { GameController } from '../GameController.js';
 import { GameStore } from '../../state/GameStore.js';
-import type { MapIndex } from '@game/shared';
+import type { MapIndex, Player } from '@game/shared';
 
 const registeredSockets = new WeakSet<TypedClientSocket>();
 const eventObservers = new WeakMap<TypedClientSocket, (event: string) => void>();
@@ -127,7 +127,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 
   socket.on('server.playerRestarted', (payload) => {
     if (payload.playerId === store.getSnapshot().currentPlayer?.id) {
-      store.applySnapshot({ sequence: store.nextSequence(), currentPlayer: payload.player, isBankrupt: false, isInJail: false, currentPlayerPosition: payload.player.position.cellId, currentMoney: payload.player.values.money?.current ?? 0, currentCredit: payload.player.values.credit?.current ?? 0 });
+      store.applySnapshot({ sequence: store.nextSequence(), currentPlayer: payload.player, isBankrupt: false, isInJail: false, currentPlayerPosition: payload.player.position.cellId });
       options.controller?.setRestarted(payload.player);
     }
     requestHudRefresh();
@@ -148,19 +148,21 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     }
   });
 
-  // 监听其他玩家事件
-  socket.on('server.playerJoined', (payload: { id: string; username: string; position?: { cellId: number }; status?: string; values?: { money?: { current?: number } } }) => {
+  // 监听其他玩家事件（payload 为服务端权威 Player，字段由 valueFieldDefinitions 动态定义）
+  socket.on('server.playerJoined', (payload: Player) => {
     // 添加新玩家或更新已有玩家（重连场景）
     const currentPlayers = store.getSnapshot().otherPlayers;
     const existingIndex = currentPlayers.findIndex(p => p.id === payload.id);
-    const playerMoney = payload.values?.money?.current ?? 2000;
     if (payload.status === 'frozen') return;
+    // primaryValue 仅为 UI 展示投影，非业务数值来源：取该玩家第一个可用 UCT 字段，不写死 `money`/不捏造默认值
+    const fieldIds = payload.values ? Object.keys(payload.values) : [];
+    const primaryField = fieldIds.length > 0 ? payload.values[fieldIds[0]!] : undefined;
     const playerData: OtherPlayerInfo = {
       id: payload.id,
       username: payload.username,
       position: { cellId: payload.position?.cellId || 0 },
       status: (payload.status as OtherPlayerInfo['status']) || 'normal',
-      primaryValue: playerMoney,
+      primaryValue: primaryField ? primaryField.current ?? 0 : 0,
     };
     const nextPlayers = [...currentPlayers];
     if (existingIndex === -1) {

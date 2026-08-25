@@ -20,7 +20,6 @@ describe('GameStore authority', () => {
     store.applyEvent({ sequence: 2, type: 'value', playerId: 'p1', fieldId: 'money', current: 250 });
 
     expect(player.values.money.current).toBe(100);
-    expect(store.getSnapshot().currentMoney).toBe(250);
     expect(store.getSnapshot().currentPlayer?.values.money.current).toBe(250);
   });
 
@@ -68,8 +67,6 @@ describe('GameStore authority', () => {
     expect(viewModel.getPlayer()).toMatchObject({
       currentPlayer: { id: 'player-1' },
       currentPlayerPosition: 8,
-      currentMoney: 900,
-      currentCredit: 40,
       currentPlayerName: '权威玩家',
     });
   });
@@ -157,7 +154,7 @@ describe('GameStore authority', () => {
     store.applyEvent({ sequence: 3, type: 'value', playerId: 'self', fieldId: 'money', current: 250 });
     store.applyEvent({ sequence: 4, type: 'value', playerId: 'other', fieldId: 'money', current: 120 });
 
-    expect(store.getSnapshot().currentMoney).toBe(250);
+    expect(store.getSnapshot().currentPlayer?.values.money.current).toBe(250);
     expect(store.getSnapshot().otherPlayers[0].primaryValue).toBe(120);
   });
 
@@ -200,7 +197,7 @@ describe('GameStore authority', () => {
     store.applyEvent({ sequence: 2, type: 'value', playerId: 'p1', fieldId: 'money', current: 700 });
     store.applyEvent({ sequence: 3, type: 'value', playerId: 'p1', fieldId: 'money', current: 700 });
 
-    expect(store.getSnapshot().currentMoney).toBe(700);
+    expect(store.getSnapshot().currentPlayer?.values.money.current).toBe(700);
   });
 
   it('保存客户端交互状态而不依赖模块级变量', () => {

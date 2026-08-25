@@ -174,7 +174,7 @@ socket.emit('client.rollDice', {}, (result) => { /* 等服务端回ack */ });
 socket.on('client.rollDice', ...)  // 由 diceHandler.register(socket) 注册
 ```
 
-各玩法 handler 在 [handlers/](file:///workspace/packages/server/src/handlers)。例如骰子 [diceHandler.ts]，地产 [propertyHandler.ts]，起点 [startHandler.ts]。它们的共同模式（读 [startHandler.ts](file:///workspace/packages/server/src/handlers/startHandler.ts) 最清晰）：
+各玩法 handler 在 [handlers/](file:///workspace/packages/server/src/handlers)。例如骰子 [diceHandler.ts]，地产 [propertyHandler.ts]，监狱 [jailHandler.ts]。供给格（起点）经过/落地补给由 MovementHandler 结算时按 `behaviorPass` 触发行为系统统一发放（见 [EventHandler.ts](file:///workspace/packages/server/src/events/EventHandler.ts)），不再由独立的起点 handler 直接发钱。它们的共同模式（读 [propertyHandler.ts](file:///workspace/packages/server/src/handlers/propertyHandler.ts) 最清晰）：
 
 1. 从 `socket.data.playerId` 拿到当前玩家；
 2. 用 `this.world` 读/改真实世界状态（钱、位置、资产）；
@@ -215,19 +215,19 @@ this.vm.subscribe('movement', () => this.update());   // GameHudShell 里这样�
 
 ### 5.1 改数值/玩法参数（不写代码）
 绝大多数经济参数在服务端读取的**地图元数据** [map-meta.json](file:///workspace/packages/server/map-meta.json) 的 `config` 里：
-- `startBonus` / `passBonus`：启动资金 / 过起点奖励；
-- `taxConfig`：税率、免税阈值、收税间隔；
+- `playerInitial`：玩家初始数值（如 `money` 启动资金）；
+- `tax`（`baseTax` / `shareTax`）：税率、免税阈值、收税间隔；
 - `diceMin` / `diceMax`：骰子范围；
 - `dayNightCycleMinutes`：昼夜周期。
 
-改这个 JSON 后重启服务端即可，**无需动 TS 代码**。规则强调：三个税率、两个免税阈值、`taxInterval` 必须同时填写。
+改这个 JSON 后重启服务端即可，**无需动 TS 代码**。税收按 UCT 逐字段计：`tax.baseTax` 与 `tax.shareTax` 各自的 `rates.player`、`exemptBelow`、`taxInterval` 需完整填写。
 
 ### 5.2 改"踩到某个格子"的效果（写代码）
 效果集中在一个枢纽 [handlers.ts](file:///workspace/packages/server/src/transport/handlers.ts) 的 `handleCellEvent`，它按格子类型分发给各 handler：
 
 ```ts
 // 真实代码
-this.startHandler.handlePassStart(playerId, cellId);
+this.handleBehaviorPass(playerId, cellId, socket); // supplier/supply 格：经行为系统发放补给
 this.jailHandler.handleEnterJail(playerId, cellId);
 this.eventHandler.handleEventCell(playerId, cellId, socket);
 this.transportHandler.handleTransportCell(playerId, cellId, socket);

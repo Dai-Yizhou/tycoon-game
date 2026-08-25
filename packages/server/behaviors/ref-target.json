@@ -1,0 +1,13 @@
+{
+  "id": "ref-target",
+  "effects": [
+    {
+      "weight": 1,
+      "exclusive": false,
+      "msg": { "zh-CN": "最近玩家", "en-US": "Nearest player" },
+      "ops": [
+        { "type": "value", "target": { "$ref": "$nearestPlayer" }, "delta": { "player": { "money": { "$ref": "$actor.money" } } } }
+      ]
+    }
+  ]
+}

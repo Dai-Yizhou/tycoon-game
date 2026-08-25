@@ -18,7 +18,10 @@ JSON -> server/app.ts 启动解析 -> GameWorld / BehaviorEngine
 
 `valueFieldDefinitions` 决定玩家或区域数值字段；客户端按服务端返回的定义投影，不要假设固定字段集合。行为事件由服务端权威选择和应用，客户端只展示结果。
 
-地图作者必须在 `map-meta.json` 的 `config.taxConfig` 中填写完整计税入口：`wealthTaxRate`、`propertyTaxRate`、`investmentTaxRate` 使用 0 到 1 的小数比例，`minWealthForTax`、`minPropertyValueForTax` 为非负免税阈值，`taxInterval` 为正数毫秒。字段缺失或非法会阻止服务端启动。
+地图作者必须在 `map-meta.json` 的 `tax` 结构中填写计税入口，税收按 UCT 动态字段逐字段计：
+- `tax.baseTax.rates.player`：`{ <fieldId>: <0到1小数比例> }`，对该字段当前值计税 `floor(current × rate)`；`tax.baseTax.exemptBelow.player[fieldId]` 为非负免税阈值（低于阈值免征）；`tax.baseTax.taxInterval` 为正数毫秒。
+- `tax.shareTax.rates.player`：`{ <fieldId>: <每股税额> }`，按玩家累计持股比例计税 `floor(totalShares × rate)`；`tax.shareTax.exemptBelow` 为总持股免税阈值；`tax.shareTax.taxInterval` 为正数毫秒。
+字段缺失或非法应阻止服务端启动。
 
 ## 删除边界
 

@@ -66,7 +66,7 @@
 |---|---|
 | `src/handlers/diceHandler.ts` | 服务端掷骰与冷却 |
 | `src/handlers/movementHandler.ts` | 权威路径、岔路选择、最终落点结算 |
-| `src/handlers/startHandler.ts` / `jailHandler.ts` | 起点与监狱规则 |
+| `src/handlers/jailHandler.ts` | 监狱规则 |
 | `src/handlers/investmentHandler.ts` | 投资购买、持股与事件收益 |
 | `src/handlers/transportHandler.ts` | 交通目的地与传送 |
 | `src/handlers/monumentHandler.ts` | 纪念碑状态与修缮 |

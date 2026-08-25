@@ -1,19 +1,9 @@
 {
   "$schema": "https://design-tokens.github.io/community-group/format/",
-  "theme": {
-    "id": {
-      "$value": "west",
-      "$type": "string"
-    }
-  },
   "color": {
     "palette": {
       "surface": {
         "$value": "#DDE0DF",
-        "$type": "color"
-      },
-      "ink": {
-        "$value": "#1A1A1A",
         "$type": "color"
       },
       "border": {
@@ -68,10 +58,6 @@
         "$value": "#F3D68A",
         "$type": "color"
       },
-      "body": {
-        "$value": "#2C5F8D",
-        "$type": "color"
-      },
       "outline": {
         "$value": "#1A1A1A",
         "$type": "color"
@@ -84,10 +70,6 @@
       },
       "current": {
         "$value": "#1A1A1A",
-        "$type": "color"
-      },
-      "key": {
-        "$value": "#D95A2B",
         "$type": "color"
       }
     },
@@ -126,20 +108,6 @@
       },
       "link": {
         "$value": "#B52B1D",
-        "$type": "color"
-      }
-    },
-    "player": {
-      "red": {
-        "$value": "#C0392B",
-        "$type": "color"
-      },
-      "blue": {
-        "$value": "#2C5F8D",
-        "$type": "color"
-      },
-      "green": {
-        "$value": "#4A7C3F",
         "$type": "color"
       }
     },
@@ -269,24 +237,10 @@
       "current": {
         "$value": 3,
         "$type": "number"
-      },
-      "key": {
-        "$value": 4,
-        "$type": "number"
-      },
-      "node": {
-        "$value": 8,
-        "$type": "number"
       }
     }
   },
   "texture": {
-    "piece": {
-      "opacity": {
-        "$value": 0.12,
-        "$type": "number"
-      }
-    },
     "region": {
       "background": {
         "$value": "repeating-linear-gradient(90deg, rgba(61,46,44,0.06) 0 1px, transparent 1px 4px), repeating-linear-gradient(0deg, rgba(61,46,44,0.06) 0 1px, transparent 1px 4px)",
@@ -295,10 +249,6 @@
     }
   },
   "font": {
-    "heading": {
-      "$value": "Noto Serif SC, Songti SC, serif",
-      "$type": "fontFamily"
-    },
     "body": {
       "$value": "Noto Sans SC, PingFang SC, sans-serif",
       "$type": "fontFamily"
@@ -333,28 +283,12 @@
           "current": {
             "$value": "#3B2B25",
             "$type": "color"
-          },
-          "key": {
-            "$value": "#B56A3A",
-            "$type": "color"
           }
         },
         "piece": {
           "head": {
             "$value": "#C89B64",
             "$type": "color"
-          },
-          "body": {
-            "$value": "#294D70",
-            "$type": "color"
-          }
-        }
-      },
-      "texture": {
-        "piece": {
-          "opacity": {
-            "$value": 0.16,
-            "$type": "number"
           }
         }
       }
@@ -375,28 +309,12 @@
           "current": {
             "$value": "#D7E3EA",
             "$type": "color"
-          },
-          "key": {
-            "$value": "#E8B83A",
-            "$type": "color"
           }
         },
         "piece": {
           "head": {
             "$value": "#5B6770",
             "$type": "color"
-          },
-          "body": {
-            "$value": "#18354E",
-            "$type": "color"
-          }
-        }
-      },
-      "texture": {
-        "piece": {
-          "opacity": {
-            "$value": 0.1,
-            "$type": "number"
           }
         }
       }

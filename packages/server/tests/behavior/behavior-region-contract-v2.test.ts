@@ -29,4 +29,18 @@ describe('BehaviorEngine region contract v2', () => {
     expect(world.getRegionValue('r1', 'pros')).toBe(55);
     expect(world.getPlayer('p1')?.values.pros).toBeUndefined();
   });
+
+  it('does not multiply region UCT by the number of players in the target region', () => {
+    const world = new GameWorld();
+    world.loadMap([cell], meta);
+    world.addPlayer(makePlayer('p1'));
+    world.addPlayer(makePlayer('p2'));
+    const engine = new BehaviorEngine({ emit: jest.fn() } as never, world, { configDir: path.resolve(__dirname, '../../behaviors') });
+
+    engine.executeBehavior('region-value', world.getPlayer('p1')!);
+
+    // 两名玩家同区域，区域 UCT 只应 +5 一次，而不是按 2 名玩家叠加成 +10
+    expect(world.getRegionValue('r1', 'pros')).toBe(55);
+    expect(world.getPlayer('p2')?.id).toBe('p2');
+  });
 });

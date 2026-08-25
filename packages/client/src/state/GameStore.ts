@@ -25,9 +25,6 @@ export interface ClientGameSnapshot {
   currentPlayer: Player | null;
   otherPlayers: OtherPlayerInfo[];
   currentPlayerPosition: number;
-  currentMoney: number;
-  currentCredit: number;
-  currentEnv: number;
   isBankrupt: boolean;
   isInJail: boolean;
   jailEndTime: number;
@@ -105,7 +102,7 @@ export interface ClientChatMessage {
 export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
-    currentMoney: 2000, currentCredit: 50, currentEnv: 0, isBankrupt: false,
+    isBankrupt: false,
     isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], prosperity: 100, regionProsperityMap: new Map(), regionValues: new Map(), mapRegions: [], mapTimezones: [], valueFieldDefs: [], cellRuntimeStates: new Map(),
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
@@ -228,9 +225,6 @@ export class GameStore {
         ...snapshotState,
         currentPlayer: snapshot.player,
         currentPlayerPosition: snapshot.player.position?.cellId ?? 0,
-        currentMoney: snapshot.player.values?.money?.current ?? 0,
-        currentCredit: snapshot.player.values?.credit?.current ?? 0,
-        currentEnv: snapshot.player.values?.environment?.current ?? snapshot.player.values?.env?.current ?? 0,
         isBankrupt: snapshot.player.status === 'bankrupt',
         isInJail: snapshot.player.status === 'jail',
       };
@@ -245,7 +239,7 @@ export class GameStore {
   applyEvent(event: ClientGameEvent): void {
     if (event.sequence <= this.snapshot.sequence) return;
     if (event.type === 'player') {
-      this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: event.player, currentPlayerPosition: event.player.position?.cellId ?? 0, currentMoney: event.player.values?.money?.current ?? 0, currentCredit: event.player.values?.credit?.current ?? 0, currentEnv: event.player.values?.environment?.current ?? event.player.values?.env?.current ?? 0, isBankrupt: event.player.status === 'bankrupt', isInJail: event.player.status === 'jail' };
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: event.player, currentPlayerPosition: event.player.position?.cellId ?? 0, isBankrupt: event.player.status === 'bankrupt', isInJail: event.player.status === 'jail' };
       this.projectAssets(event.player);
       this.publish();
       return;
@@ -269,7 +263,7 @@ export class GameStore {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, ownedInvestments, investmentShares, actionUsedThisTurn: event.playerId === this.snapshot.currentPlayer?.id ? true : this.snapshot.actionUsedThisTurn };
     } else if (event.type === 'value' && this.snapshot.currentPlayer?.id === event.playerId) {
       const player = { ...this.snapshot.currentPlayer, values: { ...this.snapshot.currentPlayer.values, [event.fieldId]: { ...this.snapshot.currentPlayer.values[event.fieldId], current: event.current } } };
-      this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: player, currentMoney: event.fieldId === 'money' ? event.current : this.snapshot.currentMoney, currentCredit: event.fieldId === 'credit' ? event.current : this.snapshot.currentCredit, currentEnv: event.fieldId === 'env' || event.fieldId === 'environment' ? event.current : this.snapshot.currentEnv };
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: player };
     } else if (event.type === 'status' && this.snapshot.currentPlayer?.id === event.playerId) {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, currentPlayer: { ...this.snapshot.currentPlayer, status: event.status }, isBankrupt: event.status === 'bankrupt', isInJail: event.status === 'jail', canRoll: event.status !== 'bankrupt' };
     } else if (event.type === 'otherPlayerValue') {
@@ -300,9 +294,6 @@ export class GameStore {
       currentPlayer: null,
       otherPlayers: [],
       currentPlayerPosition: 0,
-      currentMoney: 2000,
-      currentCredit: 50,
-      currentEnv: 0,
       isBankrupt: false,
       isInJail: false,
       jailEndTime: 0,

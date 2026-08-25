@@ -1,0 +1,13 @@
+{
+  "id": "ref-credit-weight",
+  "effects": [
+    {
+      "weight": { "$ref": "1 - (($actor.credit) / 2000)" },
+      "exclusive": false,
+      "msg": { "zh-CN": "信用权重", "en-US": "Credit weight" },
+      "ops": [
+        { "type": "value", "target": "single", "delta": { "player": { "money": 10 } } }
+      ]
+    }
+  ]
+}

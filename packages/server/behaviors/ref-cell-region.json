@@ -1,0 +1,14 @@
+{
+  "id": "ref-cell-region",
+  "effects": [
+    {
+      "weight": 1,
+      "exclusive": false,
+      "msg": { "zh-CN": "格子与区域", "en-US": "Cell and region" },
+      "ops": [
+        { "type": "ownership", "target": "single", "action": "acquireShare", "cells": [{ "cellId": { "$ref": "$cell.id" } }], "share": 0.5 },
+        { "type": "value", "target": "single", "delta": { "region": { "pros": { "$ref": "2 * $region.pros" } } } }
+      ]
+    }
+  ]
+}

@@ -37,6 +37,32 @@ function buildPlayer(id: string, overrides: Partial<Player> = {}): Player {
 }
 
 /**
+ * 追踪本文件所有测试创建的 http server，供 afterEach 兜底关闭，
+ * 避免个别测试未手动 close 造成 Jest open-handle 警告。
+ */
+const liveServers = new Set<HttpServer>();
+
+/**
+ * 兜底关闭所有仍存活的测试 http server（幂等，忽略已关闭的）。
+ */
+async function closeAllMatchedServers(): Promise<void> {
+  const pending = [...liveServers];
+  liveServers.clear();
+  await Promise.all(
+    pending.map(
+      (http) =>
+        new Promise<void>((resolve) => {
+          try {
+            http.close(() => resolve());
+          } catch {
+            resolve();
+          }
+        }),
+    ),
+  );
+}
+
+/**
  * 创建 socket.io 测试环境，返回 httpServer, io, port
  */
 function createTestEnv(): Promise<{ http: HttpServer; io: TypedServer; port: number }> {
@@ -47,6 +73,7 @@ function createTestEnv(): Promise<{ http: HttpServer; io: TypedServer; port: num
     }) as TypedServer;
     http.listen(0, () => {
       const port = (http.address() as AddressInfo).port;
+      liveServers.add(http);
       resolve({ http, io, port });
     });
   });
@@ -76,6 +103,7 @@ function waitFor<T>(socket: ClientSocket, event: string, timeoutMs = 1000): Prom
 }
 
 describe('SocketManager', () => {
+  afterEach(closeAllMatchedServers);
   describe('connection lifecycle', () => {
     it('rejects an anonymous production handshake even when JWT is configured', async () => {
       const previousNodeEnv = process.env.NODE_ENV;

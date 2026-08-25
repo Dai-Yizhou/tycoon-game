@@ -1,0 +1,13 @@
+{
+  "id": "ref-unknown",
+  "effects": [
+    {
+      "weight": 1,
+      "exclusive": false,
+      "msg": { "zh-CN": "未知引用", "en-US": "Unknown ref" },
+      "ops": [
+        { "type": "value", "target": "single", "delta": { "player": { "money": { "$ref": "$actor.foo" } } } }
+      ]
+    }
+  ]
+}

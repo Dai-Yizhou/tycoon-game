@@ -20,7 +20,7 @@ import type { TypedServer, TypedSocket } from './SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ChatManager } from '../chat/index.js';
 import { Bankruptcy, EconomyService, resolveOwnershipConfig, type OwnershipConfig } from '../economy/index.js';
-import { DiceHandler, MovementHandler, PropertyHandler, StartHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, TeamHandler } from '../handlers/index.js';
+import { DiceHandler, MovementHandler, PropertyHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, TeamHandler } from '../handlers/index.js';
 import { TeamManager, DEFAULT_TEAM_CONFIG } from '../team/index.js';
 import { EventHandler } from '../events/index.js';
 import type { ProsperityManager } from '../world/ProsperityManager.js';
@@ -72,7 +72,6 @@ export class HandlerRegistry {
   private readonly diceHandler: DiceHandler;
   private readonly movementHandler: MovementHandler;
   private readonly propertyHandler: PropertyHandler;
-  private readonly startHandler: StartHandler;
   private readonly jailHandler: JailHandler;
   private readonly eventHandler: EventHandler;
   private readonly investmentHandler: InvestmentHandler;
@@ -101,17 +100,11 @@ export class HandlerRegistry {
     this.movementHandler = new MovementHandler(io, world, (playerId, cellId, socket) => {
       this.handleCellEvent(playerId, cellId, socket);
     }, (playerId, cellId, socket) => {
-      const cell = this.world.getMapIndex()?.getById(cellId);
-      const behaviorId = cell?.behaviorPass ?? '';
-      if (!behaviorId) return;
-      const player = this.world.getPlayer(playerId);
-      if (!player || !cell) return;
-      this.eventHandler.handleBehavior(playerId, behaviorId, player, cell, socket);
+      this.handleBehaviorPass(playerId, cellId, socket);
     });
     // 初始化地产处理器
     this.propertyHandler = new PropertyHandler(io, world, resolvedOwnershipConfig, economy ?? new EconomyService(world));
-    // 初始化起点和监狱处理器
-    this.startHandler = new StartHandler(io, world, this, economy ?? null);
+    // 初始化监狱处理器
     this.jailHandler = new JailHandler(io, world, this, jailCooldownMs ?? 10_000, economy ?? null);
     // 初始化事件处理器
     this.eventHandler = new EventHandler(io, world);
@@ -137,8 +130,7 @@ export class HandlerRegistry {
     this.movementHandler.register(socket);
     // 使用 PropertyHandler
     this.propertyHandler.register(socket);
-    // 使用 StartHandler 和 JailHandler
-    this.startHandler.register(socket);
+    // 使用 JailHandler
     this.jailHandler.register(socket);
     // 使用 InvestmentHandler
     this.investmentHandler.register(socket);
@@ -174,13 +166,6 @@ export class HandlerRegistry {
    */
   getPropertyHandler(): PropertyHandler {
     return this.propertyHandler;
-  }
-
-  /**
-   * 获取 StartHandler（用于外部调用）
-   */
-  getStartHandler(): StartHandler {
-    return this.startHandler;
   }
 
   /**
@@ -284,7 +269,7 @@ export class HandlerRegistry {
 
     switch (cell.type) {
       case 'supply':
-        this.startHandler.handlePassStart(playerId, cellId);
+        this.handleBehaviorPass(playerId, cellId, socket);
         return;
       case 'event':
         this.eventHandler.handleEventCell(playerId, cellId, socket);
@@ -325,10 +310,17 @@ export class HandlerRegistry {
   }
 
   /**
-   * 处理游戏开始时的启动资金发放。
+   * 触发经过 / 落地的 behaviorPass（供给格等）
+   *
+   * 由 MovementHandler 的 settlePass 回调以及落地结算（handleCellEvent）调用。
    */
-  handleGameStart(playerId: string): void {
-    this.startHandler.handleGameStart(playerId);
+  private handleBehaviorPass(playerId: string, cellId: number, socket: TypedSocket): void {
+    const cell = this.world.getMapIndex()?.getById(cellId);
+    const behaviorId = cell?.behaviorPass ?? '';
+    if (!behaviorId) return;
+    const player = this.world.getPlayer(playerId);
+    if (!player || !cell) return;
+    this.eventHandler.handleBehavior(playerId, behaviorId, player, cell, socket);
   }
 
   private handleChat(socket: TypedSocket): void {

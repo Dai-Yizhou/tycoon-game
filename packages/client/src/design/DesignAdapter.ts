@@ -93,13 +93,8 @@ export class DesignAdapter {
         '--tycoon-cell-property-fill': property,
         '--tycoon-cell-event-fill': event,
         '--tycoon-cell-transport-fill': transport,
-        '--tycoon-cell-border': color('color.hud.cellBorder'),
         '--tycoon-piece-head': color('color.piece.head'),
-        '--tycoon-piece-body': color('color.piece.body'),
         '--tycoon-piece-outline': color('color.piece.outline'),
-        '--tycoon-line-map': color('color.line.map'),
-        '--tycoon-line-current': color('color.line.current'),
-        '--tycoon-line-key': color('color.line.key'),
         '--tycoon-accent': accent,
         '--tycoon-muted': muted,
         // HUD 覆盖层令牌：由主题 JSON 的 color.hud 区段注入，组件只消费 CSS 变量
@@ -112,28 +107,12 @@ export class DesignAdapter {
         '--gp-muted': color('color.hud.muted'),
         '--gp-accent': accent,
         '--gp-cell-bg': color('color.hud.cellBg'),
-        '--gp-cell-border': color('color.hud.cellBorder'),
-        '--gp-link': color('color.hud.link'),
-        '--gp-player-head': color('color.piece.head'),
-        '--gp-player-body': color('color.piece.body'),
-        '--gp-player-outline': color('color.piece.outline'),
-        // 主题标识 + 玩家色
-        '--theme-id': this.getString('theme.id', tokens),
-        '--player-red': color('color.player.red'),
-        '--player-blue': color('color.player.blue'),
-        '--player-green': color('color.player.green'),
-        // 字体（地域标题/功能/数字 + 通用正文/标题）
-        '--font-heading': color('font.heading'),
+        // 字体（功能/数字 + 通用正文/标题）
         '--font-body': color('font.body'),
         '--font-title': color('font.title'),
         '--font-func': color('font.func'),
         '--font-num': color('font.number'),
         // 棋子几何
-        '--piece-width': px('dimension.piece.width'),
-        '--piece-head-diameter': px('dimension.piece.headDiameter'),
-        '--piece-torso-top': px('dimension.piece.torsoTop'),
-        '--piece-torso-bottom': px('dimension.piece.torsoBottom'),
-        '--piece-torso-height': px('dimension.piece.torsoHeight'),
         '--piece-outline-width': px('dimension.piece.outline'),
         // 1900 地域语法（棋盘与 SVG 地图语义令牌）
         '--region-board-bg': color('color.region.board'),

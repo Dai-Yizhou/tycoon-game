@@ -34,7 +34,7 @@
  * ```
  */
 
-import type { Cell } from './cell.js';
+import type { Cell, Uct } from './cell.js';
 import type { ChatChannel, ChatMessage } from './chat.js';
 import type { Player, ValueField } from './player.js';
 import type { Team, TeamInvite, TeamMemberView } from './team.js';
@@ -416,12 +416,13 @@ export interface ServerToClientEvents {
     playerCount: number;
   }) => void;
 
-  /** 税收收取 */
+  /** 税收收取（按 UCT 逐字段） */
   'server.taxCollected': (payload: {
     playerId: string;
-    wealthTax: number;
-    propertyTax: number;
-    investmentTax: number;
+    /** 基础税逐字段税额 */
+    baseTax: Uct;
+    /** 股份税逐字段税额 */
+    shareTax: Uct;
     totalTax: number;
     timestamp?: number;
   }) => void;

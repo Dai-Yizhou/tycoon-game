@@ -25,7 +25,7 @@
 
 地图元数据定义玩家字段：`money` 初始值 2000、最小值 0；`credit` 初始值 0、最小值 0；`environmental` 初始值 50，但 scope 为 region，不写入玩家 values，而属于区域字段。默认区域 `region-main` 覆盖 0–7 号格，初始繁荣度 80、environmentValue 50；默认时区 `tz-main` 覆盖全部格子，偏移 0 分钟。
 
-元数据还配置 `startBonus=2000`、`passBonus=200`、`diceMin=1`、`diceMax=3`、`jailDurationTurns=3`、财产/地产/投资税率配置字段和监狱冷却字段。服务端税收实现读取 `config.taxConfig` 结构。
+元数据还通过 `playerInitial` 配置玩家初始数值（如 `money` 初始 2000）、`diceMin=1`、`diceMax=3`、`jailDurationTurns` 和监狱冷却字段；供给格（起点补给站）经过/落地的补给由格子的 `behaviorPass` 行为（如 `start-supply`）统一发放。服务端税收实现读取 `tax.baseTax` / `tax.shareTax`，按各自的 `rates.player` 逐字段计税。
 
 ## 移动与回合操作
 
@@ -49,7 +49,7 @@
 
 到达落点后，当前处理链会依次尝试起点补款、监狱、事件、交通枢纽、纪念碑和租金处理。实际是否产生效果取决于格子类型、字段、玩家状态以及对应管理器是否成功注册或注入。
 
-- 到达起点格时默认增加 200；游戏开始时 `StartHandler` 还会发放默认 2000 启动资金。具体最终余额以实际游戏开始调用链和 `server.valueChanged` 为准。
+- 到达起点格（type=`supply`）时默认通过格子的 `behaviorPass`（如 `start-supply`）发放补给；玩家初始资金由地图元数据 `playerInitial` 配置。具体最终余额以实际游戏调用链和 `server.valueChanged` 为准。
 - 事件格由事件处理器决定是否产生事件效果；默认地图格 2 没有 behavior，不能仅凭格子名称推断具体奖励或惩罚。
 - 经过其他玩家的 property 格时，若地产有可收租所有者且所有者处于 normal 或 frozen，按当前等级取 `rent[level]`；付款额为 `min(rent, payerMoney)`，不会把 money 扣成负数。自己的地产不收租，空地产不收租，所有者处于 jail 或 bankrupt 时不收租。
 
@@ -135,7 +135,7 @@
 ## 已确认的不确定与实现缺口
 
 - 地图编辑器和地图元数据必须使用 `config.taxConfig`，字段为完整税率、免税阈值和 `taxInterval`；不存在部分覆盖或源码默认回退。
-- 默认地图描述写有起点经过可得 200 元，但实际经过起点的 bonus 由 `StartHandler` 配置读取；当前源码默认也是 200。起点“经过”由当前移动/落点调用链如何处理完整路径，不能仅凭描述断言每次跨越起点都结算。
+- 默认地图描述写有起点经过可得 200 元，实际由供给格的 `behaviorPass`（如 `start-supply`）行为发放补给。起点“经过”由当前移动/落点调用链如何处理完整路径，不能仅凭描述断言每次跨越起点都结算。
 - 默认地图没有事件 behavior、投资事件影响、地产以外的纪念碑扩展字段；因此事件奖励、投资固定收益、纪念碑特殊费用或特殊加成均不能当作现状。
 - 计税实现对 property/investment 使用 ownerships 持股记录；Frozen 与 normal 使用相同税收规则，Jail 与 Bankrupt 跳过计税。
 - 当前运行时没有 item、talent、achievement 系统；相关历史/规格文档、残余 JSON、类型或编辑器内容不代表玩家可用功能。胜利条件也没有在当前运行时中形成可确认的玩家规则。

@@ -69,7 +69,7 @@ io.on('connection', socket)
      -> 核心 ping/login、连接绑定/断开、鉴权/限流
   -> handlerRegistry.registerForSocket(socket)
      -> DiceHandler / MovementHandler / PropertyHandler
-     -> StartHandler / JailHandler / InvestmentHandler
+     -> JailHandler / InvestmentHandler
      -> TransportHandler / MonumentHandler / TeamHandler
      -> chat / bankruptcy restart
      -> debugHandler（仅调试开关满足时）

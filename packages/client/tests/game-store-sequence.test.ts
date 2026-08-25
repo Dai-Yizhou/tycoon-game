@@ -19,7 +19,7 @@ describe('GameStore server sequence', () => {
     store.applyEvent({ sequence: 1, type: 'player', player: { id: 'p1', values: {} } as never });
     store.applyEvent({ sequence: 2, type: 'value', playerId: 'p1', fieldId: 'money', current: 100 });
     store.applyEvent({ sequence: 3, type: 'value', playerId: 'p1', fieldId: 'money', current: 200 });
-    expect(store.getSnapshot().currentMoney).toBe(200);
+    expect(store.getSnapshot().currentPlayer?.values.money.current).toBe(200);
     expect(store.getSnapshot().sequence).toBe(3);
   });
 

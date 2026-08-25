@@ -72,12 +72,16 @@ export interface AppDependencies {
 
 function readTaxConfig(mapMeta: ReturnType<typeof parseMapMeta>): TaxConfig {
   return {
-    wealthTaxRate: mapMeta.tax.baseTax.rates.player?.money ?? 0,
-    propertyTaxRate: 0,
-    investmentTaxRate: 0,
-    minWealthForTax: mapMeta.tax.baseTax.exemptBelow?.player?.money ?? 0,
-    minPropertyValueForTax: 0,
-    taxInterval: mapMeta.tax.baseTax.taxInterval,
+    baseTax: {
+      rates: mapMeta.tax.baseTax.rates,
+      exemptBelow: mapMeta.tax.baseTax.exemptBelow,
+      taxInterval: mapMeta.tax.baseTax.taxInterval,
+    },
+    shareTax: {
+      rates: mapMeta.tax.shareTax.rates,
+      exemptBelow: mapMeta.tax.shareTax.exemptBelow,
+      taxInterval: mapMeta.tax.shareTax.taxInterval,
+    },
   };
 }
 

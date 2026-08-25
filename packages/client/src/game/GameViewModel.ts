@@ -20,9 +20,6 @@ import { resolveTimezoneOffsetMinutes } from './timezone.js';
 export interface PlayerSlice {
   currentPlayer: Player | null;
   currentPlayerPosition: number;
-  currentMoney: number;
-  currentCredit: number;
-  currentEnv: number;
   isBankrupt: boolean;
   actionUsedThisTurn: boolean;
   ownedProperties: Set<number>;
@@ -285,7 +282,7 @@ export class GameViewModel {
   // ===== Player =====
   getPlayer(): PlayerSlice {
     const snapshot = this.projectedSnapshot();
-    return { currentPlayer: snapshot.currentPlayer, currentPlayerPosition: snapshot.currentPlayerPosition, currentMoney: snapshot.currentMoney, currentCredit: snapshot.currentCredit, currentEnv: snapshot.currentEnv, isBankrupt: snapshot.isBankrupt, actionUsedThisTurn: snapshot.actionUsedThisTurn, ownedProperties: snapshot.ownedProperties, propertyLevels: snapshot.propertyLevels, ownedInvestments: snapshot.ownedInvestments, investmentShares: snapshot.investmentShares, currentPlayerName: this.projectPlayerName() };
+    return { currentPlayer: snapshot.currentPlayer, currentPlayerPosition: snapshot.currentPlayerPosition, isBankrupt: snapshot.isBankrupt, actionUsedThisTurn: snapshot.actionUsedThisTurn, ownedProperties: snapshot.ownedProperties, propertyLevels: snapshot.propertyLevels, ownedInvestments: snapshot.ownedInvestments, investmentShares: snapshot.investmentShares, currentPlayerName: this.projectPlayerName() };
   }
 
   // ===== Movement =====
