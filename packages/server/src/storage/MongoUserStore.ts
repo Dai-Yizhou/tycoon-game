@@ -46,7 +46,6 @@ export class MongoUserStore implements UserStore {
     await this.client.connect();
     const db = this.client.db(this.dbName);
     this.collection = db.collection<UserDocument>(this.collectionName);
-    await this.collection.createIndex({ _id: 1 }, { unique: true });
     await this.collection.createIndex({ username: 1 }, { unique: true });
     logger.info(`MongoDB UserStore connected: ${this.uri}/${this.dbName}/${this.collectionName}`);
   }

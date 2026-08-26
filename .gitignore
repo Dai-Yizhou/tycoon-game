@@ -102,3 +102,4 @@ release/
 
 # External rules repo (cloned reference)
 agent-rules/
+.agent-rules/

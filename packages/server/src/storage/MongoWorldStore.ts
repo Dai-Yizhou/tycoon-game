@@ -40,10 +40,9 @@ export class MongoWorldStore implements WorldStore {
     this.client = new MongoClient(this.uri);
     await this.client.connect();
     const collection = this.client.db(this.options.dbName ?? 'monopoly_io').collection<WorldDocument>(this.options.collectionName ?? 'world_snapshots');
-    await collection.createIndex({ _id: 1 }, { unique: true });
     await collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
     this.collection = collection;
-    const document = await collection.findOne({ _id: this.options.worldId });
+    const document = await collection.findOne({ _id: this.options.worldId, namespace: this.options.namespace });
     if (document && (!document.expiresAt || document.expiresAt.getTime() > Date.now())) this.snapshot = clone(document.snapshot);
   }
 
@@ -91,10 +90,10 @@ export class MongoWorldStore implements WorldStore {
       updatedAt: now,
     } satisfies WorldDocument;
     const filter = initialize
-      ? { _id: this.options.worldId }
+      ? { _id: this.options.worldId, namespace: this.options.namespace }
       : expectedRevision === undefined
-        ? { _id: this.options.worldId }
-        : { _id: this.options.worldId, revision: expectedRevision };
+        ? { _id: this.options.worldId, namespace: this.options.namespace }
+        : { _id: this.options.worldId, namespace: this.options.namespace, revision: expectedRevision };
     let result: Awaited<ReturnType<Collection<WorldDocument>['insertOne']>> | Awaited<ReturnType<Collection<WorldDocument>['replaceOne']>>;
     try {
       result = initialize
@@ -111,7 +110,7 @@ export class MongoWorldStore implements WorldStore {
 
   async close(): Promise<void> {
     await this.ready;
-    await this.writeQueue;
+    await this.writeQueue.catch(() => undefined);
     await this.client?.close();
     this.client = null;
     this.collection = null;
