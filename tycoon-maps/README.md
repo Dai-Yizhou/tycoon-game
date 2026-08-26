@@ -8,7 +8,7 @@
 
 ```text
 tycoon-maps/
-├── AGENTS.md                  ← Agent 顶层入口（会话先读它，再进 skills/map-author/）
+├── AGENTS.md                  ← Agent 顶层入口（会话先读它，再进 skills/mapcraft/）
 ├── README.md                  ← 本文件（人类入口）
 ├── docs/                      ← 面向人类的文档，供查阅
 │   ├── UCT.md                 ← UCT 理念说明书（为什么有 UCT、正负号、字段速查）
@@ -22,17 +22,17 @@ tycoon-maps/
 │       ├── NOTES.md           ← 配置注释文档（改动必同步）
 │       └── behaviors/         ← 本图行为 JSON
 └── skills/
-    └── map-author/
-        ├── SKILL.md           ← 主工作流（入口 + 五步 + 纪律 + 先对齐后实现铁律）
-        ├── SPEC.md            ← 制图规范详解（UCT / map-meta / map.json / 行为 JSON / $ref）
-        └── EXAMPLES.md        ← 充分示例（含昼夜繁荣度、彩蛋/隐藏格、NOTES 模板）
+    └── mapcraft/                 ← 制图小助手（协作者侧 Skill）
+        ├── mapcraft.md           ← 主流程（入口 + 5步 + 必过清单 + 先对齐后实现铁律）
+        ├── spec.md               ← 制图规范详解（UCT / map-meta / map.json / 行为 JSON / 隐藏格）
+        └── examples.md           ← 充分示例（含昼夜繁荣度、彩蛋/隐藏格、NOTES 模板）
 ```
 
 ## 怎么开始
 
 - 我是**协作者** → 看 `docs/QUICKSTART.md`，或直接在 AI 对话里说"我要一个 property 格子"。
 - 我是**想要理解设计的人** → 看 `docs/UCT.md` 与 `docs/CELLS.md`。
-- 我是 **Agent** → 先读顶层 `AGENTS.md`，再加载 `skills/map-author/SKILL.md` 作为协作主流程（细节查阅同目录 `SPEC.md` / `EXAMPLES.md`）。
+- 我是 **Agent** → 先读顶层 `AGENTS.md`，再加载 `skills/mapcraft/mapcraft.md` 作为协作主流程（细节查阅同目录 `spec.md` / `examples.md`）。
 
 ## 协作底线
 

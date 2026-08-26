@@ -1,7 +1,7 @@
 # 充分示例（EXAMPLES）
 
-> 每个示例都先给**人的意图**，再给**JSON**，再给**效果复述**——Agent 生成任何东西前必须先把意图→效果复述给人类确认（见 SKILL 的"先对齐、后实现"）。
-> schema 以 `SPEC.md` 为准；示例里的灵感字段一律是**已声明**字段，不发明新字段。
+> 每个示例都先给**人的意图**，再给**JSON**，再给**效果复述**——Agent 生成任何东西前必须先把意图→效果复述给人类确认（见 `mapcraft.md` 的"先对齐后实现"）。
+> schema 以 `spec.md` 为准；示例里的灵感字段一律是**已声明**字段，不发明新字段。
 
 ---
 
@@ -128,33 +128,47 @@
 
 ---
 
-## 6. 彩蛋 / 隐藏格
+## 6. 彩蛋——隐藏格（不参与正常骰子到达）
 
-**意图**（来自既有设计决策）：彩蛋**不新增专属字段、不加插件位**；用**现有字段组合**实现一张"藏起来的格子"。demo 前不做特殊 UI；需要真正的新机制时上报开发者。
+**意图**：藏一张骰子到不了的奖励格，从入口把玩家送进去（详情见 `spec.md` §3.4）。
 
-**落地方式（示例）**：一张不显眼的 `monument` 或 `empty` 格，名字/描述带"发现的彩蛋"文案，踩中/修缮时通过 `behaviorLand` 触发彩蛋效果。
+**① 建格**：不写进任何格的 `destinations`、坐标放图外、类型 `event`、`destinations:[]`（合法）、**仍必须有 `regionId`**、中英文完整。
 
 ```jsonc
-// 格子：没人知道它是彩蛋，直到触发行为
-{ "id": 12, "x": 9, "y": 4, "type": "monument",
-  "name": { "zh-CN": "无名小碑", "en-US": "Old Marker" },          // 普通、不显眼
-  "description": { "zh-CN": "一块刻着奇怪符号的旧碑。", "en-US": "An odd old marker." },
-  "destinations": [11], "regionId": "r1", "timezone": 0,
-  "repairCost": { "player": { "money": -5 }, "region": { "pros": 5 } } }
+// maps/<图>/<图>.map.json
+{ "id": 42, "x": 900, "y": 900, "type": "event",
+  "name": { "zh-CN": "秘境", "en-US": "Hidden Realm" },
+  "description": { "zh-CN": "隐藏奖励格", "en-US": "Hidden reward cell" },
+  "destinations": [], "regionId": "r1", "timezone": 0,
+  "behaviorLand": "hidden-reward" }
 ```
 
 ```jsonc
-// behaviors/easter-egg.behavior.json —— 修缮触发的彩蛋效果（示意）
-{ "id": "easter-egg",
+// maps/<图>/behaviors/hidden-reward.behavior.json
+{ "id": "hidden-reward",
   "effects": [ { "weight": 1, "exclusive": false,
-    "msg": { "zh-CN": "彩蛋！得到一枚隐藏徽章（信用 +10）", "en-US": "Egg! +10 credit" },
-    "ops": [ { "type": "value", "target": "single", "delta": { "player": { "credit": 10 } } } ] } ] }
+    "msg": { "zh-CN": "进入秘境：+50 现金 +5 信用", "en-US": "Hidden realm: +50 money +5 credit" },
+    "ops": [ { "type": "value", "target": "single",
+               "delta": { "player": { "money": 50, "credit": 5 } } } ] } ] }
 ```
 
-**Agent 须知（不臆测）**：
-- 彩蛋只用**已声明字段**；不新增 `hidden` / `easterEgg` / `_secret` 等字段。
-- "彩蛋的具体效果、奖励、如何被发现"必须在生成前**和人类对齐**（多少量、何时触发、隐藏的程度）。
-- 若协作者想要超出现有机制的彩蛋（如自定义隐藏 UI、留存纪念等）→ **上报开发者**，不在仓库一套自造 schema。
+**② 入口 A（传送）**：在某个 `transport` 格的`teleportDestinations` 加该格。校验只查"id 存在、不查可达"，正好满足。
+```jsonc
+// 某个 transport 格上
+"teleportDestinations": [ { "cellid": 42, "cost": { "player": { "money": -10 } } } ]
+```
+**效果复述**：玩家停在传送格 → 选"去秘境" → 付 10 钱 → 进入隐藏格 → 触发 +50 钱 +5 信用。
+
+**③ 入口 B（低概率事件送进去）**：行为 `op` 用 `position.teleport` 指向 42，放进 `exclusive:true` + 低 `weight` 的彩蛋事件。
+```jsonc
+// 某个 event 格 behavior 的 effects 里：
+{ "weight": 0.05, "exclusive": true,
+  "msg": { "zh-CN": "罕见传送门开启！你被送进秘境", "en-US": "Portal! Sent to hidden realm" },
+  "ops": [ { "type": "position", "target": "single", "action": "teleport", "cellId": 42 } ] }
+```
+**效果复述**：踩该 event 格时按低概率命中 → 玩家被直接送到隐藏格 → 再触发秘境奖励。
+
+**④ 校验注意**：隐藏格仍要合法 `regionId`、完整 i18n；`teleportDestinations.cellid=42` 与 `position.cellId=42` 均须指向已存在的 `id`。缺任一 → 校验报错，不提交。
 
 ---
 

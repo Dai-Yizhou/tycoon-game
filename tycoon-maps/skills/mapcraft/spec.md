@@ -1,6 +1,6 @@
 # 制图规范详解（SPEC）
 
-> 供 map-author Skill 驱动的字段级 schema。**唯一事实源在主仓库**；本文件只描述协作方需要知道的内容，不复制主仓库解析代码。
+> 供 mapcraft（制图小助手）Skill 驱动的字段级 schema。**唯一事实源在主仓库**；本文件只描述协作方需要知道的内容，不复制主仓库解析代码。
 > 若发现本文件与主仓库 `shared/map-parser` + `shared/types` 冲突，以主仓库为准并在合并时重跑校验。
 
 ---
@@ -153,6 +153,35 @@ regionId(必须存在于 map-meta.regions), timezone(UTC 偏移分钟,字面量)
     { "cellid": 6, "cost": { "player": { "money": -20 }, "region": { "pros": -1 } } }
   ]
 }
+```
+
+### 3.4 隐藏格（彩蛋）——用现有字段实现，零新字段
+
+**目的**：做一张"正常骰子到不了"的奖励格，把玩家从入口送进去。**不新增字段、不加插件位**；超出下面模式的想法上报开发者。
+
+**建格（关键纪律）**：
+- 不把本格 `id` 写进任何格的 `destinations`（这样骰子永远到不了）。
+- 坐标放到主图之外（如 `x:900,y:900`），视觉上不干扰。
+- 类型常为 `event`（`behaviorLand` 触发奖励）；`destinations` 留空 `[]`（合法）。
+- **仍必须有合法 `regionId`**：`map-parser` 会校验非空，所以必须挂在一个已存在区域，不能建"无区域格"。
+- `name`/`description` 仍需完整 i18n（`zh-CN`+`en-US`）。
+
+```jsonc
+{ "id": 42, "x": 900, "y": 900, "type": "event",
+  "name": { "zh-CN": "秘境", "en-US": "Hidden Realm" },
+  "description": { "zh-CN": "隐藏奖励格", "en-US": "Hidden reward cell" },
+  "destinations": [], "regionId": "r1", "timezone": 0,
+  "behaviorLand": "hidden-reward" }
+```
+
+**入口 A：传送**（transport 格的 `teleportDestinations` 加该格；校验只查"id 存在"，不查"可达"，正好满足）：
+```jsonc
+"teleportDestinations": [ { "cellid": 42, "cost": { "player": { "money": -10 } } } ]
+```
+
+**入口 B：低概率事件送进去**（行为 `position.teleport`，`cellId` 指向 42；配 `exclusive:true` + 低 `weight` 当事先藏好的彩蛋事件）：
+```jsonc
+{ "type": "position", "target": "single", "action": "teleport", "cellId": 42 }
 ```
 
 ---

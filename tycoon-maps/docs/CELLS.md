@@ -69,7 +69,7 @@
 ### `event`
 - 踩中时触发 `behaviorLand` 指向的行为。
 - 行为按加权随机命中；内部可用 `exclusive` 区分"互斥"与"独立"效果。
-- 详见 `behaviors/` 与 `skills/map-author/SKILL.md`。
+- 详见 `behaviors/` 与 `skills/mapcraft/`（`mapcraft.md` / `spec.md` / `examples.md`）。
 
 ## 公共字段速记
 
