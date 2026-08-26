@@ -23,6 +23,8 @@
 }
 ```
 
+**自定义权限（协作者）**：UCT 的字段集合由协作者在 `map-meta.json` 的 `uct` 中声明，**可自由新增/删减** player/region 字段（如加作 `reputation` 声望），无需开发者介入。新字段须同步补进 `valueFieldDefinitions` 名目（同名 id、作用域、min/max）。反过来，凡是本图未声明的字段，运行时一律当成错误。因此"能设计什么、不能写超"的边界一目了然：**声明了就能用，没声明就是配置错误**。
+
 规则：
 
 - **字段全集**：只能出现本图 `map-meta.uct` 声明的键（`uct.player[]` 与 `uct.region[]`）。未声明字段 = 配置错误。
@@ -82,6 +84,8 @@
 ```
 
 要点：
+
+**i18n 格式合规（中文工作流）**：所有 `name`（含 `valueFieldDefinitions[].name`、`regions[].name`）、`description` 必须保持 i18n 对象结构 `{"zh-CN": "…", "en-US": ""}`。**中文工作流不强制填全**：`zh-CN` 必填，`en-US` 可留空（`""`）供多语言后续填充。**禁止**写成裸字符串（如 `"name": "起点"`）——那是格式错误。AI 生成时自动补全 `{zh-CN, en-US}` 外壳。
 
 - `valueFieldDefinitions` 只描述字段架构（`min/max` 用于截断）；初值由 `playerInitial`（玩家）与 `regions[].initial`（区域）提供，**不重复**。
 - `regions[]` **不**记录所辖格子（由各格 `regionId` 聚合）、**无颜色概念**。
@@ -164,7 +168,7 @@ regionId(必须存在于 map-meta.regions), timezone(UTC 偏移分钟,字面量)
 - 坐标放到主图之外（如 `x:900,y:900`），视觉上不干扰。
 - 类型常为 `event`（`behaviorLand` 触发奖励）；`destinations` 留空 `[]`（合法）。
 - **仍必须有合法 `regionId`**：`map-parser` 会校验非空，所以必须挂在一个已存在区域，不能建"无区域格"。
-- `name`/`description` 仍需完整 i18n（`zh-CN`+`en-US`）。
+- `name`/`description` 需保持 i18n 格式（`zh-CN` 必填，`en-US` 可留空）。
 
 ```jsonc
 { "id": 42, "x": 900, "y": 900, "type": "event",
@@ -184,11 +188,27 @@ regionId(必须存在于 map-meta.regions), timezone(UTC 偏移分钟,字面量)
 { "type": "position", "target": "single", "action": "teleport", "cellId": 42 }
 ```
 
+### 3.5 investmentTriggers 预定义事件（需申请新增）
+
+`investment` 格的 `investmentTriggers[].on` **只能使用以下预定义事件**，不可自定义：
+
+| 事件标识 | 触发时机 |
+|---|---|
+| `any-player-lands-event` | 任意玩家踩中任一 `event` 格 |
+| `any-player-lands-monument` | 任意玩家踩中任一 `monument` 格 |
+| `shareholder-bankrupt` | 任一持股人破产 |
+| `day-started` | 昼夜周期进入白天 |
+| `night-started` | 昼夜周期进入黑夜 |
+
+> **差异点（重点）**：UCT 字段、behavior（`effects`/`ops`/`weight`/`exclusive` 组合）都由你**自行设计**；但 `investmentTriggers[].on` 的值是**服务端预定义的事件标识**。若想要表中之外的新触发时机（如"玩家升级地产""队伍清空某区域"），**向开发者申请**，等事件上线后才可引用，不得为绕过而臆造事件名。
+
 ---
 
 ## 4. 行为 JSON（behaviorLand / behaviorPass）
 
 被 `map.json` 的 `behaviorPass` / `behaviorLand` 按 **id** 引用。同图的行为 JSON 放该图 `behaviors/` 目录。
+
+**自定义权限（协作者）**：行为 JSON 的内容（`effects` 数组、每个 effect 的 `weight`/`exclusive`/`msg`/`ops`、ops 三分支与实际取值）**完全由你设计**，无需开发者介入。只要行为 id 被本图引用即生效。唯一限制是 effects 语义也要遵守本节结构（选中规则、ops 分支、target、`$ref` 白名单），即"结构受约束、内容自由裁量"。
 
 ```jsonc
 {
@@ -249,6 +269,8 @@ regionId(必须存在于 map-meta.regions), timezone(UTC 偏移分钟,字面量)
 - `behaviorPass/Land` 指向本图 `behaviors/` 中不存在的行为 id。
 - `op` 缺 `type`；`target` 缺失。
 - `value.delta` 含有 UCT 未声明字段 / 非 number。
+- `investmentTriggers[].on` 用了 3.5 预定义事件之外的值。
+- `name`/`description` 写成裸字符串、或缺少 `zh-CN`（i18n 格式错误）。
 - `regionId` 不在 `map-meta.regions`。
 - `ownership` 同时给出 `cells` 与 `scope`。
 - 注释文档 `NOTES.md` 缺失或与配置不一致。

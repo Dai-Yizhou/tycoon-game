@@ -51,6 +51,25 @@ owner.field = owner.field + floor( delta.field × share )
 - `floor` 保留 `delta.field` 的符号（分红为正被加，扣款为负被减）。
 - `region` 字段不按玩家股比拆分。
 
+## 谁来决定用哪些字段（自定义权限）
+
+**这是你的自由**。每张地图用哪些数值字段，由地图制作者（协作方）在 `map-meta.json` 里自己定：
+
+- 在 `uct` 里声明你要的字段全集（`player` / `region` 两组）。
+- 在 `valueFieldDefinitions` 里给每个新字段补上名字（i18n 格式）、作用域、上下限。
+
+```jsonc
+"valueFieldDefinitions": [
+  { "id": "money",      "name": { "zh-CN": "财产" }, "scope": "player", "min": 0 },
+  { "id": "reputation", "name": { "zh-CN": "声望" }, "scope": "player", "min": 0, "max": 100 }
+],
+"uct": { "player": ["money", "reputation"], "region": ["pros"] }
+```
+
+- **声明了就能用**：新字段声明完成后，所有 UCT 语境（扣款、分红、事件）都自动支持它，不需要开发者改代码。
+- **没声明就是错**：用了 `uct` 没声明的字段，会直接被判定为配置错误。
+- 反过来，有些东西**不是**字段全集，不能自己加——例如 `investmentTriggers[].on` 的触发事件由服务端预定义，想要新的得向开发者申请（见 spec.md §3.5）。
+
 ## 字段速查（典型地图）
 
 | 字段 id | 作用域 | 含义 | 典型用法 |
