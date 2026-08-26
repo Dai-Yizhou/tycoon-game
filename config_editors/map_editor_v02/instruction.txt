@@ -1,0 +1,174 @@
+# 地图编辑器 v02（新格式）
+
+## 一、工具简介
+
+地图编辑器 v02 是适配**新地图格式**的可视化制图工具。与 v01.01 的主要区别：
+
+- 属性面板不再依赖自由格式的“属性模板”，而是按新格式**内置字段 schema**，按格子 `type` 显示专属字段；
+- `name` / `description` 为 i18n 对象（中文必填、英文可留空）；
+- 费用统一为 **UCT** 结构（`player` / `region` 两个作用域），字段全集来自 `map-meta.json` 的 `uct` 声明；
+- 导出 `map.json` 的结构与 `packages/server/map.json` 完全一致，可直接替换使用；
+- 编辑器需配合 `map-meta.json` 与行为文件（文件夹）使用。
+
+## 二、快速上手
+
+### 第一步：加载 map-meta.json
+
+点击工具栏 **加载 map-meta.json**，选择地图对应的 meta 文件。编辑器据此识别：
+
+- **UCT 字段全集**（`uct.player[]` / `uct.region[]`），用于渲染所有 UCT 编辑器的 player/region 两组数值输入；
+- **区域表**（`regions[]`），用于 `regionId` 下拉选择；
+- **字段显示名**（`valueFieldDefinitions`）。
+
+未加载时使用内置回退字段（player: `money`/`credit`，region: `pros`），`regionId` 退化为手动输入。
+
+### 第二步：导入行为文件
+
+点击 **行为文件（文件夹）**，选择地图的 `behaviors/` 文件夹。编辑器读取每个 JSON 的 `id` 字段，作为 `behaviorPass` / `behaviorLand` 的下拉选项（读取失败时回退为文件名）。
+
+### 第三步：创建与编辑格子
+
+- 画布**空白处单击**创建新格（默认类型 `property`）；
+- **单击**格子选中，右侧面板编辑属性；
+- **双击**格子快速编辑中文名；
+- 在面板“类型”下拉中切换格子类型，专属字段自动切换。
+
+### 第四步：连接格子
+
+点击 **连线** 进入连线模式，依次点击两个格子建立**双向连接**（同时写入双方 `destinations`）。再次点击“编辑”返回。
+
+### 第五步：导出地图
+
+点击 **导出 map.json**，得到可直接替换 `packages/server/map.json` 的完整地图数据。
+
+## 三、工具栏说明
+
+| 按钮 | 功能 |
+|------|------|
+| 新建 | 清空当前地图（会提示确认） |
+| 导出 map.json | 导出为符合新格式的 JSON（自动保存位置或下载） |
+| 导入 map.json | 导入既有 map.json（兼容旧数据，自动归一化） |
+| 撤销 / 重做 | 撤销 / 重做（`Ctrl+Z` / `Ctrl+Shift+Z`） |
+| 加载 map-meta.json | 导入 meta（识别 UCT 字段全集、区域表） |
+| 行为文件（文件夹） | 导入行为文件夹（用于 behaviorPass/behaviorLand 下拉） |
+| 背景 / 清除背景 | 导入 / 移除背景图片 |
+| 网格 | 显示 / 隐藏辅助网格 |
+| − / % / + / 重置 | 缩放与重置（`Ctrl+/-`、`Ctrl0`） |
+| 连线 / 编辑 | 切换连线模式 |
+| meta 状态 / 状态栏 / 格数 | 当前加载信息与统计 |
+
+## 四、画布交互
+
+| 操作 | 效果 |
+|------|------|
+| 单击空白处 | 创建新格子 |
+| 单击格子 | 选中并显示属性面板 |
+| 双击格子 | 选中并聚焦中文名输入框 |
+| 拖拽格子 | 移动格子位置（自动保存） |
+| 滚轮 / 双指滑动 | 平移画布 |
+| Ctrl + 滚轮 / Ctrl+/- | 缩放画布 |
+
+## 五、属性面板
+
+### 5.1 内置字段（编辑器自动管理，无需手填）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | number | 格子唯一编号，从 0 起连续，导出时自动重排 |
+| `x` / `y` | number | 画布坐标 |
+| `destinations` | number[] | 连线目标（连线模式自动写入，双向存储） |
+
+### 5.2 公共字段（所有格子）
+
+| 字段 | 类型 | 编辑方式 |
+|------|------|----------|
+| `type` | 枚举 | 下拉：empty / supply / monument / property / investment / jail / transport / event |
+| `name` | i18n | 两个输入框（zh-CN 必填、en-US 可留空） |
+| `description` | i18n | 两个输入框（en-US 可留空） |
+| `theme` | string | 文本输入 |
+| `regionId` | string | 下拉（来自 map-meta.regions），未加载时手动输入 |
+| `timezone` | number | UTC 偏移分钟（480=UTC+8） |
+| `teleportDestinations` | 数组 | 所有类型通用，默认 `[]`，行为 `{cellid, cost(UCT)}` |
+
+### 5.3 按 type 显示的专属字段
+
+| type | 专属字段 |
+|------|----------|
+| `empty` | 无 |
+| `supply` | `behaviorPass`（下拉）、`behaviorLand`（下拉），均必填 |
+| `event` | `behaviorLand`（下拉） |
+| `monument` | `repairCost`（UCT） |
+| `property` | `price`（UCT）、`rent[]`（UCT 数组）、`upgradeCost[]`（UCT 数组）、`maxLevel`、`maxOwnerCount`、可选 `buyInMultiplier` |
+| `investment` | `price`（UCT）、`maxOwnerCount`、可选 `buyInMultiplier`、`investmentTriggers[]` |
+| `jail` | `jailCooldown`（毫秒）、`jailCost`（UCT） |
+| `transport` | 无额外专属字段（使用公共 `teleportDestinations`） |
+
+### 5.4 UCT 编辑器
+
+任何 UCT 字段（`price`、`rent`、`repairCost`、`jailCost`、`teleportDestinations[].cost`、`investmentTriggers[].delta` 等）都按 **player / 区域** 两组渲染，每组列出 meta 中 `uct` 声明的字段，提供**支持正负**的数值输入。
+
+- 符号写在数值里（如 `-100` 表示扣 100，`5` 表示加 5）；
+- 值为 0 的字段导出时省略（缺省按 0 处理），保持输出精简；
+- 未声明的字段不会出现在面板中（运行时视为配置错误，请勿臆造字段）。
+
+### 5.5 数组操作
+
+- UCT 数组（`rent[]` / `upgradeCost[]`）：每行一个 UCT 编辑器，“+ 添加元素”追加，逐行“移除”删除；
+- `teleportDestinations[]`：每行 `cellid`（目标格 id）+ `cost`（UCT）；
+- `investmentTriggers[]`：每行 `id` + `on`（预定义事件下拉）+ `delta`（UCT）；
+- 完全空的行（无 cellid 且 cost 为空 / 无 id 无 on 无 delta）导出时自动丢弃。
+
+### 5.6 investmentTriggers 预定义事件（on 只允许以下值）
+
+`any-player-lands-event` | `any-player-lands-monument` | `shareholder-bankrupt` | `day-started` | `night-started`
+
+如需新增触发时机，须向开发者申请，不得臆造事件名。
+
+### 5.7 可选字段 buyInMultiplier
+
+`property` 与 `investment` 支持可选 `buyInMultiplier`（合租买入乘数）。面板通过“启用”复选框控制：勾选后输入数值并导出该字段，取消勾选则导出时省略。
+
+## 六、导出格式（新格式要点）
+
+```jsonc
+{
+  "id": 0, "x": 400, "y": 300, "type": "supply",
+  "name": { "zh-CN": "起点补给站", "en-US": "Starting Supply" },
+  "description": { "zh-CN": "经过时获得补给", "en-US": "Receive supplies when passing" },
+  "destinations": [1, 7],
+  "behaviorPass": "start-supply", "behaviorLand": "",
+  "theme": "northeast", "regionId": "northeast", "timezone": 480,
+  "teleportDestinations": []
+}
+```
+
+- `name` / `description` 必须保持 i18n 对象结构，禁止裸字符串；
+- UCT 字段：`{ "player": { "money": -100 }, "region": { "pros": 1 } }`，仅出现 meta 声明的字段；
+- `regionId` 必须存在于 `map-meta.regions`；
+- 起点**不是** `start` 类型，由 `map-meta.startCellId` 指定。
+
+## 七、键盘快捷键
+
+| 快捷键 | 功能 |
+|--------|------|
+| `Ctrl+Z` / `Cmd+Z` | 撤销 |
+| `Ctrl+Shift+Z` / `Cmd+Shift+Z` | 重做 |
+| `Ctrl+` / `Ctrl-` / `Ctrl0` | 放大 / 缩小 / 重置缩放 |
+| `Backspace` | 删除选中的格子 |
+
+## 八、常见问题
+
+**Q：为什么 UCT 面板里没有我想要的字段？**  
+A：UCT 字段全集来自 `map-meta.json` 的 `uct` 声明。请在加载 map-meta 前先确认该字段已在 meta 中声明（并同步补进 `valueFieldDefinitions`）。
+
+**Q：behaviorPass/behaviorLand 下拉是空的？**  
+A：请先点击 **行为文件（文件夹）** 导入行为文件夹，然后重新选中格子刷新面板。
+
+**Q：导出的 name 是裸字符串？**  
+A：不会。编辑器始终以 i18n 对象导出 `{zh-CN, en-US}`；导入时若遇到裸字符串会自动转成 i18n 对象。
+
+**Q：删除格子后连线会乱吗？**  
+A：不会。删除后所有格子 id 会从 0 起连续重排，`destinations` 与 `teleportDestinations[].cellid` 会自动重映射，指向已删除格的引用会被移除。
+
+**Q：如何生成隐藏格（彩蛋格）？**  
+A：把格子坐标放到主图之外（如 900,900），类型设为 `event`，`destinations` 留空，但**必须**选择合法的 `regionId`。入口通过其他 `transport` 格的 `teleportDestinations` 指向它。
