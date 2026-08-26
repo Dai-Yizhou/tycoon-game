@@ -1,8 +1,0 @@
-# 忽略编辑器与系统文件
-.DS_Store
-Thumbs.db
-*.swp
-.idea/
-.vscode/
-node_modules/
-*.log
