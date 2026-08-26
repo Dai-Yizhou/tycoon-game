@@ -32,7 +32,7 @@ tycoon-maps/
 
 - 我是**协作者** → 看 `docs/QUICKSTART.md`，或直接在 AI 对话里说"我要一个 property 格子"。
 - 我是**想要理解设计的人** → 看 `docs/UCT.md` 与 `docs/CELLS.md`。
-- 我是 **Agent** → 先读顶层 `AGENTS.md`，再加载 `skills/mapcraft/mapcraft.md` 作为协作主流程（细节查阅同目录 `spec.md` / `examples.md`）。
+- 我是 **Agent** → 从顶层 `AGENTS.md` 开始（它是 Agent 的入口与加载指引）。
 
 ## 协作底线
 

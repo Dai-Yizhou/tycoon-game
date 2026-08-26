@@ -67,9 +67,7 @@
   ```
 
 ### `event`
-- 踩中时触发 `behaviorLand` 指向的行为。
-- 行为按加权随机命中；内部可用 `exclusive` 区分"互斥"与"独立"效果。
-- 详见 `behaviors/` 与 `skills/mapcraft/`（`mapcraft.md` / `spec.md` / `examples.md`）。
+- 踩中触发 `behaviorLand` 指向的行为；行为按加权随机命中，内部用 `exclusive` 区分"互斥"与"独立"效果。"互斥"= 多个里只命中一个；"独立"= 各自按概率决定是否触发。想改？直接对 AI 说，它会帮你配好。
 
 ## 公共字段速记
 
