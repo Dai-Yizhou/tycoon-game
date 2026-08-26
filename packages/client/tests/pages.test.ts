@@ -22,7 +22,7 @@ describe('Pages', () => {
   test('破产页面提供重开按钮并请求服务端重开', () => {
     const socket = { emit: jest.fn((_event, _payload, ack) => ack({ ok: true })) } as any;
     const bankruptcyController = new GameController(mockContainer);
-    jest.spyOn(bankruptcyController, 'getSocket').mockReturnValue(socket);
+    bankruptcyController.setSocket(socket);
     const page = createBankruptcyPage(bankruptcyController);
 
     const button = page.querySelector<HTMLButtonElement>('.bankruptcy-restart-button');
@@ -184,6 +184,7 @@ describe('Pages', () => {
     });
 
     test('清理加载页会断开 socket', async () => {
+      window.localStorage.removeItem('gameAuthToken');
       const page = createLoadingPage(controller);
       await Promise.resolve();
       const socket = controller.getSocket();
@@ -195,12 +196,15 @@ describe('Pages', () => {
     });
 
     test('切换到游戏页时清理加载页不会断开已认证 socket', async () => {
+      window.localStorage.setItem('gameAuthToken', 'token');
       const page = createLoadingPage(controller);
       await Promise.resolve();
       const socket = controller.getSocket();
       expect(socket).toBeTruthy();
       const disconnect = jest.spyOn(socket!, 'disconnect');
+      controller.getAuthSession().apply({ success: true, token: 'token', user: { id: 'u1', username: 'player', passwordHash: null, isGuest: true, createdAt: 1, lastLoginAt: 1 } });
       controller.setState('game');
+      controller.setSocket(socket);
       cleanupLoadingPage(page);
       expect(disconnect).not.toHaveBeenCalled();
       expect(controller.getSocket()).toBe(socket);

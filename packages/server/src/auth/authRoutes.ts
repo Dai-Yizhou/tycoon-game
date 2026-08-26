@@ -18,12 +18,12 @@ export function createAuthRouter(authService: AuthService): Router {
       res.status(401).json({ success: false, error: 'authentication_required' });
       return;
     }
-    if (!isCredentialsBody(req.body)) {
+    if (!isGuestMigrationBody(req.body)) {
       res.status(400).json({ success: false, error: t('server.authInvalidCredentials') });
       return;
     }
     try {
-      const result = await authService.migrateGuest(user.id, req.body);
+      const result = await authService.migrateGuest(user.id, req.body as { username: string });
       res.status(result.success ? 200 : 400).json(result);
     } catch {
       res.status(500).json({ success: false, error: t('server.authUnavailable') });
@@ -78,4 +78,9 @@ function isCredentialsBody(body: unknown): body is { username: string; password:
   if (typeof body !== 'object' || body === null) return false;
   const credentials = body as Record<string, unknown>;
   return typeof credentials.username === 'string' && typeof credentials.password === 'string';
+}
+
+function isGuestMigrationBody(body: unknown): body is { username: string } {
+  if (typeof body !== 'object' || body === null) return false;
+  return typeof (body as Record<string, unknown>).username === 'string';
 }

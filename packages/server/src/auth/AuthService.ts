@@ -297,14 +297,6 @@ export class AuthService {
       };
     }
 
-    // 验证密码
-    if (!this.validatePassword(request.password)) {
-      return {
-        success: false,
-        error: t('server.passwordLength', { min: this.config.minPasswordLength }),
-      };
-    }
-
     // 检查用户名是否已存在
     const existingUser = await this.userStore.loadUserByUsername(request.username);
     if (existingUser) {
@@ -316,7 +308,7 @@ export class AuthService {
 
     // 更新用户信息
     user.username = request.username;
-    user.passwordHash = await bcrypt.hash(request.password, this.config.saltRounds);
+    user.passwordHash = null;
     user.isGuest = false;
     user.lastLoginAt = Date.now();
 

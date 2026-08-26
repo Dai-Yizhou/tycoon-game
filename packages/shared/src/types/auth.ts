@@ -84,8 +84,6 @@ export interface LoginRequest {
 export interface GuestMigrationRequest {
   /** 新用户名 */
   username: string;
-  /** 新密码 */
-  password: string;
 }
 
 /**

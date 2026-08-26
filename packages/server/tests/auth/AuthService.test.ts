@@ -181,7 +181,6 @@ describe('AuthService', () => {
       // 迁移
       const response = await authService.migrateGuest(guestId, {
         username: 'migrateduser',
-        password: 'password123',
       });
 
       expect(response.success).toBe(true);
@@ -200,7 +199,6 @@ describe('AuthService', () => {
 
       const response = await authService.migrateGuest(user.id, {
         username: 'newusername',
-        password: 'password456',
       });
 
       expect(response.success).toBe(false);

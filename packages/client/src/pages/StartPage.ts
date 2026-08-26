@@ -45,9 +45,8 @@ export function createStartPage(controller: GameController): HTMLElement {
   startButton.addEventListener('click', () => {
     startButton.disabled = true;
 
-    // 动画结束后进入登录页面
     setTimeout(() => {
-      controller.nextState();
+      void controller.startGame();
     }, 800);
   });
   page.appendChild(startButton);

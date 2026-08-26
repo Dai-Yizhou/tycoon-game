@@ -40,9 +40,10 @@ describe('GameController', () => {
 
   describe('状态转换', () => {
     test('TR-6.4: nextState 正确转换状态序列', () => {
+      window.localStorage.removeItem('gameAuthToken');
+      controller = new GameController(mockContainer);
+      controller.getAuthSession().apply({ success: true, token: 'token', user: { id: 'u1', username: 'player', passwordHash: null, isGuest: true, createdAt: 1, lastLoginAt: 1 } });
       expect(controller.getState()).toBe('start');
-      controller.nextState();
-      expect(controller.getState()).toBe('login');
       controller.nextState();
       expect(controller.getState()).toBe('loading');
       controller.nextState();
@@ -52,11 +53,15 @@ describe('GameController', () => {
     });
 
     test('TR-6.5: setState 可以直接设置状态', () => {
+      window.localStorage.removeItem('gameAuthToken');
+      controller.getAuthSession().apply({ success: true, token: 'token', user: { id: 'u1', username: 'player', passwordHash: null, isGuest: true, createdAt: 1, lastLoginAt: 1 } });
       controller.setState('game');
       expect(controller.getState()).toBe('game');
     });
 
     test('TR-6.6: setState 相同状态不会触发通知', () => {
+      controller.setState('loading');
+      controller.setState('start');
       const listener = jest.fn();
       controller.addListener(listener);
       controller.setState('start'); // 已经是 start

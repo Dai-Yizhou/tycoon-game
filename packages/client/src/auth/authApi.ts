@@ -10,9 +10,9 @@ export async function authenticateAccount(username: string, password: string): P
   return request('/api/auth/login', { username, password });
 }
 
-export async function migrateGuestAccount(username: string, password: string): Promise<LoginResponse> {
+export async function migrateGuestAccount(username: string): Promise<LoginResponse> {
   const token = getAuthToken();
-  return request('/api/auth/migrate-guest', { username, password }, token ? { Authorization: `Bearer ${token}` } : undefined);
+  return request('/api/auth/migrate-guest', { username }, token ? { Authorization: `Bearer ${token}` } : undefined);
 }
 
 export async function authenticateGuest(): Promise<LoginResponse> {

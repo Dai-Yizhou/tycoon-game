@@ -48,8 +48,8 @@ export class AuthSession {
     return result;
   }
 
-  async migrateGuest(username: string, password: string): Promise<LoginResponse> {
-    const result = await migrateGuestAccount(username, password);
+  async migrateGuest(username: string): Promise<LoginResponse> {
+    const result = await migrateGuestAccount(username);
     this.apply(result);
     return result;
   }

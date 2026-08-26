@@ -118,7 +118,7 @@ export class GameController {
    */
   nextState(): void {
     const transitions: Record<GameState, GameState> = {
-      start: 'login',
+      start: 'loading',
       login: 'loading',
       loading: 'game',
       game: 'start',
@@ -127,12 +127,31 @@ export class GameController {
     this.setState(transitions[this.context.state]);
   }
 
+  async ensureSession(): Promise<void> {
+    if (this.authSession.hasToken()) return;
+    const result = await this.authSession.guest();
+    this.applyAuthResult(result);
+  }
+
+  async startGame(): Promise<void> {
+    try {
+      await this.ensureSession();
+      this.setState('loading');
+    } catch (error) {
+      this.setError(error instanceof Error ? error.message : '认证失败');
+    }
+  }
+
   /**
    * 设置状态
    */
   setState(state: GameState): void {
     if (this.context.state === state) return;
-    this.context.state = state;
+    if (state === 'game' && !this.authSession.hasToken()) {
+      this.context.state = 'loading';
+    } else {
+      this.context.state = state;
+    }
     this.notifyListeners();
   }
 
