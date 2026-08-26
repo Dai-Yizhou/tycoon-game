@@ -72,7 +72,7 @@ function toInteractivePlayers(snapshot: ReturnType<GameStore['getSnapshot']>): P
       username: player.username,
       position: player.position,
       status: player.status as Player['status'],
-      values: { money: { id: 'money', name: t('hud.money'), current: player.primaryValue, min: 0 } },
+      values: {},
       teamId: null,
       createdAt: 0,
       lastActiveAt: 0,
@@ -110,7 +110,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   const backButton = document.createElement('button');
   backButton.className = 'back-button';
   backButton.textContent = t('common.backToStart');
-  backButton.addEventListener('click', () => controller.setState('start'));
+  backButton.addEventListener('click', () => controller.reset(true));
   page.appendChild(backButton);
   gameHudShell = new GameHudShell(gameViewModel, effects, {
     onRoll: () => {
@@ -200,7 +200,7 @@ export function createGamePage(controller: GameController): HTMLElement {
       username: p.username,
       position: p.position,
       status: p.status || 'normal',
-      primaryValue: p.values?.money?.current,
+      primaryValue: Object.values(p.values ?? {}).find((field) => field.scope !== 'region')?.current ?? 0,
     }));
     gameStore?.applyEvent({ sequence: gameStore.nextSequence(), type: 'players', players: _otherPlayers });
   }
@@ -273,7 +273,7 @@ function applyRegionTheme(page: HTMLElement, cellId: number): void {
   // 权威来源：格子 theme 直接声明的 UI 主题令牌（northeast/south/midwest/west），
   // 与 themeTokens 键一一对应。缺失/未知时回退到区域 themeId，再回退默认主题。
   let themeId = getThemeId(cell?.theme);
-  if (cell?.theme == null) {
+  if (cell?.theme === null || cell?.theme === undefined) {
     const cellRegionId = cell?.regionId;
     const region = snapshot?.mapRegions.find(candidate => candidate.id === cellRegionId);
     themeId = getRegionThemeId(region ?? { id: 'default' });

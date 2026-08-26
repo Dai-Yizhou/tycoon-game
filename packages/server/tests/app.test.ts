@@ -7,14 +7,14 @@ describe('server app', () => {
     ['development', undefined],
     ['test', undefined],
     ['production', 'production-secret'],
-  ])('supports the JWT environment matrix for %s', (nodeEnv, jwtSecret) => {
+  ])('supports the JWT environment matrix for %s', async (nodeEnv, jwtSecret) => {
     const previousNodeEnv = process.env.NODE_ENV;
     const previousJwtSecret = process.env.JWT_SECRET;
     process.env.NODE_ENV = nodeEnv;
     if (jwtSecret) process.env.JWT_SECRET = jwtSecret;
     else delete process.env.JWT_SECRET;
 
-    expect(() => createApp(loadConfig())).not.toThrow();
+    await expect(createApp(loadConfig())).resolves.toBeDefined();
 
     if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = previousNodeEnv;
@@ -22,13 +22,13 @@ describe('server app', () => {
     else process.env.JWT_SECRET = previousJwtSecret;
   });
 
-  it('requires JWT_SECRET in production', () => {
+  it('requires JWT_SECRET in production', async () => {
     const previousNodeEnv = process.env.NODE_ENV;
     const previousJwtSecret = process.env.JWT_SECRET;
     process.env.NODE_ENV = 'production';
     delete process.env.JWT_SECRET;
 
-    expect(() => createApp(loadConfig())).toThrow('JWT_SECRET is required in production');
+    await expect(createApp(loadConfig())).rejects.toThrow('JWT_SECRET is required in production');
 
     if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = previousNodeEnv;
@@ -69,7 +69,7 @@ describe('server app', () => {
 
   describe('GET /health', () => {
     it('returns ok status', async () => {
-      const { app } = createApp(loadConfig());
+      const { app } = await createApp(loadConfig());
       const res = await request(app).get('/health');
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('ok');
@@ -79,7 +79,7 @@ describe('server app', () => {
 
   describe('GET /api/map', () => {
     it('loads the configured map when the server starts from the repository root', async () => {
-      const { app } = createApp(loadConfig());
+      const { app } = await createApp(loadConfig());
       const res = await request(app).get('/api/map');
       expect(res.status).toBe(200);
       expect(res.body.mapData).toHaveLength(8);
@@ -96,7 +96,7 @@ describe('server app', () => {
 
   describe('GET /', () => {
     it('returns server info', async () => {
-      const { app } = createApp(loadConfig());
+      const { app } = await createApp(loadConfig());
       const res = await request(app).get('/');
       expect(res.status).toBe(200);
       expect(res.body.name).toContain('monopoly-io-game');

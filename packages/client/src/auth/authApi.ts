@@ -2,18 +2,27 @@ import type { LoginResponse } from '@game/shared';
 
 export const AUTH_TOKEN_KEY = 'gameAuthToken';
 
+export async function registerAccount(username: string, password: string): Promise<LoginResponse> {
+  return request('/api/auth/register', { username, password });
+}
+
 export async function authenticateAccount(username: string, password: string): Promise<LoginResponse> {
   return request('/api/auth/login', { username, password });
+}
+
+export async function migrateGuestAccount(username: string, password: string): Promise<LoginResponse> {
+  const token = getAuthToken();
+  return request('/api/auth/migrate-guest', { username, password }, token ? { Authorization: `Bearer ${token}` } : undefined);
 }
 
 export async function authenticateGuest(): Promise<LoginResponse> {
   return request('/api/auth/guest', {});
 }
 
-async function request(path: string, body: unknown): Promise<LoginResponse> {
+async function request(path: string, body: unknown, extraHeaders?: Record<string, string>): Promise<LoginResponse> {
   const response = await fetch(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...extraHeaders },
     body: JSON.stringify(body),
   });
   const result = await response.json() as LoginResponse;

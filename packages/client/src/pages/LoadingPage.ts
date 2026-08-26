@@ -10,7 +10,7 @@
 import type { GameController } from '../game/GameController.js';
 import { createSocket, waitForConnection } from '../hooks/useSocket.js';
 import { t } from '../game/i18n.js';
-import { clearAuthToken, getAuthToken } from '../auth/authApi.js';
+
 
 const loadingPageCleanups = new WeakMap<HTMLElement, () => void>();
 
@@ -99,7 +99,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
 
     socket = createSocket({
       url: window.location.origin,
-      token: getAuthToken() || undefined,
+      token: controller.getAuthSession().getToken() || undefined,
       onConnect: (socketId) => {
         if (!active || attempt !== connectionAttempt) return;
         progressBar.style.width = '60%';
@@ -108,7 +108,9 @@ export function createLoadingPage(controller: GameController): HTMLElement {
       },
       onError: (error) => {
         if (!active || attempt !== connectionAttempt) return;
-        if (error === 'authentication_failed') clearAuthToken();
+        if (error === 'authentication_failed' || error === 'authentication_required') {
+          controller.reset(true);
+        }
         controller.setError(error);
         errorText.textContent = t('loading.connectFailed', { error });
         errorContainer.style.display = 'block';

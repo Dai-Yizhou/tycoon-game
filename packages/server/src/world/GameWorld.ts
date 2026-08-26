@@ -100,10 +100,18 @@ export interface LoadMapOptions {
 /**
  * 游戏世界配置
  */
+export interface WorldIdentity {
+  worldId: string;
+  namespace: string;
+  temporary: boolean;
+  expiresAt?: number;
+}
+
 export interface GameWorldOptions {
   /** 自定义 PlayerManager（测试时注入） */
   playerManager?: PlayerManager;
   worldStore?: WorldStore;
+  worldIdentity?: WorldIdentity;
 }
 
 /**
@@ -114,6 +122,7 @@ export class GameWorld {
   private readonly playerManager: PlayerManager;
   private readonly teams: Map<string, Team>;
   private readonly worldStore?: WorldStore;
+  private readonly worldIdentity?: WorldIdentity;
 
   private mapData: MapData | null = null;
   private mapMeta: MapMeta | null = null;
@@ -125,12 +134,16 @@ export class GameWorld {
   private runtimeState: WorldRuntimeStateStore | null = null;
   private lastValidation: ValidationResult | null = null;
   private snapshotStateProvider: (() => Pick<WorldSnapshot, 'taxRecords' | 'jailStates'>) | null = null;
+  private persistenceQueue: Promise<void> = Promise.resolve();
+  private persistenceInitialized = false;
+  private persistedRevision: number | undefined;
 
   constructor(options: GameWorldOptions = {}) {
     this.emitter = new EventEmitter();
     this.playerManager = options.playerManager ?? new PlayerManager();
     this.teams = new Map();
     this.worldStore = options.worldStore;
+    this.worldIdentity = options.worldIdentity;
 
     // 透传 PlayerManager 的事件为 WorldEvent
     this.playerManager.on(PlayerEvents.Added, ({ player }: { player: Player }) => {
@@ -294,16 +307,50 @@ export class GameWorld {
     return result;
   }
 
-  saveSnapshot(taxRecords: WorldSnapshot['taxRecords'] = {}, jailStates: WorldSnapshot['jailStates'] = {}): void {
-    if (!this.worldStore || !this.mapData || !this.mapMeta) return;
+  saveSnapshot(taxRecords: WorldSnapshot['taxRecords'] = {}, jailStates: WorldSnapshot['jailStates'] = {}): Promise<void> {
+    if (!this.worldStore || !this.mapData || !this.mapMeta) return Promise.resolve();
     const state = this.snapshotStateProvider?.() ?? { taxRecords, jailStates };
-    this.worldStore.save({ version: 2, revision: this.resourceVersion, savedAt: Date.now(), mapId: this.mapMeta.id, players: this.getAllPlayers(), teams: this.getAllTeams(), runtime: this.getRuntimeState().snapshot(), era: this.currentEra, taxRecords: state.taxRecords, jailStates: state.jailStates ?? {} });
+    const snapshot: WorldSnapshot = {
+      version: 2,
+      worldId: this.worldIdentity?.worldId,
+      namespace: this.worldIdentity?.namespace,
+      temporary: this.worldIdentity?.temporary,
+      expiresAt: this.worldIdentity?.expiresAt,
+      revision: this.resourceVersion,
+      savedAt: Date.now(),
+      mapId: this.mapMeta.id,
+      players: this.getAllPlayers(),
+      teams: this.getAllTeams(),
+      runtime: this.getRuntimeState().snapshot(),
+      era: this.currentEra,
+      taxRecords: state.taxRecords,
+      jailStates: state.jailStates ?? {},
+    };
+    const task = async (): Promise<void> => {
+      if (!this.persistenceInitialized) {
+        await this.worldStore?.initialize(snapshot);
+        this.persistenceInitialized = true;
+      } else {
+        await this.worldStore?.save(snapshot, this.persistedRevision);
+      }
+      this.persistedRevision = snapshot.revision;
+    };
+    const pending = this.persistenceQueue.then(task);
+    this.persistenceQueue = pending.catch(() => undefined);
+    return pending;
+  }
+
+  async flushPersistence(taxRecords: WorldSnapshot['taxRecords'] = {}, jailStates: WorldSnapshot['jailStates'] = {}): Promise<void> {
+    await this.saveSnapshot(taxRecords, jailStates);
   }
 
   restoreSnapshot(): WorldSnapshot | null {
     const snapshot = this.worldStore?.load() ?? null;
     if (!snapshot) return null;
     if (snapshot.version !== 2 || snapshot.mapId !== this.mapMeta?.id) throw new Error('world snapshot map mismatch');
+    this.persistenceInitialized = true;
+    this.persistedRevision = snapshot.revision;
+    this.resourceVersion = snapshot.revision;
     this.getRuntimeState().restore(snapshot.runtime);
     this.playerManager.clear();
     for (const player of snapshot.players) this.playerManager.addPlayer(player);

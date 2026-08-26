@@ -299,10 +299,7 @@ export class GameHudShell {
     const playerValues = player.currentPlayer?.values ?? {};
     const cell = this.vm.getCell(player.currentPlayerPosition);
     const regionId = cell?.regionId ?? "";
-    // 地图未提供字段定义时，退化到默认“财产”一栏，避免空栏
-    const slots: ValueFieldDef[] = defs.length > 0
-      ? defs
-      : [{ id: "money", name: t("hud.money"), scope: "player" }];
+    const slots: ValueFieldDef[] = defs;
     strip.replaceChildren(...slots.map((def, index) => {
       const pill = document.createElement("div");
       pill.className = `value-pill${index === 0 ? " value-pill--accent" : ""}`;

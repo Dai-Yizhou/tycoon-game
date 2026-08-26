@@ -30,10 +30,10 @@ import { DayNightCycle, DEFAULT_DAY_NIGHT_CONFIG } from './world/DayNightCycle.j
 import { TimeZoneManager } from './world/TimeZoneManager.js';
 import { ProsperityManager, DEFAULT_PROSPERITY_CONFIG } from './world/ProsperityManager.js';
 import { BehaviorEngine } from './behavior/index.js';
-import { InMemoryPlayerStore, MongoPlayerStore, MongoUserStore, InMemoryWorldStore, FileWorldStore, type PlayerStore, type WorldStore } from './storage/index.js';
+import { MongoUserStore, FileWorldStore, MongoWorldStore, type WorldStore } from './storage/index.js';
 import { JWTService } from './auth/JWTService.js';
 import { AuthService, type UserStore } from './auth/AuthService.js';
-import { InMemoryUserStore } from './auth/InMemoryUserStore.js';
+import { FileUserStore } from './auth/FileUserStore.js';
 import { createAuthRouter } from './auth/authRoutes.js';
 
 /**
@@ -112,8 +112,6 @@ export interface CreatedApp {
   prosperityManager?: ProsperityManager;
   /** 行为执行引擎实例 */
   behaviorEngine?: BehaviorEngine;
-  /** 玩家存储实例（FR-22 账号持久化） */
-  playerStore?: PlayerStore;
   /** 用户存储实例 */
   userStore?: UserStore;
   worldStore?: WorldStore;
@@ -126,7 +124,7 @@ export interface CreatedApp {
  * @param config 服务端配置
  * @param deps 可选依赖（用于测试与扩展）
  */
-export function createApp(config: ServerConfig, deps: AppDependencies = {}): CreatedApp {
+export async function createApp(config: ServerConfig, deps: AppDependencies = {}): Promise<CreatedApp> {
   if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET?.trim()) {
     throw new Error('JWT_SECRET is required in production');
   }
@@ -145,7 +143,9 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   const authJwt = deps.socketManagerOptions?.jwtService ?? (process.env.JWT_SECRET?.trim()
     ? new JWTService()
     : new JWTService({ secret: 'development-only-secret', expiresIn: 7 * 24 * 60 * 60 }));
-  const userStore = deps.userStore ?? (config.mongoUri ? new MongoUserStore(config.mongoUri) : new InMemoryUserStore());
+  const userStore = deps.userStore ?? (config.mongoUri
+    ? new MongoUserStore(config.mongoUri)
+    : new FileUserStore(resolveConfiguredPath(config.userDataPath)));
   const authService = deps.authService ?? new AuthService(userStore, authJwt);
   app.use('/api/auth', createAuthRouter(authService));
 
@@ -161,8 +161,22 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
   });
 
   // GameWorld
-  const worldStore = deps.worldStore ?? (config.mongoUri ? new FileWorldStore(path.resolve(process.cwd(), 'data/world.json')) : new InMemoryWorldStore());
-  const world = deps.world ?? new GameWorld({ worldStore });
+  const worldId = config.worldId ?? `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const temporaryWorld = config.worldId === null;
+  const worldExpiry = temporaryWorld ? Date.now() + config.worldSnapshotTtlMs : undefined;
+  const worldStore = deps.worldStore ?? (config.mongoUri
+    ? new MongoWorldStore(config.mongoUri, { worldId, namespace: config.worldNamespace, temporary: temporaryWorld, expiresAt: worldExpiry })
+    : new FileWorldStore(resolveConfiguredPath(`${config.worldDataPath}.${worldId}`)));
+  if (worldStore instanceof MongoWorldStore) {
+    await worldStore.ready;
+  }
+  if (config.mongoUri && !deps.userStore && userStore instanceof MongoUserStore) {
+    await userStore.loadUserById('__connection_probe__');
+  }
+  const world = deps.world ?? new GameWorld({
+    worldStore,
+    worldIdentity: { worldId, namespace: config.worldNamespace, temporary: temporaryWorld, expiresAt: worldExpiry },
+  });
 
   // 加载地图数据与元数据（供 ProsperityManager、TimeZoneManager 等使用）
   try {
@@ -179,9 +193,9 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
       logger.warn(`地图加载有校验错误：${result.errors.join('; ')}`);
     }
   } catch (err) {
-    logger.warn('地图元数据加载失败，繁荣度/时区系统将不可用', {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error('server startup failed: map loading error', { error: message });
+    throw new Error(`server startup failed: map loading error: ${message}`);
   }
 
   // 健康检查
@@ -350,16 +364,6 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     handlerRegistry.registerForSocket(socket);
   });
 
-  // 初始化玩家存储（FR-22 账号持久化）
-  // 配置了 MongoDB 时使用 MongoPlayerStore，否则使用内存版
-  const playerStore: PlayerStore = config.mongoUri
-    ? new MongoPlayerStore(config.mongoUri)
-    : new InMemoryPlayerStore();
-  if (socketManager) {
-    socketManager.setPlayerStore(playerStore);
-  }
-  logger.info(`PlayerStore initialized (${config.mongoUri ? 'MongoDB' : 'InMemory'})`);
-
   return {
     app,
     io,
@@ -371,7 +375,6 @@ export function createApp(config: ServerConfig, deps: AppDependencies = {}): Cre
     timeZoneManager,
     prosperityManager,
     behaviorEngine,
-    playerStore,
     worldStore,
     handlerRegistry,
     userStore,
@@ -426,10 +429,28 @@ export async function gracefulShutdown(
   world?: GameWorld,
   handlerRegistry?: HandlerRegistry,
   userStore?: { close?: () => Promise<void> },
-  playerStore?: PlayerStore,
+  worldStore?: { close?: () => Promise<void> },
+  io?: TypedServer,
 ): Promise<void> {
   logger.info('graceful shutdown started');
-  if (world) world.saveSnapshot(economy?.taxation.getAllTaxRecords(), undefined);
+
+  if (io && !socketManager) {
+    try {
+      io.close();
+    } catch (err) {
+      logger.error('error closing Socket.IO server', err);
+    }
+  }
+  if (world) {
+    try {
+      await world.flushPersistence(
+        economy?.taxation.getAllTaxRecords(),
+        handlerRegistry?.getJailHandler().getJailStates(),
+      );
+    } catch (err) {
+      logger.error('world persistence failed during shutdown', err);
+    }
+  }
 
   // 停止繁荣度更新定时器
   if (prosperityManager) {
@@ -480,11 +501,11 @@ export async function gracefulShutdown(
     }
   }
 
-  if (playerStore?.close) {
+  if (worldStore?.close) {
     try {
-      await playerStore.close();
+      await worldStore.close();
     } catch (err) {
-      logger.error('error closing player store', err);
+      logger.error('error closing world store', err);
     }
   }
 

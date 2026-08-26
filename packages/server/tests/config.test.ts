@@ -29,6 +29,11 @@ describe('loadConfig', () => {
       'REDIS_URL',
       'MAX_PLAYERS',
       'DEBUG',
+      'WORLD_ID',
+      'WORLD_NAMESPACE',
+      'WORLD_SNAPSHOT_TTL_MS',
+      'WORLD_DATA_PATH',
+      'USER_DATA_PATH',
     ]) {
       delete process.env[key];
     }

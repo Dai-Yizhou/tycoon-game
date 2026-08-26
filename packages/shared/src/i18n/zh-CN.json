@@ -68,7 +68,7 @@
     "passedStartTitle": "经过起点",
     "passedStartContent": "玩家 {{name}} 经过起点，获得 {{amount}} 资金",
     "monumentRepairSuccess": "纪念碑修缮成功",
-    "monumentRepairContent": "玩家 {{player}}... 修缮了纪念碑 {{id}}，信用值增加 {{credit}}",
+    "monumentRepairContent": "玩家 {{player}}... 修缮了纪念碑 {{id}}，数值变化 {{values}}",
     "monumentTitle": "纪念碑",
     "monumentPrompt": "你可以修缮纪念碑，费用 {{cost}}，当前区域繁荣度 {{prosperity}}",
     "jailEnteredTitle": "进入监狱",

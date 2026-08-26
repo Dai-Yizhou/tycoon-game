@@ -37,6 +37,16 @@ export interface ServerConfig {
   maxPlayers: number;
   /** 是否启用调试日志（默认 false） */
   debug: boolean;
+  /** 固定世界标识；未设置时由服务端创建临时世界 */
+  worldId: string | null;
+  /** 世界隔离命名空间 */
+  worldNamespace: string;
+  /** 临时世界 TTL（毫秒） */
+  worldSnapshotTtlMs: number;
+  /** 本地世界快照目录 */
+  worldDataPath: string;
+  /** 本地账号数据文件 */
+  userDataPath: string;
   ownership: { buyInMultiplier: number; maxShareholders: number };
 }
 
@@ -58,6 +68,11 @@ export const DEFAULT_SERVER_CONFIG: ServerConfig = {
   redisUrl: null,
   maxPlayers: 1000,
   debug: false,
+  worldId: null,
+  worldNamespace: 'default',
+  worldSnapshotTtlMs: 24 * 60 * 60 * 1000,
+  worldDataPath: './data/world.json',
+  userDataPath: './data/users.json',
   ownership: { buyInMultiplier: 1, maxShareholders: 8 },
 };
 

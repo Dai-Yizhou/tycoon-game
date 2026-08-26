@@ -68,7 +68,7 @@
     ,"passedStartTitle": "Passed Start"
     ,"passedStartContent": "Player {{name}} passed Start and received {{amount}} funds"
     ,"monumentRepairSuccess": "Monument repaired"
-    ,"monumentRepairContent": "Player {{player}}... repaired monument {{id}} and gained {{credit}} credit"
+    ,"monumentRepairContent": "Player {{player}}... repaired monument {{id}} with value changes {{values}}"
     ,"monumentTitle": "Monument"
     ,"monumentPrompt": "You can repair this monument for {{cost}}. Current regional prosperity: {{prosperity}}"
     ,"jailEnteredTitle": "Entered Jail"

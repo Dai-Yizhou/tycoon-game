@@ -57,7 +57,7 @@ export class Bankruptcy {
       playerId,
       bankruptcyTime,
       reason,
-      netWorthAtBankruptcy: player.values.money?.current ?? 0,
+      netWorthAtBankruptcy: Object.values(player.values).reduce((total, field) => total + Math.max(0, field.current), 0),
     };
 
     this.taxation.clearTaxRecords(playerId);

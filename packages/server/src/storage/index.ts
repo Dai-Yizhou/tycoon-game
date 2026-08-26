@@ -16,3 +16,4 @@ export * from './InMemoryEraStore.js';
 export * from './MongoPlayerStore.js';
 export * from './MongoUserStore.js';
 export * from './WorldStore.js';
+export * from './MongoWorldStore.js';

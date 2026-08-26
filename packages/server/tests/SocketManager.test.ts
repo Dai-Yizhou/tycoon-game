@@ -20,7 +20,7 @@ import { GameWorld } from '../src/world/GameWorld';
 import { SocketManager, type TypedServer } from '../src/transport/SocketManager';
 import { registerHandlers } from '../src/transport/handlers';
 import { JWTService } from '../src/auth/JWTService';
-import { InMemoryPlayerStore } from '../src/storage/InMemoryPlayerStore';
+import { PlayerManager } from '../src/world/PlayerManager';
 
 function buildPlayer(id: string, overrides: Partial<Player> = {}): Player {
   return {
@@ -200,6 +200,37 @@ describe('SocketManager', () => {
       sock.disconnect();
     });
 
+    it('initializes new players from the loaded map UCT definitions', async () => {
+      const env = await createTestEnv();
+      const world = new GameWorld();
+      world.loadMap([], {
+        id: 'uct-map',
+        valueFieldDefinitions: [
+          { id: 'money', name: { 'zh-CN': '财产', 'en-US': 'Money' }, scope: 'player', min: 0 },
+          { id: 'reputation', name: { 'zh-CN': '声望', 'en-US': 'Reputation' }, scope: 'player', min: -10, max: 100 },
+          { id: 'pros', name: { 'zh-CN': '繁荣度', 'en-US': 'Prosperity' }, scope: 'region', min: 0, max: 100 },
+        ],
+        playerInitial: { player: { money: 321, reputation: 7 } },
+        startCellId: 9,
+      } as never, { skipValidation: true });
+      const jwt = new JWTService({ secret: 'test-secret', expiresIn: 3600 });
+      const socketManager = new SocketManager(env.io, { world, autoWireWorldEvents: false, jwtService: jwt });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
+      const sock = await connectClient(env.port, { auth: { token: jwt.generateToken('p-uct', 'uct_player', false) } });
+      const result = await new Promise<{ ok: boolean; data?: { player: Player } }>((resolve) => {
+        sock.emit('client.login', { username: 'uct_player', guest: false }, resolve);
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.data?.player.position.cellId).toBe(9);
+      expect(result.data?.player.values).toEqual({
+        money: { id: 'money', name: '财产', current: 321, min: 0, max: undefined, scope: 'player' },
+        reputation: { id: 'reputation', name: '声望', current: 7, min: -10, max: 100, scope: 'player' },
+      });
+      sock.disconnect();
+      await new Promise<void>((resolve) => env.http.close(() => resolve()));
+    });
+
     it('accepts client.login only after an authenticated handshake', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();
@@ -253,22 +284,22 @@ describe('SocketManager', () => {
       await new Promise<void>((resolve) => env.http.close(() => resolve()));
     });
 
-    it('restores a persisted player by the authenticated player id', async () => {
+    it('restores the authenticated player from the world authority', async () => {
       const env = await createTestEnv();
-      const world = new GameWorld();
-      const jwt = new JWTService({ secret: 'test-secret', expiresIn: 3600 });
       const persisted = buildPlayer('p-login', {
         username: 'renamed_player',
         values: {
           money: { id: 'money', name: '财产', current: 777 },
         },
       });
-      const playerStore = new InMemoryPlayerStore([persisted]);
+      const playerManager = new PlayerManager();
+      playerManager.addPlayer(persisted);
+      const world = new GameWorld({ playerManager });
+      const jwt = new JWTService({ secret: 'test-secret', expiresIn: 3600 });
       const socketManager = new SocketManager(env.io, {
         world,
         autoWireWorldEvents: false,
         jwtService: jwt,
-        playerStore,
       });
       env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
       const token = jwt.generateToken('p-login', 'login_player', false);

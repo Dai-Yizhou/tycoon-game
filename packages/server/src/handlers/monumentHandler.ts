@@ -205,13 +205,12 @@ export class MonumentHandler {
       }
 
       // 6. 获取修缮费用
-      const cost = Math.max(0, -(monumentCell.repairCost?.player?.money ?? 0));
-
-      // 7. 检查玩家财产是否足够
-      const money = this.getPlayerMoney(player);
-      if (money < cost) {
-        emitError(socket, ErrorCodes.InvalidPayload, `财产不足，需要 ${cost}，当前 ${money}`);
-        ack?.({ ok: false, error: 'insufficient_money' });
+      // 7. 检查玩家修缮费用字段是否足够
+      const insufficientField = Object.entries(monumentCell.repairCost?.player ?? {}).find(([fieldId, delta]) => (player.values[fieldId]?.current ?? 0) + delta < 0);
+      if (insufficientField) {
+        const [fieldId, delta] = insufficientField;
+        emitError(socket, ErrorCodes.InvalidPayload, `数值字段 ${fieldId} 不足，需要 ${Math.abs(delta)}，当前 ${player.values[fieldId]?.current ?? 0}`);
+        ack?.({ ok: false, error: 'insufficient_value' });
         return;
       }
 
@@ -308,10 +307,9 @@ export class MonumentHandler {
   private executeRepair(
     player: Player,
     monumentCell: Cell,
-    legacyCost?: number,
   ): RepairResult | null {
     try {
-      const repairCost = monumentCell.repairCost ?? (legacyCost === undefined ? null : { player: { money: -legacyCost } });
+      const repairCost = monumentCell.repairCost;
       if (!repairCost) return null;
       const playerChanges = Object.entries(repairCost.player ?? {});
       const appliedPlayerChanges: Array<[string, number]> = [];
@@ -374,27 +372,24 @@ export class MonumentHandler {
       id: `repair_${result.playerId}_${Date.now()}`,
       type: 'success',
       title: t('server.monumentRepairSuccess'),
-      content: t('server.monumentRepairContent', { player: result.playerId.slice(0, 8), id: result.monumentId, credit: result.cost.player?.credit ?? 0 }),
+      content: t('server.monumentRepairContent', {
+        player: result.playerId.slice(0, 8),
+        id: result.monumentId,
+        values: Object.entries(result.cost.player ?? {}).map(([fieldId, delta]) => `${fieldId}:${delta}`).join(', '),
+      }),
       durationMs: 3000,
     });
 
-    // 2. 广播数值变化（财产）
     const player = this.world.getPlayer(result.playerId);
     if (player) {
-      this.io.emit('server.valueChanged', {
-        playerId: result.playerId,
-        fieldId: 'money',
-        current: this.getPlayerMoney(player),
-        delta: result.cost.player?.money ?? 0,
-      });
-
-      // 3. 广播数值变化（信用值）
-      this.io.emit('server.valueChanged', {
-        playerId: result.playerId,
-        fieldId: 'credit',
-        current: this.getPlayerCredit(player),
-        delta: result.cost.player?.credit ?? 0,
-      });
+      for (const [fieldId, delta] of Object.entries(result.cost.player ?? {})) {
+        this.io.emit('server.valueChanged', {
+          playerId: result.playerId,
+          fieldId,
+          current: player.values[fieldId]?.current ?? 0,
+          delta,
+        });
+      }
     }
 
     // 4. 繁荣度变化由 ProsperityManager 负责广播（server.prosperityChanged）
@@ -428,7 +423,7 @@ export class MonumentHandler {
     }
 
     // 发送通知给玩家，显示修缮选项
-    const cost = Math.max(0, -(monumentCell.repairCost?.player?.money ?? 0));
+    const cost = this.getRepairPlayerCost(monumentCell);
     const currentProsperity = this.getMonumentProsperity(monumentId);
 
     socket.emit('server.notification', {
@@ -446,32 +441,14 @@ export class MonumentHandler {
     logger.debug(`玩家 ${playerId} 到达纪念碑 ${monumentId}`);
   }
 
-  /**
-   * 获取玩家财产
-   */
-  private getPlayerMoney(player: Player): number {
-    const moneyField = player.values['money'];
-    return moneyField?.current ?? 0;
-  }
-
   private repairVisitKey(playerId: string, monumentId: number): string {
     return `${playerId}:${monumentId}`;
   }
 
-  /**
-   * 设置玩家财产
-   */
-  /**
-   * 获取玩家信用值
-   */
-  private getPlayerCredit(player: Player): number {
-    const creditField = player.values['credit'];
-    return creditField?.current ?? 0;
+  private getRepairPlayerCost(monumentCell: Cell): number {
+    return Math.max(0, ...Object.values(monumentCell.repairCost?.player ?? {}).map((delta) => -delta));
   }
 
-  /**
-   * 设置玩家信用值
-   */
   /**
    * 获取纪念碑所属区域的繁荣度
    *

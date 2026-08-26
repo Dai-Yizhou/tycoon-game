@@ -8,9 +8,8 @@
  * - i18n 支持
  */
 
-import { t } from '@game/shared';
+import { t, type LoginResponse } from '@game/shared';
 import type { GameController } from '../game/GameController.js';
-import { authenticateAccount, authenticateGuest } from '../auth/authApi.js';
 
 /**
  * 创建登录界面
@@ -26,7 +25,7 @@ export function createLoginPage(controller: GameController): HTMLElement {
   const title = document.createElement('h2');
   title.className = 'login-title';
   title.dataset.ui = 'login-title';
-  title.textContent = t('game.loginButton');
+  title.textContent = t('login.title');
   const eyebrow = document.createElement('div');
   eyebrow.className = 'auth-eyebrow';
   eyebrow.textContent = t('login.eyebrow');
@@ -43,7 +42,8 @@ export function createLoginPage(controller: GameController): HTMLElement {
   input.className = 'username-input';
   input.placeholder = t('login.usernamePlaceholder');
   input.maxLength = 20;
-  input.minLength = 2;
+  input.minLength = 3;
+  input.pattern = '[a-zA-Z0-9_]+';
   input.setAttribute('aria-label', t('login.username'));
   const userLabel = document.createElement('label');
   userLabel.className = 'auth-label';
@@ -83,11 +83,15 @@ export function createLoginPage(controller: GameController): HTMLElement {
   confirmButton.disabled = true;
 
   // 游客模式按钮
+  const registerButton = document.createElement('button');
+  registerButton.className = 'guest-button';
+  registerButton.textContent = t('register.registerButton');
   const guestButton = document.createElement('button');
   guestButton.className = 'guest-button';
   guestButton.textContent = t('game.guestButton');
 
   buttonContainer.appendChild(confirmButton);
+  buttonContainer.appendChild(registerButton);
   buttonContainer.appendChild(guestButton);
   const helper = document.createElement('div');
   helper.className = 'auth-helper';
@@ -98,7 +102,7 @@ export function createLoginPage(controller: GameController): HTMLElement {
   // 输入验证
   const validateInput = (): boolean => {
     const value = input.value.trim();
-    if (value.length < 2) {
+    if (value.length < 3) {
       errorText.textContent = t('login.usernameTooShort');
       errorText.style.display = 'block';
       confirmButton.disabled = true;
@@ -111,7 +115,7 @@ export function createLoginPage(controller: GameController): HTMLElement {
       return false;
     }
     // 检查特殊字符
-    if (!/^[\u4e00-\u9fa5a-zA-Z0-9_]+$/.test(value)) {
+    if (!/^[a-zA-Z0-9_]+$/.test(value)) {
       errorText.textContent = t('login.usernameInvalidChars');
       errorText.style.display = 'block';
       confirmButton.disabled = true;
@@ -132,10 +136,11 @@ export function createLoginPage(controller: GameController): HTMLElement {
   password.addEventListener('input', validateInput);
 
   // 确认按钮点击
-  const authenticate = async (result: Promise<{ user?: { username: string } }>): Promise<void> => {
+  const authSession = controller.getAuthSession();
+  const authenticate = async (result: Promise<LoginResponse>): Promise<void> => {
     try {
       const response = await result;
-      controller.setPlayerName(response.user?.username || input.value.trim());
+      controller.applyAuthResult(response);
       controller.nextState();
     } catch (error) {
       errorText.textContent = error instanceof Error ? error.message : t('login.loginFailed');
@@ -145,19 +150,23 @@ export function createLoginPage(controller: GameController): HTMLElement {
 
   confirmButton.addEventListener('click', () => {
     if (validateInput()) {
-      void authenticate(authenticateAccount(input.value.trim(), password.value));
+      void authenticate(authSession.login(input.value.trim(), password.value));
     }
+  });
+
+  registerButton.addEventListener('click', () => {
+    if (validateInput()) void authenticate(authSession.register(input.value.trim(), password.value));
   });
 
   // 游客模式点击
   guestButton.addEventListener('click', () => {
-    void authenticate(authenticateGuest());
+    void authenticate(authSession.guest());
   });
 
   // 回车键提交
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && validateInput()) {
-      void authenticate(authenticateAccount(input.value.trim(), password.value));
+      void authenticate(authSession.login(input.value.trim(), password.value));
     }
   });
 

@@ -5,6 +5,31 @@ import { t } from '@game/shared';
 export function createAuthRouter(authService: AuthService): Router {
   const router = Router();
 
+  router.post('/migrate-guest', async (req, res) => {
+    let user: Awaited<ReturnType<AuthService['verifyAndLoadUser']>> | null = null;
+    try {
+      const token = readBearerToken(req.headers.authorization);
+      user = token ? await authService.verifyAndLoadUser(token) : null;
+    } catch {
+      res.status(500).json({ success: false, error: t('server.authUnavailable') });
+      return;
+    }
+    if (!user) {
+      res.status(401).json({ success: false, error: 'authentication_required' });
+      return;
+    }
+    if (!isCredentialsBody(req.body)) {
+      res.status(400).json({ success: false, error: t('server.authInvalidCredentials') });
+      return;
+    }
+    try {
+      const result = await authService.migrateGuest(user.id, req.body);
+      res.status(result.success ? 200 : 400).json(result);
+    } catch {
+      res.status(500).json({ success: false, error: t('server.authUnavailable') });
+    }
+  });
+
   router.post('/register', async (req, res) => {
     if (!isCredentialsBody(req.body)) {
       res.status(400).json({ success: false, error: t('server.authInvalidCredentials') });
@@ -41,6 +66,12 @@ export function createAuthRouter(authService: AuthService): Router {
   });
 
   return router;
+}
+
+function readBearerToken(value: string | undefined): string | null {
+  if (!value?.startsWith('Bearer ')) return null;
+  const token = value.slice(7).trim();
+  return token || null;
 }
 
 function isCredentialsBody(body: unknown): body is { username: string; password: string } {

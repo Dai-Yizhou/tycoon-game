@@ -10,6 +10,8 @@
 
 import type { TypedClientSocket } from '../hooks/useSocket.js';
 import type { Player } from '@game/shared';
+import type { LoginResponse } from '@game/shared';
+import { AuthSession } from '../auth/AuthSession.js';
 
 export type GameState = 'start' | 'login' | 'loading' | 'game' | 'bankruptcy';
 
@@ -50,9 +52,23 @@ export class GameController {
   private listeners: Set<StateChangeListener> = new Set();
   private container: HTMLElement;
   private socket: TypedClientSocket | null = null;
+  private readonly authSession: AuthSession;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, authSession: AuthSession = new AuthSession()) {
     this.container = container;
+    this.authSession = authSession;
+    if (authSession.hasToken()) {
+      this.context.state = 'loading';
+    }
+  }
+
+  getAuthSession(): AuthSession {
+    return this.authSession;
+  }
+
+  applyAuthResult(result: LoginResponse): void {
+    this.authSession.apply(result);
+    if (result.user) this.setPlayerName(result.user.username);
   }
 
   /**
@@ -192,11 +208,12 @@ export class GameController {
   /**
    * 重置到开始状态
    */
-  reset(): void {
+  reset(clearSession = false): void {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
     }
+    if (clearSession) this.authSession.logout();
     this.context = {
       state: 'start',
       playerName: '',

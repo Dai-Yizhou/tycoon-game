@@ -124,7 +124,7 @@ describe('Pages', () => {
       expect(errorText.style.display).not.toBe('none');
 
       // 输入正常
-      input.value = '玩家名';
+      input.value = 'player_name';
       const password = page.querySelector('.password-input') as HTMLInputElement;
       password.value = 'password';
       input.dispatchEvent(new Event('input'));

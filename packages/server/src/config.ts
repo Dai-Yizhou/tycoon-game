@@ -56,6 +56,12 @@ function parseOptionalString(value: string | undefined): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function parsePositiveDuration(value: string | undefined, fallback: number): number {
+  if (value === undefined || value.trim() === '') return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
 /**
  * 解析布尔值
  *
@@ -100,6 +106,11 @@ export function loadConfig(): ServerConfig {
     redisUrl: parseOptionalString(process.env.REDIS_URL),
     maxPlayers: parsePositiveInt(process.env.MAX_PLAYERS, DEFAULT_SERVER_CONFIG.maxPlayers),
     debug: parseBoolean(process.env.DEBUG, DEFAULT_SERVER_CONFIG.debug),
+    worldId: parseOptionalString(process.env.WORLD_ID),
+    worldNamespace: parseString(process.env.WORLD_NAMESPACE, DEFAULT_SERVER_CONFIG.worldNamespace),
+    worldSnapshotTtlMs: parsePositiveDuration(process.env.WORLD_SNAPSHOT_TTL_MS, DEFAULT_SERVER_CONFIG.worldSnapshotTtlMs),
+    worldDataPath: parseString(process.env.WORLD_DATA_PATH, DEFAULT_SERVER_CONFIG.worldDataPath),
+    userDataPath: parseString(process.env.USER_DATA_PATH, DEFAULT_SERVER_CONFIG.userDataPath),
     ownership: {
       buyInMultiplier: parseNonNegativeNumber(process.env.OWNERSHIP_BUY_IN_MULTIPLIER, DEFAULT_SERVER_CONFIG.ownership.buyInMultiplier),
       maxShareholders: parsePositiveInt(process.env.MAX_PROPERTY_SHAREHOLDERS, DEFAULT_SERVER_CONFIG.ownership.maxShareholders),

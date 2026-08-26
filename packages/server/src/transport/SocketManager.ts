@@ -25,13 +25,11 @@ import {
   type ServerToClientEvents,
   type SocketData,
   type Player,
-  type ValueField,
   PlayerStatus,
 } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { DayNightCycle } from '../world/DayNightCycle.js';
-import type { PlayerStore } from '../storage/PlayerStore.js';
 import type { TeamManager } from '../team/TeamManager.js';
 import type { JWTService } from '../auth/JWTService.js';
 import type { Cell } from '@game/shared';
@@ -85,8 +83,6 @@ export interface SocketManagerOptions {
   autoWireWorldEvents?: boolean;
   /** 昼夜循环实例（用于登录时同步时间给客户端） */
   dayNightCycle?: DayNightCycle;
-  /** 玩家存储（用于账号持久化；不传则不持久化） */
-  playerStore?: PlayerStore;
   teamManager?: TeamManager;
 }
 
@@ -101,7 +97,6 @@ export class SocketManager {
   private readonly jwtService?: JWTService;
   private readonly autoWireWorldEvents: boolean;
   private dayNightCycle?: DayNightCycle;
-  private playerStore?: PlayerStore;
   private teamManager?: TeamManager;
 
   /** socketId -> 已发事件计数（按时间窗口重置） */
@@ -117,7 +112,6 @@ export class SocketManager {
     this.jwtService = options.jwtService;
     this.autoWireWorldEvents = options.autoWireWorldEvents ?? true;
     this.dayNightCycle = options.dayNightCycle;
-    this.playerStore = options.playerStore;
     this.teamManager = options.teamManager;
 
     if (!this.authenticate && !this.jwtService && process.env.NODE_ENV === 'production') {
@@ -324,17 +318,6 @@ export class SocketManager {
     logger.info(`socket disconnected: ${socket.id} (${reason})`);
     const playerId = socket.data.playerId;
     if (playerId) {
-      // 保存玩家状态到 PlayerStore（非游客模式且有存储时）
-      // 在冻结之前保存，确保存储中的状态是真实游戏状态而非 frozen
-      if (!socket.data.guest && this.playerStore) {
-        const player = this.world.getPlayer(playerId);
-        if (player) {
-          this.playerStore.savePlayer(player).catch((err) => {
-            logger.error(`failed to save player ${playerId} on disconnect`, err);
-          });
-        }
-      }
-
       const set = this.playerSockets.get(playerId);
       if (set) {
         set.delete(socket.id);
@@ -407,13 +390,6 @@ export class SocketManager {
     this.dayNightCycle = dayNightCycle;
   }
 
-  /**
-   * 注入玩家存储实例（供登录恢复账号与断开时保存状态）
-   */
-  setPlayerStore(playerStore: PlayerStore): void {
-    this.playerStore = playerStore;
-  }
-
   private registerCoreHandlers(socket: TypedSocket): void {
     // 心跳
     socket.on('client.ping', (payload, ack) => {
@@ -441,13 +417,13 @@ export class SocketManager {
           return;
         }
         const requestedUsername = payload.username.trim();
-        if (authenticatedUsername && requestedUsername !== authenticatedUsername) {
+        if (authenticatedUsername && requestedUsername && requestedUsername !== authenticatedUsername) {
           ack?.({ ok: false, error: 'identity_mismatch' });
           return;
         }
         const username = (authenticatedUsername || requestedUsername).trim();
-        if (!username || username.length < 2) {
-          ack?.({ ok: false, error: '用户名至少需要2个字符' });
+        if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+          ack?.({ ok: false, error: 'invalid_username' });
           return;
         }
 
@@ -457,34 +433,16 @@ export class SocketManager {
         let player: Player;
         let isNewPlayer = false;
 
-        if (isGuest) {
-          // 游客模式：创建临时玩家，不持久化
-          const playerId = socket.data.playerId || `guest_${now}_${Math.random().toString(36).slice(2, 8)}`;
-          player = SocketManager.createDefaultPlayer(playerId, username, now);
-          socket.data.guest = true;
-        } else if (this.playerStore) {
-          const authenticatedPlayerId = socket.data.playerId;
-          const existingById = authenticatedPlayerId
-            ? await this.playerStore.loadPlayer(authenticatedPlayerId)
-            : null;
-          const existing = existingById ?? (this.playerStore.loadPlayerByUsername
-            ? await this.playerStore.loadPlayerByUsername(username)
-            : null);
-          if (existing) {
-            // 恢复已有玩家状态
-            player = existing;
-            player.username = username;
-            player.lastActiveAt = now;
-          } else {
-            // 新玩家
-            const playerId = socket.data.playerId || `p_${now}_${Math.random().toString(36).slice(2, 8)}`;
-            player = SocketManager.createDefaultPlayer(playerId, username, now);
-            isNewPlayer = true;
-          }
+        const existing = this.world.getPlayer(socket.data.playerId);
+        if (existing) {
+          player = { ...existing, username, lastActiveAt: now };
         } else {
-          // 无 PlayerStore：创建新玩家（保持原有行为）
-          const playerId = socket.data.playerId || `p_${now}_${Math.random().toString(36).slice(2, 8)}`;
-          player = SocketManager.createDefaultPlayer(playerId, username, now);
+          const playerId = socket.data.playerId;
+          player = this.createDefaultPlayer(playerId, username, now);
+          isNewPlayer = true;
+        }
+        if (isGuest) {
+          socket.data.guest = true;
         }
 
         // 检查玩家是否已在游戏世界中（可能是冻结状态的重连）
@@ -511,15 +469,6 @@ export class SocketManager {
         // 绑定 playerId 到 socket
         socket.data.playerId = player.id;
         this.trackPlayerSocket(player.id, socket.id);
-
-        // 保存到 PlayerStore（非游客模式且有存储时）
-        if (!isGuest && this.playerStore) {
-          try {
-            await this.playerStore.savePlayer(player);
-          } catch (err) {
-            logger.error(`failed to save player ${player.id}`, err);
-          }
-        }
 
         // 获取昼夜周期信息
         const cycleStartTime = this.dayNightCycle?.getCycleStartTime() ?? now;
@@ -583,23 +532,13 @@ export class SocketManager {
     // 双重注册导致的状态不一致。
   }
 
-  /**
-   * 创建默认玩家对象
-   *
-   * 包含初始数值字段（金钱 2000、信用值 50），位置在起点。
-   */
-  private static createDefaultPlayer(playerId: string, username: string, now: number): Player {
-    const values: Record<string, ValueField> = {
-      money: { id: 'money', name: '财产', current: 2000, min: 0 },
-      credit: { id: 'credit', name: '信用值', current: 50, min: 0, max: 100 },
-    };
-
+  private createDefaultPlayer(playerId: string, username: string, now: number): Player {
     return {
       id: playerId,
       username,
       teamId: null,
-      position: { cellId: 0 },
-      values,
+      position: { cellId: this.world.getMapMeta()?.startCellId ?? 0 },
+      values: this.world.buildInitialPlayerValues(),
       status: PlayerStatus.Normal,
       createdAt: now,
       lastActiveAt: now,
