@@ -8,26 +8,31 @@
 
 ```text
 tycoon-maps/
+├── AGENTS.md                  ← Agent 顶层入口（会话先读它，再进 skills/map-author/）
 ├── README.md                  ← 本文件（人类入口）
 ├── docs/                      ← 面向人类的文档，供查阅
 │   ├── UCT.md                 ← UCT 理念说明书（为什么有 UCT、正负号、字段速查）
 │   ├── CELLS.md               ← 8 类格子速查表（触发时机 / 必填字段）
 │   ├── QUICKSTART.md          ← 协作者三步上手指南
 │   └── COLLABORATION.md       ← 与 Agent 协作指南 + 最佳实践
-├── maps/                      ← 地图 JSON（map.json + map-meta.json）
-│   └── example.*.json         ← 可参考的完整示例
-├── behaviors/                 ← 行为 JSON（供 event / supply 的 behavior 引用）
-│   └── example-event.behavior.json
+├── maps/                      ← 地图内容，一图一目录
+│   └── example/
+│       ├── example.map.json
+│       ├── example.map-meta.json
+│       ├── NOTES.md           ← 配置注释文档（改动必同步）
+│       └── behaviors/         ← 本图行为 JSON
 └── skills/
     └── map-author/
-        └── SKILL.md           ← 协作者侧 Skill（Agent 自解释加载，覆盖整个工作流）
+        ├── SKILL.md           ← 主工作流（入口 + 五步 + 纪律 + 先对齐后实现铁律）
+        ├── SPEC.md            ← 制图规范详解（UCT / map-meta / map.json / 行为 JSON / $ref）
+        └── EXAMPLES.md        ← 充分示例（含昼夜繁荣度、彩蛋/隐藏格、NOTES 模板）
 ```
 
 ## 怎么开始
 
 - 我是**协作者** → 看 `docs/QUICKSTART.md`，或直接在 AI 对话里说"我要一个 property 格子"。
 - 我是**想要理解设计的人** → 看 `docs/UCT.md` 与 `docs/CELLS.md`。
-- 我是 **Agent** → 加载 `skills/map-author/SKILL.md` 作为协作主流程。
+- 我是 **Agent** → 先读顶层 `AGENTS.md`，再加载 `skills/map-author/SKILL.md` 作为协作主流程（细节查阅同目录 `SPEC.md` / `EXAMPLES.md`）。
 
 ## 协作底线
 

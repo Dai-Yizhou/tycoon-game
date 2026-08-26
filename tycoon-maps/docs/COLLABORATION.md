@@ -1,6 +1,6 @@
 # 与 Agent 协作指南 + 最佳实践
 
-本仓库的核心工作流由**协作者侧 Skill**驱动（`skills/map-author/SKILL.md`）。下面是人话版说明，供人类查阅，也和 Agent 协作时共同遵守的约定。
+本仓库的核心工作流由**协作者侧 Skill**驱动（入口 `AGENTS.md` → 主流程 `skills/map-author/SKILL.md`，规范详解 `SPEC.md`、充分示例 `EXAMPLES.md`）。下面是人话版说明，供人类查阅，也和 Agent 协作时共同遵守的约定。**首要纪律：先精确对齐需求与效果（谁/何时/对谁/增减多少/方向），确认"完整、无歧义"后才生成，不允许臆测。**
 
 > 人体速记：**地图 = `map.json`（格子）+ `map-meta.json`（字段/区域/计费配置）+ `behaviors/`（行为）**。schema 单一来源在主仓库，这里只有内容。
 
