@@ -1,0 +1,13 @@
+{
+  "id": "supply-land",
+  "effects": [
+    {
+      "weight": 1,
+      "exclusive": false,
+      "msg": { "zh-CN": "踩中补给站，+8 现金 +1 信用", "en-US": "Land supply: +8 money +1 credit" },
+      "ops": [
+        { "type": "value", "target": "single", "delta": { "player": { "money": 8, "credit": 1 } } }
+      ]
+    }
+  ]
+}

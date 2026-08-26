@@ -1,0 +1,38 @@
+{
+  "id": "example-map",
+  "version": "2.0.0",
+  "name": { "zh-CN": "示例地图", "en-US": "Example Map" },
+
+  "_comment": "UCT 字段全集：声明本图允许使用的数值字段；格子里的 UCT 只能出现这些键（字段 id/name/scope/min/max，不含 current；初值来自 playerInitial 与 regions[].initial）。",
+
+  "valueFieldDefinitions": [
+    { "id": "money", "name": { "zh-CN": "财产", "en-US": "Money" },  "scope": "player", "min": 0 },
+    { "id": "credit", "name": { "zh-CN": "信用", "en-US": "Credit" }, "scope": "player", "min": 0 },
+    { "id": "env",    "name": { "zh-CN": "环保", "en-US": "Env" },    "scope": "player", "min": 0 },
+    { "id": "pros",   "name": { "zh-CN": "繁荣", "en-US": "Prosperity" }, "scope": "region", "min": 0, "max": 100 }
+  ],
+  "uct": { "player": ["money", "credit", "env"], "region": ["pros"] },
+
+  "playerInitial": { "player": { "money": 1000, "credit": 50, "env": 10 } },
+  "startCellId": 0,
+
+  "regions": [
+    { "id": "r1", "name": { "zh-CN": "东区", "en-US": "East" },  "initial": { "region": { "pros": 50 } } },
+    { "id": "r2", "name": { "zh-CN": "西区", "en-US": "West" }, "initial": { "region": { "pros": 40 } } }
+  ],
+
+  "dayNightCycle": 24,
+  "dice": { "cooldownMs": 5000, "min": 1, "max": 3 },
+  "tax": {
+    "baseTax": {
+      "rates":       { "player": { "money": 0.02, "credit": 0.01 } },
+      "exemptBelow": { "player": { "money": 1000 } },
+      "taxInterval": 900000
+    },
+    "shareTax": {
+      "rates":       { "player": { "money": 10 } },
+      "exemptBelow": 0,
+      "taxInterval": 900000
+    }
+  }
+}
