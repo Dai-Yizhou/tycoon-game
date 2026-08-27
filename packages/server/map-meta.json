@@ -12,7 +12,7 @@
     "region": ["pros"]
   },
   "playerInitial": {
-    "player": { "money": 2000, "credit": 0 }
+    "player": { "money": 2000, "credit": 50 }
   },
   "startCellId": 0,
   "regions": [
