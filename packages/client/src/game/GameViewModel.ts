@@ -193,6 +193,7 @@ export const CHAT_CHANNEL_DEFS: ChatChannelDef[] = [
   { id: 'system', label: '系统', color: '#6b7280' },
   { id: 'team', label: '队伍', color: '#3b82f6' },
   { id: 'region', label: '区域', color: '#22c55e' },
+  { id: 'global', label: '世界', color: '#f59e0b' },
 ];
 
 // ===== 变更事件 =====

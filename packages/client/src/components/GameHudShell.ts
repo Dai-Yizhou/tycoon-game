@@ -1,6 +1,7 @@
 import type { GameEffectHooks } from "../game/GameEffects.js";
 import type { GameViewModel, ValueFieldDef } from "../game/GameViewModel.js";
 import { t, localizedText } from "../game/i18n.js";
+import { parseChatCommand } from "@game/shared";
 
 /** 时区偏移（分钟）→ "UTC±H:MM"；0 显示 "UTC+0" */
 function formatTimezoneOffset(offsetMinutes: number): string {
@@ -169,7 +170,7 @@ export class GameHudShell {
 
     // 下拉频道选项与输入框占位符
     this.channel.replaceChildren(
-      ...["team", "region"].map((value) => {
+      ...["team", "region", "global"].map((value) => {
         const opt = document.createElement("option");
         opt.value = value;
         opt.textContent = t(`chat.channel.${value}`);
@@ -411,6 +412,7 @@ export class GameHudShell {
       { id: "region", labelKey: "chat.channel.region" },
       { id: "system", labelKey: "chat.channel.system" },
       { id: "team", labelKey: "chat.channel.team" },
+      { id: "global", labelKey: "chat.channel.global" },
     ];
     filters.innerHTML = channels.map(channel => {
       const checked = this.activeFilters.has(channel.id);
@@ -436,8 +438,12 @@ export class GameHudShell {
   private sendChat(): void {
     const message = this.input.value.trim();
     if (!message) return;
-    this.config.onChatSend?.(message, this.channel.value);
+    const command = parseChatCommand(message);
+    const channel = command.kind === "channel" ? command.channel : this.channel.value;
+    if (command.kind === "channel") this.channel.value = channel;
+    this.config.onChatSend?.(message, channel);
     this.input.value = "";
+    this.input.focus();
   }
 
   private escapeHtml(s: string): string {

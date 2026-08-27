@@ -14,11 +14,11 @@
  * ```
  */
 
-import { ChatChannels, type ChatChannel, type ChatMessage } from '@game/shared';
+import { ChatChannels, type ChatChannel, type ChatMessage, parseChatCommand, type CommandResult } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from './SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
-import { ChatManager } from '../chat/index.js';
+import { ChatManager, DEFAULT_CHAT_CONFIG, FeedbackManager } from '../chat/index.js';
 import { Bankruptcy, EconomyService, resolveOwnershipConfig, type OwnershipConfig } from '../economy/index.js';
 import { DiceHandler, MovementHandler, PropertyHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, TeamHandler } from '../handlers/index.js';
 import { TeamManager, DEFAULT_TEAM_CONFIG } from '../team/index.js';
@@ -80,6 +80,7 @@ export class HandlerRegistry {
   private readonly teamManager: TeamManager;
   private readonly teamHandler: TeamHandler;
   private readonly chatManager: ChatManager;
+  private readonly feedbackManager: FeedbackManager;
   private bankruptcy: Bankruptcy | null = null;
   private timeZoneManager: TimeZoneManager | null = null;
 
@@ -116,7 +117,8 @@ export class HandlerRegistry {
     this.monumentHandler = new MonumentHandler(io, world, undefined, economy ?? new EconomyService(world));
     this.teamManager = new TeamManager(DEFAULT_TEAM_CONFIG);
     this.teamHandler = new TeamHandler(io, world, this.teamManager);
-    this.chatManager = new ChatManager();
+    this.chatManager = new ChatManager({ ...DEFAULT_CHAT_CONFIG, bannedWords: ['testword'] });
+    this.feedbackManager = new FeedbackManager(this.chatManager);
   }
 
   /**
@@ -325,13 +327,18 @@ export class HandlerRegistry {
 
   private handleChat(socket: TypedSocket): void {
     socket.on('client.chat', (payload, ack) => {
+      const command = parseChatCommand(payload?.content ?? '');
+      if (command.kind !== 'message') {
+        this.handleChatCommand(socket, command, ack);
+        return;
+      }
       safeHandle(socket, ErrorCodes.InternalError, () => {
-        if (!payload || typeof payload.content !== 'string' || payload.content.length === 0) {
+        if (!payload || typeof payload.content !== 'string' || payload.content.trim().length === 0) {
           emitError(socket, ErrorCodes.InvalidPayload, '消息内容不能为空');
           ack?.({ ok: false, error: 'invalid_payload' });
           return;
         }
-        const content = payload.content.replace(/<[^>]*>/g, '');
+        const content = this.chatManager.sanitizeContent(payload.content);
         const channel = payload.channel as ChatChannel;
         if (channel !== ChatChannels.Global && channel !== ChatChannels.Team && channel !== ChatChannels.Region) {
           emitError(socket, ErrorCodes.InvalidPayload, '不支持的聊天频道');
@@ -348,6 +355,15 @@ export class HandlerRegistry {
         if (!player) {
           emitError(socket, ErrorCodes.PlayerNotFound, '玩家不存在');
           ack?.({ ok: false, error: 'player_not_found' });
+          return;
+        }
+        if (channel === ChatChannels.Team && !player.teamId) {
+          ack?.({ ok: false, error: 'no_team_channel' });
+          return;
+        }
+        const regionId = this.getPlayerRegionId(player.position.cellId);
+        if (channel === ChatChannels.Region && !regionId) {
+          ack?.({ ok: false, error: 'no_region_channel' });
           return;
         }
 
@@ -372,6 +388,70 @@ export class HandlerRegistry {
         ack?.({ ok: true, data: { message } });
       });
     });
+  }
+
+  public handleChatCommand(socket: TypedSocket, command: CommandResult, ack?: (result: { ok: boolean; error?: string }) => void): void {
+    const playerId = socket.data.playerId;
+    const player = playerId ? this.world.getPlayer(playerId) : undefined;
+    if (!player) {
+      ack?.({ ok: false, error: 'not_authenticated' });
+      return;
+    }
+    if (command.kind === 'error') {
+      ack?.({ ok: false, error: command.error });
+      return;
+    }
+    if (command.kind === 'help') {
+      this.emitSystemChat(socket, '/help /team [文本] /region [文本] /global [文本] /invite 用户名 /accept /reject /leave /report 内容');
+      ack?.({ ok: true });
+      return;
+    }
+    if (command.kind === 'channel') {
+      if (command.channel === ChatChannels.Team && !player.teamId) { ack?.({ ok: false, error: 'no_team_channel' }); return; }
+      if (command.channel === ChatChannels.Region && !this.getPlayerRegionId(player.position.cellId)) { ack?.({ ok: false, error: 'no_region_channel' }); return; }
+      socket.emit('server.chat', { message: { id: `system-${Date.now()}`, channel: 'system', senderId: null, content: `频道已切换至 ${command.channel}`, timestamp: Date.now() } });
+      if (command.content !== undefined) this.sendCommandChat(socket, command.channel, command.content, ack); else ack?.({ ok: true });
+      return;
+    }
+    if (command.kind === 'invite') {
+      const target = this.world.getAllPlayers().find(candidate => candidate.username === command.username);
+      if (!target) { ack?.({ ok: false, error: 'player_not_found' }); return; }
+      this.teamHandler.handleInviteToTeam(socket, { targetPlayerId: target.id }, ack as never);
+      return;
+    }
+    if (command.kind === 'accept' || command.kind === 'reject') {
+      const invite = this.teamManager.getPlayerPendingInvites(player.id)[0];
+      if (!invite) { ack?.({ ok: false, error: 'invite_not_found' }); return; }
+      this.teamHandler.handleRespondToInvite(socket, { inviteId: invite.id, accept: command.kind === 'accept' }, ack as never);
+      return;
+    }
+    if (command.kind === 'leave') {
+      this.teamHandler.handleLeaveTeam(socket, ack as never);
+      return;
+    }
+    if (command.kind === 'report') {
+      const result = this.feedbackManager.submit(player, command.content);
+      if (!result.ok) { ack?.({ ok: false, error: result.error }); return; }
+      this.emitSystemChat(socket, '反馈已提交');
+      ack?.({ ok: true });
+      return;
+    }
+    ack?.({ ok: false, error: 'invalid_operation' });
+  }
+
+  private sendCommandChat(socket: TypedSocket, channel: Exclude<ChatChannel, 'system'>, content: string, ack?: (result: { ok: boolean; error?: string }) => void): void {
+    const playerId = socket.data.playerId;
+    const player = playerId ? this.world.getPlayer(playerId) : undefined;
+    if (!player) { ack?.({ ok: false, error: 'not_authenticated' }); return; }
+    const regionId = this.getPlayerRegionId(player.position.cellId);
+    const message = this.chatManager.sendMessage(channel, player.id, player.username, content, channel === 'team' ? { teamId: player.teamId } : channel === 'region' ? { regionId } : undefined);
+    if (!message) { ack?.({ ok: false, error: 'invalid_payload' }); return; }
+    this.broadcastChat(channel, player.id, { message });
+    ack?.({ ok: true });
+  }
+
+  private emitSystemChat(socket: TypedSocket, content: string): void {
+    socket.emit('server.chat', { message: { id: `system-${Date.now()}`, channel: 'system', senderId: null, content, timestamp: Date.now() } });
   }
 
   private broadcastChat(channel: ChatChannel, senderId: string, payload: { message: ChatMessage }): void {

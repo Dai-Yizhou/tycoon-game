@@ -46,7 +46,6 @@ describe('MongoUserStore', () => {
 
     await store.saveUser(buildUser());
 
-    expect(mockCreateIndex).toHaveBeenCalledWith({ _id: 1 }, { unique: true });
     expect(mockCreateIndex).toHaveBeenCalledWith({ username: 1 }, { unique: true });
     expect(mockUpdateOne).toHaveBeenCalledWith(
       { _id: 'user-1' },

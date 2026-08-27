@@ -140,18 +140,21 @@ export function createGamePage(controller: GameController): HTMLElement {
         return;
       }
       gameSocket.emit('client.chat', { channel, content: message }, (result) => {
-        if (!result.ok) gameStore?.appendChatMessage({ text: t('chat.sendFailed'), channel: 'error', timestamp: Date.now() });
+        if (!result.ok) {
+          gameStore?.appendChatMessage({ text: result.error || t('chat.sendFailed'), channel: 'error', timestamp: Date.now() });
+        }
       });
     },
   });
   page.appendChild(gameHudShell.getElement());
   unregisterHudRefresh = registerHudRefresh(() => { gameHudShell?.update(); });
 
+  gameSocket = controller.getSocket();
   // Init: load map data, then start game
   if (context.player && context.player.id) {
     gameStore?.applyEvent({ sequence: gameStore.nextSequence(), type: 'player', player: context.player });
   }
-  gameHudShell.update();
+  gameHudShell?.update();
   initTeam();
 
   Promise.all([loadMapData()]).then(
@@ -206,8 +209,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   }
 
   // 监听服务端昼夜事件，同步时间
-  const socket = controller.getSocket();
-  gameSocket = socket;
+  const socket = gameSocket;
   if (socket) {
 
     registerSocketHandlers(socket, {

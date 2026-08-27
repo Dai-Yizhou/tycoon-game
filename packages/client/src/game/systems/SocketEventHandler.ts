@@ -134,17 +134,10 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   // 监听聊天消息
-  socket.on('server.chat', (payload: { message: { content: string; senderName?: string; channel?: string } }) => {
+  socket.on('server.chat', (payload) => {
     const { message } = payload;
-    if (message && message.content) {
-      store.appendChatMessage({
-        id: `server-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        channel: message.channel || 'system',
-        senderId: null,
-        senderName: message.senderName || t('chat.anonymous'),
-        content: message.content,
-        timestamp: Date.now(),
-      });
+    if (message?.content) {
+      store.appendChatMessage(message);
     }
   });
 

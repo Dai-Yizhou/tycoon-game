@@ -251,8 +251,6 @@ export class TeamManager {
 
     if (accept) {
       // 接受邀请
-      invite.status = 'accepted';
-
       // 获取邀请者的队伍
       const team = this.getPlayerTeam(invite.inviterId);
       if (!team) {
@@ -272,6 +270,7 @@ export class TeamManager {
       }
 
       // 加入队伍
+      invite.status = 'accepted';
       team.memberIds.push(targetId);
       this.playerTeamBindings.set(targetId, team.id);
 

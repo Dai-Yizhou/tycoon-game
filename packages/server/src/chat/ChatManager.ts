@@ -139,9 +139,11 @@ export class ChatManager {
     // 内容处理
     let processedContent = content;
 
-    // 截断超长消息
-    if (processedContent.length > this.config.maxMessageLength) {
-      processedContent = processedContent.slice(0, this.config.maxMessageLength);
+    // 截断超长消息（按 Unicode 字符截断，避免拆分代理对）
+    const maxMessageLength = Math.max(0, this.config.maxMessageLength);
+    const characters = Array.from(processedContent);
+    if (characters.length > maxMessageLength) {
+      processedContent = characters.slice(0, maxMessageLength).join('');
     }
 
     // XSS 防护
@@ -345,8 +347,8 @@ export class ChatManager {
     let filtered = content;
     for (const word of this.config.bannedWords) {
       if (word.length === 0) continue;
-      // 使用正则替换（全局匹配）
-      const regex = new RegExp(word, 'gi');
+      const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escapedWord, 'gi');
       filtered = filtered.replace(regex, '***');
     }
     return filtered;

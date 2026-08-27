@@ -107,7 +107,7 @@ export class TeamHandler {
   /**
    * 处理发送组队邀请
    */
-  private handleInviteToTeam(
+  public handleInviteToTeam(
     socket: TypedSocket,
     payload: { targetPlayerId: string },
     ack?: (result: AckResult<{ invite: TeamInvite }>) => void,
@@ -183,7 +183,7 @@ export class TeamHandler {
   /**
    * 处理响应组队邀请（接受/拒绝）
    */
-  private handleRespondToInvite(
+  public handleRespondToInvite(
     socket: TypedSocket,
     payload: { inviteId: string; accept: boolean },
     ack?: (result: AckResult<{ team: Team | null }>) => void,
@@ -246,7 +246,7 @@ export class TeamHandler {
   /**
    * 处理离开队伍
    */
-  private handleLeaveTeam(
+  public handleLeaveTeam(
     socket: TypedSocket,
     ack?: (result: AckResult<{ teamDisbanded: boolean }>) => void,
   ): void {
