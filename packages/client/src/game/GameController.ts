@@ -57,9 +57,6 @@ export class GameController {
   constructor(container: HTMLElement, authSession: AuthSession = new AuthSession()) {
     this.container = container;
     this.authSession = authSession;
-    if (authSession.hasToken()) {
-      this.context.state = 'loading';
-    }
   }
 
   getAuthSession(): AuthSession {

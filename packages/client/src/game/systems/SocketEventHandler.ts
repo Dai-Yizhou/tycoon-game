@@ -33,7 +33,7 @@ const SOCKET_EVENTS = [
   'server.dayNightProgress', 'server.dayNightChanged', 'server.timezoneChanged', 'server.pong',
   'server.chat', 'server.playerJoined', 'server.playerLeft', 'server.playerMoved', 'server.askPath',
   'server.valueChanged', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
-  'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft', 'server.teamMemberKicked',
+  'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft',
   'server.teamUpdated', 'server.teamDisbanded', 'server.prosperityChanged', 'server.gameState',
   'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.playerBankrupt', 'server.playerRestarted',
   'server.propertyBought', 'server.propertyUpgraded', 'server.investmentBought',
@@ -285,36 +285,29 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
         <div class="modal-body">
           <div>${t('team.inviteDescription', { name: payload.inviterName })}</div>
           <div class="modal-actions" style="margin-top: 20px;">
-            <button onclick="window.acceptTeamInvite()" style="padding: 8px 24px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">${t('team.inviteAccept')}</button>
-            <button onclick="window.rejectTeamInvite()" style="padding: 8px 24px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">${t('team.inviteReject')}</button>
+            <button data-action="accept" style="padding: 8px 24px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">${t('team.inviteAccept')}</button>
+            <button data-action="reject" style="padding: 8px 24px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">${t('team.inviteReject')}</button>
           </div>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
 
-    window.rejectTeamInvite = function (): void {
-      socket.emit('client.respondToTeamInvite', { inviteId: payload.inviteId, accept: false }, (result: { ok: boolean; error?: string }) => {
-        modal.remove();
-        if (result.ok) {
-          addChatMessage(t('team.inviteRejected', { name: payload.inviterName }), 'system');
-        } else {
-          addChatMessage(t('team.rejectFailed', { error: result.error || t('common.unknown') }), 'system');
-        }
-      });
-    };
-
-    window.acceptTeamInvite = function (): void {
-      socket.emit('client.respondToTeamInvite', { inviteId: payload.inviteId, accept: true }, (result: { ok: boolean; error?: string }) => {
+    const respond = (accept: boolean): void => {
+      const buttons = modal.querySelectorAll('button');
+      buttons.forEach(button => { button.disabled = true; });
+      socket.emit('client.respondToTeamInvite', { inviteId: payload.inviteId, accept }, (result: { ok: boolean; error?: string }) => {
         if (result.ok) {
           modal.remove();
-          addChatMessage(t('team.inviteAccepted', { name: payload.inviterName }), 'system');
-          // 队伍状态由 server.teamMemberJoined / server.teamUpdated 事件推送，本地不修改
+          addChatMessage(t(accept ? 'team.inviteAccepted' : 'team.inviteRejected', { name: payload.inviterName }), 'system');
         } else {
-          addChatMessage(t('team.joinFailed', { error: result.error || t('common.unknown') }), 'system');
+          buttons.forEach(button => { button.disabled = false; });
+          addChatMessage(t(accept ? 'team.joinFailed' : 'team.rejectFailed', { error: result.error || t('common.unknown') }), 'system');
         }
       });
     };
+    modal.querySelector('[data-action="accept"]')?.addEventListener('click', () => respond(true));
+    modal.querySelector('[data-action="reject"]')?.addEventListener('click', () => respond(false));
   });
 
   // 监听成员加入队伍（仅显示提示，队伍状态以 server.teamUpdated 为准）
@@ -326,16 +319,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   // 监听成员离开队伍（仅显示提示，队伍状态以 server.teamUpdated 为准）
   socket.on('server.teamMemberLeft', (payload: { playerId: string }) => {
     addChatMessage(t('team.memberLeft', { name: payload.playerId }), 'system');
-  });
-
-  // 监听成员被踢出（仅显示提示，队伍状态以 server.teamUpdated 为准）
-  socket.on('server.teamMemberKicked', (payload: { playerId: string }) => {
-    if (payload.playerId === store.getSnapshot().currentPlayer?.id) {
-      addChatMessage(t('team.youWereKicked'), 'system');
-    } else {
-      addChatMessage(t('team.memberKicked', { name: payload.playerId }), 'system');
-    }
-    // teamMembers 由 server.teamUpdated / server.teamDisbanded 事件权威更新
   });
 
   // 监听队伍状态更新（服务端权威：完整重建本地队伍视图）

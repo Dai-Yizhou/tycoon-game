@@ -213,6 +213,15 @@ describe('Pages', () => {
     });
   });
 
+  describe('BankruptcyPage', () => {
+    test('破产页面挂载到控制器容器', () => {
+      const page = createBankruptcyPage(controller);
+
+      expect(mockContainer.contains(page)).toBe(true);
+      expect(page.querySelector('h1')?.textContent).toBe('破产');
+    });
+  });
+
   describe('GamePage', () => {
     test('GamePage 的掷骰按钮使用控制器中的已认证 socket', () => {
       controller.setPlayerName('测试玩家');

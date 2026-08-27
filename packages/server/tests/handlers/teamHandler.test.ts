@@ -56,18 +56,6 @@ describe('TeamHandler', () => {
     expect(sockets.player1.emit).toHaveBeenCalledWith('server.teamUpdated', expect.objectContaining({ team: expect.objectContaining({ id: team.id }) }));
   });
 
-  it('操作权限可执行踢人并清除 teamId', () => {
-    const team = manager.createTeam('player1', 'player_player1');
-    const invite = manager.sendInvite('player1', 'player_player1', 'player2');
-    manager.respondInvite(invite!.id, 'player2', true);
-    const secondInvite = manager.sendInvite('player1', 'player_player1', 'player3');
-    manager.respondInvite(secondInvite!.id, 'player3', true);
-    for (const playerId of team.memberIds) world.updatePlayer({ ...world.getPlayer(playerId)!, teamId: team.id });
-    getRegisteredHandler(sockets.player1, 'client.kickTeamMember')({ targetPlayerId: 'player2' });
-    expect(world.getPlayer('player2')?.teamId).toBeNull();
-    expect(sockets.player2.emit).toHaveBeenCalledWith('server.teamMemberKicked', expect.objectContaining({ teamId: team.id }));
-  });
-
   it('离线不解散队伍，也不清除成员 teamId', () => {
     const team = manager.createTeam('player1', 'player_player1');
     const invite = manager.sendInvite('player1', 'player_player1', 'player2');

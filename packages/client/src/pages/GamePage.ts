@@ -5,10 +5,8 @@ declare global {
     toggleTutorial: () => void;
     showTeamInvite: () => void;
     showTeamManagement: () => void;
-    removeTeamMember: (memberId: string) => void;
     leaveTeam: () => void;
-    acceptTeamInvite: () => void;
-    rejectTeamInvite: () => void;
+
     nextTutorialStep: () => void;
     prevTutorialStep: () => void;
     endTutorial: () => void;
@@ -134,15 +132,21 @@ export function createGamePage(controller: GameController): HTMLElement {
       };
       actions[actionId]?.();
     },
-    onChatSend: (message, channel) => {
+    onChatSend: (message, channel, onResult) => {
       if (!gameSocket) {
         gameStore?.appendChatMessage({ text: t('chat.noConnection'), channel: 'error', timestamp: Date.now() });
+        onResult?.(false);
         return;
       }
       gameSocket.emit('client.chat', { channel, content: message }, (result) => {
         if (!result.ok) {
           gameStore?.appendChatMessage({ text: result.error || t('chat.sendFailed'), channel: 'error', timestamp: Date.now() });
         }
+        if (result.ok && (message.startsWith('/team') || message.startsWith('/region') || message.startsWith('/global'))) {
+          const target = message.split(' ')[0]?.slice(1);
+          if (target) gameHudShell?.setChatChannel(target);
+        }
+        onResult?.(result.ok);
       });
     },
   });
@@ -402,7 +406,6 @@ window.showTeamManagement = function(): void {
                 <span>${m.username}</span>
                 <span style="font-size:0.75rem; color:var(--secondary);">${formatTeamValues(m.values, gameStore?.getSnapshot().valueFieldDefs ?? [])} · ${m.status}</span>
               </div>
-              <button type="button" class="modal-btn btn-secondary" onclick="window.removeTeamMember('${m.id}')">${t('team.removeMember')}</button>
             </div>
           `).join('')}
         </div>
@@ -411,23 +414,6 @@ window.showTeamManagement = function(): void {
       </div>
     </div>
   `;
-  
-  window.removeTeamMember = (memberId: string) => {
-    const member = teamMembers.find(m => m.id === memberId);
-    if (!member) return;
-    if (!gameSocket) {
-      addChatMessage(t('team.noConnectionRemove'), 'system');
-      return;
-    }
-    gameSocket.emit('client.kickTeamMember', { targetPlayerId: memberId }, (result) => {
-      if (result.ok) {
-        // 本地状态由 server.teamMemberKicked 事件更新
-        modal.remove();
-      } else {
-        addChatMessage(t('team.removeFailed', { error: result.error || t('common.unknownError') }), 'system');
-      }
-    });
-  };
   
   window.leaveTeam = () => {
     leaveTeam();

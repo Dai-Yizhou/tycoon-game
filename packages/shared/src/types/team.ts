@@ -58,7 +58,7 @@ export interface TeamInvite {
  * 队伍成员显示数据（服务端权威，供客户端队伍面板渲染）
  *
  * 由服务端 TeamHandler.buildMemberViews 构建，通过 `server.teamUpdated`
- * 和 `server.teamState` 推送。客户端据此完整重建本地队伍视图，无需本地推测。
+ * 和 `client.getTeamState` ack。客户端据此完整重建本地队伍视图，无需本地推测。
  */
 export interface TeamMemberView {
   /** 玩家 ID */

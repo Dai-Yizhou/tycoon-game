@@ -17,7 +17,7 @@ function formatTimezoneOffset(offsetMinutes: number): string {
 
 export interface GameHudShellConfig {
   onRoll?: () => void;
-  onChatSend?: (message: string, channel: string) => void;
+  onChatSend?: (message: string, channel: string, onResult?: (ok: boolean) => void) => void;
   onPathChoice?: (cellId: number) => void;
   onCellAction?: (actionId: string) => void;
   onCellHover?: (cellId: number, x: number, y: number) => void;
@@ -158,6 +158,10 @@ export class GameHudShell {
   }
 
   getElement(): HTMLElement { return this.root; }
+
+  setChatChannel(channel: string): void {
+    if (channel === "team" || channel === "region" || channel === "global") this.channel.value = channel;
+  }
 
   /** 写入不进 innerHTML、只在语言切换时变化的静态文案。 */
   private bindStaticLabels(): void {
@@ -440,8 +444,13 @@ export class GameHudShell {
     if (!message) return;
     const command = parseChatCommand(message);
     const channel = command.kind === "channel" ? command.channel : this.channel.value;
-    if (command.kind === "channel") this.channel.value = channel;
-    this.config.onChatSend?.(message, channel);
+    if (command.kind === "channel") {
+      this.config.onChatSend?.(message, channel, (ok) => {
+        if (ok) this.channel.value = command.channel;
+      });
+    } else {
+      this.config.onChatSend?.(message, channel);
+    }
     this.input.value = "";
     this.input.focus();
   }

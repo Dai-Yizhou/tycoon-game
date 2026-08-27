@@ -136,12 +136,6 @@ export interface ClientToServerEvents {
     ack?: (result: AckResult<{ teamDisbanded: boolean }>) => void,
   ) => void;
 
-  /** 踢出队伍成员（由服务端校验权限并执行） */
-  'client.kickTeamMember': (
-    payload: { targetPlayerId: string },
-    ack?: (result: AckResult) => void,
-  ) => void;
-
   /** 查询当前队伍状态（服务端返回完整队伍与成员显示数据） */
   'client.getTeamState': (
     payload: Record<string, never>,
@@ -319,12 +313,6 @@ export interface ServerToClientEvents {
     playerId: string;
   }) => void;
 
-  /** 队伍成员被踢通知（仅提示，队伍状态以 teamUpdated 为准） */
-  'server.teamMemberKicked': (payload: {
-    teamId: string;
-    playerId: string;
-    kickedBy: string;
-  }) => void;
 
   /** 队伍解散通知 */
   'server.teamDisbanded': (payload: { teamId: string }) => void;

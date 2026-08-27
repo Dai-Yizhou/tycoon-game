@@ -527,7 +527,7 @@ export class SocketManager {
     });
 
     // 注：组队相关事件（inviteToTeam / respondToTeamInvite / leaveTeam /
-    // kickTeamMember / getTeamState）由 TeamHandler 统一处理（服务端权威），
+    // getTeamState）由 TeamHandler 统一处理（服务端权威），
     // 注册见 HandlerRegistry.registerForSocket。此处不再保留旧实现，避免
     // 双重注册导致的状态不一致。
   }

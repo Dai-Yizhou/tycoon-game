@@ -47,6 +47,7 @@ export function createBankruptcyPage(controller: GameController): HTMLElement {
     }
   };
   page.append(title, message, usernameInput, button);
+  controller.getContainer().appendChild(page);
   return page;
 }
 

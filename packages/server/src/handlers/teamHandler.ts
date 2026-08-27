@@ -11,18 +11,14 @@
  * - client.inviteToTeam       : 发送组队邀请 { targetPlayerId }
  * - client.respondToTeamInvite: 响应邀请 { inviteId, accept }
  * - client.leaveTeam           : 离开队伍 {}
- * - client.kickTeamMember      : 踢出成员 { targetPlayerId }（服务端校验操作权限）
  * - client.getTeamState        : 获取队伍状态 {}
  *
  * 服务端 -> 客户端：
  * - server.teamInviteReceived  : 收到邀请 { inviteId, inviterId, inviterName, teamId, expiresAt }
  * - server.teamMemberJoined    : 成员加入 { teamId, playerId, playerName }（仅提示，队伍状态以 teamUpdated 为准）
  * - server.teamMemberLeft      : 成员离开 { teamId, playerId }（仅提示，队伍状态以 teamUpdated 为准）
- * - server.teamMemberKicked    : 成员被踢 { teamId, playerId, kickedBy }（仅提示，队伍状态以 teamUpdated 为准）
  * - server.teamUpdated         : 队伍状态更新 { team, members }（服务端权威：members 携带每个成员的实时显示数据，客户端据此完整重建本地队伍视图）
  * - server.teamDisbanded       : 队伍解散 { teamId }
- * - server.teamInviteResult    : 邀请结果反馈 { ok, error?, invite? }
- * - server.teamState           : 队伍状态响应 { team, members, color }（members 同 teamUpdated，供客户端主动查询）
  *
  * 设计原则：
  * - 与 TeamManager（纯数据层）解耦：Handler 负责 I/O 与协议，Manager 负责状态
@@ -89,10 +85,6 @@ export class TeamHandler {
 
     socket.on('client.leaveTeam', (_payload, ack) => {
       this.handleLeaveTeam(socket, ack);
-    });
-
-    socket.on('client.kickTeamMember', (payload, ack) => {
-      this.handleKickMember(socket, payload, ack);
     });
 
     socket.on('client.getTeamState', (_payload, ack) => {
@@ -288,89 +280,6 @@ export class TeamHandler {
     }
 
     ack?.({ ok: true, data: { teamDisbanded: isDisbanded } });
-  }
-
-  /**
-   * 处理踢出成员
-   */
-  private handleKickMember(
-    socket: TypedSocket,
-    payload: { targetPlayerId: string },
-    ack?: (result: AckResult) => void,
-  ): void {
-    const playerId = this.getPlayerId(socket);
-    if (!playerId) {
-      emitError(socket, ErrorCodes.NotAuthenticated, '未认证');
-      ack?.({ ok: false, error: 'not_authenticated' });
-      return;
-    }
-
-    if (!payload?.targetPlayerId) {
-      emitError(socket, ErrorCodes.InvalidPayload, '缺少目标玩家 ID');
-      ack?.({ ok: false, error: 'invalid_payload' });
-      return;
-    }
-
-    const team = this.teamManager.getPlayerTeam(playerId);
-    if (!team) {
-      emitError(socket, ErrorCodes.InvalidOperation, '不在队伍中');
-      ack?.({ ok: false, error: 'not_in_team' });
-      return;
-    }
-
-    if (!this.teamManager.canOperateTeam(team.id, playerId)) {
-      emitError(socket, ErrorCodes.InvalidOperation, '无权操作该队伍');
-      ack?.({ ok: false, error: 'not_team_operator' });
-      return;
-    }
-
-    // 校验目标是否在同一队伍
-    if (!team.memberIds.includes(payload.targetPlayerId)) {
-      emitError(socket, ErrorCodes.InvalidOperation, '目标玩家不在队伍中');
-      ack?.({ ok: false, error: 'target_not_in_team' });
-      return;
-    }
-
-    // 禁止踢自己（应使用离开队伍）
-    if (payload.targetPlayerId === playerId) {
-      emitError(socket, ErrorCodes.InvalidOperation, '不能踢出自己，请使用离开队伍');
-      ack?.({ ok: false, error: 'cannot_kick_self' });
-      return;
-    }
-
-    const teamId = team.id;
-    const originalMembers = team.memberIds.slice();
-
-    // 调用 TeamManager 踢出成员（复用 leaveTeam 逻辑）
-    const result = this.teamManager.leaveTeam(payload.targetPlayerId);
-    if (!result) {
-      emitError(socket, ErrorCodes.InternalError, '踢出成员失败');
-      ack?.({ ok: false, error: 'kick_failed' });
-      return;
-    }
-
-    logger.info(`玩家 ${payload.targetPlayerId} 被 ${playerId} 踢出队伍 ${teamId}`);
-
-    if (result.team) {
-      this.clearWorldTeamIds([payload.targetPlayerId], teamId);
-      this.emitToPlayer(payload.targetPlayerId, 'server.teamMemberKicked', {
-        teamId,
-        playerId: payload.targetPlayerId,
-        kickedBy: playerId,
-      });
-      // 通知全队有成员被踢
-      this.broadcastToTeam(result.team, 'server.teamMemberKicked', {
-        teamId: result.team.id,
-        playerId: payload.targetPlayerId,
-        kickedBy: playerId,
-      });
-      this.notifyTeamUpdated(result.team);
-    } else {
-      this.clearWorldTeamIds(originalMembers, teamId);
-      this.emitToPlayer(payload.targetPlayerId, 'server.teamDisbanded', { teamId });
-    }
-
-    ack?.({ ok: true });
   }
 
   /**

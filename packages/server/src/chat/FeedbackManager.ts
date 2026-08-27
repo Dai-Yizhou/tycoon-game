@@ -9,6 +9,7 @@ export interface FeedbackRecord {
   playerId: string;
   isGuest: boolean;
   cellId: number;
+  worldId?: string;
   content: string;
 }
 
@@ -24,6 +25,7 @@ export class FeedbackManager {
 
   constructor(
     private readonly chatManager: ChatManager,
+    private readonly worldId?: string,
     private readonly maxLength = 500,
     private readonly maxPerMinute = 3,
   ) {}
@@ -42,10 +44,11 @@ export class FeedbackManager {
       playerId: player.id,
       isGuest: player.username.startsWith('guest_'),
       cellId: player.position.cellId,
+      worldId: this.worldId,
       content: sanitized,
     };
     this.records.push(record);
-    logger.info('chat report received', { feedbackId: record.id, playerId: record.playerId, isGuest: record.isGuest, cellId: record.cellId, content: record.content });
+    logger.info('chat report received', { feedbackId: record.id, playerId: record.playerId, isGuest: record.isGuest, worldId: record.worldId, cellId: record.cellId, content: record.content });
     return { ok: true, record };
   }
 

@@ -118,7 +118,7 @@ export class HandlerRegistry {
     this.teamManager = new TeamManager(DEFAULT_TEAM_CONFIG);
     this.teamHandler = new TeamHandler(io, world, this.teamManager);
     this.chatManager = new ChatManager({ ...DEFAULT_CHAT_CONFIG, bannedWords: ['testword'] });
-    this.feedbackManager = new FeedbackManager(this.chatManager);
+    this.feedbackManager = new FeedbackManager(this.chatManager, world.getWorldIdentity()?.worldId);
   }
 
   /**
@@ -398,6 +398,7 @@ export class HandlerRegistry {
       return;
     }
     if (command.kind === 'error') {
+      this.emitCommandError(socket, '指令参数无效');
       ack?.({ ok: false, error: command.error });
       return;
     }
@@ -407,10 +408,10 @@ export class HandlerRegistry {
       return;
     }
     if (command.kind === 'channel') {
-      if (command.channel === ChatChannels.Team && !player.teamId) { ack?.({ ok: false, error: 'no_team_channel' }); return; }
-      if (command.channel === ChatChannels.Region && !this.getPlayerRegionId(player.position.cellId)) { ack?.({ ok: false, error: 'no_region_channel' }); return; }
-      socket.emit('server.chat', { message: { id: `system-${Date.now()}`, channel: 'system', senderId: null, content: `频道已切换至 ${command.channel}`, timestamp: Date.now() } });
-      if (command.content !== undefined) this.sendCommandChat(socket, command.channel, command.content, ack); else ack?.({ ok: true });
+      if (command.channel === ChatChannels.Team && !player.teamId) { this.emitCommandError(socket, '当前没有可用的队伍频道'); ack?.({ ok: false, error: 'no_team_channel' }); return; }
+      if (command.channel === ChatChannels.Region && !this.getPlayerRegionId(player.position.cellId)) { this.emitCommandError(socket, '当前没有可用的区域频道'); ack?.({ ok: false, error: 'no_region_channel' }); return; }
+      if (command.content !== undefined) this.sendCommandChat(socket, command.channel, command.content, ack);
+      else { this.emitSystemChat(socket, `频道已切换至 ${command.channel}`); ack?.({ ok: true }); }
       return;
     }
     if (command.kind === 'invite') {
@@ -431,7 +432,7 @@ export class HandlerRegistry {
     }
     if (command.kind === 'report') {
       const result = this.feedbackManager.submit(player, command.content);
-      if (!result.ok) { ack?.({ ok: false, error: result.error }); return; }
+      if (!result.ok) { this.emitCommandError(socket, '反馈提交失败'); ack?.({ ok: false, error: result.error }); return; }
       this.emitSystemChat(socket, '反馈已提交');
       ack?.({ ok: true });
       return;
@@ -445,13 +446,18 @@ export class HandlerRegistry {
     if (!player) { ack?.({ ok: false, error: 'not_authenticated' }); return; }
     const regionId = this.getPlayerRegionId(player.position.cellId);
     const message = this.chatManager.sendMessage(channel, player.id, player.username, content, channel === 'team' ? { teamId: player.teamId } : channel === 'region' ? { regionId } : undefined);
-    if (!message) { ack?.({ ok: false, error: 'invalid_payload' }); return; }
+    if (!message) { this.emitCommandError(socket, '消息发送失败'); ack?.({ ok: false, error: 'invalid_payload' }); return; }
     this.broadcastChat(channel, player.id, { message });
     ack?.({ ok: true });
   }
 
   private emitSystemChat(socket: TypedSocket, content: string): void {
     socket.emit('server.chat', { message: { id: `system-${Date.now()}`, channel: 'system', senderId: null, content, timestamp: Date.now() } });
+  }
+
+  private emitCommandError(socket: TypedSocket, message: string): void {
+    emitError(socket, ErrorCodes.InvalidOperation, message);
+    this.emitSystemChat(socket, message);
   }
 
   private broadcastChat(channel: ChatChannel, senderId: string, payload: { message: ChatMessage }): void {
@@ -490,6 +496,7 @@ export class HandlerRegistry {
           return;
         }
         const result = this.bankruptcy.restartBankruptPlayer(playerId, socket);
+        if (result.success) this.diceHandler.clearCooldown(playerId);
         ack?.({ ok: result.success, error: result.error });
       });
     });

@@ -24,8 +24,10 @@ describe('bankruptcy socket authority', () => {
     const world = new GameWorld(); world.addPlayer(buildPlayer());
     const bankruptcy = { restartBankruptPlayer: jest.fn(() => ({ success: true })) };
     const registry = new HandlerRegistry({ emit: jest.fn() } as unknown as TypedServer, world); registry.setBankruptcy(bankruptcy as any);
+    const clearCooldown = jest.spyOn(registry.getDiceHandler(), 'clearCooldown');
     const { socket, handlers } = buildSocket(); registry.registerForSocket(socket);
     handlers.get('client.bankruptRestart')?.({}, jest.fn());
     expect(bankruptcy.restartBankruptPlayer).toHaveBeenCalledWith('player-1', socket);
+    expect(clearCooldown).toHaveBeenCalledWith('player-1');
   });
 });

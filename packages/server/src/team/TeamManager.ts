@@ -231,6 +231,12 @@ export class TeamManager {
    */
   respondInvite(inviteId: string, targetId: string, accept: boolean): Team | null {
     const invite = this.invites.get(inviteId);
+    if (invite && invite.inviterId === targetId) {
+      logger.warn(`玩家 ${targetId} 不能接受自己发出的组队邀请`);
+      invite.status = 'rejected';
+      this.invites.delete(inviteId);
+      return null;
+    }
     if (!invite) {
       logger.warn(`邀请 ${inviteId} 不存在`);
       return null;

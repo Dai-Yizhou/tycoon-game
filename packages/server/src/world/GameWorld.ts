@@ -380,6 +380,10 @@ export class GameWorld {
     return this.mapMeta;
   }
 
+  getWorldIdentity(): WorldIdentity | undefined {
+    return this.worldIdentity;
+  }
+
   /**
    * 获取地图索引
    */

@@ -217,6 +217,7 @@
   },
   "cell": {
     "start": "起点",
+    "supply": "补给",
     "property": "地产",
     "event": "事件格",
     "investment": "投资项目",

@@ -217,6 +217,7 @@
   },
   "cell": {
     "start": "Start",
+    "supply": "Supply",
     "property": "Property",
     "event": "Event",
     "investment": "Investment",
