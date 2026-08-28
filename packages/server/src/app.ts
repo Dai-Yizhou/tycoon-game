@@ -392,13 +392,21 @@ export function startHttpServer(
   httpServer: http.Server,
   config: ServerConfig,
 ): Promise<{ port: number; host: string }> {
-  return new Promise((resolve) => {
-    httpServer.listen(config.port, config.host, () => {
+  return new Promise((resolve, reject) => {
+    const handleError = (error: Error): void => {
+      httpServer.off('listening', handleListening);
+      reject(error);
+    };
+    const handleListening = (): void => {
+      httpServer.off('error', handleError);
       const addr = httpServer.address();
       const port = typeof addr === 'object' && addr ? addr.port : config.port;
       logger.info(`server listening on http://${config.host}:${port}`, { port });
       resolve({ port, host: config.host });
-    });
+    };
+    httpServer.once('error', handleError);
+    httpServer.once('listening', handleListening);
+    httpServer.listen(config.port, config.host);
   });
 }
 

@@ -33,7 +33,7 @@ export class Bankruptcy {
   private readonly bankruptcyRecords = new Map<string, BankruptcyRecord>();
   private domainEventDispatcher: ((eventName: string) => void) | null = null;
   private readonly onPlayerUpdated = ({ player }: { player: import('@game/shared').Player }): void => {
-    if (isBankruptcyCheckable(player.status) && Object.values(player.values).some((field) => field.current <= (field.min ?? Number.NEGATIVE_INFINITY))) {
+    if (isBankruptcyCheckable(player.status) && Object.values(player.values).some((field) => field.current < (field.min ?? Number.NEGATIVE_INFINITY))) {
       this.triggerBankruptcy(player.id, 'negative_net_worth');
     }
   };

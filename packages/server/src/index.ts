@@ -56,8 +56,10 @@ export async function bootstrap(config: ServerConfig = loadConfig()): Promise<vo
   try {
     await startHttpServer(httpServer, config);
   } catch (err) {
-    logger.error('failed to start http server', err);
-    process.exit(1);
+    const error = err instanceof Error ? err : new Error(String(err));
+    logger.error('failed to start http server', error);
+    await gracefulShutdown(httpServer, socketManager, economy, dayNightCycle, prosperityManager, 5000, world, handlerRegistry, userStore, worldStore);
+    throw error;
   }
 
   // 注册信号处理
