@@ -1,5 +1,6 @@
 import type { MapData } from '../types/cell';
 import type { MapMeta, Region, TaxConfig, ValueFieldDefinition } from '../types/map-meta';
+import type { RankingConfig } from '../types/leaderboard';
 import type { ValidationResult } from './map-parser';
 import { MapParseError } from './map-parser';
 
@@ -15,6 +16,26 @@ function parseNumberMap(value: unknown, field: string): Record<string, number> {
   const result: Record<string, number> = {};
   for (const [key, current] of Object.entries(input)) if (typeof current !== 'number' || !Number.isFinite(current)) throw new MapMetaParseError(`${field}.${key} 必须是有限数字`); else result[key] = current;
   return result;
+}
+
+function parseRanking(value: unknown): RankingConfig | undefined {
+  if (value === undefined) return undefined;
+  const input = object(value, 'ranking');
+  if (typeof input.enabled !== 'boolean') throw new MapMetaParseError('ranking.enabled 必须是布尔值');
+  if (typeof input.topN !== 'number' || !Number.isInteger(input.topN)) throw new MapMetaParseError('ranking.topN 必须是整数');
+  if (typeof input.refreshMs !== 'number' || !Number.isFinite(input.refreshMs)) throw new MapMetaParseError('ranking.refreshMs 必须是有限数字');
+  const score = object(input.score, 'ranking.score');
+  if (typeof score.constant !== 'number' || !Number.isFinite(score.constant)) throw new MapMetaParseError('ranking.score.constant 必须是有限数字');
+  return {
+    enabled: input.enabled,
+    topN: input.topN,
+    refreshMs: input.refreshMs,
+    score: {
+      constant: score.constant,
+      player: parseNumberMap(score.player, 'ranking.score.player'),
+      region: parseNumberMap(score.region, 'ranking.score.region'),
+    },
+  };
 }
 
 function parseTax(value: unknown): TaxConfig {
@@ -41,7 +62,7 @@ export function parseMapMeta(raw: unknown): MapMeta {
   });
   const uct = object(input.uct, 'uct');
   const regions: Region[] = (input.regions as unknown[]).map((value) => { const region = object(value, 'regions'); const regionName = object(region.name, 'regions.name'); if (typeof region.id !== 'string') throw new MapMetaParseError('region id 无效'); return { id: region.id, name: regionName as Region['name'], initial: region.initial as Region['initial'] }; });
-  return { id: input.id as string, version: input.version as string, name: name as MapMeta['name'], valueFieldDefinitions: fields, uct: { player: Array.isArray(uct.player) ? uct.player as string[] : [], region: Array.isArray(uct.region) ? uct.region as string[] : [] }, playerInitial: input.playerInitial as MapMeta['playerInitial'], startCellId: input.startCellId as number, regions, dayNightCycle: input.dayNightCycle as number, dice: input.dice as MapMeta['dice'], tax: parseTax(input.tax) };
+  return { id: input.id as string, version: input.version as string, name: name as MapMeta['name'], valueFieldDefinitions: fields, uct: { player: Array.isArray(uct.player) ? uct.player as string[] : [], region: Array.isArray(uct.region) ? uct.region as string[] : [] }, playerInitial: input.playerInitial as MapMeta['playerInitial'], startCellId: input.startCellId as number, regions, dayNightCycle: input.dayNightCycle as number, dice: input.dice as MapMeta['dice'], tax: parseTax(input.tax), ranking: parseRanking(input.ranking) };
 }
 
 export function validateMapMeta(meta: MapMeta, map: MapData): ValidationResult {

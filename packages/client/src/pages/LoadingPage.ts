@@ -10,6 +10,7 @@
 import type { GameController } from '../game/GameController.js';
 import { createSocket, waitForConnection } from '../hooks/useSocket.js';
 import { t } from '../game/i18n.js';
+import { GameStore } from '../state/GameStore.js';
 
 
 const loadingPageCleanups = new WeakMap<HTMLElement, () => void>();
@@ -19,6 +20,7 @@ const loadingPageCleanups = new WeakMap<HTMLElement, () => void>();
  */
 export function createLoadingPage(controller: GameController): HTMLElement {
   const container = controller.getContainer();
+  const gameStore = new GameStore();
 
   const page = document.createElement('div');
   page.className = 'page loading-page';
@@ -101,10 +103,14 @@ export function createLoadingPage(controller: GameController): HTMLElement {
       url: window.location.origin,
       token: controller.getAuthSession().getToken() || undefined,
       onConnect: (socketId) => {
-        if (!active || attempt !== connectionAttempt) return;
+        if (!active || attempt !== connectionAttempt || controller.getSocket() !== socket) return;
         progressBar.style.width = '60%';
         progressText.textContent = '60%';
         controller.setConnected(socketId);
+      },
+      onStatus: (status) => {
+        if (!active || attempt !== connectionAttempt) return;
+        if (status === 'offline') gameStore.setLeaderboardOffline();
       },
       onError: (error) => {
         if (!active || attempt !== connectionAttempt) return;
@@ -136,7 +142,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
         if (result.ok && result.data) {
           progressBar.style.width = '100%';
           progressText.textContent = '100%';
-          controller.setLoginResult(result.data.player, result.data.cycleStartTime, result.data.cycleMinutes, result.data.existingPlayers || []);
+          controller.setLoginResult(result.data.player, result.data.cycleStartTime, result.data.cycleMinutes, result.data.existingPlayers || [], result.data.leaderboard || null);
 
           // 连接成功后进入对应页面
           setTimeout(() => {

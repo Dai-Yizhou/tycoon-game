@@ -9,8 +9,7 @@
  */
 
 import type { TypedClientSocket } from '../hooks/useSocket.js';
-import type { Player } from '@game/shared';
-import type { LoginResponse } from '@game/shared';
+import type { LeaderboardSnapshot, LoginResponse, Player } from '@game/shared';
 import { AuthSession } from '../auth/AuthSession.js';
 
 export type GameState = 'start' | 'login' | 'loading' | 'game' | 'bankruptcy';
@@ -29,6 +28,7 @@ export interface GameContext {
   cycleMinutes: number | null;
   /** 已有玩家列表（登录时返回） */
   existingPlayers: Player[];
+  leaderboard: LeaderboardSnapshot | null;
 }
 
 export type StateChangeListener = (context: GameContext) => void;
@@ -47,6 +47,7 @@ export class GameController {
     cycleStartTime: null,
     cycleMinutes: null,
     existingPlayers: [],
+    leaderboard: null,
   };
 
   private listeners: Set<StateChangeListener> = new Set();
@@ -189,11 +190,12 @@ export class GameController {
   /**
    * 设置登录后的玩家信息和时间同步数据
    */
-  setLoginResult(player: Player, cycleStartTime: number, cycleMinutes: number, existingPlayers: Player[] = []): void {
+  setLoginResult(player: Player, cycleStartTime: number, cycleMinutes: number, existingPlayers: Player[] = [], leaderboard: LeaderboardSnapshot | null = null): void {
     this.context.player = player;
     this.context.cycleStartTime = cycleStartTime;
     this.context.cycleMinutes = cycleMinutes;
     this.context.existingPlayers = existingPlayers;
+    this.context.leaderboard = leaderboard;
     this.context.state = player.status === 'bankrupt' ? 'bankruptcy' : 'game';
     this.notifyListeners();
   }
@@ -240,6 +242,7 @@ export class GameController {
       cycleStartTime: null,
       cycleMinutes: null,
       existingPlayers: [],
+      leaderboard: null,
     };
     this.notifyListeners();
   }

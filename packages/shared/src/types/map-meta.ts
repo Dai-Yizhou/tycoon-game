@@ -1,4 +1,5 @@
 import type { ValueField } from './player';
+import type { RankingConfig } from './leaderboard';
 import type { LocalizedText, Uct } from './cell';
 
 export interface ValueFieldDefinition {
@@ -54,6 +55,7 @@ export interface MapMeta {
   dayNightCycle: number;
   dice: DiceConfig;
   tax: TaxConfig;
+  ranking?: RankingConfig;
 }
 
 export const DEFAULT_DAY_NIGHT_CYCLE_MINUTES = 15;

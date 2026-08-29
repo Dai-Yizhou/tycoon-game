@@ -22,6 +22,8 @@ export interface GameHudShellConfig {
   onCellAction?: (actionId: string) => void;
   onCellHover?: (cellId: number, x: number, y: number) => void;
   onCellLeave?: () => void;
+  effectsEnabled?: boolean;
+  onEffectsToggle?: (enabled: boolean) => void;
 }
 
 /**
@@ -68,6 +70,7 @@ export class GameHudShell {
           </div>
           <div class="value-pills" data-ui="resource-strip"></div>
           <div class="topbar-spacer"></div>
+          <section class="leaderboard-panel" data-ui="leaderboard" aria-live="polite"></section>
           <div class="cycle-indicator" data-ui="day-night">
             <div class="cycle-dot" data-ui="cycle-dot"></div>
             <span class="cycle-text" data-ui="day-time">--:--</span>
@@ -76,6 +79,8 @@ export class GameHudShell {
 
         <div class="map-overlay map-overlay--zone" data-ui="zone-tag">--</div>
         <div class="map-overlay map-overlay--prosperity" data-ui="prosperity-tag">--</div>
+
+        <button class="effects-toggle" data-action="effects-toggle" type="button" aria-pressed="true"></button>
 
         <div class="event-toast" data-ui="event-toast" style="display:none">
           <span class="event-toast__title"></span>
@@ -124,6 +129,12 @@ export class GameHudShell {
     this.root.querySelector('[data-action="chat-send"]')?.addEventListener("click", () => this.sendChat());
     this.input.addEventListener("keydown", (e) => { if (e.key === "Enter") this.sendChat(); });
     this.root.querySelector('[data-action="roll"]')?.addEventListener("click", () => this.config.onRoll?.());
+    const effectsToggle = this.root.querySelector('[data-action="effects-toggle"]') as HTMLButtonElement | null;
+    effectsToggle?.addEventListener("click", () => {
+      const enabled = effectsToggle.getAttribute("aria-pressed") !== "true";
+      effectsToggle.setAttribute("aria-pressed", String(enabled));
+      this.config.onEffectsToggle?.(enabled);
+    });
     const toggle = this.root.querySelector('[data-ui="chat-toggle"]');
     const setExpanded = (expanded: boolean): void => {
       this.isExpanded = expanded;
@@ -153,6 +164,7 @@ export class GameHudShell {
       this.vm.subscribe("chat", () => this.update()),
       this.vm.subscribe("pathChoice", () => this.update()),
       this.vm.subscribe("cellActions", () => this.update()),
+      this.vm.subscribe("leaderboard", () => this.update()),
     );
     this.update();
   }
@@ -171,6 +183,11 @@ export class GameHudShell {
     };
     set('[data-action="roll"]', "dice.roll");
     set('[data-action="chat-send"]', "chat.send");
+    const effectsToggle = this.root.querySelector('[data-action="effects-toggle"]') as HTMLButtonElement | null;
+    if (effectsToggle) {
+      effectsToggle.textContent = this.config.effectsEnabled === false ? t("hud.effectsOff") : t("hud.effectsOn");
+      effectsToggle.setAttribute("aria-pressed", String(this.config.effectsEnabled !== false));
+    }
 
     // 下拉频道选项与输入框占位符
     this.channel.replaceChildren(
@@ -280,6 +297,7 @@ export class GameHudShell {
     this.updateDiceButton();
     this.updateActionCluster();
     this.updateChat();
+    this.updateLeaderboard();
     this.renderCellHover();
   }
 
@@ -321,6 +339,37 @@ export class GameHudShell {
       pill.append(label, num);
       return pill;
     }));
+  }
+
+  private updateLeaderboard(): void {
+    const panel = this.root.querySelector('[data-ui="leaderboard"]')!;
+    const state = this.vm.getLeaderboard().leaderboard;
+    if (state.status === 'loading') {
+      panel.textContent = t('leaderboard.loading');
+      return;
+    }
+    if (state.status === 'disabled') {
+      panel.textContent = t('leaderboard.disabled');
+      return;
+    }
+    if (state.status === 'error') {
+      panel.textContent = state.error ?? t('leaderboard.error');
+      return;
+    }
+    if (state.status === 'offline') {
+      panel.textContent = t('leaderboard.offline');
+      return;
+    }
+    const leaderboard = state.snapshot;
+    if (!leaderboard || state.status === 'empty') {
+      panel.textContent = t('leaderboard.empty');
+      return;
+    }
+    const rows = leaderboard.top.map((entry) => `${entry.rank}. ${entry.username} ${entry.score}`);
+    if (leaderboard.currentPlayer && !leaderboard.top.some((entry) => entry.playerId === leaderboard.currentPlayer?.playerId)) {
+      rows.push(`${leaderboard.currentPlayer.rank}. ${leaderboard.currentPlayer.username} ${leaderboard.currentPlayer.score}`);
+    }
+    panel.textContent = rows.join(' | ');
   }
 
   /** 昼夜指示器 */

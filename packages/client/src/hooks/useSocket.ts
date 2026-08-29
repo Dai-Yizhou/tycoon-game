@@ -24,6 +24,7 @@ export interface SocketOptions {
   onConnect?: (socketId: string) => void;
   onDisconnect?: () => void;
   onError?: (error: string) => void;
+  onStatus?: (status: 'offline' | 'online' | 'connecting') => void;
   onGameState?: (payload: ServerToClientEvents['server.gameState'] extends (p: infer P) => void ? P : never) => void;
 }
 
@@ -32,6 +33,8 @@ export interface SocketOptions {
  */
 export function createSocket(options: SocketOptions = {}): TypedClientSocket {
   const url = options.url || window.location.origin;
+
+  options.onStatus?.('connecting');
 
   const socket: TypedClientSocket = io(url, {
     auth: options.token ? { token: options.token } : undefined,
@@ -48,14 +51,14 @@ export function createSocket(options: SocketOptions = {}): TypedClientSocket {
     if (options.onConnect) {
       options.onConnect(socket.id || 'unknown');
     }
+    options.onStatus?.('online');
   });
 
   // 断开连接
   socket.on('disconnect', (reason) => {
     console.info('[socket] disconnected:', reason);
-    if (options.onDisconnect) {
-      options.onDisconnect();
-    }
+    options.onDisconnect?.();
+    options.onStatus?.('offline');
   });
 
   // 连接错误

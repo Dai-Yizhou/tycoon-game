@@ -31,8 +31,9 @@ export interface SocketHandlerOptions {
 
 const SOCKET_EVENTS = [
   'server.dayNightProgress', 'server.dayNightChanged', 'server.timezoneChanged', 'server.pong',
-  'server.chat', 'server.playerJoined', 'server.playerLeft', 'server.playerMoved', 'server.askPath',
-  'server.valueChanged', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
+  'server.chat', 'server.leaderboardUpdated', 'connect', 'disconnect',
+  'server.playerJoined', 'server.playerLeft', 'server.playerMoved', 'server.askPath',
+  'server.valueChanged', 'server.error', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
   'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft',
   'server.teamUpdated', 'server.teamDisbanded', 'server.prosperityChanged', 'server.gameState',
   'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.playerBankrupt', 'server.playerRestarted',
@@ -88,6 +89,30 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     options.onNotification?.(payload);
   });
 
+  socket.on('server.leaderboardUpdated', (payload) => {
+    store.setLeaderboard(payload);
+    requestHudRefresh();
+  });
+
+  socket.on('server.error', (payload) => {
+    if (payload.code.toLowerCase().includes('leaderboard') || payload.message.toLowerCase().includes('榜单')) {
+      store.setLeaderboardError(payload.message);
+      requestHudRefresh();
+    }
+  });
+
+  socket.on('disconnect', () => {
+    store.setLeaderboardOffline();
+    requestHudRefresh();
+  });
+
+  socket.on('connect', () => {
+    if (store.getSnapshot().leaderboard.status === 'offline') {
+      store.setLeaderboard(store.getSnapshot().leaderboard.snapshot);
+      requestHudRefresh();
+    }
+  });
+
   socket.on('server.playerBankrupt', (payload) => {
     if (payload.playerId === store.getSnapshot().currentPlayer?.id) {
       store.applyEvent({ sequence: store.nextSequence(), type: 'status', playerId: payload.playerId, status: 'bankrupt' });
@@ -98,6 +123,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 
   socket.on('server.gameState', (payload) => {
     const teamMembers = payload.members ?? [];
+    if (payload.leaderboard) store.setLeaderboard(payload.leaderboard);
     if (payload.visibleCells?.length) store.setCells(payload.visibleCells);
     store.applySnapshot({ sequence: store.nextSequence(), player: payload.player, teamMembers, ownedProperties: payload.ownedProperties, ownedInvestments: payload.ownedInvestments });
   });
@@ -193,11 +219,11 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     }
     const activePlayer = store.getSnapshot().currentPlayer;
     if (activePlayer && payload.playerId === activePlayer.id) {
-      store.applyEvent({ sequence: store.nextSequence(), type: 'move', playerId: payload.playerId, cellId: payload.cellId });
       const snapshot = store.getSnapshot();
-      if (store && options.mapIndex && payload.path && payload.path.length > 1 && !snapshot?.isServerAnimating) {
-        startServerPathAnimation(store, options.mapIndex, payload.path, () => requestHudRefresh());
+      if (options.mapIndex && payload.path && payload.path.length > 1 && !snapshot.isServerAnimating) {
+        startServerPathAnimation(store, options.mapIndex, payload.path, () => requestHudRefresh(), undefined, payload.cellId);
       } else {
+        store.applyEvent({ sequence: store.nextSequence(), type: 'move', playerId: payload.playerId, cellId: payload.cellId });
         requestHudRefresh();
       }
     }

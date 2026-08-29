@@ -161,13 +161,31 @@ export class InteractiveMapSurface {
   }
 
   updatePlayers(players: Player[]): void {
+    const changed = players.length !== this.players.length || players.some((player, index) => {
+      const previous = this.players[index];
+      return !previous || previous.id !== player.id || previous.position.cellId !== player.position.cellId || previous.status !== player.status;
+    });
     this.players = players;
-    if (this.map.length) this.render(this.map, players, this.valueFieldDefinitions);
+    if (changed && this.map.length) this.render(this.map, players, this.valueFieldDefinitions);
+  }
+
+  setPlayerDisplayPosition(playerId: string, x: number, y: number): void {
+    const player = Array.from(this.root.querySelectorAll('[data-player-id]'))
+      .find((element) => element.getAttribute('data-player-id') === playerId);
+    if (player) player.setAttribute('transform', `translate(${x} ${y})`);
+  }
+
+  setDisplayPosition(x: number, y: number): void {
+    const playerId = this.players[0]?.id;
+    if (playerId) this.setPlayerDisplayPosition(playerId, x, y);
   }
 
   followPlayer(cellId: number): void {
     this.followedCellId = cellId;
-    if (this.map.length) this.render(this.map, this.players, this.valueFieldDefinitions);
+    if (!this.map.length) return;
+    const svg = this.root.querySelector('svg');
+    const cell = this.map.find((item) => item.id === cellId);
+    if (svg && cell) this.applyViewBox(svg, cell);
   }
 
   private applyViewBox(svg: SVGSVGElement, followedCell: MapData[number] | undefined): void {

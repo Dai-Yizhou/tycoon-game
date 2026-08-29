@@ -40,6 +40,7 @@ export const WorldEvents = {
   EraChanged: 'eraChanged',
   TeamChanged: 'teamChanged',
   MapLoaded: 'mapLoaded',
+  RegionValueChanged: 'regionValueChanged',
 } as const;
 
 /** 游戏世界事件名字符串字面量联合 */
@@ -82,6 +83,12 @@ export interface MapLoadedPayload {
   mapMeta: MapMeta;
   cellCount: number;
   validation: ValidationResult;
+}
+
+export interface RegionValueChangedPayload {
+  regionId: string;
+  fieldId: string;
+  value: number;
 }
 
 /**
@@ -391,12 +398,19 @@ export class GameWorld {
     return this.mapIndex;
   }
 
+  getRegionId(cellId: number): string | undefined {
+    return this.mapData?.find((cell) => cell.id === cellId)?.regionId;
+  }
+
   getRegionValue(regionId: string, fieldId: string): number {
     return this.getRuntimeState().getRegionValue(regionId, fieldId);
   }
 
   changeRegionValue(regionId: string, fieldId: string, delta: number): number {
-    return this.getRuntimeState().changeRegionValue(regionId, fieldId, delta);
+    const value = this.getRuntimeState().changeRegionValue(regionId, fieldId, delta);
+    this.emit(WorldEvents.RegionValueChanged, { regionId, fieldId, value });
+    this.saveSnapshot();
+    return value;
   }
 
   getRuntimeState(): WorldRuntimeStateStore {

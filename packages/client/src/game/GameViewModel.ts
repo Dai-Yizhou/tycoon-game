@@ -167,6 +167,10 @@ export interface OtherPlayersSlice {
   players: OtherPlayerInfo[];
 }
 
+export interface LeaderboardSlice {
+  leaderboard: import('@game/shared').LeaderboardState;
+}
+
 /** 教程状态 */
 export interface TutorialSlice {
   step: number;
@@ -203,7 +207,7 @@ export type StateChangeKey =
   | 'player' | 'movement' | 'camera' | 'dice' | 'cooldown' | 'jail'
   | 'dayNight'
   | 'regions' | 'chat' | 'team' | 'tutorial' | 'otherPlayers' | 'behavior'
-  | 'pathChoice' | 'cellActions' | 'all';
+  | 'pathChoice' | 'cellActions' | 'leaderboard' | 'all';
 
 export interface StateChangeEvent {
   key: StateChangeKey;
@@ -230,6 +234,7 @@ export class GameViewModel {
       this.notify('player', 'store');
       this.notify('movement', 'store');
       this.notify('chat', 'store');
+      this.notify('leaderboard', 'store');
       this.notify('all', 'store');
     });
   }
@@ -314,6 +319,10 @@ export class GameViewModel {
   getRegions(): RegionSlice {
     const snapshot = this.projectedSnapshot();
     return { mapRegions: snapshot.mapRegions, valueFieldDefs: snapshot.valueFieldDefs, regionProsperityMap: snapshot.regionProsperityMap, regionValues: snapshot.regionValues };
+  }
+
+  getLeaderboard(): LeaderboardSlice {
+    return { leaderboard: this.projectedSnapshot().leaderboard };
   }
 
   // ===== Chat =====

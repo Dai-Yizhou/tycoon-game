@@ -54,6 +54,18 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   animation: fadeIn var(--motion-normal) ease-out;
 }
 .game-page { display: block; padding: 0; }
+.effects-toggle {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 5;
+  padding: 5px 9px;
+  border: 1px solid var(--gp-border, var(--region-rule));
+  background: var(--gp-surface, var(--region-board-bg));
+  color: var(--gp-fg, var(--region-fg));
+  font-size: 11px;
+}
+.effects-toggle[aria-pressed="false"] { opacity: 0.7; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -564,4 +576,5 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 @media (prefers-reduced-motion: reduce) {
   .dice-btn, .act-btn, .start-button, .confirm-button, .retry-button,
   .username-input, .password-input, .progress-bar::after { transition: none; }
+  .fx-step-start, .fx-step-arrive, .fx-move-complete { animation: none; }
 }

@@ -33,6 +33,7 @@ import type { DayNightCycle } from '../world/DayNightCycle.js';
 import type { TeamManager } from '../team/TeamManager.js';
 import type { JWTService } from '../auth/JWTService.js';
 import type { Cell } from '@game/shared';
+import type { LeaderboardManager } from '../ranking/LeaderboardManager.js';
 
 /**
  * Socket.IO 类型化 Server
@@ -84,6 +85,7 @@ export interface SocketManagerOptions {
   /** 昼夜循环实例（用于登录时同步时间给客户端） */
   dayNightCycle?: DayNightCycle;
   teamManager?: TeamManager;
+  leaderboardManager?: LeaderboardManager;
 }
 
 /**
@@ -98,6 +100,7 @@ export class SocketManager {
   private readonly autoWireWorldEvents: boolean;
   private dayNightCycle?: DayNightCycle;
   private teamManager?: TeamManager;
+  private leaderboardManager?: LeaderboardManager;
 
   /** socketId -> 已发事件计数（按时间窗口重置） */
   private readonly rateBuckets: Map<string, { count: number; windowStart: number }> = new Map();
@@ -113,6 +116,7 @@ export class SocketManager {
     this.autoWireWorldEvents = options.autoWireWorldEvents ?? true;
     this.dayNightCycle = options.dayNightCycle;
     this.teamManager = options.teamManager;
+    this.setLeaderboardManager(options.leaderboardManager);
 
     if (!this.authenticate && !this.jwtService && process.env.NODE_ENV === 'production') {
       throw new Error('explicit socket authentication is required');
@@ -207,11 +211,15 @@ export class SocketManager {
   }
 
   /**
-   * 单玩家推送
-   *
-   * - 一个玩家可能多端在线，全部推送
-   * - 未找到玩家时静默
+   * 榜单快照按在线玩家分别推送
    */
+  broadcastLeaderboard(snapshot: import('@game/shared').LeaderboardSnapshot): void {
+    for (const [playerId, sockets] of this.playerSockets) {
+      const personalized = this.leaderboardManager?.getCurrentSnapshot(playerId, snapshot.generatedAt) ?? snapshot;
+      for (const sid of sockets) this.io.sockets.sockets.get(sid)?.emit('server.leaderboardUpdated', personalized);
+    }
+  }
+
   emitToPlayer<K extends keyof ServerToClientEvents>(
     playerId: string,
     event: K,
@@ -490,6 +498,7 @@ export class SocketManager {
             cycleStartTime,
             cycleMinutes,
             existingPlayers,
+            leaderboard: this.leaderboardManager?.getCurrentSnapshot(player.id) ?? undefined,
           },
         });
 
@@ -518,6 +527,7 @@ export class SocketManager {
             };
           }) ?? [],
           serverTime: now,
+          leaderboard: this.leaderboardManager?.getCurrentSnapshot(player.id) ?? undefined,
         });
 
       } catch (err) {
@@ -530,6 +540,10 @@ export class SocketManager {
     // getTeamState）由 TeamHandler 统一处理（服务端权威），
     // 注册见 HandlerRegistry.registerForSocket。此处不再保留旧实现，避免
     // 双重注册导致的状态不一致。
+  }
+
+  setLeaderboardManager(manager: LeaderboardManager | undefined): void {
+    this.leaderboardManager = manager;
   }
 
   private createDefaultPlayer(playerId: string, username: string, now: number): Player {

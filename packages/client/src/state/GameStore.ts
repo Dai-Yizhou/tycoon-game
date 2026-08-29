@@ -1,4 +1,4 @@
-import type { Cell, Player, ChatMessage as ServerChatMessage } from '@game/shared';
+import type { Cell, LeaderboardSnapshot, LeaderboardState, Player, ChatMessage as ServerChatMessage } from '@game/shared';
 
 // ===== 类型定义 =====
 
@@ -69,6 +69,7 @@ export interface ClientGameSnapshot {
   mapTimezones: TimeZoneInfo[];
   valueFieldDefs: ValueFieldDef[];
   cellRuntimeStates: Map<number, { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number; repairedBy?: string; repairedAt?: number }>;
+  leaderboard: LeaderboardState;
 }
 
 export type ClientGameEvent =
@@ -103,7 +104,7 @@ export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     isBankrupt: false,
-    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], prosperity: 100, regionProsperityMap: new Map(), regionValues: new Map(), mapRegions: [], mapTimezones: [], valueFieldDefs: [], cellRuntimeStates: new Map(),
+    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], prosperity: 100, regionProsperityMap: new Map(), regionValues: new Map(), mapRegions: [], mapTimezones: [], valueFieldDefs: [], cellRuntimeStates: new Map(), leaderboard: { status: 'loading', snapshot: null, error: null },
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
 
@@ -140,6 +141,22 @@ export class GameStore {
 
   updateCooldown(partial: Partial<Pick<ClientGameSnapshot, 'rollCooldownEnd' | 'rollCooldownMs'>>): void {
     this.snapshot = { ...this.snapshot, ...partial };
+    this.publish();
+  }
+
+  setLeaderboard(snapshot: LeaderboardSnapshot | null): void {
+    const status = snapshot ? ((snapshot.top?.length ?? 0) > 0 ? 'ready' : 'empty') : 'disabled';
+    this.snapshot = { ...this.snapshot, leaderboard: { status, snapshot, error: null } };
+    this.publish();
+  }
+
+  setLeaderboardError(error: string): void {
+    this.snapshot = { ...this.snapshot, leaderboard: { ...this.snapshot.leaderboard, status: 'error', error } };
+    this.publish();
+  }
+
+  setLeaderboardOffline(): void {
+    this.snapshot = { ...this.snapshot, leaderboard: { ...this.snapshot.leaderboard, status: 'offline' } };
     this.publish();
   }
 
@@ -338,6 +355,7 @@ export class GameStore {
       valueFieldDefs: [],
       regionValues: new Map(),
       cellRuntimeStates: new Map(),
+      leaderboard: { status: 'loading', snapshot: null, error: null },
     };
     this.publish();
   }

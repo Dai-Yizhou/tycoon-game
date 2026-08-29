@@ -18,7 +18,9 @@ import { MapIndex, t } from '@game/shared';
 import type { Player } from '@game/shared';
 import { GameHudShell } from '../components/GameHudShell.js';
 import { InteractiveMapSurface } from '../components/InteractiveMapSurface.js';
-import { NoOpEffectHooks } from '../game/GameEffects.js';
+import { CssTransitionEffectHooks } from '../game/GameEffects.js';
+import type { MovementEffectHooks } from '../game/GameEffects.js';
+import { EffectController } from '../game/EffectController.js';
 import { GameViewModel } from '../game/GameViewModel.js';
 import { GameStore } from '../state/GameStore.js';
 import type { TypedClientSocket } from '../hooks/useSocket.js';
@@ -33,13 +35,15 @@ import {
 
 import { registerHudRefresh } from '../game/ClientHudBridge.js';
 
-import { handleRollDice,
+import {
+  handleRollDice,
   handleBuyProperty, handleUpgradeProperty, handleBuyInvestment, handleCoInvest,
-  handleTransport, handleRestoreMonument, type GameRuntime,
+  handleTransport, handleRestoreMonument, onPlayerArrived, type GameRuntime,
 } from '../game/systems/GameLogic.js';
 
 import {
   onIntersectionChoice,
+  updateMovement,
 } from '../game/systems/MovementSystem.js';
 
 import { registerSocketHandlers, unregisterSocketHandlers } from '../game/systems/SocketEventHandler.js';
@@ -53,6 +57,7 @@ let unregisterHudRefresh: (() => void) | null = null;
 let unsubscribeGameStore: (() => void) | null = null;
 let mapIndex: MapIndex | null = null;
 let gameSocket: TypedClientSocket | null = null;
+let movementFrame: number | null = null;
 const pageEventCleanups = new WeakMap<HTMLElement, () => void>();
 
 function createGameRuntime(store: GameStore, socket: NonNullable<typeof gameSocket>, index: NonNullable<typeof mapIndex>): GameRuntime {
@@ -88,7 +93,8 @@ export function createGamePage(controller: GameController): HTMLElement {
   gameStore = new GameStore();
   setChatStore(gameStore);
   gameViewModel = new GameViewModel(gameStore, context.playerName || t('game.defaultPlayerName'));
-  const effects = new NoOpEffectHooks();
+  const effects = new EffectController(new CssTransitionEffectHooks(page));
+  const movementEffects: MovementEffectHooks = effects;
 
   // Board
   const boardContainer = document.createElement('div');
@@ -101,6 +107,29 @@ export function createGamePage(controller: GameController): HTMLElement {
     interactiveMap.followPlayer(snapshot.currentPlayerPosition);
     syncCellActions(snapshot.currentPlayerPosition);
     if (mapIndex) applyRegionTheme(page, snapshot.currentPlayerPosition);
+    const displayPlayer = snapshot.currentPlayer;
+    if (displayPlayer && snapshot.isMoving) {
+      interactiveMap.setPlayerDisplayPosition(displayPlayer.id, snapshot.playerDisplayX, snapshot.playerDisplayY);
+      interactiveMap.followPlayer(snapshot.currentPlayerPosition);
+    }
+    if (snapshot.isMoving && movementFrame === null) {
+      const tick = (): void => {
+        movementFrame = null;
+        const current = gameStore?.getSnapshot();
+        if (!current?.isMoving) return;
+        if (mapIndex) {
+          updateMovement(gameStore!, mapIndex, () => {
+            invokeGameAction(onPlayerArrived);
+          }, movementEffects);
+        }
+        const next = gameStore?.getSnapshot();
+        if (next?.currentPlayer) interactiveMap.setPlayerDisplayPosition(next.currentPlayer.id, next.playerDisplayX, next.playerDisplayY);
+        if (next?.isMoving) {
+          movementFrame = window.requestAnimationFrame(tick);
+        }
+      };
+      movementFrame = window.requestAnimationFrame(tick);
+    }
   });
   page.appendChild(boardContainer);
 
@@ -111,6 +140,8 @@ export function createGamePage(controller: GameController): HTMLElement {
   backButton.addEventListener('click', () => controller.reset(true));
   page.appendChild(backButton);
   gameHudShell = new GameHudShell(gameViewModel, effects, {
+    effectsEnabled: effects.isEnabled(),
+    onEffectsToggle: (enabled) => effects.setEnabled(enabled),
     onRoll: () => {
       if (gameStore && gameSocket) {
         const index = mapIndex ?? ({ getById: () => undefined } as unknown as MapIndex);
@@ -118,7 +149,7 @@ export function createGamePage(controller: GameController): HTMLElement {
       }
     },
       onPathChoice: (cellId) => {
-      if (gameStore && gameSocket) onIntersectionChoice(gameStore, gameSocket, cellId);
+      if (gameStore && gameSocket) onIntersectionChoice(gameStore, gameSocket, cellId, movementEffects);
       gameStore?.clearPathChoice();
     },
     onCellAction: (actionId) => {
@@ -154,6 +185,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   unregisterHudRefresh = registerHudRefresh(() => { gameHudShell?.update(); });
 
   gameSocket = controller.getSocket();
+  if (context.leaderboard) gameStore.setLeaderboard(context.leaderboard);
   // Init: load map data, then start game
   if (context.player && context.player.id) {
     gameStore?.applyEvent({ sequence: gameStore.nextSequence(), type: 'player', player: context.player });
@@ -215,7 +247,6 @@ export function createGamePage(controller: GameController): HTMLElement {
   // 监听服务端昼夜事件，同步时间
   const socket = gameSocket;
   if (socket) {
-
     registerSocketHandlers(socket, {
       controller,
       store: gameStore!,
@@ -485,6 +516,10 @@ function formatTeamValues(values: Record<string, number>, definitions: Array<{ i
 }
 
 export function cleanupGamePage(page: HTMLElement): void {
+  if (movementFrame !== null) {
+    window.cancelAnimationFrame(movementFrame);
+    movementFrame = null;
+  }
   pageEventCleanups.get(page)?.();
   pageEventCleanups.delete(page);
   unregisterHudRefresh?.();

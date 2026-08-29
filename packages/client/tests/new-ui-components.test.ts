@@ -26,6 +26,21 @@ describe("GameHudShell", () => {
     shell.destroy();
   });
 
+  it('提供视效总开关并通知页面状态', () => {
+    const vm = new GameViewModel(new GameStore());
+    const onEffectsToggle = jest.fn();
+    const shell = new GameHudShell(vm, new NoOpEffectHooks(), { onEffectsToggle, effectsEnabled: true });
+    const toggle = shell.getElement().querySelector('[data-action="effects-toggle"]') as HTMLButtonElement;
+
+    expect(toggle).not.toBeNull();
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    toggle.click();
+
+    expect(onEffectsToggle).toHaveBeenCalledWith(false);
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    shell.destroy();
+  });
+
   it('依据服务端冷却结束时间控制掷骰按钮', () => {
     const store = new GameStore();
     const vm = new GameViewModel(store);

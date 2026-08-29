@@ -38,6 +38,8 @@ import type { Cell, Uct } from './cell.js';
 import type { ChatChannel, ChatMessage } from './chat.js';
 import type { Player, ValueField } from './player.js';
 import type { Team, TeamInvite, TeamMemberView } from './team.js';
+import type { LeaderboardSnapshot } from './leaderboard.js';
+import type { AchievementSnapshot, AchievementUnlockedPayload } from './achievement.js';
 
 // ---------------------------------------------------------------------------
 // 共用负载（Payloads）
@@ -86,7 +88,7 @@ export interface ClientToServerEvents {
   /** 登录/加入游戏 */
   'client.login': (
     payload: { username: string; guest?: boolean },
-    ack?: (result: AckResult<{ player: import('../types/player').Player; serverTime: number; cycleStartTime: number; cycleMinutes: number; existingPlayers: import('../types/player').Player[] }>) => void,
+    ack?: (result: AckResult<{ player: Player; serverTime: number; cycleStartTime: number; cycleMinutes: number; existingPlayers: Player[]; leaderboard?: LeaderboardSnapshot; leaderboardEnabled?: boolean; achievements?: AchievementSnapshot }>) => void,
   ) => void;
 
   /** 掷骰子 */
@@ -208,7 +210,14 @@ export interface ServerToClientEvents {
     visibleCells?: Cell[];
     /** 服务端时间 */
     serverTime: number;
+    /** 当前排行榜快照 */
+    leaderboard?: LeaderboardSnapshot;
+    /** 是否启用排行榜 */
+    leaderboardEnabled?: boolean;
   }) => void;
+
+  /** 榜单完整快照更新 */
+  'server.leaderboardUpdated': (payload: LeaderboardSnapshot) => void;
 
   /** 玩家加入 */
   'server.playerJoined': (payload: Player) => void;

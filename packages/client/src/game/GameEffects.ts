@@ -142,6 +142,25 @@ export class CssTransitionEffectHooks extends NoOpEffectHooks {
     super();
   }
 
+  onStepStart(fromCellId: number, toCellId: number): void {
+    void fromCellId;
+    void toCellId;
+    this.root.classList.add('fx-step-start');
+    setTimeout(() => this.root.classList.remove('fx-step-start'), 280);
+  }
+
+  onStepArrive(cellId: number): void {
+    void cellId;
+    this.root.classList.add('fx-step-arrive');
+    setTimeout(() => this.root.classList.remove('fx-step-arrive'), 220);
+  }
+
+  onMoveComplete(cellId: number): void {
+    void cellId;
+    this.root.classList.add('fx-move-complete');
+    setTimeout(() => this.root.classList.remove('fx-move-complete'), 320);
+  }
+
   onDiceSettled(value: number): void {
     void value;
     this.root.classList.add('fx-dice-settled');

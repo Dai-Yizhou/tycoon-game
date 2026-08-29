@@ -2,6 +2,7 @@ import type { MapIndex } from '@game/shared';
 import { t } from '@game/shared';
 import type { TypedClientSocket } from '../../hooks/useSocket.js';
 import type { ClientGameSnapshot, GameStore } from '../../state/GameStore.js';
+import type { MovementEffectHooks } from '../GameEffects.js';
 import { addChatMessage } from './ChatSystem.js';
 import { requestHudRefresh } from '../ClientHudBridge.js';
 
@@ -15,7 +16,7 @@ function updateSnapshot(store: GameStore, partial: Partial<ClientGameSnapshot>):
   store.applySnapshot({ sequence: store.nextSequence(), ...partial });
 }
 
-export function updateMovement(store: GameStore, map: MapIndex, onPlayerArrived: () => void): void {
+export function updateMovement(store: GameStore, map: MapIndex, onPlayerArrived: () => void, effects?: MovementEffectHooks): void {
   const snapshot = store.getSnapshot();
   if (!snapshot.isMoving) return;
 
@@ -27,21 +28,29 @@ export function updateMovement(store: GameStore, map: MapIndex, onPlayerArrived:
 
   if (progress < 1) return;
   if (snapshot.isServerAnimating) {
-    advanceServerPathStep(store, map, onPlayerArrived);
+    effects?.onStepArrive(snapshot.currentPlayerPosition);
+    if (snapshot.serverPathIndex >= snapshot.serverPath.length - 1) {
+      updateSnapshot(store, { isServerAnimating: false, isMoving: false });
+      onPlayerArrived();
+      effects?.onMoveComplete(snapshot.currentPlayerPosition);
+      return;
+    }
+    advanceServerPathStep(store, map, onPlayerArrived, effects);
     return;
   }
 
   const remainingSteps = snapshot.remainingSteps - 1;
   updateSnapshot(store, { remainingSteps });
   if (remainingSteps > 1) {
-    startNextStep(store, map, onPlayerArrived);
+    startNextStep(store, map, onPlayerArrived, effects);
   } else {
     updateSnapshot(store, { isMoving: false });
     onPlayerArrived();
+    effects?.onMoveComplete(snapshot.currentPlayerPosition);
   }
 }
 
-export function startNextStep(store: GameStore, map: MapIndex, onPlayerArrived: () => void): void {
+export function startNextStep(store: GameStore, map: MapIndex, onPlayerArrived: () => void, effects?: MovementEffectHooks): void {
   const snapshot = store.getSnapshot();
   if (!snapshot.isServerAnimating) return;
   const cell = map.getById(snapshot.currentPlayerPosition);
@@ -56,13 +65,14 @@ export function startNextStep(store: GameStore, map: MapIndex, onPlayerArrived: 
     updateSnapshot(store, { isMoving: false });
     onPlayerArrived();
   } else if (available.length === 1) {
-    animateMoveTo(store, map, available[0]);
+    animateMoveTo(store, map, available[0], effects);
   } else {
     updateSnapshot(store, { isWaitingForChoice: true });
+    effects?.onIntersectionPrompt(available);
   }
 }
 
-export function animateMoveTo(store: GameStore, map: MapIndex, targetId: number): void {
+export function animateMoveTo(store: GameStore, map: MapIndex, targetId: number, effects?: MovementEffectHooks): void {
   const snapshot = store.getSnapshot();
   if (!snapshot.isServerAnimating) return;
   const target = map.getById(targetId);
@@ -77,17 +87,24 @@ export function animateMoveTo(store: GameStore, map: MapIndex, targetId: number)
     moveStartTime: performance.now(),
     currentPlayerPosition: targetId,
   });
+  effects?.onStepStart(snapshot.currentPlayerPosition, targetId);
 }
 
-export function startServerPathAnimation(store: GameStore, map: MapIndex, path: number[], onPlayerArrived: () => void): void {
-  if (path.length < 2) return;
+export function startServerPathAnimation(store: GameStore, map: MapIndex, path: number[], onPlayerArrived: () => void, effects?: MovementEffectHooks, authoritativeCellId?: number): void {
+  const current = store.getSnapshot();
+  const start = path[0];
+  const end = path[path.length - 1];
+  const authoritativeEnd = authoritativeCellId ?? current.currentPlayer?.position.cellId;
+  if (path.length < 2 || start !== current.currentPlayerPosition || end !== authoritativeEnd) return;
+  if (path.some((cellId) => !Number.isInteger(cellId) || !map.getById(cellId))) return;
+  if (path.slice(0, -1).some((cellId, index) => !map.getById(cellId)?.destinations.includes(path[index + 1]))) return;
   updateSnapshot(store, { serverPath: [...path], serverPathIndex: 0, isServerAnimating: true, isMoving: true, remainingSteps: 0 });
   window.dispatchEvent(new CustomEvent('game:cell-leave'));
   requestHudRefresh();
-  advanceServerPathStep(store, map, onPlayerArrived);
+  advanceServerPathStep(store, map, onPlayerArrived, effects);
 }
 
-export function advanceServerPathStep(store: GameStore, map: MapIndex, onPlayerArrived: () => void): void {
+export function advanceServerPathStep(store: GameStore, map: MapIndex, onPlayerArrived: () => void, effects?: MovementEffectHooks): void {
   const snapshot = store.getSnapshot();
   if (!snapshot.isServerAnimating) return;
   const serverPathIndex = snapshot.serverPathIndex + 1;
@@ -96,15 +113,17 @@ export function advanceServerPathStep(store: GameStore, map: MapIndex, onPlayerA
   if (serverPathIndex >= snapshot.serverPath.length) {
     updateSnapshot(store, { isServerAnimating: false, isMoving: false });
     onPlayerArrived();
+    effects?.onMoveComplete(snapshot.currentPlayerPosition);
     return;
   }
 
-  animateMoveTo(store, map, snapshot.serverPath[serverPathIndex]);
+  animateMoveTo(store, map, snapshot.serverPath[serverPathIndex], effects);
 }
 
-export function onIntersectionChoice(store: GameStore, socket: TypedClientSocket, targetId: number): void {
+export function onIntersectionChoice(store: GameStore, socket: TypedClientSocket, targetId: number, effects?: MovementEffectHooks): void {
   const snapshot = store.getSnapshot();
   updateSnapshot(store, { isWaitingForChoice: false });
+  effects?.onIntersectionResolved(targetId);
   socket.emit('client.choosePath', { fromCellId: snapshot.currentPlayerPosition, toCellId: targetId }, (result) => {
     if (!result.ok) addChatMessage(t('path.selectFailed', { error: result.error || t('common.unknownError') }), 'error');
   });

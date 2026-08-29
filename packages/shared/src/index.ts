@@ -9,4 +9,3 @@ export * from './types/index.js';
 export * from './debug/index.js';
 export * from './map/index.js';
 export * from './i18n/index.js';
-export * from './chat/commandParser.js';

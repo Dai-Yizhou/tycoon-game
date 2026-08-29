@@ -184,6 +184,8 @@
     "ready": "就绪",
     "moving": "移动中",
     "cooldown": "冷却中",
+    "effectsOn": "动效：开",
+    "effectsOff": "动效：关",
     "noMessage": "暂无消息",
     "choosePath": "选择路径",
     "currentTag": "当前格",
@@ -426,6 +428,7 @@
     "managementTitle": "队伍管理",
     "noTeamMembers": "无队伍"
   },
+  "leaderboard": { "loading": "榜单加载中", "empty": "暂无榜单数据", "disabled": "榜单未启用", "error": "榜单服务异常", "offline": "榜单连接断开" },
   "chat": {
     "noConnection": "连接断开时无法发送聊天消息",
     "title": "聊天",

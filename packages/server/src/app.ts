@@ -35,6 +35,7 @@ import { JWTService } from './auth/JWTService.js';
 import { AuthService, type UserStore } from './auth/AuthService.js';
 import { FileUserStore } from './auth/FileUserStore.js';
 import { createAuthRouter } from './auth/authRoutes.js';
+import { LeaderboardManager } from './ranking/index.js';
 
 /**
  * Socket 管理器配置（不包含 world，由 createApp 注入）
@@ -308,14 +309,34 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   });
 
   let socketManager: SocketManager | undefined;
+  const leaderboardManager = new LeaderboardManager({
+    worldId: world.getWorldIdentity()?.worldId ?? mapMeta.id,
+    mapMeta,
+    getPlayers: () => world.getAllPlayers(),
+    getRegionId: (cellId) => world.getRegionId(cellId),
+    getRegionValue: (regionId, fieldId) => world.getRegionValue(regionId, fieldId),
+    broadcast: (snapshot) => {
+      if (socketManager) {
+        socketManager.broadcastLeaderboard(snapshot);
+      }
+    },
+  });
   if (deps.socketManagerOptions) {
     socketManager = new SocketManager(io, {
       ...deps.socketManagerOptions,
       world,
       jwtService: deps.socketManagerOptions.jwtService ?? authJwt,
       teamManager: handlerRegistry.getTeamManager(),
+      leaderboardManager,
     });
   }
+  world.on('playerAdded', () => leaderboardManager.markDirty());
+  world.on('playerRemoved', () => leaderboardManager.markDirty());
+  world.on('playerUpdated', () => leaderboardManager.markDirty());
+  world.on('playerPositionChanged', () => leaderboardManager.markDirty());
+  world.on('playerStatusChanged', () => leaderboardManager.markDirty());
+  world.on('regionValueChanged', () => leaderboardManager.markDirty());
+  leaderboardManager.markDirty();
 
   // 初始化昼夜循环（从服务器启动时开始计时）
   const dayNightCycle = new DayNightCycle(

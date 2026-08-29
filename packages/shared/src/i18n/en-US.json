@@ -184,6 +184,8 @@
     "ready": "Ready",
     "moving": "Moving",
     "cooldown": "Cooldown",
+    "effectsOn": "Effects: On",
+    "effectsOff": "Effects: Off",
     "noMessage": "No messages yet",
     "choosePath": "Choose path",
     "currentTag": "Current",
@@ -426,6 +428,7 @@
     "managementTitle": "Team Management",
     "noTeamMembers": "No Team"
   },
+  "leaderboard": { "loading": "Leaderboard loading", "empty": "No leaderboard data", "disabled": "Leaderboard disabled", "error": "Leaderboard service error", "offline": "Leaderboard disconnected" },
   "chat": {
     "noConnection": "Chat is unavailable while disconnected",
     "title": "Chat",
