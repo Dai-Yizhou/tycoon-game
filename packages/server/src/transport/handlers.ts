@@ -83,6 +83,8 @@ export class HandlerRegistry {
   private readonly feedbackManager: FeedbackManager;
   private bankruptcy: Bankruptcy | null = null;
   private timeZoneManager: TimeZoneManager | null = null;
+  private achievementManager: import('../achievement/AchievementManager.js').AchievementManager | null = null;
+  private achievementOwner: ((playerId: string, guest: boolean) => import('../achievement/AchievementStore.js').AchievementOwner) | null = null;
 
   constructor(io: TypedServer, world: GameWorld, ownershipConfig?: OwnershipConfig, jailCooldownMs?: number, economy?: EconomyService) {
     this.io = io;
@@ -250,11 +252,39 @@ export class HandlerRegistry {
     logger.info('Bankruptcy 已注入 HandlerRegistry');
   }
 
+  setAchievementManager(manager: import('../achievement/AchievementManager.js').AchievementManager, owner: (playerId: string, guest: boolean) => import('../achievement/AchievementStore.js').AchievementOwner): void {
+    this.achievementManager = manager;
+    this.achievementOwner = owner;
+    this.eventHandler.setAchievementEvent((playerId, cellId, eventId, guest) => {
+      const achievementOwner = owner(playerId, guest);
+      const mapId = this.world.getMapMeta()?.id;
+      if (mapId) void manager.recordEvent(achievementOwner, mapId, cellId, eventId);
+    });
+    const recordPurchase = (playerId: string, cellId: number, guest: boolean): void => {
+      const achievementOwner = owner(playerId, guest);
+      void manager.recordPurchase(achievementOwner, cellId);
+    };
+    this.propertyHandler.setAchievementPurchase(recordPurchase);
+    this.investmentHandler.setAchievementPurchase(recordPurchase);
+  }
+
+  private achievementOwnerFor(socket: TypedSocket): import('../achievement/AchievementStore.js').AchievementOwner | null {
+    const playerId = socket.data.playerId;
+    return playerId && this.achievementOwner ? this.achievementOwner(playerId, socket.data.guest === true) : null;
+  }
+
   /**
    * 处理掷骰后的移动（由 DiceHandler 调用）
    */
   handleMovement(playerId: string, steps: number, socket: TypedSocket): void {
     const result = this.movementHandler.handleMovement(playerId, steps, socket);
+    if (result && this.achievementManager) {
+      const owner = this.achievementOwnerFor(socket);
+      const mapId = this.world.getMapMeta()?.id;
+      if (owner && mapId) {
+        for (const cellId of new Set(result.path)) void this.achievementManager.recordCellVisit(owner, mapId, cellId);
+      }
+    }
     if (!result) {
       logger.warn(`移动处理失败：玩家 ${playerId}，步数 ${steps}`);
       return;
@@ -268,6 +298,12 @@ export class HandlerRegistry {
   handleCellEvent(playerId: string, cellId: number, socket: TypedSocket): void {
     const cell = this.world.getMapIndex()?.getById(cellId);
     if (!cell) return;
+
+    const owner = this.achievementOwnerFor(socket);
+    const mapId = this.world.getMapMeta()?.id;
+    if (owner && mapId) {
+      void this.achievementManager?.recordCellVisit(owner, mapId, cellId);
+    }
 
     switch (cell.type) {
       case 'supply':

@@ -39,7 +39,7 @@ import type { ChatChannel, ChatMessage } from './chat.js';
 import type { Player, ValueField } from './player.js';
 import type { Team, TeamInvite, TeamMemberView } from './team.js';
 import type { LeaderboardSnapshot } from './leaderboard.js';
-import type { AchievementSnapshot, AchievementUnlockedPayload } from './achievement.js';
+import type { AchievementSnapshot } from './achievement.js';
 
 // ---------------------------------------------------------------------------
 // 共用负载（Payloads）
@@ -203,6 +203,7 @@ export interface ServerToClientEvents {
   'server.gameState': (payload: {
     player: Player;
     team: Team | null;
+    achievements?: AchievementSnapshot;
     members?: TeamMemberView[];
     ownedProperties?: Array<{ cellId: number; level: number }>;
     ownedInvestments?: Array<{ cellId: number; share: number }>;
@@ -218,6 +219,8 @@ export interface ServerToClientEvents {
 
   /** 榜单完整快照更新 */
   'server.leaderboardUpdated': (payload: LeaderboardSnapshot) => void;
+
+  'server.achievementUnlocked': (payload: import('./achievement.js').AchievementUnlockedPayload) => void;
 
   /** 玩家加入 */
   'server.playerJoined': (payload: Player) => void;

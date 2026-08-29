@@ -34,6 +34,8 @@ import type { TeamManager } from '../team/TeamManager.js';
 import type { JWTService } from '../auth/JWTService.js';
 import type { Cell } from '@game/shared';
 import type { LeaderboardManager } from '../ranking/LeaderboardManager.js';
+import type { AchievementManager } from '../achievement/AchievementManager.js';
+import type { AchievementOwner } from '../achievement/AchievementStore.js';
 
 /**
  * Socket.IO 类型化 Server
@@ -86,6 +88,8 @@ export interface SocketManagerOptions {
   dayNightCycle?: DayNightCycle;
   teamManager?: TeamManager;
   leaderboardManager?: LeaderboardManager;
+  achievementManager?: AchievementManager;
+  achievementOwner?: (playerId: string, guest: boolean) => AchievementOwner;
 }
 
 /**
@@ -101,6 +105,8 @@ export class SocketManager {
   private dayNightCycle?: DayNightCycle;
   private teamManager?: TeamManager;
   private leaderboardManager?: LeaderboardManager;
+  private achievementManager?: AchievementManager;
+  private achievementOwner?: (playerId: string, guest: boolean) => AchievementOwner;
 
   /** socketId -> 已发事件计数（按时间窗口重置） */
   private readonly rateBuckets: Map<string, { count: number; windowStart: number }> = new Map();
@@ -116,6 +122,8 @@ export class SocketManager {
     this.autoWireWorldEvents = options.autoWireWorldEvents ?? true;
     this.dayNightCycle = options.dayNightCycle;
     this.teamManager = options.teamManager;
+    this.achievementManager = options.achievementManager;
+    this.achievementOwner = options.achievementOwner;
     this.setLeaderboardManager(options.leaderboardManager);
 
     if (!this.authenticate && !this.jwtService && process.env.NODE_ENV === 'production') {
@@ -482,6 +490,11 @@ export class SocketManager {
         const cycleStartTime = this.dayNightCycle?.getCycleStartTime() ?? now;
         const cycleMinutes = this.dayNightCycle?.getConfig().cycleMinutes ?? 15;
 
+        const achievementOwner = this.achievementOwner?.(player.id, isGuest);
+        const achievements = achievementOwner && this.achievementManager
+          ? await this.achievementManager.initialize(achievementOwner, this.world.getMapMeta()?.id ?? '')
+          : undefined;
+
         logger.info(
           `player logged in: ${username} (${player.id})` +
             `${isGuest ? ' [guest]' : ''}${isNewPlayer ? ' [new]' : ''}`,
@@ -499,11 +512,13 @@ export class SocketManager {
             cycleMinutes,
             existingPlayers,
             leaderboard: this.leaderboardManager?.getCurrentSnapshot(player.id) ?? undefined,
+            achievements,
           },
         });
 
         socket.emit('server.gameState', {
           player,
+          achievements,
           ownedProperties: (this.world.getMapData() ?? []).flatMap((cell: Cell) => {
             const ownerships = this.world.getRuntimeState().getOwnerships(cell.id);
             return cell.type === 'property' && ownerships.some((ownership) => ownership.playerId === player.id && ownership.share > 0)
@@ -544,6 +559,11 @@ export class SocketManager {
 
   setLeaderboardManager(manager: LeaderboardManager | undefined): void {
     this.leaderboardManager = manager;
+  }
+
+  setAchievementManager(manager: AchievementManager | undefined, owner?: (playerId: string, guest: boolean) => AchievementOwner): void {
+    this.achievementManager = manager;
+    this.achievementOwner = owner;
   }
 
   private createDefaultPlayer(playerId: string, username: string, now: number): Player {

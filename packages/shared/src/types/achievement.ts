@@ -49,6 +49,7 @@ export interface AchievementSnapshot {
 }
 
 export interface AchievementUnlockedPayload {
+  playerId: string;
   achievement: AchievementView;
   unlockedAt: number;
 }

@@ -22,3 +22,8 @@ test('拒绝与触发规则冲突的 scope 和非法引用', () => {
   expect(() => validateAchievementDefinitions([definition({ scope: 'global' })])).toThrow('scope');
   expect(() => validateAchievementDefinitions([definition({ trigger: { type: 'ranking', targetRank: 0 }, scope: 'global' })])).toThrow('targetRank');
 });
+
+test('校验所有阈值触发器的正整数边界', () => {
+  expect(() => validateAchievementDefinitions([definition({ scope: 'map', trigger: { type: 'ownedCells', target: 0 } })])).toThrow('正整数');
+  expect(() => validateAchievementDefinitions([definition({ scope: 'global', trigger: { type: 'purchasedCells', target: 1 } })])).not.toThrow();
+});

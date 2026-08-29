@@ -71,6 +71,7 @@ export class GameHudShell {
           <div class="value-pills" data-ui="resource-strip"></div>
           <div class="topbar-spacer"></div>
           <section class="leaderboard-panel" data-ui="leaderboard" aria-live="polite"></section>
+          <button class="achievement-button" data-action="achievements" type="button">成就</button>
           <div class="cycle-indicator" data-ui="day-night">
             <div class="cycle-dot" data-ui="cycle-dot"></div>
             <span class="cycle-text" data-ui="day-time">--:--</span>
@@ -128,6 +129,7 @@ export class GameHudShell {
     // Event wiring
     this.root.querySelector('[data-action="chat-send"]')?.addEventListener("click", () => this.sendChat());
     this.input.addEventListener("keydown", (e) => { if (e.key === "Enter") this.sendChat(); });
+    this.root.querySelector('[data-action="achievements"]')?.addEventListener("click", () => this.showAchievements());
     this.root.querySelector('[data-action="roll"]')?.addEventListener("click", () => this.config.onRoll?.());
     const effectsToggle = this.root.querySelector('[data-action="effects-toggle"]') as HTMLButtonElement | null;
     effectsToggle?.addEventListener("click", () => {
@@ -165,6 +167,7 @@ export class GameHudShell {
       this.vm.subscribe("pathChoice", () => this.update()),
       this.vm.subscribe("cellActions", () => this.update()),
       this.vm.subscribe("leaderboard", () => this.update()),
+      this.vm.subscribe("achievements", () => this.updateAchievements()),
     );
     this.update();
   }
@@ -339,6 +342,36 @@ export class GameHudShell {
       pill.append(label, num);
       return pill;
     }));
+  }
+
+  private showAchievements(): void {
+    const existing = this.root.querySelector('[data-ui="achievement-panel"]');
+    if (existing) {
+      existing.remove();
+      return;
+    }
+    const panel = document.createElement('section');
+    panel.dataset.ui = 'achievement-panel';
+    panel.className = 'achievement-panel';
+    this.root.appendChild(panel);
+    this.updateAchievements();
+  }
+
+  private updateAchievements(): void {
+    const panel = this.root.querySelector('[data-ui="achievement-panel"]');
+    if (!panel) return;
+    const state = this.vm.getAchievements().achievements;
+    if (state.status === 'loading') panel.textContent = '成就加载中';
+    else if (state.status === 'offline') panel.textContent = '成就暂时离线';
+    else if (state.status === 'error') panel.textContent = state.error ?? '成就加载失败';
+    else if (state.status === 'disabled') panel.textContent = '成就未启用';
+    else if (!state.snapshot || state.status === 'empty') panel.textContent = '暂无成就';
+    else {
+      panel.innerHTML = state.snapshot.achievements.map((item) => {
+      const progress = item.record.progress.visible ? ` ${item.record.progress.current}/${item.record.progress.target}` : '';
+        return `<div class="achievement-row"><strong>${this.escapeHtml(localizedText(item.name))}</strong><span>${item.record.unlocked ? '已解锁' : progress}</span><p>${this.escapeHtml(localizedText(item.description))}</p></div>`;
+      }).join('');
+    }
   }
 
   private updateLeaderboard(): void {

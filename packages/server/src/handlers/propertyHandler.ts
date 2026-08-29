@@ -87,6 +87,7 @@ export class PropertyHandler {
   private readonly world: GameWorld;
   private readonly ownershipConfig: OwnershipConfig;
   private readonly economy: EconomyService;
+  private achievementPurchase?: (playerId: string, cellId: number, guest: boolean) => void;
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
   private readonly operationGuard = new EconomicOperationGuard<AckResult<{ cell: Cell }>>();
@@ -103,6 +104,10 @@ export class PropertyHandler {
    *
    * @param engine 行为执行引擎实例
    */
+  setAchievementPurchase(handler: (playerId: string, cellId: number, guest: boolean) => void): void {
+    this.achievementPurchase = handler;
+  }
+
   setBehaviorEngine(engine: BehaviorEngine): void {
     this.behaviorEngine = engine;
     logger.info('BehaviorEngine 已注入 PropertyHandler');
@@ -250,6 +255,8 @@ export class PropertyHandler {
         playerId,
         runtime: this.world.getRuntimeState().getCellState(result.cell.id),
       });
+
+      this.achievementPurchase?.(playerId, result.cell.id, socket.data.guest === true);
 
       // 13. 返回成功结果
       const response = { ok: true, data: { cell: result.cell } } as AckResult<{ cell: Cell }>;

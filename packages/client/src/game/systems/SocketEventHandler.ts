@@ -36,7 +36,7 @@ const SOCKET_EVENTS = [
   'server.valueChanged', 'server.error', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
   'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft',
   'server.teamUpdated', 'server.teamDisbanded', 'server.prosperityChanged', 'server.gameState',
-  'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.playerBankrupt', 'server.playerRestarted',
+  'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.achievementUnlocked', 'server.playerBankrupt', 'server.playerRestarted',
   'server.propertyBought', 'server.propertyUpgraded', 'server.investmentBought',
 ] as const;
 
@@ -94,6 +94,13 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     requestHudRefresh();
   });
 
+  socket.on('server.achievementUnlocked', (payload) => {
+    const current = store.getSnapshot().achievements.snapshot;
+    store.setAchievements(current ? { ...current, generatedAt: Date.now(), achievements: current.achievements.map((item) => item.id === payload.achievement.id ? payload.achievement : item) } : { enabled: true, mapId: payload.achievement.record.mapId ?? '', generatedAt: Date.now(), achievements: [payload.achievement] });
+    options.onNotification?.({ id: `achievement-${payload.achievement.id}`, type: 'success', title: '成就解锁', content: localizedText(payload.achievement.name), durationMs: 3000 });
+    requestHudRefresh();
+  });
+
   socket.on('server.error', (payload) => {
     if (payload.code.toLowerCase().includes('leaderboard') || payload.message.toLowerCase().includes('榜单')) {
       store.setLeaderboardError(payload.message);
@@ -102,6 +109,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   socket.on('disconnect', () => {
+    store.setAchievementsOffline();
     store.setLeaderboardOffline();
     requestHudRefresh();
   });
@@ -124,6 +132,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   socket.on('server.gameState', (payload) => {
     const teamMembers = payload.members ?? [];
     if (payload.leaderboard) store.setLeaderboard(payload.leaderboard);
+    if (payload.achievements) store.setAchievements(payload.achievements);
     if (payload.visibleCells?.length) store.setCells(payload.visibleCells);
     store.applySnapshot({ sequence: store.nextSequence(), player: payload.player, teamMembers, ownedProperties: payload.ownedProperties, ownedInvestments: payload.ownedInvestments });
   });

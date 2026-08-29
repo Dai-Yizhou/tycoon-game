@@ -36,6 +36,11 @@ export class EventHandler {
   private readonly world: GameWorld;
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
+  private achievementEvent?: (playerId: string, cellId: number, eventId: string, guest: boolean) => void;
+
+  setAchievementEvent(handler: (playerId: string, cellId: number, eventId: string, guest: boolean) => void): void {
+    this.achievementEvent = handler;
+  }
 
   constructor(
     io: TypedServer,
@@ -131,6 +136,7 @@ export class EventHandler {
         // 广播事件通知
         this.broadcastBehaviorNotification(player, behaviorResult, socket);
 
+        this.achievementEvent?.(playerId, cellId, behaviorResult.behaviorId, socket.data.guest === true);
         logger.info(
           `玩家 ${playerId} 触发 behavior ${behaviorId}: ${behaviorResult.event.msg}`,
         );

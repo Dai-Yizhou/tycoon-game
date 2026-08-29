@@ -15,7 +15,11 @@
 import type { ServerConfig } from '@game/shared';
 import { loadConfig } from './config.js';
 import { logger } from './utils/logger.js';
-import { createApp, gracefulShutdown, startHttpServer } from './app.js';
+import {
+  createApp,
+  gracefulShutdown,
+  startHttpServer,
+} from './app.js';
 
 /**
  * 启动服务端

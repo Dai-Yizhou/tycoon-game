@@ -64,6 +64,7 @@ export class InvestmentHandler {
   private behaviorEngine: BehaviorEngine | null = null;
   private readonly ownershipConfig: OwnershipConfig;
   private readonly economy: EconomyService;
+  private achievementPurchase?: (playerId: string, cellId: number, guest: boolean) => void;
   private readonly operationGuard = new EconomicOperationGuard<AckResult<{ cell: Cell }>>();
 
   constructor(io: TypedServer, world: GameWorld, ownershipConfig: OwnershipConfig = DEFAULT_OWNERSHIP_CONFIG, economy: EconomyService = new EconomyService(world)) {
@@ -78,6 +79,10 @@ export class InvestmentHandler {
    *
    * @param engine 行为执行引擎实例
    */
+  setAchievementPurchase(handler: (playerId: string, cellId: number, guest: boolean) => void): void {
+    this.achievementPurchase = handler;
+  }
+
   setBehaviorEngine(engine: BehaviorEngine): void {
     this.behaviorEngine = engine;
     logger.info('BehaviorEngine 已注入 InvestmentHandler');
@@ -228,6 +233,8 @@ export class InvestmentHandler {
         playerId,
         runtime: this.world.getRuntimeState().getCellState(result.cell.id),
       });
+
+      this.achievementPurchase?.(playerId, result.cell.id, socket.data.guest === true);
 
       // 13. 返回成功结果
       const response = { ok: true, data: { cell: result.cell } } as AckResult<{ cell: Cell }>;

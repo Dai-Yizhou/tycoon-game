@@ -16,21 +16,23 @@ export class AchievementManager {
   }
 
   async initialize(owner: AchievementOwner, mapId: string): Promise<AchievementSnapshot> {
+    const key = ownerKey(owner);
     const records = await this.store.load(owner);
-    this.records.set(ownerKey(owner), records);
-    return this.getSnapshot(owner, mapId);
+    this.records.set(key, records);
+    return await this.getSnapshot(owner, mapId);
   }
 
   async getSnapshot(owner: AchievementOwner, mapId: string): Promise<AchievementSnapshot> {
-    const records = this.records.get(ownerKey(owner)) ?? await this.store.load(owner);
-    this.records.set(ownerKey(owner), records);
+    const allRecords = this.records.get(ownerKey(owner)) ?? await this.store.load(owner);
+    this.records.set(ownerKey(owner), allRecords);
+    const records = allRecords.filter((record) => record.scope === 'global' || record.mapId === mapId);
     return {
       enabled: true,
       mapId,
       generatedAt: Date.now(),
       achievements: this.definitions.map((definition) => ({
         ...definition,
-        record: records.find((record) => record.achievementId === definition.id) ?? this.newRecord(definition),
+        record: records.find((record) => record.achievementId === definition.id && (record.scope === 'global' || record.mapId === mapId)) ?? this.newRecord(definition, mapId),
       })),
     };
   }
@@ -46,7 +48,7 @@ export class AchievementManager {
   }
 
   async recordPurchase(owner: AchievementOwner, cellId: number): Promise<void> {
-    await this.update(owner, '', (definition, record) => {
+    await this.update(owner, undefined, (definition, record) => {
       if (definition.scope !== 'global' || definition.trigger.type !== 'purchasedCells') return false;
       if (record.seenKeys.includes(String(cellId))) return false;
       record.seenKeys.push(String(cellId));
@@ -55,13 +57,55 @@ export class AchievementManager {
     });
   }
 
-  private async update(owner: AchievementOwner, mapId: string, action: (definition: AchievementDefinition, record: Awaited<ReturnType<AchievementStore['load']>>[number]) => boolean): Promise<void> {
+  async recordEvent(owner: AchievementOwner, mapId: string, cellId: number, eventId: string): Promise<void> {
+    await this.update(owner, mapId, (definition, record) => {
+      if (definition.scope !== 'map' || definition.trigger.type !== 'completeEvents') return false;
+      const key = `${cellId}:${eventId}`;
+      if (!definition.trigger.cellIds.includes(cellId) || !definition.trigger.eventIds.includes(eventId) || record.seenKeys.includes(key)) return false;
+      record.seenKeys.push(key);
+      record.progress.current = record.seenKeys.length;
+      return record.progress.current >= record.progress.target;
+    });
+  }
+
+  async recordUct(owner: AchievementOwner, mapId: string, player: import('@game/shared').Player): Promise<void> {
+    await this.update(owner, mapId, (definition, record) => {
+      if (definition.trigger.type !== 'uctThreshold') return false;
+      const current = player.values[definition.trigger.fieldId]?.current ?? 0;
+      record.progress.current = current;
+      return current >= record.progress.target;
+    });
+  }
+
+  async recordOwnedCells(owner: AchievementOwner, mapId: string, cellIds: number[]): Promise<void> {
+    await this.update(owner, mapId, (definition, record) => {
+      if (definition.scope !== 'map' || definition.trigger.type !== 'ownedCells') return false;
+      record.progress.current = new Set(cellIds).size;
+      return record.progress.current >= record.progress.target;
+    });
+  }
+
+  async recordRanking(owner: AchievementOwner, mapId: string, rank: number | null): Promise<void> {
+    await this.update(owner, mapId, (definition, record) => {
+      if (definition.scope !== 'global' || definition.trigger.type !== 'ranking' || rank === null) return false;
+      record.progress.current = rank <= record.progress.target ? record.progress.target : 0;
+      return rank <= record.progress.target;
+    });
+  }
+
+  async mergeOwners(from: AchievementOwner, to: AchievementOwner): Promise<void> {
+    const records = await this.store.merge(from, to);
+    this.records.delete(ownerKey(from));
+    this.records.set(ownerKey(to), records);
+  }
+
+  private async update(owner: AchievementOwner, mapId: string | undefined, action: (definition: AchievementDefinition, record: Awaited<ReturnType<AchievementStore['load']>>[number]) => boolean): Promise<void> {
     const key = ownerKey(owner);
     const records = this.records.get(key) ?? await this.store.load(owner);
     this.records.set(key, records);
     const unlocked: AchievementView[] = [];
     for (const definition of this.definitions) {
-      const record = records.find((item) => item.achievementId === definition.id) ?? this.newRecord(definition, mapId);
+      const record = records.find((item) => item.achievementId === definition.id && (item.scope === 'global' || item.mapId === mapId)) ?? this.newRecord(definition, mapId);
       if (!records.includes(record)) records.push(record);
       if (record.unlocked) continue;
       if (action(definition, record)) {
@@ -71,12 +115,12 @@ export class AchievementManager {
       }
     }
     await this.store.save(owner, records);
-    for (const achievement of unlocked) this.notify({ achievement, unlockedAt: achievement.record.unlockedAt ?? Date.now() });
+    for (const achievement of unlocked) this.notify({ playerId: owner.accountId, achievement, unlockedAt: achievement.record.unlockedAt ?? Date.now() });
   }
 
   private newRecord(definition: AchievementDefinition, mapId?: string) {
     const target = definition.progress?.target ?? defaultTarget(definition);
-    return { achievementId: definition.id, scope: definition.scope, ...(definition.scope === 'map' && mapId ? { mapId } : {}), progress: { current: 0, target, visible: definition.progress?.visible ?? true }, unlocked: false, seenKeys: [] };
+    return { achievementId: definition.id, scope: definition.scope, ...(definition.scope === 'map' && mapId ? { mapId } : {}), progress: { current: 0, target, visible: definition.progress?.visible ?? true }, unlocked: false, unlockedAt: undefined, seenKeys: [] };
   }
 }
 

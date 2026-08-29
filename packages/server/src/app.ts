@@ -36,6 +36,7 @@ import { AuthService, type UserStore } from './auth/AuthService.js';
 import { FileUserStore } from './auth/FileUserStore.js';
 import { createAuthRouter } from './auth/authRoutes.js';
 import { LeaderboardManager } from './ranking/index.js';
+import { AchievementManager, FileAchievementStore, loadAchievementDefinitions, MongoAchievementStore, type AchievementStore } from './achievement/index.js';
 
 /**
  * Socket 管理器配置（不包含 world，由 createApp 注入）
@@ -309,6 +310,22 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   });
 
   let socketManager: SocketManager | undefined;
+  let achievementStore: AchievementStore;
+  if (config.mongoUri) {
+    achievementStore = new MongoAchievementStore(config.mongoUri);
+  } else {
+    achievementStore = new FileAchievementStore(resolveConfiguredPath(config.userDataPath + '.achievements'));
+  }
+  const achievementDefinitions = loadAchievementDefinitions(resolveConfiguredPath('data/achievements.json'));
+  const achievementManager = new AchievementManager(
+    achievementDefinitions,
+    achievementStore,
+    (payload) => socketManager?.emitToPlayer(payload.playerId, 'server.achievementUnlocked', payload),
+  );
+  handlerRegistry.setAchievementManager(achievementManager, (playerId, guest) => ({ accountId: playerId, guest }));
+  authService.setAchievementMigration(async (guestId, accountId) => {
+    await achievementManager.mergeOwners({ accountId: guestId, guest: true }, { accountId, guest: false });
+  });
   const leaderboardManager = new LeaderboardManager({
     worldId: world.getWorldIdentity()?.worldId ?? mapMeta.id,
     mapMeta,
@@ -328,6 +345,8 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
       jwtService: deps.socketManagerOptions.jwtService ?? authJwt,
       teamManager: handlerRegistry.getTeamManager(),
       leaderboardManager,
+      achievementManager,
+      achievementOwner: (playerId, guest) => ({ accountId: playerId, guest }),
     });
   }
   world.on('playerAdded', () => leaderboardManager.markDirty());
