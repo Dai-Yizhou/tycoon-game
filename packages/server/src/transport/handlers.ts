@@ -83,8 +83,9 @@ export class HandlerRegistry {
   private readonly feedbackManager: FeedbackManager;
   private bankruptcy: Bankruptcy | null = null;
   private timeZoneManager: TimeZoneManager | null = null;
-  private achievementManager: import('../achievement/AchievementManager.js').AchievementManager | null = null;
-  private achievementOwner: ((playerId: string, guest: boolean) => import('../achievement/AchievementStore.js').AchievementOwner) | null = null;
+  private achievementManager?: import('../achievement/AchievementManager.js').AchievementManager;
+  refreshOwnedCells: (playerId: string, guest: boolean) => void = (_playerId, _guest) => undefined;
+  private achievementOwner: ((playerId: string, guest: boolean) => import('../achievement/AchievementStore.js').AchievementOwner) | undefined;
 
   constructor(io: TypedServer, world: GameWorld, ownershipConfig?: OwnershipConfig, jailCooldownMs?: number, economy?: EconomyService) {
     this.io = io;
@@ -255,22 +256,32 @@ export class HandlerRegistry {
   setAchievementManager(manager: import('../achievement/AchievementManager.js').AchievementManager, owner: (playerId: string, guest: boolean) => import('../achievement/AchievementStore.js').AchievementOwner): void {
     this.achievementManager = manager;
     this.achievementOwner = owner;
+    this.refreshOwnedCells = (playerId, guest) => {
+      const mapId = this.world.getMapMeta()?.id;
+      if (!mapId) return;
+      const cellIds = (this.world.getMapData() ?? []).filter((cell) => this.world.getRuntimeState().getOwnerships(cell.id).some((ownership) => ownership.playerId === playerId && ownership.share > 0)).map((cell) => cell.id);
+      void manager.refreshOwnedCells(owner(playerId, guest), mapId, cellIds).catch((error) => logger.error('achievement ownership update failed', error));
+    };
     this.eventHandler.setAchievementEvent((playerId, cellId, eventId, guest) => {
       const achievementOwner = owner(playerId, guest);
       const mapId = this.world.getMapMeta()?.id;
-      if (mapId) void manager.recordEvent(achievementOwner, mapId, cellId, eventId);
+      if (mapId) void manager.recordEvent(achievementOwner, mapId, cellId, eventId).catch((error) => logger.error(`achievement event update failed (map=${mapId}, cell=${cellId}, event=${eventId})`, error));
     });
     const recordPurchase = (playerId: string, cellId: number, guest: boolean): void => {
       const achievementOwner = owner(playerId, guest);
-      void manager.recordPurchase(achievementOwner, cellId);
+      const mapId = this.world.getMapMeta()?.id;
+      if (mapId) void manager.recordPurchase(achievementOwner, mapId, cellId).catch((error) => logger.error(`achievement purchase update failed (map=${mapId}, cell=${cellId})`, error));
     };
     this.propertyHandler.setAchievementPurchase(recordPurchase);
     this.investmentHandler.setAchievementPurchase(recordPurchase);
+    this.propertyHandler.setAchievementOwnershipChanged((playerId, guest) => this.refreshOwnedCells(playerId, guest));
+    this.investmentHandler.setAchievementOwnershipChanged((playerId, guest) => this.refreshOwnedCells(playerId, guest));
   }
 
   private achievementOwnerFor(socket: TypedSocket): import('../achievement/AchievementStore.js').AchievementOwner | null {
     const playerId = socket.data.playerId;
-    return playerId && this.achievementOwner ? this.achievementOwner(playerId, socket.data.guest === true) : null;
+    if (!playerId || !this.achievementOwner) return null;
+    return this.achievementOwner(playerId, socket.data.guest === true);
   }
 
   /**
@@ -282,7 +293,7 @@ export class HandlerRegistry {
       const owner = this.achievementOwnerFor(socket);
       const mapId = this.world.getMapMeta()?.id;
       if (owner && mapId) {
-        for (const cellId of new Set(result.path)) void this.achievementManager.recordCellVisit(owner, mapId, cellId);
+        for (const cellId of new Set(result.path)) void this.achievementManager.recordCellVisit(owner, mapId, cellId).catch((error) => logger.error(`achievement movement update failed (map=${mapId}, cell=${cellId})`, error));
       }
     }
     if (!result) {
@@ -302,7 +313,7 @@ export class HandlerRegistry {
     const owner = this.achievementOwnerFor(socket);
     const mapId = this.world.getMapMeta()?.id;
     if (owner && mapId) {
-      void this.achievementManager?.recordCellVisit(owner, mapId, cellId);
+      void this.achievementManager?.recordCellVisit(owner, mapId, cellId).catch((error) => logger.error(`achievement landing update failed (map=${mapId}, cell=${cellId})`, error));
     }
 
     switch (cell.type) {

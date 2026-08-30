@@ -8,6 +8,5 @@ export interface AchievementOwner {
 export interface AchievementStore {
   load(owner: AchievementOwner): Promise<AchievementRecord[]>;
   save(owner: AchievementOwner, records: AchievementRecord[]): Promise<void>;
-  merge(from: AchievementOwner, to: AchievementOwner): Promise<AchievementRecord[]>;
   close?(): Promise<void>;
 }

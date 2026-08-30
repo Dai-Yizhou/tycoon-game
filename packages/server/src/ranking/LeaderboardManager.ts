@@ -17,7 +17,7 @@ export class LeaderboardManager {
   private readonly options: LeaderboardManagerOptions;
   private dirty = false;
   private timer: ReturnType<typeof setInterval> | null = null;
-  private readonly subscribers = new Set<() => void>();
+  private readonly subscribers = new Set<(snapshot: LeaderboardSnapshot) => void>();
 
   get enabled(): boolean {
     return this.config?.enabled === true;
@@ -43,7 +43,7 @@ export class LeaderboardManager {
     const snapshot = this.buildSnapshot(this.options.getPlayers(), undefined, now);
     this.options.broadcast(snapshot);
     for (const subscriber of this.subscribers) {
-      subscriber();
+      subscriber(snapshot);
     }
     return snapshot;
   }
@@ -97,7 +97,7 @@ export class LeaderboardManager {
     return this.buildSnapshot(this.options.getPlayers(), currentPlayerId, now);
   }
 
-  subscribe(listener: () => void): () => void {
+  subscribe(listener: (snapshot: LeaderboardSnapshot) => void): () => void {
     this.subscribers.add(listener);
     return () => this.subscribers.delete(listener);
   }

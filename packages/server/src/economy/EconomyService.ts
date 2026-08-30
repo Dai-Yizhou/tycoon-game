@@ -13,7 +13,13 @@ export interface EconomyChangeResult {
 }
 
 export class EconomyService {
+  private onPlayerValueChanged?: (player: Player) => void;
+
   constructor(private readonly world: GameWorld) {}
+
+  setPlayerValueChangedHandler(handler: (player: Player) => void): void {
+    this.onPlayerValueChanged = handler;
+  }
 
   changeValue(playerId: string, fieldId: string, delta: number, reason: string, createIfMissing = true): EconomyChangeResult {
     const player = this.world.getPlayer(playerId);
@@ -29,6 +35,7 @@ export class EconomyService {
     field.current = current;
     player.lastActiveAt = Date.now();
     this.world.updatePlayer(player);
+    this.onPlayerValueChanged?.(player);
     return { ok: true, playerId, fieldId, previous, current, delta: current - previous, reason };
   }
 

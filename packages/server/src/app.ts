@@ -46,6 +46,10 @@ export type SocketManagerConfig = Omit<
   'world'
 >;
 
+function isGuestPlayer(username: string): boolean {
+  return username.startsWith('guest_');
+}
+
 function resolveConfiguredPath(configuredPath: string): string {
   if (path.isAbsolute(configuredPath)) return configuredPath;
   const candidates = [
@@ -67,6 +71,7 @@ export interface AppDependencies {
   /** 客户端静态资源目录（绝对路径），可选 */
   clientDistPath?: string;
   worldStore?: WorldStore;
+  achievementStore?: AchievementStore;
   handlerRegistry?: HandlerRegistry;
   userStore?: UserStore;
   authService?: AuthService;
@@ -117,6 +122,8 @@ export interface CreatedApp {
   /** 用户存储实例 */
   userStore?: UserStore;
   worldStore?: WorldStore;
+  achievementStore?: AchievementStore;
+  leaderboardManager?: LeaderboardManager;
   handlerRegistry?: HandlerRegistry;
 }
 
@@ -305,17 +312,15 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   }));
 
   handlerRegistry.setBankruptcy(bankruptcy);
+  bankruptcy.setOwnershipChangedHandler((playerId, guest) => handlerRegistry.refreshOwnedCells(playerId, guest));
   bankruptcy.setDomainEventDispatcher((eventName) => {
     handlerRegistry.getInvestmentHandler().dispatchDomainEvent(eventName);
   });
 
   let socketManager: SocketManager | undefined;
-  let achievementStore: AchievementStore;
-  if (config.mongoUri) {
-    achievementStore = new MongoAchievementStore(config.mongoUri);
-  } else {
-    achievementStore = new FileAchievementStore(resolveConfiguredPath(config.userDataPath + '.achievements'));
-  }
+  const achievementStore = deps.achievementStore ?? (config.mongoUri
+    ? new MongoAchievementStore(config.mongoUri)
+    : new FileAchievementStore(resolveConfiguredPath(config.userDataPath + '.achievements')));
   const achievementDefinitions = loadAchievementDefinitions(resolveConfiguredPath('data/achievements.json'));
   const achievementManager = new AchievementManager(
     achievementDefinitions,
@@ -323,8 +328,10 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
     (payload) => socketManager?.emitToPlayer(payload.playerId, 'server.achievementUnlocked', payload),
   );
   handlerRegistry.setAchievementManager(achievementManager, (playerId, guest) => ({ accountId: playerId, guest }));
-  authService.setAchievementMigration(async (guestId, accountId) => {
-    await achievementManager.mergeOwners({ accountId: guestId, guest: true }, { accountId, guest: false });
+  economy.setPlayerValueChangedHandler((player) => {
+    const currentPlayer = world.getPlayer(player.id);
+    if (!currentPlayer) return;
+    void achievementManager.recordUct({ accountId: currentPlayer.id, guest: isGuestPlayer(currentPlayer.username) }, mapMeta.id, currentPlayer).catch((error) => logger.error('achievement UCT update failed', error));
   });
   const leaderboardManager = new LeaderboardManager({
     worldId: world.getWorldIdentity()?.worldId ?? mapMeta.id,
@@ -355,6 +362,13 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   world.on('playerPositionChanged', () => leaderboardManager.markDirty());
   world.on('playerStatusChanged', () => leaderboardManager.markDirty());
   world.on('regionValueChanged', () => leaderboardManager.markDirty());
+  leaderboardManager.subscribe((snapshot) => {
+    for (const player of world.getAllPlayers()) {
+      const personalized = leaderboardManager.getCurrentSnapshot(player.id, snapshot.generatedAt);
+      const rank = personalized?.currentPlayer?.rank ?? null;
+      void achievementManager.recordRanking({ accountId: player.id, guest: isGuestPlayer(player.username) }, rank).catch((error) => logger.error('achievement ranking update failed', error));
+    }
+  });
   leaderboardManager.markDirty();
 
   // 初始化昼夜循环（从服务器启动时开始计时）
@@ -418,6 +432,8 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
     worldStore,
     handlerRegistry,
     userStore,
+    achievementStore,
+    leaderboardManager,
   };
 }
 
@@ -478,6 +494,7 @@ export async function gracefulShutdown(
   handlerRegistry?: HandlerRegistry,
   userStore?: { close?: () => Promise<void> },
   worldStore?: { close?: () => Promise<void> },
+  achievementStore?: { close?: () => Promise<void> },
   io?: TypedServer,
 ): Promise<void> {
   logger.info('graceful shutdown started');
@@ -554,6 +571,14 @@ export async function gracefulShutdown(
       await worldStore.close();
     } catch (err) {
       logger.error('error closing world store', err);
+    }
+  }
+
+  if (achievementStore?.close) {
+    try {
+      await achievementStore.close();
+    } catch (err) {
+      logger.error('error closing achievement store', err);
     }
   }
 

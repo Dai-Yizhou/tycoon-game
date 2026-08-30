@@ -34,12 +34,41 @@ describe('bankruptcy socket authority', () => {
     world.loadMap(map, meta);
     const player = { ...buildPlayer(), values: { money: { id: 'money', name: '财产', current: 100, min: 0 }, credit: { id: 'credit', name: '信用值', current: 0, min: 0 } } };
     world.addPlayer(player);
-    const bankruptcy = new Bankruptcy({ emit: jest.fn() } as unknown as TypedServer, world, { clearTaxRecords: jest.fn() } as any);
+    const bankruptcy = new Bankruptcy({ emit: jest.fn() } as unknown as TypedServer, world, { clearTaxRecords: jest.fn(), getAllTaxRecords: jest.fn(() => new Map()) } as any);
 
     world.updatePlayer(player);
 
     expect(world.getPlayer('player-1')?.status).toBe(PlayerStatus.Normal);
     expect(player.status).toBe(PlayerStatus.Normal);
+    bankruptcy.cleanup();
+  });
+
+  test('破产清算完成后通知 ownership 变化', () => {
+    const world = new GameWorld();
+    const map = [{ id: 0, x: 0, y: 0, type: 'property', name: { 'zh-CN': '地产', 'en-US': 'Property' }, description: { 'zh-CN': '', 'en-US': '' }, destinations: [], teleportDestinations: [], theme: 'northeast', regionId: 'r1', timezone: 0, extra: {} }] as any;
+    world.loadMap(map, {
+      id: 'test',
+      version: '1',
+      name: { 'zh-CN': '测试', 'en-US': 'Test' },
+      valueFieldDefinitions: [{ id: 'money', name: { 'zh-CN': '财产', 'en-US': 'Money' }, scope: 'player', min: 0 }],
+      uct: { player: ['money'], region: [] },
+      playerInitial: { player: { money: 100 } },
+      startCellId: 0,
+      regions: [{ id: 'r1', name: { 'zh-CN': '区域', 'en-US': 'Region' }, initial: { region: {} } }],
+      dayNightCycle: 15,
+      dice: { cooldownMs: 1000, min: 1, max: 6 },
+      tax: { baseTax: { rates: { player: {} }, taxInterval: 1000 }, shareTax: { rates: { player: {} }, taxInterval: 1000 } },
+    } as any);
+    const player = buildPlayer();
+    world.addPlayer(player);
+    world.getRuntimeState().replaceOwnerships(0, [{ playerId: player.id, share: 1, purchasePrice: 100 }]);
+    const bankruptcy = new Bankruptcy({ emit: jest.fn() } as unknown as TypedServer, world, { clearTaxRecords: jest.fn(), getAllTaxRecords: jest.fn(() => new Map()) } as any);
+    const ownershipChanged = jest.fn<(playerId: string, isOwner: boolean) => void>();
+    bankruptcy.setOwnershipChangedHandler(ownershipChanged);
+
+    expect(bankruptcy.triggerBankruptcy(player.id, 'manual').success).toBe(true);
+    expect(world.getRuntimeState().getOwnerships(0)).toEqual([]);
+    expect(ownershipChanged).toHaveBeenCalledWith(player.id, false);
     bankruptcy.cleanup();
   });
 

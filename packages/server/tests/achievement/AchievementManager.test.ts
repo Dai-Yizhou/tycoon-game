@@ -2,23 +2,41 @@ import type { AchievementDefinition, Player } from '@game/shared';
 import { AchievementManager } from '../../src/achievement/AchievementManager.js';
 import { InMemoryAchievementStore } from '../../src/achievement/InMemoryAchievementStore.js';
 
+const player = (id = 'p1', current = 0): Player => ({ id, username: id, teamId: null, position: { cellId: 1 }, values: { score: { id: 'score', name: 'score', current } }, status: 'normal', createdAt: 1, lastActiveAt: 1 });
 const defs: AchievementDefinition[] = [
   { id: 'visit', scope: 'map', name: { 'zh-CN': '访问', 'en-US': 'Visit' }, description: { 'zh-CN': '访问格子', 'en-US': 'Visit cells' }, category: 'movement', progress: { visible: true, target: 2 }, trigger: { type: 'visitCells', cellIds: [1, 2] } },
+  { id: 'event', scope: 'map', name: { 'zh-CN': '事件', 'en-US': 'Event' }, description: { 'zh-CN': '完成事件', 'en-US': 'Complete events' }, category: 'event', progress: { visible: true, target: 2 }, trigger: { type: 'completeEvents', cellIds: [1, 2], eventIds: ['e1', 'e2'] } },
+  { id: 'uct', scope: 'map', name: { 'zh-CN': '财富', 'en-US': 'Wealth' }, description: { 'zh-CN': '达到阈值', 'en-US': 'Reach threshold' }, category: 'economy', progress: { visible: true, target: 10 }, trigger: { type: 'uctThreshold', fieldId: 'score', target: 10 } },
+  { id: 'owned', scope: 'map', name: { 'zh-CN': '持有', 'en-US': 'Owned' }, description: { 'zh-CN': '持有格子', 'en-US': 'Own cells' }, category: 'economy', progress: { visible: true, target: 2 }, trigger: { type: 'ownedCells', target: 2 } },
   { id: 'buy', scope: 'global', name: { 'zh-CN': '购买', 'en-US': 'Buy' }, description: { 'zh-CN': '购买格子', 'en-US': 'Buy cells' }, category: 'economy', progress: { visible: true, target: 2 }, trigger: { type: 'purchasedCells', target: 2 } },
+  { id: 'rank', scope: 'global', name: { 'zh-CN': '榜单', 'en-US': 'Rank' }, description: { 'zh-CN': '进入榜单', 'en-US': 'Reach rank' }, category: 'ranking', progress: { visible: true, target: 2 }, trigger: { type: 'ranking', targetRank: 2 } },
 ];
 
-const player = { id: 'p1' } as Player;
-
-test('服务端按去重事件推进并只通知一次解锁', async () => {
+test('六类触发均通过服务端入口推进且只解锁一次', async () => {
   const unlocked: string[] = [];
   const manager = new AchievementManager(defs, new InMemoryAchievementStore(), (payload) => unlocked.push(payload.achievement.id));
-  await manager.initialize({ accountId: player.id, guest: true }, 'map-a');
-  await manager.recordCellVisit({ accountId: player.id, guest: true }, 'map-a', 1);
-  await manager.recordCellVisit({ accountId: player.id, guest: true }, 'map-a', 1);
-  await manager.recordCellVisit({ accountId: player.id, guest: true }, 'map-a', 2);
-  await manager.recordPurchase({ accountId: player.id, guest: true }, 1);
-  await manager.recordPurchase({ accountId: player.id, guest: true }, 1);
-  await manager.recordPurchase({ accountId: player.id, guest: true }, 2);
-  expect(unlocked).toEqual(['visit', 'buy']);
-  expect((await manager.getSnapshot({ accountId: player.id, guest: true }, 'map-a')).achievements.find((item) => item.id === 'visit')?.record.unlocked).toBe(true);
+  const owner = { accountId: 'p1', guest: true };
+  await manager.initialize(owner, 'map-a');
+  await manager.recordCellVisit(owner, 'map-a', 1);
+  await manager.recordCellVisit(owner, 'map-a', 1);
+  await manager.recordCellVisit(owner, 'map-a', 2);
+  await manager.recordEvent(owner, 'map-a', 1, 'e1');
+  await manager.recordEvent(owner, 'map-a', 1, 'e1');
+  await manager.recordEvent(owner, 'map-a', 2, 'e2');
+  await manager.recordUct(owner, 'map-a', player('p1', 10));
+  await manager.refreshOwnedCells(owner, 'map-a', [1, 2]);
+  await manager.refreshOwnedCells(owner, 'map-a', [1]);
+  await manager.recordPurchase(owner, 'map-a', 1);
+  await manager.recordPurchase(owner, 'map-a', 2);
+  await manager.recordRanking(owner, 2);
+  expect(unlocked.sort()).toEqual(['buy', 'event', 'owned', 'rank', 'uct', 'visit'].sort());
+  expect((await manager.getSnapshot(owner, 'map-a')).achievements.every((item) => item.record.unlocked)).toBe(true);
+});
+
+test('同一 owner 的并发事件不丢失去重进度或重复通知', async () => {
+  const unlocked: string[] = [];
+  const manager = new AchievementManager([defs[0]!], new InMemoryAchievementStore(), (payload) => unlocked.push(payload.achievement.id));
+  const owner = { accountId: 'p2', guest: true };
+  await Promise.all([1, 1, 2].map((cellId) => manager.recordCellVisit(owner, 'map-a', cellId)));
+  expect(unlocked).toEqual(['visit']);
 });

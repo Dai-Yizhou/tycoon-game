@@ -29,36 +29,13 @@ export class MongoAchievementStore implements AchievementStore {
     await this.collection.replaceOne({ _id: key(owner) }, { _id: key(owner), ownerType: owner.guest ? 'guest' : 'account', ownerId: owner.accountId, records: clone(records) }, { upsert: true });
   }
 
-  async merge(from: AchievementOwner, to: AchievementOwner): Promise<AchievementRecord[]> {
-    const merged = mergeRecords(await this.load(from), await this.load(to));
-    await this.save(to, merged);
-    await this.collection.deleteOne({ _id: key(from) });
-    return clone(merged);
-  }
-
   async close(): Promise<void> {
     await this.client.close();
   }
 }
 
 function key(owner: AchievementOwner): string {
-  return `${owner.guest ? 'guest' : 'account'}:${owner.accountId}`;
-}
-
-function mergeRecords(source: AchievementRecord[], target: AchievementRecord[]): AchievementRecord[] {
-  const merged = new Map(target.map((record) => [record.achievementId + ':' + (record.mapId ?? ''), clone([record])[0]! ]));
-  for (const record of source) {
-    const id = record.achievementId + ':' + (record.mapId ?? '');
-    const existing = merged.get(id);
-    if (!existing) merged.set(id, clone([record])[0]!);
-    else {
-      existing.unlocked ||= record.unlocked;
-      existing.unlockedAt ??= record.unlockedAt;
-      existing.progress.current = Math.max(existing.progress.current, record.progress.current);
-      existing.seenKeys = [...new Set([...existing.seenKeys, ...record.seenKeys])];
-    }
-  }
-  return [...merged.values()];
+  return owner.accountId;
 }
 
 function clone(records: AchievementRecord[]): AchievementRecord[] {

@@ -66,7 +66,6 @@ export class AuthService {
   private readonly userStore: UserStore;
   private readonly jwtService: JWTService;
   private readonly config: Omit<AuthConfig, 'jwt'>;
-  private migrateAchievementRecords?: (guestId: string, accountId: string) => Promise<void>;
 
   constructor(
     userStore: UserStore,
@@ -76,10 +75,6 @@ export class AuthService {
     this.userStore = userStore;
     this.jwtService = jwtService;
     this.config = config;
-  }
-
-  setAchievementMigration(handler: (guestId: string, accountId: string) => Promise<void>): void {
-    this.migrateAchievementRecords = handler;
   }
 
   /**
@@ -312,14 +307,12 @@ export class AuthService {
     }
 
     // 更新用户信息
-    const guestId = user.id;
     user.username = request.username;
     user.passwordHash = null;
     user.isGuest = false;
     user.lastLoginAt = Date.now();
 
     await this.userStore.saveUser(user);
-    await this.migrateAchievementRecords?.(guestId, user.id);
 
     // 生成新 token
     const token = this.jwtService.generateToken(user.id, user.username, false);

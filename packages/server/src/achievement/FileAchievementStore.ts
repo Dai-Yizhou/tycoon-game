@@ -14,23 +14,13 @@ export class FileAchievementStore implements AchievementStore {
 
   async load(owner: AchievementOwner): Promise<AchievementRecord[]> {
     this.ensureLoaded();
-    return clone(this.records.get(key(owner)) ?? []);
+    return clone(this.records.get(ownerKey(owner)) ?? []);
   }
 
   async save(owner: AchievementOwner, records: AchievementRecord[]): Promise<void> {
     this.ensureLoaded();
-    this.records.set(key(owner), clone(records));
+    this.records.set(ownerKey(owner), clone(records));
     this.persist();
-  }
-
-  async merge(from: AchievementOwner, to: AchievementOwner): Promise<AchievementRecord[]> {
-    this.ensureLoaded();
-    if (key(from) === key(to)) return this.load(to);
-    const result = mergeRecords(this.records.get(key(from)) ?? [], this.records.get(key(to)) ?? []);
-    this.records.set(key(to), result);
-    this.records.delete(key(from));
-    this.persist();
-    return clone(result);
   }
 
   private ensureLoaded(): void {
@@ -53,24 +43,8 @@ export class FileAchievementStore implements AchievementStore {
   }
 }
 
-function key(owner: AchievementOwner): string {
-  return `${owner.guest ? 'guest' : 'account'}:${owner.accountId}`;
-}
-
-function mergeRecords(source: AchievementRecord[], target: AchievementRecord[]): AchievementRecord[] {
-  const merged = new Map(target.map((record) => [record.achievementId + ':' + (record.mapId ?? ''), clone([record])[0]! ]));
-  for (const record of source) {
-    const id = record.achievementId + ':' + (record.mapId ?? '');
-    const existing = merged.get(id);
-    if (!existing) merged.set(id, clone([record])[0]!);
-    else {
-      existing.unlocked ||= record.unlocked;
-      existing.unlockedAt ??= record.unlockedAt;
-      existing.progress.current = Math.max(existing.progress.current, record.progress.current);
-      existing.seenKeys = [...new Set([...existing.seenKeys, ...record.seenKeys])];
-    }
-  }
-  return [...merged.values()];
+function ownerKey(owner: AchievementOwner): string {
+  return owner.accountId;
 }
 
 function clone(records: AchievementRecord[]): AchievementRecord[] {

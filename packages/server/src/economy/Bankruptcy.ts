@@ -32,6 +32,7 @@ export class Bankruptcy {
   private readonly taxation: Taxation;
   private readonly bankruptcyRecords = new Map<string, BankruptcyRecord>();
   private domainEventDispatcher: ((eventName: string) => void) | null = null;
+  private ownershipChanged?: (playerId: string, guest: boolean) => void;
   private readonly onPlayerUpdated = ({ player }: { player: import('@game/shared').Player }): void => {
     if (isBankruptcyCheckable(player.status) && Object.values(player.values).some((field) => field.current < (field.min ?? Number.NEGATIVE_INFINITY))) {
       this.triggerBankruptcy(player.id, 'negative_net_worth');
@@ -63,6 +64,7 @@ export class Bankruptcy {
     this.taxation.clearTaxRecords(playerId);
     this.world.getPlayerManager().updateStatus(playerId, PlayerStatus.Bankrupt);
     this.clearPlayerAssets(playerId);
+    this.ownershipChanged?.(playerId, player.username.startsWith('guest_'));
     this.world.updatePlayer(player);
     this.world.saveSnapshot(this.taxation.getAllTaxRecords(), {});
     this.bankruptcyRecords.set(playerId, record);
@@ -70,6 +72,10 @@ export class Bankruptcy {
     this.io.emit('server.playerBankrupt', { playerId, bankruptcyId, bankruptcyTime, reason, netWorthAtBankruptcy: record.netWorthAtBankruptcy });
     this.domainEventDispatcher?.('shareholder-bankrupt');
     return { success: true, bankruptcyId };
+  }
+
+  setOwnershipChangedHandler(handler: (playerId: string, guest: boolean) => void): void {
+    this.ownershipChanged = handler;
   }
 
   setDomainEventDispatcher(dispatcher: (eventName: string) => void): void {

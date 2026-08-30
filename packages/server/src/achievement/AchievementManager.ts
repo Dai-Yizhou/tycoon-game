@@ -8,6 +8,7 @@ export class AchievementManager {
   private readonly store: AchievementStore;
   private readonly notify: AchievementNotification;
   private readonly records = new Map<string, Awaited<ReturnType<AchievementStore['load']>>>();
+  private readonly ownerQueues = new Map<string, Promise<void>>();
 
   constructor(definitions: AchievementDefinition[], store: AchievementStore, notify: AchievementNotification = () => undefined) {
     this.definitions = definitions;
@@ -23,7 +24,8 @@ export class AchievementManager {
   }
 
   async getSnapshot(owner: AchievementOwner, mapId: string): Promise<AchievementSnapshot> {
-    const allRecords = this.records.get(ownerKey(owner)) ?? await this.store.load(owner);
+    const key = ownerKey(owner);
+    const allRecords = this.records.get(key) ?? await this.store.load(owner);
     this.records.set(ownerKey(owner), allRecords);
     const records = allRecords.filter((record) => record.scope === 'global' || record.mapId === mapId);
     return {
@@ -32,7 +34,7 @@ export class AchievementManager {
       generatedAt: Date.now(),
       achievements: this.definitions.map((definition) => ({
         ...definition,
-        record: records.find((record) => record.achievementId === definition.id && (record.scope === 'global' || record.mapId === mapId)) ?? this.newRecord(definition, mapId),
+        record: records.find((record) => record.achievementId === definition.id && record.scope === definition.scope && (definition.scope === 'global' || record.mapId === mapId)) ?? this.newRecord(definition, mapId),
       })),
     };
   }
@@ -47,8 +49,8 @@ export class AchievementManager {
     });
   }
 
-  async recordPurchase(owner: AchievementOwner, cellId: number): Promise<void> {
-    await this.update(owner, undefined, (definition, record) => {
+  async recordPurchase(owner: AchievementOwner, mapId: string, cellId: number): Promise<void> {
+    await this.update(owner, mapId, (definition, record) => {
       if (definition.scope !== 'global' || definition.trigger.type !== 'purchasedCells') return false;
       if (record.seenKeys.includes(String(cellId))) return false;
       record.seenKeys.push(String(cellId));
@@ -77,7 +79,7 @@ export class AchievementManager {
     });
   }
 
-  async recordOwnedCells(owner: AchievementOwner, mapId: string, cellIds: number[]): Promise<void> {
+  async refreshOwnedCells(owner: AchievementOwner, mapId: string, cellIds: number[]): Promise<void> {
     await this.update(owner, mapId, (definition, record) => {
       if (definition.scope !== 'map' || definition.trigger.type !== 'ownedCells') return false;
       record.progress.current = new Set(cellIds).size;
@@ -85,27 +87,32 @@ export class AchievementManager {
     });
   }
 
-  async recordRanking(owner: AchievementOwner, mapId: string, rank: number | null): Promise<void> {
-    await this.update(owner, mapId, (definition, record) => {
+  async recordRanking(owner: AchievementOwner, rank: number | null): Promise<void> {
+    await this.update(owner, undefined, (definition, record) => {
       if (definition.scope !== 'global' || definition.trigger.type !== 'ranking' || rank === null) return false;
       record.progress.current = rank <= record.progress.target ? record.progress.target : 0;
       return rank <= record.progress.target;
     });
   }
 
-  async mergeOwners(from: AchievementOwner, to: AchievementOwner): Promise<void> {
-    const records = await this.store.merge(from, to);
-    this.records.delete(ownerKey(from));
-    this.records.set(ownerKey(to), records);
-  }
-
   private async update(owner: AchievementOwner, mapId: string | undefined, action: (definition: AchievementDefinition, record: Awaited<ReturnType<AchievementStore['load']>>[number]) => boolean): Promise<void> {
     const key = ownerKey(owner);
+    const previous = this.ownerQueues.get(key) ?? Promise.resolve();
+    const current = previous.then(() => this.updateUnlocked(key, owner, mapId, action));
+    this.ownerQueues.set(key, current);
+    try {
+      await current;
+    } finally {
+      if (this.ownerQueues.get(key) === current) this.ownerQueues.delete(key);
+    }
+  }
+
+  private async updateUnlocked(key: string, owner: AchievementOwner, mapId: string | undefined, action: (definition: AchievementDefinition, record: Awaited<ReturnType<AchievementStore['load']>>[number]) => boolean): Promise<void> {
     const records = this.records.get(key) ?? await this.store.load(owner);
     this.records.set(key, records);
     const unlocked: AchievementView[] = [];
     for (const definition of this.definitions) {
-      const record = records.find((item) => item.achievementId === definition.id && (item.scope === 'global' || item.mapId === mapId)) ?? this.newRecord(definition, mapId);
+      const record = records.find((item) => item.achievementId === definition.id && item.scope === definition.scope && (definition.scope === 'global' || item.mapId === mapId)) ?? this.newRecord(definition, mapId);
       if (!records.includes(record)) records.push(record);
       if (record.unlocked) continue;
       if (action(definition, record)) {
@@ -133,5 +140,5 @@ function defaultTarget(definition: AchievementDefinition): number {
 }
 
 function ownerKey(owner: AchievementOwner): string {
-  return `${owner.guest ? 'guest' : 'account'}:${owner.accountId}`;
+  return owner.accountId;
 }

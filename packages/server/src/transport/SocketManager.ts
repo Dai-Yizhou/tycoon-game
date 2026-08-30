@@ -511,8 +511,6 @@ export class SocketManager {
             cycleStartTime,
             cycleMinutes,
             existingPlayers,
-            leaderboard: this.leaderboardManager?.getCurrentSnapshot(player.id) ?? undefined,
-            achievements,
           },
         });
 
@@ -542,7 +540,7 @@ export class SocketManager {
             };
           }) ?? [],
           serverTime: now,
-          leaderboard: this.leaderboardManager?.getCurrentSnapshot(player.id) ?? undefined,
+          leaderboard: this.leaderboardManager?.getCurrentSnapshot(player.id, now) ?? undefined,
         });
 
       } catch (err) {
