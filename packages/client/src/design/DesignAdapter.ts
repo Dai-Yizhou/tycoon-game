@@ -72,6 +72,7 @@ export class DesignAdapter {
       ? this.baseTokens
       : mergeTrees(this.baseTokens, ((this.baseTokens.modes as TokenTree | undefined)?.[phase] as TokenTree | undefined) ?? {});
     const color = (path: string) => this.getColor(path, tokens);
+    const str = (path: string): string => this.getString(path, tokens);
     const number = (path: string): number => {
       const token = path.split('.').reduce<unknown>((node, key) => {
         return typeof node === 'object' && node !== null ? (node as TokenTree)[key] : undefined;

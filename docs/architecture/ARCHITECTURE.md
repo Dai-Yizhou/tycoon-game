@@ -122,15 +122,20 @@ server.*
 
 ## 删除边界
 
-- item、talent、achievement 已从当前运行时的 shared 类型、Socket 契约、服务端注册链和客户端主链移除；旧历史/规格文档仍不构成运行时事实。
-- 服务端与客户端运行时配置目录不再保留 `achievements.json`；`ai-bot` 与 `ai_bot_try` 不属于本次清理边界。
+- item、talent 未实现；achievement 已作为现行系统实现（见下）。
+- 客户端与部分文档曾出现的历史 "item / talent / achievement 均未实现" 的结论已过时。现状：
+  - 成就系统已成现行功能：`AchievementManager` 支持六类触发（visitCells、completeEvents、uctThreshold、ownedCells、purchasedCells、ranking），经 `MongoAchievementStore` / `FileAchievementStore` 持久化，owner 级并发串行化，解锁通知经 Socket 下发。配置在 `packages/server/achievements.json`（由 `config.achievementConfigPath` 指向）。
+  - 游客转正（`AuthService.migrateGuest`）不改变用户 ID，不执行成就迁移/合并；成就按稳定 owner ID 读取。
+- `ai-bot` 与 `ai_bot_try` 不属于本次清理边界。
 - 破产重开仍是基础 Player 状态流程，不提供远程恢复或道具恢复机制。
+- `NotificationManager`、`InMemoryEraStore` 等模块存在但尚无生产调用方：`server.notification` 事件当前不被任何服务端路径发出；时代仅停留在 `GameWorld.setEra/getCurrentEra` 数据层，尚无自动时代推进调度。
 
 ## 残余技术债
 
 - `GamePage` 仍承担页面组合、兼容状态和部分业务接线，`GameStore` 与 `GameViewModel` 并存。
 - `packages/client/src/state/GameStore.ts` 是客户端业务快照源；旧模块级变量仅保留给渲染和兼容接线，不再作为经济业务状态写入口。
-- `NotificationManager`、部分认证/持久化能力和若干配置文件存在，但是否进入生产链需以 `app.ts` 与具体 handler 的注册为准。
+- 客户端 `SocketEventHandler.ts` 残留 `console.warn('[DBG-*]')` 调试日志，Beta 上线前应移除。
+- `NotificationManager` 无生产调用方（`server.notification` 无人发出），认证/持久化能力需以 `app.ts` 注册为准。
 - `REDIS_URL` 在配置类型和文档中存在，当前 app 未建立 Redis 适配器；不能描述为已实现多实例同步。
 - 服务端存在 REST 地图读取与 Socket 状态两条输入来源，客户端地图请求失败时的回退逻辑增加了状态排查成本。
 

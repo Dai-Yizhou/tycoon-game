@@ -31,7 +31,7 @@ export function updateMovement(store: GameStore, map: MapIndex, onPlayerArrived:
   if (!snapshot.isMoving) return;
 
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const progress = reducedMotion ? 1 : Math.min((performance.now() - snapshot.moveStartTime) / MOVE_STEP_DURATION, 1);
+  const progress = reducedMotion ? 1 : Math.min((performance.now() - snapshot.moveStartTime) / stepDurationMs, 1);
   const eased = easeInOutQuad(progress);
   const newX = snapshot.moveFromX + (snapshot.moveToX - snapshot.moveFromX) * eased;
   const newY = snapshot.moveFromY + (snapshot.moveToY - snapshot.moveFromY) * eased;

@@ -5,10 +5,38 @@
 ## 当前功能
 
 - 数据驱动地图：服务端读取 `map.json`、`map-meta.json`，客户端通过 `/api/map` 投影并渲染。
-- 客户端使用原生 TypeScript/DOM、Vite 和 Canvas，页面链为 Start → Login → Loading → Game。
-- shared 提供前后端共享类型、Socket 事件契约、地图解析、i18n 与调试开关。
+- 客户端使用原生 TypeScript/DOM、Vite，地图渲染层为 `InteractiveMapSurface` 生成的 SVG（单层，非 Canvas）。
+- 页面链为 Start → Login → Loading → Game → Bankruptcy。
+- shared 提供前后端共享类型、Socket 事件契约、地图解析、i18n、UCT/经济规则与调试开关。
 
-当前运行时不包含 item、talent、achievement 三个系统；仓库中仍存在的同名配置、类型、历史/规格文档和编辑器内容不构成现行功能。
+### 已实现的玩法与系统
+
+前端（`packages/client`）：
+
+- 掷骰与后摇冷却（服务端权威 `cooldownEndsAt`）；基础移动动画由 `requestAnimationFrame` 驱动，移动锁防止动画期间重建 SVG，视野跟随插值坐标避免瞬移。
+- 岔路/路径选择（`server.askPath`）与落点结算。
+- 地产购买、升级、租金结算；投资购买/合租；交通枢纽传送；纪念碑修缮。
+- 破产流程（进入 BankruptcyPage，`bankruptRestart` 重开）。
+- 组队：邀请弹窗、接受/拒绝、队伍成员视图、离队。
+- 聊天多频道（global/team/region/system + 斜杠指令 `/invite /accept /reject /leave /report`）与频道筛选。
+- HUD 四象限：左上玩家名牌与数值条、右上区域状态与实时榜单与昼夜指示、左下聊天气泡、底部行动栏（掷骰 + 上下文动作）。
+- 设置面板（仅 Beta 的视效开关）、成就面板（本地化文案 + 打开时实时刷新）、格子悬浮卡（按格子能力显示价格/租金/升级/等级/持有者/时区）。
+- i18n（zh-CN / en-US，`localizedText`）、区域主题与昼夜时区显示。
+
+后端（`packages/server`）：
+
+- 账号：游客/正式/登录、JWT、游客转正（不改变用户 ID）、Mongo / 文件用户存储。
+- GameWorld 权威状态与持久化（Mongo / 文件，快照恢复）。
+- 经济：计税（底税/持股税 + 豁免阈值 + 定时器）、破产清算、所有权/持股管理。
+- 昼夜循环（DayNightCycle）、时区（TimeZoneManager）、昼夜驱动的区域 UCT 数值变化（DayNightValueChange）。
+- 行为事件引擎（BehaviorEngine，供供给格/事件格落地行为）。
+- 区域繁荣度：由 `regionValues` / 数值字段定义动态驱动，无硬编码字段。
+- 成就系统（六类触发：visitCells / completeEvents / uctThreshold / ownedCells / purchasedCells / ranking；Mongo / 文件存储；owner 级并发串行化；解锁通知经 Socket 下发）。
+- 实时榜单（LeaderboardManager，区域数值与玩家更新标记脏、正式刷新后广播）。
+- 反馈 `/report`（清洗、限长、限频、结构化日志）。
+- 状态语义：Normal 与 Frozen 参与经济，Jail 与 Bankrupt 不参与；Frozen 仅连接状态，不豁免经济结算。
+
+当前运行时不包含 item、talent 两个系统（未实现）。
 
 ## 技术栈与命令
 

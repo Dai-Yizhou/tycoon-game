@@ -129,7 +129,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .start-page > *, .login-page > *, .loading-page > * { position: relative; z-index: 2; }
 
 /* —— 欢迎页 —— */
-.title-container { text-align: center; z-index: 10; animation: slideUp 0.6s ease-out; }
+.title-container { text-align: center; z-index: 10; animation: slideUp var(--motion-slideup-title) ease-out; }
 .game-title {
   font-family: var(--font-title);
   font-size: clamp(3rem, 8vw, 6rem); font-weight: 900;
@@ -180,7 +180,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   border: var(--region-border-w) solid var(--auth-border);
   border-radius: var(--auth-radius);
   box-shadow: 2px 2px 0 var(--auth-border);
-  animation: slideUp 0.4s ease-out;
+  animation: slideUp var(--motion-slideup) ease-out;
   flex: 0 1 auto;
 }
 .login-card { display: flex; flex-direction: column; gap: 9px; }

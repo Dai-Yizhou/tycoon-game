@@ -12,6 +12,8 @@
  * - 默认 no-op 确保不实现视效时功能正常
  */
 
+import { readCssVarNumber } from '../design/DesignAdapter.js';
+
 /** 骰子相关视效 */
 export interface DiceEffectHooks {
   /** 骰子开始滚动动画 */
