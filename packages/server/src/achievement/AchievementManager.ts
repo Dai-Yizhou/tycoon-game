@@ -121,7 +121,12 @@ export class AchievementManager {
         unlocked.push({ ...definition, record: { ...record, progress: { ...record.progress }, seenKeys: [...record.seenKeys] } });
       }
     }
-    await this.store.save(owner, records);
+    try {
+      await this.store.save(owner, records);
+    } catch (error) {
+      this.records.delete(key);
+      throw error;
+    }
     for (const achievement of unlocked) this.notify({ playerId: owner.accountId, achievement, unlockedAt: achievement.record.unlockedAt ?? Date.now() });
   }
 

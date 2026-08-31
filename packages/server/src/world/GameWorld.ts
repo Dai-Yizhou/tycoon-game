@@ -89,6 +89,8 @@ export interface RegionValueChangedPayload {
   regionId: string;
   fieldId: string;
   value: number;
+  /** 本次变化量 */
+  delta: number;
 }
 
 /**
@@ -408,7 +410,7 @@ export class GameWorld {
 
   changeRegionValue(regionId: string, fieldId: string, delta: number): number {
     const value = this.getRuntimeState().changeRegionValue(regionId, fieldId, delta);
-    this.emit(WorldEvents.RegionValueChanged, { regionId, fieldId, value });
+    this.emit(WorldEvents.RegionValueChanged, { regionId, fieldId, value, delta });
     this.saveSnapshot();
     return value;
   }

@@ -5,12 +5,12 @@
  * - 修缮功能：玩家可修缮纪念碑
  * - 消耗财产（修缮费用从 cell.repairCost 读取）
  * - 增加玩家信用值
- * - 增加区域繁荣度（通过 ProsperityManager）
+ * - 增加区域 UCT 数值（从 cell.repairCost.region 读取，经 GameWorld 统一管理）
  * - 纪念碑状态视觉显示
  *
  * 设计原则：
  * - 修缮费用从地图数据读取
- * - 繁荣度由 ProsperityManager 统一管理（昼夜衰减、纪念碑修缮增益）
+ * - 区域 UCT 数值由 GameWorld 统一管理（昼夜切换、纪念碑修缮增益），不硬编码具体字段
  * - 服务端权威校验所有修缮操作
  */
 
@@ -19,7 +19,6 @@ import { getExtra, normalizeCellType, CellTypes, t } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
-import type { ProsperityManager } from '../world/ProsperityManager.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
 import { EconomyService } from '../economy/EconomyService.js';
@@ -56,8 +55,8 @@ interface MonumentInternalState {
  * 纪念碑状态（API 返回，包含从 ProsperityManager 读取的繁荣度快照）
  */
 export interface MonumentState extends MonumentInternalState {
-  /** 区域繁荣度（从 ProsperityManager 读取的快照） */
-  regionProsperity: number;
+  /** 区域 UCT 数值（从运行时状态读取的快照） */
+  regionValues: Record<string, number>;
 }
 
 /**
@@ -67,8 +66,6 @@ export class MonumentHandler {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
   private readonly economy: EconomyService;
-  /** 繁荣度管理器（可选，由 app.ts 注入） */
-  private prosperityManager: ProsperityManager | null = null;
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
   /** 纪念碑状态映射 */
@@ -78,22 +75,11 @@ export class MonumentHandler {
   /** 最大繁荣度 */
   private readonly maxProsperity = 100;
 
-  constructor(io: TypedServer, world: GameWorld, prosperityManager?: ProsperityManager, economy: EconomyService = new EconomyService(world)) {
+  constructor(io: TypedServer, world: GameWorld, economy: EconomyService = new EconomyService(world)) {
     this.io = io;
     this.world = world;
     this.economy = economy;
-    if (prosperityManager) {
-      this.prosperityManager = prosperityManager;
-    }
     this.initializeMonuments();
-  }
-
-  /**
-   * 注入繁荣度管理器（用于 app.ts 中延迟注入）
-   */
-  setProsperityManager(prosperityManager: ProsperityManager): void {
-    this.prosperityManager = prosperityManager;
-    logger.debug('ProsperityManager 已注入 MonumentHandler');
   }
 
   /**
@@ -290,7 +276,7 @@ export class MonumentHandler {
       // 构造 API 返回状态（包含从 ProsperityManager 读取的繁荣度快照）
       const apiState: MonumentState = {
         ...state,
-        regionProsperity: this.getMonumentProsperity(payload.monumentId),
+        regionValues: this.getMonumentRegionValues(payload.monumentId),
       };
 
       ack?.({ ok: true, data: { state: apiState } });
@@ -450,15 +436,21 @@ export class MonumentHandler {
   }
 
   /**
-   * 获取纪念碑所属区域的繁荣度
-   *
-   * 优先从 ProsperityManager 读取；若 ProsperityManager 未注入，返回默认最大繁荣度。
+   * 获取纪念碑所属区域的 UCT 数值快照
    */
+  private getMonumentRegionValues(monumentId: number): Record<string, number> {
+    const regionId = this.world.getMapData()?.find((cell) => cell.id === monumentId)?.regionId;
+    if (!regionId) return {};
+    const meta = this.world.getMapMeta();
+    return Object.fromEntries((meta?.valueFieldDefinitions ?? [])
+      .filter((field) => field.scope === 'region')
+      .map((field) => [field.id, this.world.getRegionValue(regionId, field.id)]));
+  }
+
   private getMonumentProsperity(monumentId: number): number {
-    if (this.prosperityManager) {
-      return this.prosperityManager.getCellProsperity(monumentId);
-    }
-    return this.maxProsperity;
+    const values = this.getMonumentRegionValues(monumentId);
+    const fieldId = this.world.getMapMeta()?.valueFieldDefinitions.find((field) => field.scope === 'region')?.id;
+    return (fieldId && values[fieldId] !== undefined) ? values[fieldId] : this.maxProsperity;
   }
 
   /**
@@ -469,7 +461,7 @@ export class MonumentHandler {
     if (!internal) return undefined;
     return {
       ...internal,
-      regionProsperity: this.getMonumentProsperity(monumentId),
+      regionValues: this.getMonumentRegionValues(monumentId),
     };
   }
 
@@ -479,7 +471,7 @@ export class MonumentHandler {
   getAllMonumentStates(): MonumentState[] {
     return Array.from(this.monumentStates.entries()).map(([id, internal]) => ({
       ...internal,
-      regionProsperity: this.getMonumentProsperity(id),
+      regionValues: this.getMonumentRegionValues(id),
     }));
   }
 }
@@ -487,8 +479,8 @@ export class MonumentHandler {
 /**
  * 快速注册纪念碑处理器
  */
-export function registerMonumentHandler(io: TypedServer, world: GameWorld, prosperityManager?: ProsperityManager): MonumentHandler {
-  const handler = new MonumentHandler(io, world, prosperityManager);
+export function registerMonumentHandler(io: TypedServer, world: GameWorld): MonumentHandler {
+  const handler = new MonumentHandler(io, world);
   // 注册将在 HandlerRegistry.registerForSocket 中调用
   return handler;
 }

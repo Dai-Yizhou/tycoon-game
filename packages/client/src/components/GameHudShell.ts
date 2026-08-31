@@ -50,6 +50,16 @@ export class GameHudShell {
   private destroyed = false;
   private hoveredCell: { id: number; x: number; y: number } | null = null;
   private hoverCardCellId: number | null = null;
+  private readonly handleGlobalChatShortcut = (event: KeyboardEvent): void => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const target = event.target as HTMLElement | null;
+    if (target?.tagName === "INPUT" || target?.tagName === "SELECT" || target?.tagName === "TEXTAREA" || target?.tagName === "BUTTON") return;
+    if (!this.root.isConnected) return;
+    event.preventDefault();
+    this.root.querySelector('[data-ui="chat-panel"]')?.classList.add("is-expanded");
+    this.isExpanded = true;
+    this.input.focus();
+  };
 
   constructor(
     private readonly vm: GameViewModel,
@@ -61,7 +71,7 @@ export class GameHudShell {
     this.root.innerHTML = `
       <div class="gp-layout" data-ui="hud-layout">
         <header class="gp-topbar" data-ui="top-bar">
-          <div class="player-badge" data-ui="player-badge">
+          <div class="player-badge" data-ui="player-badge" aria-live="polite">
             <div class="player-badge__avatar"></div>
             <div>
               <div class="player-badge__name" data-ui="player-name"></div>
@@ -70,18 +80,21 @@ export class GameHudShell {
           </div>
           <div class="value-pills" data-ui="resource-strip"></div>
           <div class="topbar-spacer"></div>
-          <section class="leaderboard-panel" data-ui="leaderboard" aria-live="polite"></section>
-          <button class="achievement-button" data-action="achievements" type="button">成就</button>
-          <div class="cycle-indicator" data-ui="day-night">
-            <div class="cycle-dot" data-ui="cycle-dot"></div>
-            <span class="cycle-text" data-ui="day-time">--:--</span>
-          </div>
+          <section class="region-status" data-ui="region-status" aria-live="polite" role="status">
+            <div class="region-status__name" data-ui="zone-tag">--</div>
+            <div class="region-status__value" data-ui="prosperity-tag">--</div>
+            <section class="leaderboard-panel" data-ui="leaderboard" aria-live="polite"></section>
+            <div class="cycle-indicator" data-ui="day-night">
+              <div class="cycle-dot" data-ui="cycle-dot"></div>
+              <span class="cycle-text" data-ui="day-time">--:--</span>
+            </div>
+          </section>
         </header>
 
-        <div class="map-overlay map-overlay--zone" data-ui="zone-tag">--</div>
-        <div class="map-overlay map-overlay--prosperity" data-ui="prosperity-tag">--</div>
-
-        <button class="effects-toggle" data-action="effects-toggle" type="button" aria-pressed="true"></button>
+        <div class="hud-panel-actions" data-ui="panel-actions" role="group">
+           <button class="panel-button" data-action="settings" type="button"></button>
+           <button class="panel-button" data-action="achievements" type="button"></button>
+        </div>
 
         <div class="event-toast" data-ui="event-toast" style="display:none">
           <span class="event-toast__title"></span>
@@ -130,24 +143,30 @@ export class GameHudShell {
     this.root.querySelector('[data-action="chat-send"]')?.addEventListener("click", () => this.sendChat());
     this.input.addEventListener("keydown", (e) => { if (e.key === "Enter") this.sendChat(); });
     this.root.querySelector('[data-action="achievements"]')?.addEventListener("click", () => this.showAchievements());
+    this.root.querySelector('[data-action="settings"]')?.addEventListener("click", () => this.showSettings());
     this.root.querySelector('[data-action="roll"]')?.addEventListener("click", () => this.config.onRoll?.());
-    const effectsToggle = this.root.querySelector('[data-action="effects-toggle"]') as HTMLButtonElement | null;
-    effectsToggle?.addEventListener("click", () => {
-      const enabled = effectsToggle.getAttribute("aria-pressed") !== "true";
-      effectsToggle.setAttribute("aria-pressed", String(enabled));
-      this.config.onEffectsToggle?.(enabled);
-    });
     const toggle = this.root.querySelector('[data-ui="chat-toggle"]');
     const setExpanded = (expanded: boolean): void => {
       this.isExpanded = expanded;
       this.root.querySelector('[data-ui="chat-panel"]')?.classList.toggle("is-expanded", expanded);
     };
     toggle?.addEventListener("click", () => setExpanded(!this.isExpanded));
+    this.root.addEventListener("keydown", (event) => {
+      const keyboardEvent = event as KeyboardEvent;
+      if (keyboardEvent.key !== "Enter" && keyboardEvent.key !== " ") return;
+      const target = keyboardEvent.target as HTMLElement | null;
+      if (target === this.input || target === this.channel || target?.tagName === "BUTTON") return;
+      event.preventDefault();
+      setExpanded(true);
+      this.input.focus();
+    });
+    window.addEventListener("keydown", this.handleGlobalChatShortcut);
     toggle?.addEventListener("keydown", (event) => {
       const keyboardEvent = event as KeyboardEvent;
       if (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") {
         event.preventDefault();
         setExpanded(!this.isExpanded);
+        this.input.focus();
       }
     });
     this.input.addEventListener("focus", () => setExpanded(true));
@@ -186,11 +205,10 @@ export class GameHudShell {
     };
     set('[data-action="roll"]', "dice.roll");
     set('[data-action="chat-send"]', "chat.send");
-    const effectsToggle = this.root.querySelector('[data-action="effects-toggle"]') as HTMLButtonElement | null;
-    if (effectsToggle) {
-      effectsToggle.textContent = this.config.effectsEnabled === false ? t("hud.effectsOff") : t("hud.effectsOn");
-      effectsToggle.setAttribute("aria-pressed", String(this.config.effectsEnabled !== false));
-    }
+    set('[data-action="settings"]', "hud.settings");
+    set('[data-action="achievements"]', "hud.achievements");
+    this.root.querySelector('[data-action="settings"]')?.setAttribute('aria-label', t('hud.settings'));
+    this.root.querySelector('[data-action="achievements"]')?.setAttribute('aria-label', t('hud.achievements'));
 
     // 下拉频道选项与输入框占位符
     this.channel.replaceChildren(
@@ -237,7 +255,7 @@ export class GameHudShell {
     const holderText = runtime?.ownerships.length
       ? runtime.ownerships.map((ownership) => `${ownership.playerId} ${(ownership.share * 100).toFixed(0)}%`).join(', ')
       : t("hud.noOwners");
-    const typeLabel = this.escapeHtml(t("cell." + type));
+    const typeLabel = this.escapeHtml(t(`cell.${type}`));
 
     // 当前档位租金
     const rentRaw = cell.rent;
@@ -296,6 +314,7 @@ export class GameHudShell {
     if (this.destroyed) return;
     this.updatePlayerBadge();
     this.updateValuePills();
+    this.updateRegionStatus();
     this.updateDayNight();
     this.updateDiceButton();
     this.updateActionCluster();
@@ -307,6 +326,12 @@ export class GameHudShell {
   /** 玩家名牌 + 队伍状态 */
   private updatePlayerBadge(): void {
     const player = this.vm.getPlayer();
+    const avatarEl = this.root.querySelector("[data-ui=player-badge] .player-badge__avatar");
+    if (avatarEl) {
+      const playerName = player.currentPlayerName || t("game.defaultPlayerName");
+      avatarEl.textContent = playerName.charAt(0).toUpperCase();
+      avatarEl.setAttribute("aria-label", playerName);
+    }
     const team = this.vm.getTeam();
     const nameEl = this.root.querySelector("[data-ui=player-name]")!;
     nameEl.textContent = player.currentPlayerName || t("game.defaultPlayerName");
@@ -321,7 +346,7 @@ export class GameHudShell {
     const strip = this.root.querySelector("[data-ui=resource-strip]")!;
     // 字段数值来源：
     // - scope 'player'：直接从当前玩家的 values[def.id].current 读取
-    // - scope 'region'：从当前格子所属区域的 environmentValue 读取（可随地图更换名称/数量）
+    // - scope 'region'：从当前格子所属区域的 regionValues 读取（可随地图更换名称/数量）
     const playerValues = player.currentPlayer?.values ?? {};
     const cell = this.vm.getCell(player.currentPlayerPosition);
     const regionId = cell?.regionId ?? "";
@@ -344,6 +369,33 @@ export class GameHudShell {
     }));
   }
 
+  private showSettings(): void {
+    const existing = this.root.querySelector('[data-ui="settings-panel"]');
+    if (existing) {
+      existing.remove();
+      return;
+    }
+    const panel = document.createElement("section");
+    panel.dataset.ui = "settings-panel";
+    panel.className = 'hud-panel settings-panel';
+    const title = document.createElement('h2');
+    title.textContent = t('hud.settings');
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.dataset.action = 'effects-toggle';
+    toggle.setAttribute('aria-pressed', String(this.config.effectsEnabled !== false));
+    toggle.textContent = this.config.effectsEnabled === false ? t('hud.effectsOff') : t('hud.effectsOn');
+    toggle.addEventListener('click', () => {
+      const enabled = toggle.getAttribute('aria-pressed') !== 'true';
+      toggle.setAttribute('aria-pressed', String(enabled));
+      toggle.textContent = enabled ? t('hud.effectsOn') : t('hud.effectsOff');
+      this.config.onEffectsToggle?.(enabled);
+    });
+    panel.append(title, toggle);
+    const layout = this.root.querySelector('[data-ui="hud-layout"]') ?? this.root;
+    layout.append(panel);
+  }
+
   private showAchievements(): void {
     const existing = this.root.querySelector('[data-ui="achievement-panel"]');
     if (existing) {
@@ -352,8 +404,9 @@ export class GameHudShell {
     }
     const panel = document.createElement('section');
     panel.dataset.ui = 'achievement-panel';
-    panel.className = 'achievement-panel';
-    this.root.appendChild(panel);
+    panel.className = 'hud-panel achievement-panel';
+    const layout = this.root.querySelector('[data-ui="hud-layout"]') ?? this.root;
+    layout.appendChild(panel);
     this.updateAchievements();
   }
 
@@ -361,21 +414,22 @@ export class GameHudShell {
     const panel = this.root.querySelector('[data-ui="achievement-panel"]');
     if (!panel) return;
     const state = this.vm.getAchievements().achievements;
-    if (state.status === 'loading') panel.textContent = '成就加载中';
-    else if (state.status === 'offline') panel.textContent = '成就暂时离线';
-    else if (state.status === 'error') panel.textContent = state.error ?? '成就加载失败';
-    else if (state.status === 'disabled') panel.textContent = '成就未启用';
-    else if (!state.snapshot || state.status === 'empty') panel.textContent = '暂无成就';
+    if (state.status === 'loading') panel.textContent = t('hud.achievementLoading');
+    else if (state.status === 'offline') panel.textContent = t('hud.achievementOffline');
+    else if (state.status === 'error') panel.textContent = state.error ?? t('hud.achievementError');
+    else if (state.status === 'disabled') panel.textContent = t('hud.achievementDisabled');
+    else if (!state.snapshot || state.status === 'empty') panel.textContent = t('hud.achievementEmpty');
     else {
       panel.innerHTML = state.snapshot.achievements.map((item) => {
       const progress = item.record.progress.visible ? ` ${item.record.progress.current}/${item.record.progress.target}` : '';
-        return `<div class="achievement-row"><strong>${this.escapeHtml(localizedText(item.name))}</strong><span>${item.record.unlocked ? '已解锁' : progress}</span><p>${this.escapeHtml(localizedText(item.description))}</p></div>`;
+        return `<div class="achievement-row"><strong>${this.escapeHtml(localizedText(item.name))}</strong><span>${item.record.unlocked ? t('hud.achievementUnlocked') : progress}</span><p>${this.escapeHtml(localizedText(item.description))}</p></div>`;
       }).join('');
     }
   }
 
   private updateLeaderboard(): void {
-    const panel = this.root.querySelector('[data-ui="leaderboard"]')!;
+    const panel = this.root.querySelector('[data-ui="leaderboard"]');
+    if (!panel) return;
     const state = this.vm.getLeaderboard().leaderboard;
     if (state.status === 'loading') {
       panel.textContent = t('leaderboard.loading');
@@ -403,6 +457,20 @@ export class GameHudShell {
       rows.push(`${leaderboard.currentPlayer.rank}. ${leaderboard.currentPlayer.username} ${leaderboard.currentPlayer.score}`);
     }
     panel.textContent = rows.join(' | ');
+  }
+
+  private updateRegionStatus(): void {
+    const position = this.vm.getPlayer().currentPlayerPosition;
+    const cell = this.vm.getCell(position);
+    const region = this.vm.getRegions().mapRegions.find((item) => item.id === cell?.regionId);
+    const name = this.root.querySelector('[data-ui="zone-tag"]');
+    const value = this.root.querySelector('[data-ui="prosperity-tag"]');
+    if (name) name.textContent = localizedText(region?.name, t('game.unknownRegion'));
+    if (value) {
+      const regionValues = this.vm.getRegions().regionValues.get(cell?.regionId ?? '') ?? {};
+      const definitions = this.vm.getRegions().valueFieldDefs.filter((definition) => definition.scope === 'region');
+      value.textContent = definitions.map((definition) => `${localizedText(definition.name, definition.id)} ${regionValues[definition.id] ?? 0}`).join(' · ');
+    }
   }
 
   /** 昼夜指示器 */
@@ -516,6 +584,7 @@ export class GameHudShell {
 
   destroy(): void {
     this.destroyed = true;
+    window.removeEventListener("keydown", this.handleGlobalChatShortcut);
     this.unsubscribers.forEach(fn => fn());
     this.effects.onNotifyDismiss("game-hud-shell");
     this.root.remove();

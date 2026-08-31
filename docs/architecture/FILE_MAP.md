@@ -25,7 +25,7 @@
 | `packages/shared/src/types/socket-events.ts` | ClientToServerEvents、ServerToClientEvents、SocketData、AckResult | 两端 typed Socket 契约 |
 | `packages/shared/src/types/team.ts` / `chat.ts` / `transport.ts` / `event.ts` / `era.ts` / `auth.ts` / `server-config.ts` | 队伍、聊天、交通、事件、时代、认证、服务端配置契约 | 对应 server/client 模块 |
 | `packages/shared/src/map/map-parser.ts` | 校验并标准化地图 JSON | app 与客户端地图链 |
-| `packages/shared/src/map/map-index.ts` | 按 cell id 建索引 | MovementHandler、BoardRenderer |
+| `packages/shared/src/map/map-index.ts` | 按 cell id 建索引 | MovementHandler、客户端地图加载 |
 | `packages/shared/src/map/path-finder.ts` | 沿 destinations 查路径/邻居 | 服务端移动 |
 | `packages/shared/src/map/map-loader.ts` / `map-meta-loader.ts` | 地图与元数据加载/解析 | parser 外层 |
 | `packages/shared/src/debug/index.ts` | DEBUG_FLAGS 和功能开关 | server/client 调试门控 |
@@ -106,13 +106,10 @@
 | `src/state/GameStore.ts` | 模块级玩家、移动、区域、队伍、昼夜和 UI 状态 |
 | `src/game/GameViewModel.ts` | GameHudShell 的状态切片与订阅通知 |
 | `src/game/ClientHudBridge.ts` | 统一 HUD 刷新回调 |
-| `src/game/ClientRenderLoop.ts` | 每帧移动、相机、棋子更新和 render 调用 |
-| `src/renderer/BoardRenderer.ts` | Canvas 主渲染器 |
-| `src/renderer/CellRenderer.ts`、`ConnectionRenderer.ts`、`PlayerRenderer.ts`、`DayNightRenderer.ts`、`VisionMaskRenderer.ts`、`Camera.ts` | 棋盘子渲染与相机 |
 | `src/components/GameHudShell.ts` | HUD 组合入口，消费 ViewModel |
-| `src/components/ActionBarComponent.ts`、`TopBarComponent.ts`、`ChatPanel.ts`、`PropertyModal.ts`、`InvestmentModal.ts`、`TransportModal.ts`、`MonumentModal.ts`、`JailIndicator.ts`、`NotificationCenter.ts` 等 | UI 展示与请求代理 |
+| `src/components/InteractiveMapSurface.ts` | 实际可见的 SVG 地图层；负责地图节点渲染、棋子 transform、移动锁与视野 viewBox 跟随 |
 | `src/game/systems/MapLoader.ts` | 请求 `/api/map`、标准化地图、计算本地昼夜 |
-| `src/game/systems/MovementSystem.ts` | 服务端移动事件的动画和岔路选择界面 |
+| `src/game/systems/MovementSystem.ts` | 服务端移动路径/单步插值，供 GamePage 的 RAF 循环驱动棋子移动动画与岔路选择界面 |
 | `src/game/systems/ChatSystem.ts`、`TeamSystem.ts`、`TutorialSystem.ts`、`GameLogic.ts` | 对应请求/投影/引导逻辑 |
 
 `packages/client/public/config/behaviors/` 是客户端可读行为副本。旧 HUD、部分 hooks 和历史文档引用的文件若不在上述当前树中，不得补写为现行文件。`ai-bot` 与 `ai_bot_try` 不在本次运行时文件地图和清理边界内。

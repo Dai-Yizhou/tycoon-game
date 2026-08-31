@@ -15,6 +15,17 @@ export interface ThemeSnapshot {
   line: { currentWidth: number };
 }
 
+/**
+ * 从根元素读取带 `--` 前缀的 CSS 数值变量并解析为毫秒，供 JS 动画时序使用。
+ * 解析失败或数值非正时回退 fallback，避免动画时序因缺失变量而失效。
+ */
+export function readCssVarNumber(root: HTMLElement, property: string, fallback: number): number {
+  if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return fallback;
+  const raw = window.getComputedStyle(root).getPropertyValue(property);
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function isToken(value: unknown): value is { $value: unknown } {
   return typeof value === 'object' && value !== null && '$value' in value;
 }
@@ -156,6 +167,18 @@ export class DesignAdapter {
         '--gp-paper': color('color.region.btnFg'),
         '--gp-cycle-day': color('color.region.cycleDay'),
         '--gp-cycle-night': color('color.region.cycleNight'),
+        // 动效时序令牌：JS 动画通过 CSS 变量读取毫秒数，CSS 动画直接消费时长字符串
+        '--motion-fast': str('motion.fast'),
+        '--motion-normal': str('motion.normal'),
+        '--motion-step': `${number('motion.step')}ms`,
+        '--motion-step-arrive': `${number('motion.stepArrive')}ms`,
+        '--motion-move-complete': `${number('motion.moveComplete')}ms`,
+        '--motion-dice-settled': `${number('motion.diceSettled')}ms`,
+        '--motion-property-bought': `${number('motion.propertyBought')}ms`,
+        '--motion-bankrupt': `${number('motion.bankrupt')}ms`,
+        '--motion-slideup-title': str('motion.slideUpTitle'),
+        '--motion-slideup': str('motion.slideUp'),
+        '--motion-spin': str('motion.spin'),
       },
       piece: { outlineWidth: number('dimension.piece.outline') },
       line: { currentWidth: number('dimension.line.current') },

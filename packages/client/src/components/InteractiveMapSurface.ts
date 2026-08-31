@@ -7,7 +7,18 @@ export class InteractiveMapSurface {
   private players: Player[] = [];
   private bounds: { minX: number; minY: number; maxX: number; maxY: number } | null = null;
   private followedCellId: number | null = null;
+  private movementLocked = false;
+  private displayedPlayerPositions = new Map<string, { x: number; y: number }>();
   private valueFieldDefinitions: ValueFieldDefinition[] = [];
+
+  setMovementLocked(locked: boolean): void {
+    if (this.movementLocked === locked) return;
+    this.movementLocked = locked;
+    if (!locked) {
+      this.displayedPlayerPositions.clear();
+      if (this.map.length) this.render(this.map, this.players, this.valueFieldDefinitions);
+    }
+  }
 
   constructor() {
     this.root.className = "interactive-map-surface";
@@ -47,7 +58,8 @@ export class InteractiveMapSurface {
     const links = document.createElementNS(ns, "g");
     links.classList.add("interactive-map-surface__links");
     const drawn = new Set<string>();
-    this.applyViewBox(svg, byId.get(this.followedCellId ?? -1));
+    const followedCell = byId.get(this.followedCellId ?? -1);
+    if (followedCell) this.applyViewBox(svg, followedCell.x, followedCell.y);
 
     cells.forEach(c =>
       (c.destinations || []).forEach(id => {
@@ -131,10 +143,12 @@ export class InteractiveMapSurface {
         if (!cell) return;
         const g = document.createElementNS(ns, "g");
         g.classList.add("map-player");
-        g.setAttribute(
-          "transform",
-          `translate(${cell.x + (i % 3 - 1) * 18} ${cell.y - 42 - Math.floor(i / 3) * 8})`
-        );
+        const defaultX = i === 0 ? cell.x : cell.x + (i % 3 - 1) * 18;
+        const defaultY = i === 0 ? cell.y : cell.y - 42 - Math.floor(i / 3) * 8;
+        const displayed = this.displayedPlayerPositions.get(player.id);
+        const x = displayed?.x ?? defaultX;
+        const y = displayed?.y ?? defaultY;
+        g.setAttribute("transform", `translate(${x} ${y})`);
         g.dataset.playerId = player.id;
         
         const body = document.createElementNS(ns, "path");
@@ -163,13 +177,25 @@ export class InteractiveMapSurface {
   updatePlayers(players: Player[]): void {
     const changed = players.length !== this.players.length || players.some((player, index) => {
       const previous = this.players[index];
-      return !previous || previous.id !== player.id || previous.position.cellId !== player.position.cellId || previous.status !== player.status;
+      return !previous || previous.id !== player.id || previous.status !== player.status;
     });
     this.players = players;
-    if (changed && this.map.length) this.render(this.map, players, this.valueFieldDefinitions);
+    if (this.movementLocked) return;
+    if (changed && this.map.length) {
+      this.render(this.map, players, this.valueFieldDefinitions);
+      return;
+    }
+    players.slice(1).forEach((player, index) => {
+      const cell = this.map.find((item) => item.id === player.position.cellId);
+      const element = this.root.querySelector(`[data-player-id="${player.id}"]`);
+      if (cell && element) {
+        element.setAttribute('transform', `translate(${cell.x + ((index + 1) % 3 - 1) * 18} ${cell.y - 42 - Math.floor((index + 1) / 3) * 8})`);
+      }
+    });
   }
 
   setPlayerDisplayPosition(playerId: string, x: number, y: number): void {
+    this.displayedPlayerPositions.set(playerId, { x, y });
     const player = Array.from(this.root.querySelectorAll('[data-player-id]'))
       .find((element) => element.getAttribute('data-player-id') === playerId);
     if (player) player.setAttribute('transform', `translate(${x} ${y})`);
@@ -181,24 +207,31 @@ export class InteractiveMapSurface {
   }
 
   followPlayer(cellId: number): void {
+    if (this.movementLocked) return;
     this.followedCellId = cellId;
     if (!this.map.length) return;
     const svg = this.root.querySelector('svg');
     const cell = this.map.find((item) => item.id === cellId);
-    if (svg && cell) this.applyViewBox(svg, cell);
+    if (svg && cell) this.applyViewBox(svg, cell.x, cell.y);
   }
 
-  private applyViewBox(svg: SVGSVGElement, followedCell: MapData[number] | undefined): void {
-    if (!this.bounds || !followedCell) return;
+  followDisplayPosition(x: number, y: number): void {
+    if (!this.map.length) return;
+    const svg = this.root.querySelector('svg');
+    if (svg) this.applyViewBox(svg, x, y);
+  }
+
+  private applyViewBox(svg: SVGSVGElement, x: number, y: number): void {
+    if (!this.bounds) return;
     const width = Math.max(720, (this.bounds.maxX - this.bounds.minX) * 0.68);
     const height = width * 0.625;
     const centerX = Math.min(
       this.bounds.maxX - width / 2,
-      Math.max(this.bounds.minX + width / 2, followedCell.x)
+      Math.max(this.bounds.minX + width / 2, x)
     );
     const centerY = Math.min(
       this.bounds.maxY - height / 2,
-      Math.max(this.bounds.minY + height / 2, followedCell.y)
+      Math.max(this.bounds.minY + height / 2, y)
     );
     svg.setAttribute(
       "viewBox",

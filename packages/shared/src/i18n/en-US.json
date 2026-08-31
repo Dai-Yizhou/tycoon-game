@@ -201,7 +201,17 @@
     "hoverFetching": "Fetching cell state",
     "chatNotify": "Chat / Notifications",
     "chatTabs": "Team Region",
-    "sysUnread": "System {{count}}"
+    "actionArea": "Actions",
+    "regionStatus": "Region Status",
+    "sysUnread": "System {{count}}",
+    "settings": "Settings",
+    "achievements": "Achievements",
+    "achievementLoading": "Loading achievements",
+    "achievementOffline": "Achievements temporarily offline",
+    "achievementError": "Failed to load achievements",
+    "achievementDisabled": "Achievements disabled",
+    "achievementEmpty": "No achievements",
+    "achievementUnlocked": "Unlocked"
   },
   "dice": {
     "roll": "Roll Dice",
@@ -339,6 +349,7 @@
   "jail": {
     "title": "Jail",
     "inJail": "In jail! Cannot roll until released",
+    "enteredDetailed": "Player {{playerId}} entered jail, cooldown {{duration}}ms",
     "stillInJail": "Still in jail! {{seconds}}s remaining",
     "released": "Released from jail, can roll again",
     "releasedStatus": "Released! Back to normal",

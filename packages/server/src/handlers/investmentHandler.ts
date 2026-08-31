@@ -240,7 +240,11 @@ export class InvestmentHandler {
       });
 
       this.achievementPurchase?.(playerId, result.cell.id, socket.data.guest === true);
-      this.achievementOwnershipChanged?.(playerId, socket.data.guest === true);
+      const ownershipsAfterPurchase = getOwnerships(result.cell, this.world.getRuntimeState());
+      for (const ownerId of new Set(ownershipsAfterPurchase.map((ownership) => ownership.playerId))) {
+        const ownerPlayer = this.world.getPlayer(ownerId);
+        this.achievementOwnershipChanged?.(ownerId, ownerPlayer?.username.startsWith('guest_') === true);
+      }
 
       // 13. 返回成功结果
       const response = { ok: true, data: { cell: result.cell } } as AckResult<{ cell: Cell }>;

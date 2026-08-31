@@ -138,44 +138,64 @@ export class NoOpEffectHooks implements GameEffectHooks {
  * 不依赖任何外部库，仅操作 DOM classList。
  */
 export class CssTransitionEffectHooks extends NoOpEffectHooks {
+  private readonly timers = new Set<ReturnType<typeof setTimeout>>();
+
   constructor(private readonly root: HTMLElement) {
     super();
+  }
+
+  destroy(): void {
+    for (const timer of this.timers) clearTimeout(timer);
+    this.timers.clear();
+  }
+
+  private removeClassAfter(className: string, durationMs: number): void {
+    const timer = setTimeout(() => {
+      this.root.classList.remove(className);
+      this.timers.delete(timer);
+    }, durationMs);
+    this.timers.add(timer);
+  }
+
+  /** 从主题令牌读取动效毫秒数；缺失时回退 fallback */
+  private motionMs(property: string, fallback: number): number {
+    return readCssVarNumber(this.root, property, fallback);
   }
 
   onStepStart(fromCellId: number, toCellId: number): void {
     void fromCellId;
     void toCellId;
     this.root.classList.add('fx-step-start');
-    setTimeout(() => this.root.classList.remove('fx-step-start'), 280);
+    this.removeClassAfter('fx-step-start', this.motionMs('--motion-step', 280));
   }
 
   onStepArrive(cellId: number): void {
     void cellId;
     this.root.classList.add('fx-step-arrive');
-    setTimeout(() => this.root.classList.remove('fx-step-arrive'), 220);
+    this.removeClassAfter('fx-step-arrive', this.motionMs('--motion-step-arrive', 220));
   }
 
   onMoveComplete(cellId: number): void {
     void cellId;
     this.root.classList.add('fx-move-complete');
-    setTimeout(() => this.root.classList.remove('fx-move-complete'), 320);
+    this.removeClassAfter('fx-move-complete', this.motionMs('--motion-move-complete', 320));
   }
 
   onDiceSettled(value: number): void {
     void value;
     this.root.classList.add('fx-dice-settled');
-    setTimeout(() => this.root.classList.remove('fx-dice-settled'), 400);
+    this.removeClassAfter('fx-dice-settled', this.motionMs('--motion-dice-settled', 400));
   }
 
   onPropertyPurchased(cellId: number): void {
     void cellId;
     this.root.classList.add('fx-property-bought');
-    setTimeout(() => this.root.classList.remove('fx-property-bought'), 600);
+    this.removeClassAfter('fx-property-bought', this.motionMs('--motion-property-bought', 600));
   }
 
   onBankrupt(): void {
     this.root.classList.add('fx-bankrupt');
-    setTimeout(() => this.root.classList.remove('fx-bankrupt'), 1000);
+    this.removeClassAfter('fx-bankrupt', this.motionMs('--motion-bankrupt', 1000));
   }
 
   onDayNightToggle(isDay: boolean): void {

@@ -124,12 +124,12 @@ export class EventHandler {
         // 已配置 behavior 时走专属路径：执行失败即报错返回，不再回退到随机事件，
         // 以免掩盖配置/加载问题（如 config/behaviors/{id}.json 缺失）。
         if (!this.behaviorEngine) {
-          logger.error(`事件格 ${cellId} 配置了 behavior ${behaviorId}，但 BehaviorEngine 未注入`);
+          logger.error('事件行为引擎未注入', undefined, { playerId, cellId, behaviorId });
           return null;
         }
         const behaviorResult = this.behaviorEngine.executeBehavior(behaviorId, player);
         if (!behaviorResult) {
-          logger.error(`事件格 ${cellId} 的 behavior ${behaviorId} 执行失败`);
+          logger.error('事件行为执行失败', undefined, { playerId, cellId, behaviorId });
           return null;
         }
 
@@ -137,9 +137,15 @@ export class EventHandler {
         this.broadcastBehaviorNotification(player, behaviorResult, socket);
 
         this.achievementEvent?.(playerId, cellId, behaviorResult.behaviorId, socket.data.guest === true);
-        logger.info(
-          `玩家 ${playerId} 触发 behavior ${behaviorId}: ${behaviorResult.event.msg}`,
-        );
+        logger.info('事件行为完成', {
+          playerId,
+          cellId,
+          behaviorId,
+          target: behaviorResult.target,
+          affectedPlayerIds: behaviorResult.affectedPlayerIds,
+          valueChanges: behaviorResult.valueChanges,
+          message: behaviorResult.event.msg,
+        });
 
         // 构造事件结果，保留事件处理器的统一返回结构
         return {

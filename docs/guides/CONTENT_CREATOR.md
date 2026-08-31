@@ -13,7 +13,7 @@
 
 ```text
 JSON -> server/app.ts 启动解析 -> GameWorld / BehaviorEngine
-    -> server.* -> client SocketEventHandler -> Store/HUD/Canvas
+    -> server.* -> client SocketEventHandler -> Store/HUD/InteractiveMapSurface
 ```
 
 `valueFieldDefinitions` 决定玩家或区域数值字段；客户端按服务端返回的定义投影，不要假设固定字段集合。行为事件由服务端权威选择和应用，客户端只展示结果。

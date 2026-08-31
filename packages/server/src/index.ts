@@ -56,7 +56,7 @@ export async function bootstrap(config: ServerConfig = loadConfig()): Promise<vo
     socketManager,
     economy,
     dayNightCycle,
-    prosperityManager,
+    dayNightValueChange,
     world,
     handlerRegistry,
     userStore,
@@ -73,14 +73,14 @@ export async function bootstrap(config: ServerConfig = loadConfig()): Promise<vo
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
     logger.error('failed to start http server', error);
-    await gracefulShutdown(httpServer, socketManager, economy, dayNightCycle, prosperityManager, 5000, world, handlerRegistry, userStore, worldStore, achievementStore);
+    await gracefulShutdown(httpServer, socketManager, economy, dayNightCycle, dayNightValueChange, 5000, world, handlerRegistry, userStore, worldStore, achievementStore);
     throw error;
   }
 
   // 注册信号处理
   const shutdown = (signal: string) => {
     logger.info(`received ${signal}`);
-        gracefulShutdown(httpServer, socketManager, economy, dayNightCycle, prosperityManager, 5000, world, handlerRegistry, userStore, worldStore, achievementStore)
+        gracefulShutdown(httpServer, socketManager, economy, dayNightCycle, dayNightValueChange, 5000, world, handlerRegistry, userStore, worldStore, achievementStore)
       .then(() => {
         process.exit(0);
       })

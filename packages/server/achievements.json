@@ -1,0 +1,11 @@
+[
+  {
+    "id": "visit-starter-cells",
+    "scope": "map",
+    "name": { "zh-CN": "初来乍到", "en-US": "First Steps" },
+    "description": { "zh-CN": "访问起始格", "en-US": "Visit the starting cell" },
+    "category": "movement",
+    "progress": { "visible": true, "target": 1 },
+    "trigger": { "type": "visitCells", "cellIds": [0] }
+  }
+]

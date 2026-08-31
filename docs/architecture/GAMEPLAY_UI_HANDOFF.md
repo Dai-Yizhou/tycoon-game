@@ -20,7 +20,7 @@ LoadingPage 创建并认证 Socket
   -> SocketEventHandler 接收 server.*
   -> GameStore 保存客户端权威投影
   -> GameViewModel 投影 UI 切片
-  -> GameHudShell / InteractiveMapSurface / Canvas 渲染
+  -> GameHudShell / InteractiveMapSurface 渲染
 ```
 
 关键入口：
@@ -31,8 +31,7 @@ LoadingPage 创建并认证 Socket
 - `packages/client/src/game/systems/SocketEventHandler.ts`：客户端服务端事件的集中消费入口。
 - `packages/client/src/game/systems/GameLogic.ts`：发送玩法请求，不在客户端结算经济。
 - `packages/client/src/components/GameHudShell.ts`：顶部栏、聊天、底部行动栏的 UI 渲染。
-- `packages/client/src/components/InteractiveMapSurface.ts`：当前实际可见的 SVG 地图层。
-- `packages/client/src/game/ClientRenderLoop.ts` 与 `packages/client/src/renderer/BoardRenderer.ts`：Canvas 渲染链，当前 Canvas 在游戏页被隐藏，不能作为唯一可见 UI 层修复。
+- `packages/client/src/components/InteractiveMapSurface.ts`：当前唯一可见的 SVG 地图渲染层，承载地图节点、棋子动画与视野跟随。
 
 ## 不可破坏的架构约束
 
@@ -149,7 +148,7 @@ LoadingPage 创建并认证 Socket
 
 ### 不允许直接做
 
-- 不要把 Canvas 重新设为唯一渲染层，除非同时迁移当前 SVG 的所有交互和视觉能力并完成回归验证。
+- 不要把 `InteractiveMapSurface` 的 SVG 换成其他渲染层，除非同时迁移当前 SVG 的所有交互和视觉能力并完成回归验证。
 - 不要删除 `GameStore`、`GameViewModel` 或 `SocketEventHandler` 以“简化 UI”。
 - 不要在组件中导入 `gameSocket`、`currentPlayer`、`currentMoney`、`ownedProperties` 等模块级变量。
 - 不要新增绕过 `SocketEventHandler` 的 `socket.on()`。
@@ -217,7 +216,7 @@ pnpm --dir packages/server exec tsc -p tsconfig.json --noEmit
 
 ## 当前自审盲区
 
-- 当前 UI 运行时同时保留 SVG `InteractiveMapSurface` 和隐藏的 Canvas `BoardRenderer`，下一会话如果扩大地图职责，需要先确认是否继续双层架构，不能凭视觉目标直接删除其中一层。
+- 当前客户端唯一可见地图渲染层已收敛为 `InteractiveMapSurface` 的 SVG；旧的隐藏 Canvas `BoardRenderer`、`ClientRenderLoop` 与 `src/renderer/*` 子渲染器已从源码移除，不再保留双层架构。若下一会话扩大地图职责，直接在此单层上扩展即可。
 - 当前 `syncCellActions()` 仍位于 `GamePage.ts`，且动态格子 presentation 尚未集中抽取；卡片状态同步应先补数据投影测试，再调整组件样式。
 
 ## 相关文档

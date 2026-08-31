@@ -26,11 +26,16 @@ describe("GameHudShell", () => {
     shell.destroy();
   });
 
-  it('提供视效总开关并通知页面状态', () => {
+  it('设置面板提供视效开关并通知页面状态', () => {
     const vm = new GameViewModel(new GameStore());
     const onEffectsToggle = jest.fn();
     const shell = new GameHudShell(vm, new NoOpEffectHooks(), { onEffectsToggle, effectsEnabled: true });
-    const toggle = shell.getElement().querySelector('[data-action="effects-toggle"]') as HTMLButtonElement;
+    const root = shell.getElement();
+    const settings = root.querySelector('[data-action="settings"]') as HTMLButtonElement;
+    settings.click();
+    const toggle = root.querySelector('[data-action="effects-toggle"]') as HTMLButtonElement;
+
+    expect(root.querySelector('[data-ui="settings-panel"]')).toBeTruthy();
 
     expect(toggle).not.toBeNull();
     expect(toggle.getAttribute('aria-pressed')).toBe('true');
@@ -38,6 +43,31 @@ describe("GameHudShell", () => {
 
     expect(onEffectsToggle).toHaveBeenCalledWith(false);
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    shell.destroy();
+  });
+
+  it('成就面板打开后收到解锁快照会更新内容且不重复创建面板', () => {
+    const store = new GameStore();
+    const vm = new GameViewModel(store);
+    const shell = new GameHudShell(vm, new NoOpEffectHooks());
+    const root = shell.getElement();
+    const achievement = {
+      id: 'first',
+      scope: 'map',
+      name: { 'zh-CN': '第一步', 'en-US': 'First Step' },
+      description: { 'zh-CN': '访问起点', 'en-US': 'Visit start' },
+      category: 'movement',
+      progress: { visible: true, target: 1 },
+      trigger: { type: 'visitCells', cellIds: [1] },
+      record: { achievementId: 'first', scope: 'map', mapId: 'map-a', progress: { current: 0, target: 1, visible: true }, unlocked: false, seenKeys: [] },
+    } as never;
+    store.setAchievements({ enabled: true, mapId: 'map-a', generatedAt: 1, achievements: [achievement] });
+    (root.querySelector('[data-action="achievements"]') as HTMLButtonElement).click();
+    expect(root.querySelectorAll('[data-ui="achievement-panel"]')).toHaveLength(1);
+    store.setAchievements({ enabled: true, mapId: 'map-a', generatedAt: 2, achievements: [{ ...achievement, record: { ...achievement.record, progress: { ...achievement.record.progress, current: 1 }, unlocked: true } }] });
+    expect(root.querySelector('[data-ui="achievement-panel"]')?.textContent).toContain('已解锁');
+    (root.querySelector('[data-action="achievements"]') as HTMLButtonElement).click();
+    expect(root.querySelectorAll('[data-ui="achievement-panel"]')).toHaveLength(0);
     shell.destroy();
   });
 

@@ -1,4 +1,5 @@
 import { EffectController } from '../src/game/EffectController.js';
+import { CssTransitionEffectHooks } from '../src/game/GameEffects.js';
 import { InteractiveMapSurface } from '../src/components/InteractiveMapSurface.js';
 
 describe('EffectController', () => {
@@ -19,6 +20,25 @@ describe('EffectController', () => {
     controller.setEnabled(false);
     controller.onDiceSettled(6);
 
+    expect(hook).not.toHaveBeenCalled();
+  });
+
+  it('销毁时清理 CSS 视效定时器', () => {
+    jest.useFakeTimers();
+    const root = document.createElement('div');
+    const hooks = new CssTransitionEffectHooks(root);
+    hooks.onBankrupt();
+    hooks.destroy();
+    jest.advanceTimersByTime(1000);
+    expect(root.classList.contains('fx-bankrupt')).toBe(true);
+    jest.useRealTimers();
+  });
+
+  it('销毁后忽略新的视效调用', () => {
+    const hook = jest.fn();
+    const controller = new EffectController({ onDiceSettled: hook });
+    controller.destroy();
+    controller.onDiceSettled(6);
     expect(hook).not.toHaveBeenCalled();
   });
 });

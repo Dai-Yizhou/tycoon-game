@@ -5,8 +5,18 @@ import type { ClientGameSnapshot, GameStore } from '../../state/GameStore.js';
 import type { MovementEffectHooks } from '../GameEffects.js';
 import { addChatMessage } from './ChatSystem.js';
 import { requestHudRefresh } from '../ClientHudBridge.js';
+import { readCssVarNumber } from '../../design/DesignAdapter.js';
 
+/** 单步移动插值时长的兜底默认值；运行时以主题令牌 --motion-step 覆盖 */
 const MOVE_STEP_DURATION = 280;
+
+/** 当前生效的单步时长（毫秒）；在每次移动起点刷新，避免 RAF 热路径每帧读取计算样式 */
+let stepDurationMs = MOVE_STEP_DURATION;
+
+function refreshStepDuration(): void {
+  if (typeof document === 'undefined') return;
+  stepDurationMs = readCssVarNumber(document.documentElement, '--motion-step', MOVE_STEP_DURATION);
+}
 
 function easeInOutQuad(value: number): number {
   return value < 0.5 ? 2 * value * value : 1 - Math.pow(-2 * value + 2, 2) / 2;
@@ -20,7 +30,8 @@ export function updateMovement(store: GameStore, map: MapIndex, onPlayerArrived:
   const snapshot = store.getSnapshot();
   if (!snapshot.isMoving) return;
 
-  const progress = Math.min((performance.now() - snapshot.moveStartTime) / MOVE_STEP_DURATION, 1);
+  const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const progress = reducedMotion ? 1 : Math.min((performance.now() - snapshot.moveStartTime) / MOVE_STEP_DURATION, 1);
   const eased = easeInOutQuad(progress);
   const newX = snapshot.moveFromX + (snapshot.moveToX - snapshot.moveFromX) * eased;
   const newY = snapshot.moveFromY + (snapshot.moveToY - snapshot.moveFromY) * eased;
@@ -30,7 +41,8 @@ export function updateMovement(store: GameStore, map: MapIndex, onPlayerArrived:
   if (snapshot.isServerAnimating) {
     effects?.onStepArrive(snapshot.currentPlayerPosition);
     if (snapshot.serverPathIndex >= snapshot.serverPath.length - 1) {
-      updateSnapshot(store, { isServerAnimating: false, isMoving: false });
+      const finalCell = map.getById(snapshot.currentPlayerPosition);
+      updateSnapshot(store, { isServerAnimating: false, isMoving: false, playerDisplayX: finalCell?.x ?? snapshot.playerDisplayX, playerDisplayY: finalCell?.y ?? snapshot.playerDisplayY });
       onPlayerArrived();
       effects?.onMoveComplete(snapshot.currentPlayerPosition);
       return;
@@ -78,6 +90,7 @@ export function animateMoveTo(store: GameStore, map: MapIndex, targetId: number,
   const target = map.getById(targetId);
   if (!target) return;
 
+  refreshStepDuration();
   updateSnapshot(store, {
     previousCellId: snapshot.currentPlayerPosition,
     moveFromX: snapshot.playerDisplayX,
@@ -98,7 +111,10 @@ export function startServerPathAnimation(store: GameStore, map: MapIndex, path: 
   if (path.length < 2 || start !== current.currentPlayerPosition || end !== authoritativeEnd) return;
   if (path.some((cellId) => !Number.isInteger(cellId) || !map.getById(cellId))) return;
   if (path.slice(0, -1).some((cellId, index) => !map.getById(cellId)?.destinations.includes(path[index + 1]))) return;
-  updateSnapshot(store, { serverPath: [...path], serverPathIndex: 0, isServerAnimating: true, isMoving: true, remainingSteps: 0 });
+  const startCell = map.getById(start);
+  const endCell = map.getById(end);
+  if (!startCell || !endCell) return;
+  updateSnapshot(store, { serverPath: [...path], serverPathIndex: 0, isServerAnimating: true, isMoving: true, currentPlayerPosition: start, playerDisplayX: startCell.x, playerDisplayY: startCell.y, moveFromX: startCell.x, moveFromY: startCell.y, moveToX: endCell.x, moveToY: endCell.y, remainingSteps: 0 });
   window.dispatchEvent(new CustomEvent('game:cell-leave'));
   requestHudRefresh();
   advanceServerPathStep(store, map, onPlayerArrived, effects);

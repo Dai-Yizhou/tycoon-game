@@ -10,7 +10,7 @@ export interface OtherPlayerInfo {
   primaryValue: number;
 }
 
-export interface RegionInfo { id: string; name: string; cellIds: number[]; prosperity: number; initialValues: Record<string, number>; themeId?: 'northeast' | 'south' | 'midwest' | 'west'; }
+export interface RegionInfo { id: string; name: string; cellIds: number[]; initialValues: Record<string, number>; themeId?: 'northeast' | 'south' | 'midwest' | 'west'; }
 export interface TimeZoneInfo { id: string; name?: string; offsetMinutes: number; }
 
 export interface ValueFieldDef {
@@ -62,8 +62,6 @@ export interface ClientGameSnapshot {
   isWaitingForChoice: boolean;
   isServerAnimating: boolean;
   cellActions: Array<{ id: string; label: string; detail?: string; enabled: boolean }>;
-  prosperity: number;
-  regionProsperityMap: Map<string, number>;
   regionValues: Map<string, Record<string, number>>;
   mapRegions: RegionInfo[];
   mapTimezones: TimeZoneInfo[];
@@ -105,7 +103,8 @@ export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     isBankrupt: false,
-    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], prosperity: 100, regionProsperityMap: new Map(), regionValues: new Map(), mapRegions: [], mapTimezones: [], valueFieldDefs: [], cellRuntimeStates: new Map(), leaderboard: { status: 'loading', snapshot: null, error: null }, achievements: { status: 'loading', snapshot: null, error: null },
+    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], regionValues: new Map(),
+      mapRegions: [], mapTimezones: [], valueFieldDefs: [], cellRuntimeStates: new Map(), leaderboard: { status: 'loading', snapshot: null, error: null }, achievements: { status: 'loading', snapshot: null, error: null },
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
 
@@ -182,14 +181,10 @@ export class GameStore {
     this.publish();
   }
 
-  setProsperity(regionId: string | null, value: number): void {
-    const regionProsperityMap = new Map(this.snapshot.regionProsperityMap);
+  setRegionValue(regionId: string, fieldId: string, value: number): void {
     const regionValues = new Map(this.snapshot.regionValues);
-    if (regionId) {
-      regionProsperityMap.set(regionId, value);
-      regionValues.set(regionId, { ...(regionValues.get(regionId) ?? {}), pros: value });
-    }
-    this.snapshot = { ...this.snapshot, prosperity: value, regionProsperityMap, regionValues };
+    regionValues.set(regionId, { ...(regionValues.get(regionId) ?? {}), [fieldId]: value });
+    this.snapshot = { ...this.snapshot, regionValues };
     this.publish();
   }
 
@@ -365,8 +360,6 @@ export class GameStore {
       isWaitingForChoice: false,
       isServerAnimating: false,
       cellActions: [],
-      prosperity: 100,
-      regionProsperityMap: new Map(),
       mapRegions: [],
       mapTimezones: [],
       valueFieldDefs: [],

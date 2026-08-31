@@ -124,6 +124,7 @@ export class MovementHandler {
     steps: number,
     socket: TypedSocket,
     visited: Set<number>,
+    pathStartId?: number,
   ): MovementResult | null {
     const player = this.world.getPlayer(playerId);
     if (!player) return null;
@@ -133,7 +134,12 @@ export class MovementHandler {
     const currentCell = mapIndex.getById(startCellId);
     if (!currentCell) return null;
 
-    const path: number[] = [startCellId];
+    // 岔路续走时，玩家真实位置在路径起点（fromCellId）。path 必须以该格开头，
+    // 客户端根据 path[0] === currentPlayerPosition 校验并据此插值动画；
+    // 若缺失起点（仅以 toCellId 开头），校验会失败导致动画被跳过、棋子瞬移。
+    const path: number[] = pathStartId !== undefined && pathStartId !== startCellId
+      ? [pathStartId, startCellId]
+      : [startCellId];
     let current = currentCell;
     let stepsTaken = 0;
     let encounteredChoice = false;
@@ -166,16 +172,20 @@ export class MovementHandler {
       stepsTaken++;
     }
 
-    player.position.cellId = current.id;
-    player.lastActiveAt = Date.now();
-    this.world.updatePlayer(player);
-
     const payload: PositionChangedPayload = {
       playerId,
       cellId: current.id,
       path,
     };
+    // 关键：带完整 path 的移动信号必须先于位置同步发出。
+    // updatePlayer 会触发 playerPositionChanged → SocketManager 广播一个不含 path 的
+    // server.playerMoved；若该无 path 信号先到达客户端，会被当成直接跳转，覆盖移动动画。
+    // 因此先广播带 path 信号，让客户端启动动画，后续无 path 同步会被客户端动画锁定忽略。
     this.io.emit('server.playerMoved', payload);
+
+    player.position.cellId = current.id;
+    player.lastActiveAt = Date.now();
+    this.world.updatePlayer(player);
 
     logger.debug(`玩家 ${playerId} 移动：从 ${startCellId} 到 ${current.id}，路径 ${path.join(' → ')}，步数 ${stepsTaken}`);
 
@@ -264,7 +274,9 @@ export class MovementHandler {
       logger.debug(`玩家 ${playerId} 选择路径：从 ${payload.fromCellId} 到 ${payload.toCellId}`);
 
       state.visited.add(payload.toCellId);
-      this.continueMovement(playerId, payload.toCellId, state.remainingSteps - 1, socket, state.visited);
+      // pathStartId = payload.fromCellId：动画路径必须从玩家真实所在格（岔路口）起步，
+      // 否则客户端 path[0] !== currentPlayerPosition 校验失败，动画被跳过直接瞬移。
+      this.continueMovement(playerId, payload.toCellId, state.remainingSteps - 1, socket, state.visited, payload.fromCellId);
     } catch (err) {
       logger.error('路径选择处理错误', err);
       emitError(socket, ErrorCodes.InternalError, err instanceof Error ? err.message : String(err));

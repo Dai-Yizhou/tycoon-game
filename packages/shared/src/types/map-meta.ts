@@ -43,6 +43,19 @@ export interface TaxConfig {
   };
 }
 
+/**
+ * 昼夜驱动的 UCT 数值变化配置（通用，不绑定具体字段名）
+ *
+ * 进入白天/夜晚时，对各 UCT 字段施加一次增量（`day` / `night`）。
+ * 字段按地图声明的 UCT 区域字段处理，与税收一致，不硬编码特定字段。
+ */
+export interface DayNightValueChangeConfig {
+  /** 进入白天时对各 UCT 字段的增量 */
+  day: Uct;
+  /** 进入夜晚时对各 UCT 字段的增量 */
+  night: Uct;
+}
+
 export interface MapMeta {
   id: string;
   version: string;
@@ -56,6 +69,8 @@ export interface MapMeta {
   dice: DiceConfig;
   tax: TaxConfig;
   ranking?: RankingConfig;
+  /** 昼夜 UCT 数值变化配置（可选，未配置则日夜切换不调整数值） */
+  dayNight?: DayNightValueChangeConfig;
 }
 
 export const DEFAULT_DAY_NIGHT_CYCLE_MINUTES = 15;

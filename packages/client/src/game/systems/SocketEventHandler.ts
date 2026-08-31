@@ -6,7 +6,7 @@
  */
 
 import type { TypedClientSocket } from '../../hooks/useSocket.js';
-import { t, localizedText } from '../i18n.js';
+import { localizedText, t } from '../i18n.js';
 import { resolveTimezoneOffsetMinutes } from '../timezone.js';
 import type { OtherPlayerInfo } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
@@ -15,6 +15,7 @@ import { requestHudRefresh } from '../ClientHudBridge.js';
 import type { GameController } from '../GameController.js';
 import { GameStore } from '../../state/GameStore.js';
 import type { MapIndex, Player } from '@game/shared';
+import type { MovementEffectHooks } from '../GameEffects.js';
 
 const registeredSockets = new WeakSet<TypedClientSocket>();
 const eventObservers = new WeakMap<TypedClientSocket, (event: string) => void>();
@@ -22,11 +23,13 @@ const eventObservers = new WeakMap<TypedClientSocket, (event: string) => void>()
 export interface SocketHandlerOptions {
   store: GameStore;
   mapIndex?: MapIndex;
+  getMapIndex?: () => MapIndex | undefined;
   controller?: GameController;
   onEvent?: (event: string) => void;
   onNotification?: (payload: { id: string; type: 'info' | 'success' | 'warning' | 'error'; title: string; content: string; durationMs?: number; createdAt?: number }) => void;
   onPathChoiceOptions?: (options: Array<{ cellId: number; label: string }>) => void;
   onPathChoiceCleared?: () => void;
+  movementEffects?: MovementEffectHooks;
 }
 
 const SOCKET_EVENTS = [
@@ -35,7 +38,7 @@ const SOCKET_EVENTS = [
   'server.playerJoined', 'server.playerLeft', 'server.playerMoved', 'server.askPath',
   'server.valueChanged', 'server.error', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
   'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft',
-  'server.teamUpdated', 'server.teamDisbanded', 'server.prosperityChanged', 'server.gameState',
+  'server.teamUpdated', 'server.teamDisbanded', 'server.regionValueChanged', 'server.gameState',
   'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.achievementUnlocked', 'server.playerBankrupt', 'server.playerRestarted',
   'server.propertyBought', 'server.propertyUpgraded', 'server.investmentBought',
 ] as const;
@@ -97,7 +100,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   socket.on('server.achievementUnlocked', (payload) => {
     const current = store.getSnapshot().achievements.snapshot;
     store.setAchievements(current ? { ...current, generatedAt: Date.now(), achievements: current.achievements.map((item) => item.id === payload.achievement.id ? payload.achievement : item) } : { enabled: true, mapId: payload.achievement.record.mapId ?? '', generatedAt: Date.now(), achievements: [payload.achievement] });
-    options.onNotification?.({ id: `achievement-${payload.achievement.id}`, type: 'success', title: '成就解锁', content: localizedText(payload.achievement.name), durationMs: 3000 });
+    options.onNotification?.({ id: `achievement-${payload.achievement.id}`, type: 'success', title: t('hud.achievements'), content: localizedText(payload.achievement.name), durationMs: 3000 });
     requestHudRefresh();
   });
 
@@ -130,6 +133,8 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   socket.on('server.gameState', (payload) => {
+    const currentSnapshot = store.getSnapshot();
+    if (currentSnapshot.isServerAnimating && payload.player?.id === currentSnapshot.currentPlayer?.id) return;
     const teamMembers = payload.members ?? [];
     if (payload.leaderboard) store.setLeaderboard(payload.leaderboard);
     if (payload.achievements) store.setAchievements(payload.achievements);
@@ -229,9 +234,17 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     const activePlayer = store.getSnapshot().currentPlayer;
     if (activePlayer && payload.playerId === activePlayer.id) {
       const snapshot = store.getSnapshot();
-      if (options.mapIndex && payload.path && payload.path.length > 1 && !snapshot.isServerAnimating) {
-        startServerPathAnimation(store, options.mapIndex, payload.path, () => requestHudRefresh(), undefined, payload.cellId);
+      const activeMapIndex = options.getMapIndex?.() ?? options.mapIndex;
+      console.warn('[DBG-PLAYERMOVED]', JSON.stringify(payload), 'isServerAnimating=', snapshot.isServerAnimating, 'hasMap=', !!activeMapIndex, 'curPos=', snapshot.currentPlayerPosition);
+      // 动画进行中：moveHandler 的 updatePlayer 会额外广播一个不含 path 的
+      // server.playerMoved 位置同步（可能先/后到达）。此时必须忽略，避免把
+      // 动画权威位置直接当成跳转整格覆盖，导致棋子停留在原地而视野已被拉走。
+      if (snapshot.isServerAnimating) return;
+      if (activeMapIndex && payload.path && payload.path.length > 1) {
+        const started = startServerPathAnimation(store, activeMapIndex, payload.path, () => requestHudRefresh(), options.movementEffects, payload.cellId);
+        console.warn('[DBG-START-ANIM] started=', started);
       } else {
+        console.warn('[DBG-JUMP-MOVE] no path, direct jump');
         store.applyEvent({ sequence: store.nextSequence(), type: 'move', playerId: payload.playerId, cellId: payload.cellId });
         requestHudRefresh();
       }
@@ -261,6 +274,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   socket.on('server.playerJailed', (payload: { playerId: string; durationMs: number; expiresAt?: number }) => {
     const snapshot = store.getSnapshot();
     if (snapshot.currentPlayer?.id === payload.playerId) store.applyEvent({ sequence: store.nextSequence(), type: 'jail', isInJail: true, jailEndTime: payload.expiresAt ?? Date.now() + payload.durationMs });
+    addChatMessage(t('jail.enteredDetailed', { playerId: payload.playerId, duration: payload.durationMs }), 'system');
     // 服务端权威：监狱状态由服务端驱动
     const isCurrentPlayer = snapshot.currentPlayer?.id === payload.playerId;
     if (isCurrentPlayer) {
@@ -374,10 +388,10 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     requestHudRefresh();
   });
 
-  // 监听服务端繁荣度变化
-  socket.on('server.prosperityChanged', (payload: { regionId?: string; monumentId?: number; prosperity: number; delta: number; reason?: string; timestamp?: number }) => {
-    if (payload.regionId) {
-      store.setProsperity(payload.regionId, payload.prosperity);
+  // 监听服务端区域 UCT 数值变化（昼夜切换、纪念碑修缮等统一广播）
+  socket.on('server.regionValueChanged', (payload: { regionId?: string; fieldId?: string; value?: number; delta: number; reason?: string; timestamp?: number }) => {
+    if (payload.regionId && payload.fieldId && typeof payload.value === 'number') {
+      store.setRegionValue(payload.regionId, payload.fieldId, payload.value);
     }
   });
 }

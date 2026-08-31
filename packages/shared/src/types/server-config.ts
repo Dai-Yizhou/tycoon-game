@@ -29,6 +29,8 @@ export interface ServerConfig {
   mapPath: string;
   /** 地图元数据文件路径（默认 './map-meta.json'） */
   mapMetaPath: string;
+  /** 成就配置文件路径（默认 './achievements.json'，与地图配置同级，不属于运行时临时数据） */
+  achievementConfigPath: string;
   /** MongoDB 连接字符串（可选，开发模式可不用） */
   mongoUri: string | null;
   /** Redis 连接字符串（可选，用于多实例水平扩展） */
@@ -64,6 +66,7 @@ export const DEFAULT_SERVER_CONFIG: ServerConfig = {
   jailCooldownMs: 10_000,
   mapPath: './map.json',
   mapMetaPath: './map-meta.json',
+  achievementConfigPath: './achievements.json',
   mongoUri: null,
   redisUrl: null,
   maxPlayers: 1000,

@@ -25,9 +25,6 @@ export async function loadMapData(): Promise<{
       id: String(region['id'] || ''),
       name: typeof region['name'] === 'object' ? String((region['name'] as Record<string, unknown>)['zh-CN'] || '') : '',
       cellIds: [],
-      prosperity: typeof region['initial'] === 'object' && region['initial'] !== null
-        ? Number(((region['initial'] as Record<string, unknown>)['region'] as Record<string, unknown> | undefined)?.['pros'] ?? 0)
-        : 0,
       initialValues: typeof region['initial'] === 'object' && region['initial'] !== null
         ? Object.fromEntries(Object.entries(((region['initial'] as Record<string, unknown>)['region'] as Record<string, unknown> | undefined) ?? {}).map(([id, value]) => [id, Number(value)]))
         : {},

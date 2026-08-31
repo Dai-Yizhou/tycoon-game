@@ -355,14 +355,14 @@ export interface ServerToClientEvents {
     cycleMinutes: number;
   }) => void;
 
-  /** 繁荣度变化 */
-  'server.prosperityChanged': (payload: {
+  /** 区域 UCT 数值变化 */
+  'server.regionValueChanged': (payload: {
     /** 区域 ID */
     regionId?: string;
-    /** 纪念碑 ID */
-    monumentId?: number;
-    /** 当前繁荣度 */
-    prosperity: number;
+    /** 数值字段 ID */
+    fieldId?: string;
+    /** 当前字段值 */
+    value?: number;
     /** 变化量 */
     delta: number;
     /** 变化原因 */

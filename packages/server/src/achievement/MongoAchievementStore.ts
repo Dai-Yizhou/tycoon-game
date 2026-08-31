@@ -18,14 +18,18 @@ export class MongoAchievementStore implements AchievementStore {
     this.collection = this.client.db(dbName).collection<AchievementDocument>(collectionName);
   }
 
-  async load(owner: AchievementOwner): Promise<AchievementRecord[]> {
+  async connect(): Promise<void> {
     await this.client.connect();
+  }
+
+  async load(owner: AchievementOwner): Promise<AchievementRecord[]> {
+    await this.connect();
     const document = await this.collection.findOne({ _id: key(owner) });
     return clone(document?.records ?? []);
   }
 
   async save(owner: AchievementOwner, records: AchievementRecord[]): Promise<void> {
-    await this.client.connect();
+    await this.connect();
     await this.collection.replaceOne({ _id: key(owner) }, { _id: key(owner), ownerType: owner.guest ? 'guest' : 'account', ownerId: owner.accountId, records: clone(records) }, { upsert: true });
   }
 

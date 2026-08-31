@@ -22,6 +22,10 @@
     { "id": "west", "name": { "zh-CN": "西部区域", "en-US": "West" }, "initial": { "region": { "pros": 70 } } }
   ],
   "dayNightCycle": 24,
+  "dayNight": {
+    "day": { "region": { "pros": 20 } },
+    "night": { "region": { "pros": -20 } }
+  },
   "dice": { "cooldownMs": 3000, "min": 1, "max": 3 },
   "ranking": { "enabled": true, "topN": 5, "refreshMs": 1000, "score": { "constant": 0, "player": { "money": 1, "credit": 0.5 }, "region": { "pros": 0 } } },
   "tax": {

@@ -4,13 +4,13 @@
 
 ## 一页概览
 
-`@game/shared` 是无 game 包依赖的契约与数据工具层；`@game/server` 通过 Express、Socket.IO 和 `GameWorld` 持有服务端权威；`@game/client` 通过 Vite 提供原生 TypeScript/DOM/CSS 客户端，消费服务端事件并投影到 `GameStore`、`GameViewModel`、HUD 和 Canvas。客户端与服务端各使用一条 Socket.IO 连接。
+`@game/shared` 是无 game 包依赖的契约与数据工具层；`@game/server` 通过 Express、Socket.IO 和 `GameWorld` 持有服务端权威；`@game/client` 通过 Vite 提供原生 TypeScript/DOM/CSS 客户端，消费服务端事件并投影到 `GameStore`、`GameViewModel`、HUD 和 `InteractiveMapSurface` 的 SVG 地图层。客户端与服务端各使用一条 Socket.IO 连接。
 
 ```mermaid
 graph LR
   Shared[@game/shared\n类型 / 地图解析 / i18n / debug]
   Server[@game/server\nExpress / Socket.IO / GameWorld / handlers]
-  Client[@game/client\n页面 / Store / ViewModel / Canvas]
+  Client[@game/client\n页面 / Store / ViewModel / SVG 地图层]
   Files[map.json / map-meta.json / behaviors]
   Client --> Shared
   Server --> Shared
@@ -55,7 +55,7 @@ packages/client/src/main.ts: bootstrap()
   -> GamePage 复用连接
   -> registerSocketHandlers()
   -> GameStore / GameViewModel
-  -> GameHudShell + ClientRenderLoop + BoardRenderer
+  -> GameHudShell + InteractiveMapSurface
 ```
 
 ## Socket 注册链
@@ -108,10 +108,10 @@ server.*
   -> SocketEventHandler
   -> GameStore setters / team/chat/movement systems
   -> ClientHudBridge -> GameViewModel.sync -> GameHudShell
-  -> ClientRenderLoop -> BoardRenderer -> Cell/Connection/Player/DayNight/Vision
+  -> GamePage 订阅 GameStore -> InteractiveMapSurface（SVG transform/viewBox）
 ```
 
-Canvas 的每帧循环只读取投影后的状态，更新移动动画、相机和棋子，再调用 `BoardRenderer.render()`。地图由 `MapLoader` 请求 `/api/map`，经 shared 的解析工具标准化为 `MapIndex` 后交给渲染器。
+地图的可见渲染层是 `InteractiveMapSurface` 生成的 SVG，不再是隐藏的 Canvas。移动动画由 `GamePage` 用 `requestAnimationFrame` 循环驱动 `MovementSystem`：`MovementSystem` 对 `playerDisplayX/Y` 做单步插值写入 Store，`GamePage` 每帧把新插值坐标交给 `InteractiveMapSurface` 直接更新棋子节点 transform；动画期间保持移动锁，避免重建 SVG 或干扰棋子节点，仅在动画结束后按最新权威位置校准。动画期间视野通过 `followDisplayPosition` 跟随插值坐标更新 SVG viewBox，避免“地图瞬移”。地图由 `MapLoader` 请求 `/api/map`，经 shared 的解析工具标准化为 `MapIndex` 后交给渲染层。
 
 ## 经济状态决策
 

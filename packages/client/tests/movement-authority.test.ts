@@ -44,6 +44,31 @@ describe('MovementSystem authority', () => {
     expect(hooks.onMoveComplete).toHaveBeenCalledWith(2);
   });
 
+  it('服务端路径动画触发移动视效钩子', () => {
+    const store = new GameStore();
+    const mapIndex = { getById: (id: number) => ({ id, x: id * 10, y: id * 10, destinations: [2] }) } as never;
+    const hooks = { onStepStart: jest.fn(), onStepArrive: jest.fn(), onMoveComplete: jest.fn() } as never;
+    store.applySnapshot({ sequence: store.nextSequence(), currentPlayer: { id: 'p1', username: '玩家', position: { cellId: 2 }, values: {}, status: 'normal', createdAt: 1, lastActiveAt: 1 } as never, currentPlayerPosition: 1 });
+
+    startServerPathAnimation(store, mapIndex, [1, 2], jest.fn(), hooks, 2);
+
+    expect(hooks.onStepStart).toHaveBeenCalledWith(1, 2);
+  });
+
+  it('reduced-motion 下直接完成当前权威步进', () => {
+    const store = new GameStore();
+    const mapIndex = { getById: (id: number) => ({ id, x: id * 10, y: id * 10, destinations: [] }) } as never;
+    store.applySnapshot({ sequence: store.nextSequence(), isMoving: true, isServerAnimating: true, currentPlayerPosition: 2, moveFromX: 0, moveFromY: 0, moveToX: 20, moveToY: 20, moveStartTime: performance.now(), serverPath: [1, 2], serverPathIndex: 1 });
+    const media = window.matchMedia;
+    window.matchMedia = (() => ({ matches: true, media: 'prefers-reduced-motion', onchange: null, addListener: jest.fn(), removeListener: jest.fn(), addEventListener: jest.fn(), removeEventListener: jest.fn(), dispatchEvent: jest.fn() })) as typeof window.matchMedia;
+
+    updateMovement(store, mapIndex, jest.fn());
+
+    expect(store.getSnapshot().playerDisplayX).toBe(20);
+    expect(store.getSnapshot().isMoving).toBe(false);
+    window.matchMedia = media;
+  });
+
   it('ignores a server path whose endpoint does not match the authoritative cell', () => {
     const store = new GameStore();
     const mapIndex = { getById: (id: number) => ({ id, x: id * 10, y: id * 10, destinations: id === 1 ? [2] : [] }) } as never;

@@ -49,6 +49,7 @@ import {
 import { registerSocketHandlers, unregisterSocketHandlers } from '../game/systems/SocketEventHandler.js';
 import { DesignAdapter } from '../design/DesignAdapter.js';
 import { getRegionThemeId, getThemeId, getThemeTokens } from '../design/ThemeConfig.js';
+import { localizedText } from '../game/i18n.js';
 
 let gameViewModel: GameViewModel | null = null;
 let gameStore: GameStore | null = null;
@@ -57,6 +58,7 @@ let unregisterHudRefresh: (() => void) | null = null;
 let unsubscribeGameStore: (() => void) | null = null;
 let mapIndex: MapIndex | null = null;
 let gameSocket: TypedClientSocket | null = null;
+let gameEffects: EffectController | null = null;
 let movementFrame: number | null = null;
 const pageEventCleanups = new WeakMap<HTMLElement, () => void>();
 
@@ -94,6 +96,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   setChatStore(gameStore);
   gameViewModel = new GameViewModel(gameStore, context.playerName || t('game.defaultPlayerName'));
   const effects = new EffectController(new CssTransitionEffectHooks(page));
+  gameEffects = effects;
   const movementEffects: MovementEffectHooks = effects;
 
   // Board
@@ -103,29 +106,48 @@ export function createGamePage(controller: GameController): HTMLElement {
   boardContainer.appendChild(interactiveMap.getElement());
   unsubscribeGameStore = gameStore.subscribe((snapshot) => {
     const players = toInteractivePlayers(snapshot);
+    interactiveMap.setMovementLocked(snapshot.isMoving);
     interactiveMap.updatePlayers(players);
-    interactiveMap.followPlayer(snapshot.currentPlayerPosition);
+    if (!snapshot.isMoving) interactiveMap.followPlayer(snapshot.currentPlayerPosition);
     syncCellActions(snapshot.currentPlayerPosition);
     if (mapIndex) applyRegionTheme(page, snapshot.currentPlayerPosition);
     const displayPlayer = snapshot.currentPlayer;
     if (displayPlayer && snapshot.isMoving) {
       interactiveMap.setPlayerDisplayPosition(displayPlayer.id, snapshot.playerDisplayX, snapshot.playerDisplayY);
-      interactiveMap.followPlayer(snapshot.currentPlayerPosition);
+      interactiveMap.followDisplayPosition(snapshot.playerDisplayX, snapshot.playerDisplayY);
     }
     if (snapshot.isMoving && movementFrame === null) {
+      // RAF 循环必须由本回调启动一次，并仅在无循环运行时（movementFrame === null）才再次启动。
+      // 严禁在 tick 开头将 movementFrame 置空：tick 内 updateMovement 通过
+      // applySnapshot 同步触发本订阅回调，若此时 movementFrame 已为 null，会重复
+      // requestAnimationFrame 排入并发循环，导致同一帧内路径步进与棋子位置被多个
+      // 回调交错覆盖——视野瞬移、棋子停在原地/错位。
       const tick = (): void => {
-        movementFrame = null;
         const current = gameStore?.getSnapshot();
-        if (!current?.isMoving) return;
+        if (!current?.isMoving) {
+          movementFrame = null;
+          return;
+        }
         if (mapIndex) {
           updateMovement(gameStore!, mapIndex, () => {
             invokeGameAction(onPlayerArrived);
           }, movementEffects);
         }
         const next = gameStore?.getSnapshot();
-        if (next?.currentPlayer) interactiveMap.setPlayerDisplayPosition(next.currentPlayer.id, next.playerDisplayX, next.playerDisplayY);
+        if (next?.currentPlayer) {
+          interactiveMap.setPlayerDisplayPosition(next.currentPlayer.id, next.playerDisplayX, next.playerDisplayY);
+          if (next.isMoving) interactiveMap.followDisplayPosition(next.playerDisplayX, next.playerDisplayY);
+        }
         if (next?.isMoving) {
           movementFrame = window.requestAnimationFrame(tick);
+        } else if (next?.currentPlayer) {
+          movementFrame = null;
+          const finalCell = mapIndex?.getById(next.currentPlayerPosition);
+          if (finalCell) {
+            interactiveMap.setPlayerDisplayPosition(next.currentPlayer.id, finalCell.x, finalCell.y);
+          }
+        } else {
+          movementFrame = null;
         }
       };
       movementFrame = window.requestAnimationFrame(tick);
@@ -201,7 +223,6 @@ export function createGamePage(controller: GameController): HTMLElement {
       const { mapData, regions, timezones } = mapResult;
       // 初始化区域繁荣度快照
       gameStore?.setRegions(regions, mapResult.valueFields, timezones);
-      for (const r of regions) gameStore?.setProsperity(r.id, r.prosperity);
       mapIndex = new MapIndex(mapData);
       gameStore?.setCells(mapData);
       const snapshot = gameStore!.getSnapshot();
@@ -245,15 +266,20 @@ export function createGamePage(controller: GameController): HTMLElement {
   }
 
   // 监听服务端昼夜事件，同步时间
-  const socket = gameSocket;
+  const socket = gameSocket ?? controller.getSocket();
   if (socket) {
     registerSocketHandlers(socket, {
       controller,
       store: gameStore!,
       mapIndex: mapIndex ?? undefined,
+      getMapIndex: () => mapIndex ?? undefined,
       onPathChoiceOptions: (options) => gameStore?.setPathChoice(options),
       onPathChoiceCleared: () => gameStore?.clearPathChoice(),
-      onEvent: () => gameHudShell?.update(),
+      movementEffects,
+      onEvent: () => {
+        gameHudShell?.update();
+        syncCellActions(gameStore?.getSnapshot().currentPlayerPosition ?? 0);
+      },
     });
   }
 
@@ -495,10 +521,11 @@ function syncCellActions(cellId: number): void {
   if (!unchanged) gameStore.setCellActions(actions);
 }
 
-function formatClientUct(uct: import('@game/shared').Uct | undefined, definitions: Array<{ id: string; name: string }>): string {
+function formatClientUct(uct: import('@game/shared').Uct | undefined, definitions: Array<{ id: string; name: unknown }>): string {
   if (!uct) return '';
   return Object.entries(uct.player ?? {}).concat(Object.entries(uct.region ?? {})).map(([fieldId, value]) => {
-    const name = definitions.find((definition) => definition.id === fieldId)?.name ?? fieldId;
+    const definition = definitions.find((field) => field.id === fieldId);
+    const name = definition ? localizedText(definition.name, fieldId) : fieldId;
     return `${name} ${value >= 0 ? '+' : ''}${value}`;
   }).join(', ');
 }
@@ -526,6 +553,8 @@ export function cleanupGamePage(page: HTMLElement): void {
   unregisterHudRefresh = null;
   gameHudShell?.destroy();
   gameHudShell = null;
+  gameEffects?.destroy();
+  gameEffects = null;
   gameViewModel?.destroy();
   gameViewModel = null;
   unsubscribeGameStore?.();

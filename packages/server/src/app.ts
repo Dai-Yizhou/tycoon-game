@@ -28,7 +28,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { parseMapData, parseMapMeta } from '@game/shared';
 import { DayNightCycle, DEFAULT_DAY_NIGHT_CONFIG } from './world/DayNightCycle.js';
 import { TimeZoneManager } from './world/TimeZoneManager.js';
-import { ProsperityManager, DEFAULT_PROSPERITY_CONFIG } from './world/ProsperityManager.js';
+import { DayNightValueChange } from './world/DayNightValueChange.js';
 import { BehaviorEngine } from './behavior/index.js';
 import { MongoUserStore, FileWorldStore, MongoWorldStore, type WorldStore } from './storage/index.js';
 import { JWTService } from './auth/JWTService.js';
@@ -115,8 +115,8 @@ export interface CreatedApp {
   dayNightCycle?: DayNightCycle;
   /** 时区管理器实例 */
   timeZoneManager?: TimeZoneManager;
-  /** 繁荣度管理器实例 */
-  prosperityManager?: ProsperityManager;
+  /** 昼夜 UCT 数值变化服务实例 */
+  dayNightValueChange?: DayNightValueChange;
   /** 行为执行引擎实例 */
   behaviorEngine?: BehaviorEngine;
   /** 用户存储实例 */
@@ -197,7 +197,7 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
     const mapMeta = parseMapMeta(rawMeta);
     const result = world.loadMap(mapData, mapMeta);
     if (result.valid) {
-      logger.info(`地图加载成功：${mapMeta.id} (${mapMeta.name})，${mapData.length} 个格子`);
+      logger.info('地图加载成功', { mapId: mapMeta.id, mapName: mapMeta.name, cellCount: mapData.length });
     } else {
       logger.warn(`地图加载有校验错误：${result.errors.join('; ')}`);
     }
@@ -321,7 +321,10 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   const achievementStore = deps.achievementStore ?? (config.mongoUri
     ? new MongoAchievementStore(config.mongoUri)
     : new FileAchievementStore(resolveConfiguredPath(config.userDataPath + '.achievements')));
-  const achievementDefinitions = loadAchievementDefinitions(resolveConfiguredPath('data/achievements.json'));
+  if (achievementStore instanceof MongoAchievementStore) {
+    await achievementStore.connect();
+  }
+  const achievementDefinitions = loadAchievementDefinitions(resolveConfiguredPath(config.achievementConfigPath));
   const achievementManager = new AchievementManager(
     achievementDefinitions,
     achievementStore,
@@ -389,19 +392,23 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   const timeZoneManager = new TimeZoneManager(world, dayNightCycle);
   logger.info(`TimeZoneManager initialized (${timeZoneManager.getTimezoneCount()} timezones)`);
 
-  // 初始化繁荣度管理器（依赖 TimeZoneManager 和 DayNightCycle，FR-7/FR-12/FR-14）
-  const prosperityManager = new ProsperityManager(
-    io,
-    world,
-    timeZoneManager,
-    dayNightCycle,
-    DEFAULT_PROSPERITY_CONFIG,
-  );
-  prosperityManager.startUpdateTimer();
-  logger.info(`ProsperityManager initialized (${prosperityManager.getRegionCount()} regions)`);
+  // 初始化昼夜驱动的区域 UCT 数值变化服务（进入白天/夜晚时对配置的区域字段施加增量）
+  const dayNightValueChange = new DayNightValueChange(world, dayNightCycle);
+  if (world.getMapMeta()?.dayNight) {
+    logger.info('DayNightValueChange initialized (region UCT changes on day/night)');
+  }
 
-  // 将 ProsperityManager 注入 MonumentHandler（修缮纪念碑时增加区域繁荣度）
-  handlerRegistry.setProsperityManager(prosperityManager);
+  // 统一广播区域 UCT 数值变化（无论来自昼夜切换或纪念碑修缮，均由 GameWorld 单一权威点触发）
+  world.on('regionValueChanged', (payload: { regionId: string; fieldId: string; value: number; delta: number }) => {
+    io.emit('server.regionValueChanged', {
+      regionId: payload.regionId,
+      fieldId: payload.fieldId,
+      value: payload.value,
+      delta: payload.delta,
+      reason: 'region_value_change',
+      timestamp: Date.now(),
+    });
+  });
 
   // 将 TimeZoneManager 注入 MovementHandler（移动时检测时区变化）
   handlerRegistry.setTimeZoneManager(timeZoneManager);
@@ -427,7 +434,7 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
     economy: { taxation, bankruptcy },
     dayNightCycle,
     timeZoneManager,
-    prosperityManager,
+    dayNightValueChange,
     behaviorEngine,
     worldStore,
     handlerRegistry,
@@ -472,14 +479,14 @@ export function startHttpServer(
  * - 关闭 HTTP server（不再接受新连接）
  * - 关闭 Socket.IO（断开所有客户端）
  * - 清理经济系统定时器
- * - 停止繁荣度更新定时器
+ * - 停止昼夜 UCT 数值变化服务
  * - 兜底超时（默认 5s）
  *
  * @param httpServer HTTP server
  * @param socketManager Socket 管理器（可选）
  * @param economy 经济系统实例（可选）
  * @param dayNightCycle 昼夜循环实例（可选）
- * @param prosperityManager 繁荣度管理器实例（可选）
+ * @param dayNightValueChange 昼夜 UCT 数值变化服务实例（可选）
  * @param eraManager 时代管理器实例（可选）
  * @param timeoutMs 兜底超时（毫秒）
  */
@@ -488,7 +495,7 @@ export async function gracefulShutdown(
   socketManager?: SocketManager,
   economy?: { taxation: Taxation; bankruptcy: Bankruptcy },
   dayNightCycle?: DayNightCycle,
-  prosperityManager?: ProsperityManager,
+  dayNightValueChange?: DayNightValueChange,
   timeoutMs: number = 5000,
   world?: GameWorld,
   handlerRegistry?: HandlerRegistry,
@@ -517,13 +524,13 @@ export async function gracefulShutdown(
     }
   }
 
-  // 停止繁荣度更新定时器
-  if (prosperityManager) {
+  // 停止昼夜 UCT 数值变化服务
+  if (dayNightValueChange) {
     try {
-      prosperityManager.stopUpdateTimer();
-      logger.info('ProsperityManager stopped');
+      dayNightValueChange.stop();
+      logger.info('DayNightValueChange stopped');
     } catch (err) {
-      logger.error('error stopping prosperityManager', err);
+      logger.error('error stopping dayNightValueChange', err);
     }
   }
 

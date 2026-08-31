@@ -79,7 +79,6 @@ export interface DayNightSlice {
   cycleDuration: number;
   cycleStartTime: number;
   serverTimeOffset: number;
-  prosperity: number;
 }
 
 /** 区域信息 */
@@ -87,8 +86,6 @@ export interface RegionInfo {
   id: string;
   name: string;
   cellIds: number[];
-  prosperity: number;
-  environmentValue?: number;
 }
 
 /** 动态数值字段定义 */
@@ -104,7 +101,6 @@ export interface ValueFieldDef {
 export interface RegionSlice {
   mapRegions: RegionInfo[];
   valueFieldDefs: ValueFieldDef[];
-  regionProsperityMap: Map<string, number>;
   regionValues: Map<string, Record<string, number>>;
 }
 
@@ -182,10 +178,6 @@ export interface TutorialSlice {
 }
 
 // ===== 常量 =====
-
-export const MOVE_STEP_DURATION = 280;
-export const CAMERA_FOLLOW_SPEED = 0.15;
-export const DICE_ANIM_DURATION = 700;
 
 export const RARITY_COLORS: Record<string, string> = {
   common: '#9ca3af', uncommon: '#22c55e', rare: '#3b82f6',
@@ -317,13 +309,13 @@ export class GameViewModel {
   // ===== Day/Night =====
   getDayNight(): DayNightSlice {
     const snapshot = this.projectedSnapshot();
-    return { cycleDuration: 15 * 60 * 1000, cycleStartTime: snapshot.dayNightStartTime, serverTimeOffset: snapshot.serverTimeOffset, prosperity: snapshot.prosperity };
+    return { cycleDuration: 15 * 60 * 1000, cycleStartTime: snapshot.dayNightStartTime, serverTimeOffset: snapshot.serverTimeOffset };
   }
 
   // ===== Regions =====
   getRegions(): RegionSlice {
     const snapshot = this.projectedSnapshot();
-    return { mapRegions: snapshot.mapRegions, valueFieldDefs: snapshot.valueFieldDefs, regionProsperityMap: snapshot.regionProsperityMap, regionValues: snapshot.regionValues };
+    return { mapRegions: snapshot.mapRegions, valueFieldDefs: snapshot.valueFieldDefs, regionValues: snapshot.regionValues };
   }
 
   getLeaderboard(): LeaderboardSlice {
@@ -390,7 +382,7 @@ export class GameViewModel {
     const dayNight = this.getDayNight();
     const serverNow = Date.now() + dayNight.serverTimeOffset;
     const serverElapsed = serverNow - dayNight.cycleStartTime;
-    const localProgress = ((serverElapsed / dayNight.cycleDuration) + offsetMinutes / (24 * 60)) % 1;
+    const localProgress = (((serverElapsed / dayNight.cycleDuration) + offsetMinutes / (24 * 60)) % 1 + 1) % 1;
     const totalMinutes = Math.floor(localProgress * 24 * 60);
     const hour = Math.floor(totalMinutes / 60);
     const minute = totalMinutes % 60;

@@ -2,7 +2,15 @@ import type { GameEffectHooks } from './GameEffects.js';
 
 export class EffectController implements GameEffectHooks {
   private enabled = true;
+  private destroyed = false;
   private readonly hooks: Partial<GameEffectHooks>;
+
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    const destroyable = this.hooks as Partial<GameEffectHooks> & { destroy?: () => void };
+    destroyable.destroy?.();
+  }
 
   constructor(hooks: Partial<GameEffectHooks> = {}) {
     this.hooks = hooks;
@@ -43,8 +51,11 @@ export class EffectController implements GameEffectHooks {
   onNotifyDismiss(message: string): void { this.invoke('onNotifyDismiss', message); }
 
   private invoke<K extends keyof GameEffectHooks>(name: K, ...args: Parameters<GameEffectHooks[K]>): void {
-    if (!this.enabled) return;
+    if (this.destroyed || !this.enabled) return;
     const hook = this.hooks[name] as ((...values: Parameters<GameEffectHooks[K]>) => void) | undefined;
-    hook?.(...args);
+    if (typeof hook !== 'function') return;
+    // 必须把 hook 的接收者绑定到其所在对象（如 CssTransitionEffectHooks 实例），
+    // 否则裸调用 hook(...) 会丢失 this，导致 this.root 访问 undefined 而抛错。
+    hook.apply(this.hooks, args);
   }
 }

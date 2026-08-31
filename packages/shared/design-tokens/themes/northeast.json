@@ -202,6 +202,19 @@
       }
     }
   },
+  "motion": {
+    "fast": { "$value": "0.15s ease", "$type": "string" },
+    "normal": { "$value": "0.25s ease", "$type": "string" },
+    "step": { "$value": 280, "$type": "number" },
+    "stepArrive": { "$value": 220, "$type": "number" },
+    "moveComplete": { "$value": 320, "$type": "number" },
+    "diceSettled": { "$value": 400, "$type": "number" },
+    "propertyBought": { "$value": 600, "$type": "number" },
+    "bankrupt": { "$value": 1000, "$type": "number" },
+    "slideUpTitle": { "$value": "0.6s", "$type": "string" },
+    "slideUp": { "$value": "0.4s", "$type": "string" },
+    "spin": { "$value": "1s", "$type": "string" }
+  },
   "dimension": {
     "piece": {
       "width": {

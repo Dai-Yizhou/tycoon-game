@@ -32,7 +32,7 @@ export function handleRollDice(runtime: GameRuntime): void {
       setRuntimeSnapshot(runtime, { canRoll: true });
       return;
     }
-    setRuntimeSnapshot(runtime, { diceValue: result.data.dice, diceAnimating: true, diceAnimStart: performance.now(), rollCooldownEnd: result.data.cooldownEndsAt, rollCooldownMs: result.data.cooldownMs });
+    setRuntimeSnapshot(runtime, { diceValue: result.data.dice, diceAnimating: true, diceAnimStart: performance.now(), rollCooldownEnd: Math.max(Date.now(), result.data.cooldownEndsAt), rollCooldownMs: result.data.cooldownMs });
     addChatMessage(t('dice.rolled', { value: result.data.dice }), 'system');
     startRollCooldownTimer(runtime);
   });
@@ -57,7 +57,7 @@ export function startRollCooldownTimer(runtime: GameRuntime): void {
     }
     if (runtime.rollButton) {
       const cooldownDuration = Math.max(snapshot.rollCooldownMs, 1);
-      const progress = Math.min(1, Math.max(0, 1 - remaining / cooldownDuration));
+      const progress = Math.min(1, Math.max(0, 1 - Math.max(remaining, 0) / cooldownDuration));
       runtime.rollButton.textContent = t('dice.cooldownBar');
       runtime.rollButton.classList.add('cooldown');
       runtime.rollButton.style.background = `linear-gradient(to right, var(--accent, #4f46e5) ${progress * 100}%, rgba(255,255,255,0.15) ${progress * 100}%)`;

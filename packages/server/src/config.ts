@@ -102,6 +102,7 @@ export function loadConfig(): ServerConfig {
     jailCooldownMs: parsePositiveInt(process.env.JAIL_COOLDOWN_MS, DEFAULT_SERVER_CONFIG.jailCooldownMs),
     mapPath: parseString(process.env.MAP_PATH, DEFAULT_SERVER_CONFIG.mapPath),
     mapMetaPath: parseString(process.env.MAP_META_PATH, DEFAULT_SERVER_CONFIG.mapMetaPath),
+    achievementConfigPath: parseString(process.env.ACHIEVEMENT_CONFIG_PATH, DEFAULT_SERVER_CONFIG.achievementConfigPath),
     mongoUri: parseOptionalString(process.env.MONGO_URI),
     redisUrl: parseOptionalString(process.env.REDIS_URL),
     maxPlayers: parsePositiveInt(process.env.MAX_PLAYERS, DEFAULT_SERVER_CONFIG.maxPlayers),

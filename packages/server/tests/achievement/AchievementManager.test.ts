@@ -33,6 +33,29 @@ test('六类触发均通过服务端入口推进且只解锁一次', async () =>
   expect((await manager.getSnapshot(owner, 'map-a')).achievements.every((item) => item.record.unlocked)).toBe(true);
 });
 
+test('持久化失败时丢弃 owner 缓存且不发送解锁通知', async () => {
+  const stored: Awaited<ReturnType<InMemoryAchievementStore['load']>> = [];
+  let failSave = true;
+  const store = {
+    load: jest.fn(async () => stored.map((record) => ({ ...record, progress: { ...record.progress }, seenKeys: [...record.seenKeys] }))),
+    save: jest.fn(async (_owner: { accountId: string; guest: boolean }, records: typeof stored) => {
+      if (failSave) throw new Error('save failed');
+      stored.splice(0, stored.length, ...records.map((record) => ({ ...record, progress: { ...record.progress }, seenKeys: [...record.seenKeys] })));
+    }),
+  };
+  const unlocked: string[] = [];
+  const manager = new AchievementManager([defs[0]!], store, (payload) => unlocked.push(payload.achievement.id));
+  const owner = { accountId: 'p-save', guest: false };
+  await manager.initialize(owner, 'map-a');
+
+  await expect(manager.recordCellVisit(owner, 'map-a', 1)).rejects.toThrow('save failed');
+  failSave = false;
+  await manager.recordCellVisit(owner, 'map-a', 2);
+
+  expect(unlocked).toEqual([]);
+  expect((await manager.getSnapshot(owner, 'map-a')).achievements[0]?.record.progress.current).toBe(1);
+});
+
 test('同一 owner 的并发事件不丢失去重进度或重复通知', async () => {
   const unlocked: string[] = [];
   const manager = new AchievementManager([defs[0]!], new InMemoryAchievementStore(), (payload) => unlocked.push(payload.achievement.id));

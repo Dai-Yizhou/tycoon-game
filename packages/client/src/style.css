@@ -54,18 +54,44 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   animation: fadeIn var(--motion-normal) ease-out;
 }
 .game-page { display: block; padding: 0; }
-.effects-toggle {
+.hud-panel-actions {
   position: absolute;
   right: 16px;
   bottom: 16px;
-  z-index: 5;
-  padding: 5px 9px;
+  z-index: 35;
+  display: flex;
+  gap: 6px;
+}
+.panel-button,
+.settings-panel button {
+  padding: 6px 10px;
   border: 1px solid var(--gp-border, var(--region-rule));
   background: var(--gp-surface, var(--region-board-bg));
   color: var(--gp-fg, var(--region-fg));
   font-size: 11px;
 }
-.effects-toggle[aria-pressed="false"] { opacity: 0.7; }
+.panel-button:hover,
+.settings-panel button:hover { background: var(--gp-card); }
+.hud-panel {
+  position: absolute;
+  right: 16px;
+  bottom: 128px;
+  z-index: 34;
+  min-width: 190px;
+  padding: 10px;
+  border: var(--region-border-w) solid var(--gp-border);
+  border-radius: var(--region-radius);
+  background: var(--gp-card);
+  color: var(--gp-fg);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--gp-border) 28%, transparent);
+}
+.hud-panel h2 { margin: 0 0 8px; font-size: 12px; }
+.achievement-panel { max-height: min(52vh, 420px); overflow-y: auto; }
+.achievement-row { padding: 7px 0; border-bottom: 1px solid var(--gp-border); }
+.achievement-row:last-child { border-bottom: 0; }
+.achievement-row strong { display: block; }
+.achievement-row span { color: var(--gp-accent); font-family: var(--font-num); }
+.achievement-row p { margin-top: 3px; color: var(--gp-muted); font-size: 10px; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -216,7 +242,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   border: 3px solid var(--auth-border);
   border-top-color: var(--auth-accent);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin var(--motion-spin) linear infinite;
 }
 .progress-container {
   width: 100%; display: grid;
@@ -300,19 +326,33 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 /* 顶栏 / 底栏：半透明渐变贴在整屏地图上（全视野） */
 .gp-topbar {
   top: 0; left: 0; right: 0; height: 76px; z-index: 20;
-  display: flex; align-items: center; gap: 14px; padding: 0 18px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 14px 18px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--gp-bar-bg) 25%, transparent) 0%, transparent 100%);
 }
+.region-status {
+  display: flex; align-items: center; gap: 8px; text-align: right; max-width: 52%;
+  padding: 4px 8px; border: var(--region-border-w) solid var(--gp-border);
+  border-radius: var(--region-radius); background: var(--gp-card);
+}
+.region-status__name,
+.region-status__value { white-space: nowrap; }
+.region-status__name { font-weight: 800; font-size: 12px; color: var(--gp-fg); }
+.region-status__value { color: var(--gp-muted); font-family: var(--font-num); }
+.region-status .cycle-indicator { padding-left: 7px; border-left: 1px solid var(--gp-border); }
 .gp-actionbar {
-  bottom: 0; left: 0; right: 0; height: 112px; z-index: 20;
+  bottom: 0; left: 0; right: auto; width: min(640px, calc(100vw - 32px)); height: 112px; z-index: 20;
   display: flex; align-items: center; gap: 12px; padding: 0 18px;
   background: linear-gradient(0deg, color-mix(in srgb, var(--gp-bar-bg) 25%, transparent) 0%, transparent 100%);
 }
+.gp-topbar .player-badge { margin-right: auto; }
+.gp-topbar .region-status { margin-left: auto; }
+.gp-topbar .leaderboard-panel { display: none; }
 
 .player-badge { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .player-badge__avatar {
   width: 22px; height: 22px; border-radius: 50%;
   border: 2px solid var(--gp-fg); background: var(--gp-accent); flex-shrink: 0;
+  display: grid; place-items: center; color: var(--gp-paper); font-size: 10px; font-weight: 800;
 }
 .player-badge__name { font-weight: 800; font-size: 12px; color: var(--gp-fg); }
 .player-badge__team { font-size: 9px; color: var(--gp-muted); }
@@ -341,16 +381,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 
 /* 地图角落标签 */
 .map-overlay { position: absolute; z-index: 5; font-size: 9px; }
-.map-overlay--zone {
-  top: 88px; right: 18px;
-  color: var(--gp-fg);
-  border: var(--region-border-w) solid var(--gp-border);
-  background: var(--gp-card); padding: 2px 8px; border-radius: var(--region-radius);
-}
-.map-overlay--prosperity {
-  top: 112px; right: 18px;
-  color: var(--gp-muted); font-family: var(--font-num);
-}
+.map-overlay--zone,
+.map-overlay--prosperity { top: 88px; right: 18px; color: var(--gp-fg); }
 
 /* 事件提示 */
 .event-toast {

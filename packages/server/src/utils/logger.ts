@@ -162,7 +162,7 @@ export class Logger {
         ctx['error'] = error.message;
         if (error.stack) ctx['stack'] = error.stack;
       } else {
-        ctx['error'] = String(error);
+        ctx['error'] = formatLogValue(error);
       }
     }
     this.emit(LogLevel.Error, message, ctx);
@@ -219,4 +219,16 @@ export class Logger {
  *
  * 应用启动后调用 `setDebug(config.debug)` 同步配置。
  */
+function formatLogValue(value: unknown): string {
+  if (value === null) return 'null';
+  if (typeof value === 'string') return value;
+  if (value instanceof Error) return value.message;
+  try {
+    const serialized = JSON.stringify(value);
+    return serialized === undefined ? String(value) : serialized;
+  } catch {
+    return String(value);
+  }
+}
+
 export const logger = new Logger();

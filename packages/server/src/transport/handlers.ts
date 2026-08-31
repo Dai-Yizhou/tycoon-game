@@ -23,7 +23,6 @@ import { Bankruptcy, EconomyService, resolveOwnershipConfig, type OwnershipConfi
 import { DiceHandler, MovementHandler, PropertyHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, TeamHandler } from '../handlers/index.js';
 import { TeamManager, DEFAULT_TEAM_CONFIG } from '../team/index.js';
 import { EventHandler } from '../events/index.js';
-import type { ProsperityManager } from '../world/ProsperityManager.js';
 import type { TimeZoneManager } from '../world/TimeZoneManager.js';
 
 /**
@@ -117,7 +116,7 @@ export class HandlerRegistry {
     // 初始化交通枢纽处理器
     this.transportHandler = new TransportHandler(io, world, economy);
     // 初始化纪念碑处理器
-    this.monumentHandler = new MonumentHandler(io, world, undefined, economy ?? new EconomyService(world));
+    this.monumentHandler = new MonumentHandler(io, world, economy ?? new EconomyService(world));
     this.teamManager = new TeamManager(DEFAULT_TEAM_CONFIG);
     this.teamHandler = new TeamHandler(io, world, this.teamManager);
     this.chatManager = new ChatManager({ ...DEFAULT_CHAT_CONFIG, bannedWords: ['testword'] });
@@ -212,14 +211,6 @@ export class HandlerRegistry {
   setBehaviorEngine(behaviorEngine: any): void {
     this.eventHandler.setBehaviorEngine(behaviorEngine);
     logger.info('BehaviorEngine 已注入 EventHandler');
-  }
-
-  /**
-   * 注入 ProsperityManager 到 MonumentHandler（在 app.ts 中 ProsperityManager 创建后调用）
-   */
-  setProsperityManager(prosperityManager: ProsperityManager): void {
-    this.monumentHandler.setProsperityManager(prosperityManager);
-    logger.info('ProsperityManager 已注入 MonumentHandler');
   }
 
   /**
