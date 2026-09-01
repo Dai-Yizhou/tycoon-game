@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "大富翁.io 游戏客户端（Vite + TypeScript + Canvas）",
+  "description": "大富翁.io 游戏客户端（Vite + TypeScript + SVG 地图渲染）",
   "scripts": {
     "build": "tsc -p tsconfig.json && vite build",
     "dev": "vite",

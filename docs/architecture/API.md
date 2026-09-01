@@ -2,7 +2,7 @@
 
 > 当前文档以运行时代码为准；`docs/legacy/` 仅保存历史交接材料，不代表现行协议。
 
-> 本文来自 `packages/shared/src/types/socket-events.ts`、`packages/server/src/app.ts`、`packages/server/src/transport/SocketManager.ts` 与 `packages/server/src/transport/handlers.ts`。只记录当前注册或明确暴露的接口；item、talent、achievement 不属于当前运行时 API。
+> 本文来自 `packages/shared/src/types/socket-events.ts`、`packages/server/src/app.ts`、`packages/server/src/transport/SocketManager.ts` 与 `packages/server/src/transport/handlers.ts`。只记录当前注册或明确暴露的接口；item、talent 不属于当前运行时 API，achievement 与 leaderboard 已是现行能力（见下文）。
 
 ## 连接约束
 
@@ -69,10 +69,10 @@
 
 ## 共享类型
 
-- `Player`、`ValueField`、`Cell`、`MapMeta`、`Team`、`EraInfo`、聊天和交通类型位于 `packages/shared/src/types/`。
+- `Player`、`ValueField`、`Cell`、`MapMeta`、`Team`、`EraInfo`、`AchievementSnapshot`、`LeaderboardSnapshot`、聊天和交通类型位于 `packages/shared/src/types/`。
 - Socket 事件使用 `ClientToServerEvents`、`ServerToClientEvents`、`SocketData`；两端通过 `@game/shared` 获得同一编译期契约。
 - `Player.values` 是动态数值字段记录；可用字段来自地图元数据的 `valueFieldDefinitions`。
-- 当前 shared 导出、Socket 契约和服务端注册链均不提供 item/talent/achievement 能力；历史/规格文档中的同名协议不纳入 API。
+- 成就与榜单是现行 API：`client.login` ack 与 `server.gameState` 携带 `achievements?: AchievementSnapshot` 与 `leaderboard?: LeaderboardSnapshot`；`server.achievementUnlocked` 下发解锁通知、`server.leaderboardUpdated` 广播正式榜单刷新。item、talent 不在当前运行时 API 内。
 
 ## 错误与权威边界
 

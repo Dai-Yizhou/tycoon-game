@@ -24,6 +24,8 @@
 | `packages/shared/src/types/map-meta.ts` | MapMeta、区域、时区、字段定义 | app、地图加载、HUD |
 | `packages/shared/src/types/socket-events.ts` | ClientToServerEvents、ServerToClientEvents、SocketData、AckResult | 两端 typed Socket 契约 |
 | `packages/shared/src/types/team.ts` / `chat.ts` / `transport.ts` / `event.ts` / `era.ts` / `auth.ts` / `server-config.ts` | 队伍、聊天、交通、事件、时代、认证、服务端配置契约 | 对应 server/client 模块 |
+| `packages/shared/src/types/uct.ts` / `economy-rules.ts` | UCT 数值与计税/持股规则契约 | 服务端经济、客户端 UCT 显示 |
+| `packages/shared/src/types/achievement.ts` / `leaderboard.ts` | 成就快照/解锁与榜单快照契约 | 服务端 achievement/ranking、客户端成就面板与榜单 |
 | `packages/shared/src/map/map-parser.ts` | 校验并标准化地图 JSON | app 与客户端地图链 |
 | `packages/shared/src/map/map-index.ts` | 按 cell id 建索引 | MovementHandler、客户端地图加载 |
 | `packages/shared/src/map/path-finder.ts` | 沿 destinations 查路径/邻居 | 服务端移动 |
@@ -32,7 +34,7 @@
 | `packages/shared/src/i18n/index.ts`、`zh-CN.json`、`en-US.json` | 翻译与语言资源 | 客户端界面 |
 | `packages/shared/package.json` | CJS/ESM 构建出口与 build/lint/test scripts | 独立构建包 |
 
-当前 `packages/shared/src/types`、运行时配置和 Socket 契约均不包含 item/talent/achievement 的现行能力；历史/规格文档中的同名描述不属于当前文件地图。
+`packages/shared/src/types` 与 Socket 契约已包含 `achievement`、`leaderboard`、`uct`、`economy-rules` 等现行能力；`item`、`talent` 仍不属于当前运行时能力（见 ARCHITECTURE.md 删除边界）。
 
 ## server
 
@@ -54,9 +56,12 @@
 | `src/world/GameWorld.ts` | 地图、时代和玩家世界容器，发出世界事件 |
 | `src/world/PlayerManager.ts` | 玩家增删改查、连接绑定、冻结/恢复 |
 | `src/world/DayNightCycle.ts` | 昼夜计时、广播、税收和交通周期联动 |
+| `src/world/DayNightValueChange.ts` | 昼夜驱动的区域 UCT 数值变化（`regionValues` 动态字段） |
 | `src/world/TimeZoneManager.ts` | 地图时区、本地时间与昼夜判定 |
 | `src/world/ProsperityManager.ts` | 区域繁荣度更新与广播 |
 | `src/storage/PlayerStore.ts`、`InMemoryPlayerStore.ts`、`MongoPlayerStore.ts` | 玩家持久化接口及内存/Mongo 实现 |
+| `src/storage/WorldStore.ts`、`MongoWorldStore.ts` | 世界状态持久化接口及 Mongo 实现（快照恢复） |
+| `src/state/WorldRuntimeState.ts`、`WorldRuntimeStateStore.ts` | 世界运行时状态聚合与存储 |
 | `src/storage/EraStore.ts`、`InMemoryEraStore.ts` | 时代存储接口及内存实现 |
 | `src/era/EraManager.ts` | 时代初始化、结算、切换、纪念碑铭记 |
 
@@ -70,10 +75,16 @@
 | `src/handlers/investmentHandler.ts` | 投资购买、持股与事件收益 |
 | `src/handlers/transportHandler.ts` | 交通目的地与传送 |
 | `src/handlers/monumentHandler.ts` | 纪念碑状态与修缮 |
+| `src/handlers/propertyHandler.ts` | 地产购买、升级、租金结算 |
+| `src/economy/Taxation.ts`、`Bankruptcy.ts` | 计税、破产清算 |
+| `src/economy/Ownership.ts`、`EconomicOperationGuard.ts` | 持股/合租模型与经济操作守卫 |
+| `src/economy/EconomyService.ts` | 经济数值中枢（计税联动、UCT 变更回调） |
+| `src/achievement/AchievementManager.ts`、`AchievementStore.ts`（Mongo/File/InMemory 实现）、`AchievementConfigLoader.ts` | 成就定义加载、六类触发、owner 级并发串行化与持久化 |
+| `src/ranking/LeaderboardManager.ts` | 榜单脏标记与正式刷新广播 |
 | `src/events/EventHandler.ts`、`EventRegistry.ts`、`EventEffects.ts`、`eventTemplates.ts` | 事件注册、模板和效果 |
 | `src/behavior/BehaviorEngine.ts` | 加载 `config/behaviors/*.json` 并权威执行行为 |
 | `src/team/TeamManager.ts`、`src/handlers/teamHandler.ts` | 队伍纯数据与 Socket 协议 |
-| `src/chat/ChatManager.ts` | 聊天消息与频道状态 |
+| `src/chat/ChatManager.ts`、`FeedbackManager.ts` | 聊天消息、频道状态与反馈 `/report`（清洗/限长/限频/结构化日志） |
 | `src/notifications/NotificationManager.ts` | 通知管理能力；接线以具体 handler 为准 |
 | `src/handlers/debugHandler.ts` | debug flags 开启时的调试请求 |
 

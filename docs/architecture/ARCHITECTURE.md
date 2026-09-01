@@ -113,6 +113,27 @@ server.*
 
 地图的可见渲染层是 `InteractiveMapSurface` 生成的 SVG，不再是隐藏的 Canvas。移动动画由 `GamePage` 用 `requestAnimationFrame` 循环驱动 `MovementSystem`：`MovementSystem` 对 `playerDisplayX/Y` 做单步插值写入 Store，`GamePage` 每帧把新插值坐标交给 `InteractiveMapSurface` 直接更新棋子节点 transform；动画期间保持移动锁，避免重建 SVG 或干扰棋子节点，仅在动画结束后按最新权威位置校准。动画期间视野通过 `followDisplayPosition` 跟随插值坐标更新 SVG viewBox，避免“地图瞬移”。地图由 `MapLoader` 请求 `/api/map`，经 shared 的解析工具标准化为 `MapIndex` 后交给渲染层。
 
+### 格子信息卡（hover/tap）渲染链
+
+格子详情卡是当前唯一按需浮动的信息层，链路：
+
+```text
+InteractiveMapSurface：每个格子 <g> 的 mouseenter / tap
+  -> CustomEvent('map:hover', { cellId, clientX, clientY }) / 'map:leave'
+  -> GamePage：gameHudShell.showCellHover(cellId, clientX, clientY) / hideCellHover()
+  -> GameHudShell.renderCellHover()
+       仅当 hoverCardCellId !== cellId 时重建 innerHTML（buildCellHoverContent），避免高频 update() 重写导致闪烁
+       -> positionCellHover(card, x, y)：JS 计算 left/top 并夹紧视口（含空间不足时切到左侧）
+```
+
+数据来源：`GameViewModel.getCell()`（静态 `name/description/price/rent/upgradeCost/timezone`）+ `getCellRuntimeState()`（`level`/ownerships）。字段按格子能力显隐：价格仅“可购买”格（当前以 `price.player` 含负值判定）、等级仅“可升级”格（有 `upgradeCost` 档位）、租金取 `rent[level]`、升级费取 `upgradeCost[level]`、持有者与 `cell.timezone`（数字偏移分钟）恒定展示。
+
+规范化重构基线（当前非理想点，实施时收敛）：
+1. 定位口径不一致：CSS 仍保留 `left:50%; top:24%; transform:translateX(-50%)` 默认值，与 JS `positionCellHover` 写入的 `left/top` 叠加，`translateX(-50%)` 会让视觉左缘再偏移半个卡宽，与 JS 的视口夹紧计算产生系统性错位 → 定位应完全交给 JS，移除 CSS 的 transform 与默认坐标，或统一成同一偏移口径。
+2. 坐标意图重复：surface 传的是格子右缘（`getBoundingClientRect().right/top`），而 `positionCellHover` 又自行 `x+100` 右移、溢出时再反向 `x-cw-20` —— “向右错开”在两处各实现一次，应收敛到单一负责点（一个负责提议位置，另一个只做视口夹紧）。
+3. 幻数分散：定位偏移（`100`/`-20`/`8`）、卡片兜底尺寸（`210`/`130`）、移动端媒体断点宽度（`168`/`190`）散落在 JS 与 style.css，应转为 CSS 变量/主题令牌驱动，遵循 animations/motion 的令牌化约定。
+4. “可购买”判定采用 `price.player` 含负值的启发式，把能力判定与数值符号耦合；规范化应改为基于格子类型的显式能力判定（可购买/可升级），避免符号误判与后续维护歧义。
+
 ## 经济状态决策
 
 - Frozen 是连接状态，不是经济豁免。断线玩家不获得主动操作入口，但不解散队伍、不释放地产或投资；收租、计税、投资收益和破产检查继续执行。

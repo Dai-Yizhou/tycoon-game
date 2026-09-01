@@ -320,15 +320,15 @@ getPlayerTeam(playerId: string): Team | undefined { ... }
 
 ### 6.1 先认清现状：三系统当前是"残留"不是"半成品"
 仓库 README 与 ARCHITECTURE 已明确它们**不属于当前运行时**。残留物包括：
-- 共享层无 `items.ts` 类型（`packages/shared/src/types/` 里看不到）；事件契约里没有 item/talent/achievement 事件（`ServerToClientEvents`/`ClientToServerEvents` 无对应项）。
-- 服务端无 `items/` 运行时目录（三系统没有 handler/manager）。
+- 共享层无 `items.ts` 类型（`packages/shared/src/types/` 里看不到）；事件契约里没有 item/talent 事件——注意 achievement 已是现行能力：Socket 含 `server.achievementUnlocked`、`achievements` 快照（见 ``ServerToClientEvents`` 与 `login`/`gameState` ack）。
+- 服务端无 `items/`、`talent/` 运行时目录（item/talent 没有 handler/manager）；achievement 已有 `src/achievement/` 与 `app.ts` 中六类触发接线。
 - `docs/specs/TASKS.md` 把三系统的任务勾成"完成"（例如声称建过 `items/ItemRegistry`、`ItemBag`、talent 树、achievement labels），但**源码里没有对应实现** —— 这是"文档声称完成、代码未落地"最具迷惑性的点。
 - `config_editors/talent_achievement_editor.html` 等编辑 UI 是三系统设计的产物残留。
 
-**所以这不是"恢复被删的功能"，而是"按现有架构从零实现一个新系统"**。里面没有可复用的运行时代码，只有历史规格可参考（记录设计意图），但要以现在架构为准重建。
+**achievement 已先落地**（见 ARCHITECTURE.md 删除边界与 `src/achievement/`），因此本节"三系统"方向实际收窄为 **item 与 talent** 两个系统：按现有架构从零实现，历史规格只作设计参考。
 
 ### 6.2 选最小可落地范围（避免一次铺太大）
-三系统逐个来，**先做最独立、最好演示的 `item`（道具）**，talent（被动成长树）与 achievement（成就/档案）依赖更多状态与 UI，放二期。
+先做最独立、最好演示的 `item`（道具）；`talent`（被动成长树）依赖更多状态与 UI，放其后。achievement 已实现，不再在本节范围内。
 
 ### 6.3 item 系统的落地计划（按现有架构）
 
