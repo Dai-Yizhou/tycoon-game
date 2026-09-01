@@ -81,13 +81,15 @@ export class GameHudShell {
           <div class="value-pills" data-ui="resource-strip"></div>
           <div class="topbar-spacer"></div>
           <section class="region-status" data-ui="region-status" aria-live="polite" role="status">
-            <div class="region-status__name" data-ui="zone-tag">--</div>
-            <div class="region-status__value" data-ui="prosperity-tag">--</div>
-            <section class="leaderboard-panel" data-ui="leaderboard" aria-live="polite"></section>
-            <div class="cycle-indicator" data-ui="day-night">
-              <div class="cycle-dot" data-ui="cycle-dot"></div>
-              <span class="cycle-text" data-ui="day-time">--:--</span>
+            <div class="region-status__row">
+              <div class="region-status__name" data-ui="zone-tag">--</div>
+              <div class="region-status__value" data-ui="prosperity-tag">--</div>
+              <div class="cycle-indicator" data-ui="day-night">
+                <div class="cycle-dot" data-ui="cycle-dot"></div>
+                <span class="cycle-text" data-ui="day-time">--:--</span>
+              </div>
             </div>
+            <section class="leaderboard-panel" data-ui="leaderboard" aria-live="polite"></section>
           </section>
         </header>
 

@@ -330,15 +330,20 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   background: linear-gradient(180deg, color-mix(in srgb, var(--gp-bar-bg) 25%, transparent) 0%, transparent 100%);
 }
 .region-status {
-  display: flex; align-items: center; gap: 8px; text-align: right; max-width: 52%;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; max-width: 52%;
   padding: 4px 8px; border: var(--region-border-w) solid var(--gp-border);
   border-radius: var(--region-radius); background: var(--gp-card);
 }
+.region-status__row { display: flex; align-items: center; gap: 8px; max-width: 100%; }
 .region-status__name,
 .region-status__value { white-space: nowrap; }
 .region-status__name { font-weight: 800; font-size: 12px; color: var(--gp-fg); }
 .region-status__value { color: var(--gp-muted); font-family: var(--font-num); }
 .region-status .cycle-indicator { padding-left: 7px; border-left: 1px solid var(--gp-border); }
+.region-status .leaderboard-panel {
+  display: block; max-width: 100%; color: var(--gp-muted); font-family: var(--font-num);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .gp-actionbar {
   bottom: 0; left: 0; right: auto; width: min(640px, calc(100vw - 32px)); height: 112px; z-index: 20;
   display: flex; align-items: center; gap: 12px; padding: 0 18px;
@@ -346,7 +351,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 }
 .gp-topbar .player-badge { margin-right: auto; }
 .gp-topbar .region-status { margin-left: auto; }
-.gp-topbar .leaderboard-panel { display: none; }
 
 .player-badge { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .player-badge__avatar {
