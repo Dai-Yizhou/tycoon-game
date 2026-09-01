@@ -136,6 +136,8 @@ export class InteractiveMapSurface {
 
     const pieces = document.createElementNS(ns, "g");
     pieces.classList.add("interactive-map-surface__players");
+    const selfId = this.players[0]?.id;
+    const selfTeamId = this.players[0]?.teamId ?? null;
     this.players
       .filter((player): player is Player => Boolean(player))
       .forEach((player, i) => {
@@ -160,10 +162,13 @@ export class InteractiveMapSurface {
         head.setAttribute("cy", "-4");
         head.classList.add("map-player__head");
         
-        /* 玩家色：按索引轮转主题调色板（红/蓝/绿），从 :root 继承的主令牌读取 */
-        const color = getComputedStyle(this.root)
-          .getPropertyValue(["--player-red", "--player-blue", "--player-green"][i % 3])
-          .trim();
+        /* 玩家色：按关系区分（本玩家/队友/其他玩家），颜色由主题令牌注入 */
+        const roleVar = player.id === selfId
+          ? "--gp-player-self"
+          : player.teamId !== null && player.teamId === selfTeamId
+            ? "--gp-player-teammate"
+            : "--gp-player-other";
+        const color = getComputedStyle(this.root).getPropertyValue(roleVar).trim();
         if (color) g.style.setProperty("--gp-player-color", color);
 
         g.append(head, body);

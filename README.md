@@ -60,7 +60,7 @@ pnpm test
 ```text
 packages/shared/  共享类型、地图解析、i18n、debug
 packages/server/  Express、Socket.IO、GameWorld、业务管理器与 handlers
-packages/client/  页面、Socket 投影、GameStore、ViewModel、HUD、Canvas
+packages/client/  页面、Socket 投影、GameStore、ViewModel、HUD、SVG 棋盘渲染
 docs/architecture/ 当前运行时架构、API、文件地图
 docs/guides/      开发与内容编辑指南
 docs/player/      玩家操作指南

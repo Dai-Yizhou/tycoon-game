@@ -75,7 +75,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .hud-panel {
   position: absolute;
   right: 16px;
-  bottom: 128px;
+  bottom: 50px;
   z-index: 34;
   min-width: 190px;
   padding: 10px;

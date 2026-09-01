@@ -234,7 +234,7 @@ export interface ServerToClientEvents {
   /** 服务端询问路径选择 */
   'server.askPath': (payload: {
     fromCellId: number;
-    options: { cellId: number; label?: string }[];
+    options: { cellId: number; label?: import('./cell.js').LocalizedText | string }[];
   }) => void;
 
   /** 玩家数值变化（财产/信用值等） */
@@ -397,7 +397,7 @@ export interface ServerToClientEvents {
   /** 交通枢纽目的地变更 */
   'server.transportDestinationsChanged': (payload: {
     hubId: number;
-    destinations: Array<{ cellId: number; name?: string }>;
+    destinations: Array<{ cellId: number; name?: import('./cell.js').LocalizedText | string }>;
   }) => void;
 
   /** 投资项目被购买 */

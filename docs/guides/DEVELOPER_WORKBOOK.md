@@ -1,6 +1,6 @@
 # 项目开发实操手册（按方向的详细指南）
 
-> 配套上一篇 [PROJECT_TUTORIAL.md](Project_TUTORIAL.md)（入门）。本文针对 7 个具体开发方向给出**照做就能上手的步骤**，每个方向都基于仓库真实代码、真实文件、真实方法名。预读：先跑通第 3 节，读通第 4 节"一次动作闭环"。
+> 配套上一篇 [PROJECT_TUTORIAL.md](Project_TUTORIAL.md)（入门）。本文针对多个具体开发方向给出**照做就能上手的步骤**，每个方向都基于仓库真实代码、真实文件、真实方法名。预读：先跑通第 3 节，读通第 4 节"一次动作闭环"。
 >
 > 几个贯穿全文的硬性约定（来自仓库规则与架构）：
 > - **服务端权威**：数值、位置、资产只能服务端改；客户端只发请求 + 更新视图。
@@ -767,3 +767,104 @@ cd packages/client && npx jest --listTests 2>&1 | head
 > **教训 / 继续项**：远程清理删了生产代码，但**没同步删引用它们的测试**（`tests/renderer.test.ts`、`tests/board-renderer.test.ts` 现在 import 已删的 `../src/renderer/*`，会 Failed to run），也没删 `GamePage.ts:100-105` 那个空壳 `<canvas>` 与可能的死 CSS。**"删生产代码必须同步清测试与死死 DOM"**——否则留下一批指空测试与空壳元素，仍是技术债。
 
 > 修正本手册早前一处表述：**"真正的渲染代码 = 入口循环 → BoardRenderer.render() → 三个子渲染器.render()" 这句话仅描述了一个存在调用链的候选路径，不代表它真的是最终产物来源。** 本项目真实产出玩家棋子的链条是 `GameStore.subscribe → InteractiveMapSurface.updatePlayers/render (SVG)`。
+
+---
+
+## 方向 13：修复"移动动画失效"——RAF 循环竞态 与 动画时长令牌化（本次实战，已解决）
+
+> 症状：**动画依然不生效，仍存在视野内地图瞬移、棋子留在原格子的现象。** 之前的改动看似覆盖了动画渲染链路，却始终没触到真正起作用的代码（或被覆盖）。
+>
+> 结论前置：本项目的移动动画是由 `GamePage.ts` 里的一个 **`requestAnimationFrame` 循环（`tick`）** 驱动插值写 `playerDisplayX/Y`，再由 `InteractiveMapSurface` 消费这些插值坐标的。所谓"动画失效"的根因不在 SVG 渲染器，而在**驱动循环自身的竞态**——之前在 `tick` 开头把 `movementFrame` 置空，导致订阅回调重复排入多个并发循环。本节讲清三条线索：**① 谁来驱动动画；② 竞态为什么发生；③ 修复后的正确写法**，最后给出动画时长令牌化（主题化）的落地方式。
+
+### 13.1 先认清"真正驱动动画的代码"（别再改错地方）
+
+真实产出玩家棋子位置变化的链条是：
+
+```
+socket `server.*`（移动信号）
+  → SocketEventHandler 写入 GameStore（isMoving = true，moveFromX/Y、moveToX/Y、moveStartTime、serverPath）
+  → GamePage.ts 的 store.subscribe 回调发现 isMoving 且 movementFrame === null，启动 RAF tick
+  → tick 每帧调用 MovementSystem.updateMovement(store, map, onPlayerArrived, effects)
+      用 (performance.now() - moveStartTime) / stepDurationMs 算 progress → easeInOutQuad → 写 playerDisplayX/Y
+  → 订阅回调里 setPlayerDisplayPosition + followDisplayPosition 让 SVG 棋子跟随插值坐标
+```
+
+关键文件与责任：
+- [GamePage.ts](file:///workspace/packages/client/src/pages/GamePage.ts)：**唯一**启动 RAF 循环的地方（`store.subscribe` 里 `movementFrame === null` 时才 `requestAnimationFrame(tick)`）。循环寿命由 `isMoving` 决定：不再是移动锁的那段旧逻辑，而是真正的动画驱动。
+- [MovementSystem.ts](file:///workspace/packages/client/src/game/systems/MovementSystem.ts)：纯位置/路径插值（`updateMovement`、`animateMoveTo`、`advanceServerPathStep`、`startServerPathAnimation`），不碰 DOM。
+- [InteractiveMapSurface.ts](file:///workspace/packages/client/src/components/InteractiveMapSurface.ts)：SVG 渲染棋子，消费 `setPlayerDisplayPosition` / `followDisplayPosition`；`setMovementLocked` 在动画期间暂停 SVG 重建，保持节点 DOM 身份稳定。
+- 服务端信号双来源：带 `serverPath` 的动画信号（`startServerPathAnimation`）与仅同步 `isMoving=false` 的位置信号，两者有先后时序；客户端要用 `isServerAnimating` 兜住，不能只信单个事件。
+
+### 13.2 根因：`tick` 开头把 `movementFrame = null` 引发的 R-A-F 循环竞态
+
+**错误写法（根因所在）：**
+
+```ts
+const tick = (): void => {
+  movementFrame = null;            // ← 问题根源：开头置空
+  const current = gameStore?.getSnapshot();
+  if (!current?.isMoving) return;
+  updateMovement(...);             // 内部 applySnapshot 同步触发订阅回调
+  movementFrame = requestAnimationFrame(tick);   // 订阅回调里 movementFrame 已为 null → 又排一次
+};
+```
+
+为什么会同时存在"视野瞬移"和"棋子原地不动"两种表现？
+
+- `updateMovement` 通过 `updateSnapshot` → `store.applySnapshot` **同步触发** `GamePage.ts` 的 `subscribe` 回调。
+- 回调第 120 行判断 `if (snapshot.isMoving && movementFrame === null)`：因为 `tick` 开头已经把 `movementFrame` 置空，回调认为"没有循环在跑"，于是**再开一个** `requestAnimationFrame(tick)`。
+- 于是同一时间存在两个并发 `tick`，各自按自己的时间步进 `playerDisplayX/Y`，且每帧都重排——位置被多个循环交错覆盖，`moveToX/Y` 又相对 `moveStartTime` 计时，导致：某一帧位置被"跳到终点"又被"拉回起点"（瞬移），或进度一直算不出有效位移（棋子停在原地）。
+
+**修复后的正确写法：**
+
+```ts
+const tick = (): void => {
+  const current = gameStore?.getSnapshot();
+  if (!current?.isMoving) {           // 仅在循环自然结束时才置空
+    movementFrame = null;
+    return;
+  }
+  if (mapIndex) {
+    updateMovement(gameStore!, mapIndex, () => invokeGameAction(onPlayerArrived), movementEffects);
+  }
+  const next = gameStore?.getSnapshot();
+  if (next?.currentPlayer) {
+    interactiveMap.setPlayerDisplayPosition(next.currentPlayer.id, next.playerDisplayX, next.playerDisplayY);
+    if (next.isMoving) interactiveMap.followDisplayPosition(next.playerDisplayX, next.playerDisplayY);
+  }
+  if (next?.isMoving) {
+    movementFrame = window.requestAnimationFrame(tick);   // 结尾续排，每帧只有一个循环
+  } else if (next?.currentPlayer) {
+    movementFrame = null;                                // 落点归位
+    const finalCell = mapIndex?.getById(next.currentPlayerPosition);
+    if (finalCell) interactiveMap.setPlayerDisplayPosition(next.currentPlayer.id, finalCell.x, finalCell.y);
+  } else {
+    movementFrame = null;
+  }
+};
+```
+
+要点：**`movementFrame` 的值应当始终代表"当前有无循环在跑"**。它只在该帧结束时根据 `next.isMoving` 决定续排（赋值）或结束（置空），绝不在 `tick` 开头提前置空。配合 `Animation state 必须跟踪，防止并发更新` 这条工程约定，`subscribe 回调只在 movementFrame === null` 时启动一次，形成单循环。销毁时（`GamePage` 清理）需对称 `cancelAnimationFrame(movementFrame)`（见 `GamePage.ts` 的 `movementFrame !== null` 分支）。
+
+### 13.3 动画时长令牌化（去掉硬编码，走主题 token）
+
+原代码在 JS 与 CSS 各写死时长（如 `280`、`0.6s`），无法按主题调，且存在死常量。统一改为主题令牌驱动，一套 `motion.*` 值由主题 JSON 下发、DesignAdapter 注入 CSS 变量、JS 用 `readCssVarNumber` 读取：
+
+1. **主题 JSON 加 `motion` 组**：`packages/shared/design-tokens/themes/*.json` 新增 `motion.step`（单步插值，如 `280ms`）、`stepArrive / moveComplete / diceSettled / propertyBought / bankrupt` 等数字时长，及 `fast / normal / slideUp / spin` 等时长字符串。
+2. **DesignAdapter 注入 CSS 变量**：`DesignAdapter.ts` 把 `motion.*` 映射为 `--motion-*` 变量（`--motion-step` 等），并新增 `color.player.self/teammate/other` → `--gp-player-self/teammate/other` 供棋子按关系着色。
+3. **JS 读取**：`MovementSystem.ts` 用兜底常量 `MOVE_STEP_DURATION = 280` 加 `refreshStepDuration()`：
+   ```ts
+   stepDurationMs = readCssVarNumber(document.documentElement, '--motion-step', MOVE_STEP_DURATION);
+   ```
+   在每次移动起点（`animateMoveTo`）刷新一次，避免 RAF 热路径每帧读计算样式；`GameEffects.ts` 同理用 `readCssVarNumber(root, '--motion-*', fallback)`。
+4. **CSS 消费**：`style.css` 直接 `var(--motion-step)` / `var(--motion-fast)`，不要再写秒数死值。
+
+> 配合工程约定：**动画时长必须主题令牌驱动，禁止在 JS/CSS 写死 ms/s 字面量**；新增时长统一加进 `motion.*` 组，JS 经 `readCssVarNumber`/`DesignAdapter` 读取，CSS 直接消费 `--motion-*` 变量。
+
+### 13.4 验证咒语（回归）
+
+```bash
+pnpm build:shared && pnpm build:server && pnpm build:client
+pnpm lint && pnpm test
+```
+手动：开发服开两个窗口 → 掷骰移动 → 观察棋子沿路径逐格移动、视野平滑跟随、到达落点精确归位；`prefers-reduced-motion: reduce` 时直接跳帧到终点。若再次"瞬移/原地"，先确认 `movementFrame` 单循环（加探针数 `requestAnimationFrame` 次数，1 帧应只有 1 次），再查服务端双信号是否被 `isServerAnimating` 兜住。

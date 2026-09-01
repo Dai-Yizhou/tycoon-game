@@ -15,6 +15,8 @@
 | 文档 | 读者 | 内容 |
 |---|---|---|
 | [guides/DEVELOPER.md](./guides/DEVELOPER.md) | 协作开发者 | 三包开发、直接编辑配置、Socket 与验证 |
+| [guides/DEVELOPER_WORKBOOK.md](./guides/DEVELOPER_WORKBOOK.md) | 开发者 | 按方向的可上手实操手册（含动画修复等） |
+| [guides/PROJECT_TUTORIAL.md](./guides/PROJECT_TUTORIAL.md) | 新开发者 | 入门总览与一次动作闭环 |
 | [guides/CODING_STYLE.md](./guides/CODING_STYLE.md) | 开发者 | 代码风格约定 |
 | [guides/CONTENT_CREATOR.md](./guides/CONTENT_CREATOR.md) | 内容创作者 | 地图数据与 JSON 配置直接编辑 |
 

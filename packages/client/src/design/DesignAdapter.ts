@@ -107,6 +107,9 @@ export class DesignAdapter {
         '--tycoon-cell-transport-fill': transport,
         '--tycoon-piece-head': color('color.piece.head'),
         '--tycoon-piece-outline': color('color.piece.outline'),
+        '--gp-player-self': color('color.player.self'),
+        '--gp-player-teammate': color('color.player.teammate'),
+        '--gp-player-other': color('color.player.other'),
         '--tycoon-accent': accent,
         '--tycoon-muted': muted,
         // HUD 覆盖层令牌：由主题 JSON 的 color.hud 区段注入，组件只消费 CSS 变量

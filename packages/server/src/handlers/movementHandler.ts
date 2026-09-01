@@ -14,7 +14,6 @@
  */
 
 import type { AckResult, PositionChangedPayload, Cell } from '@game/shared';
-import { getExtra } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -206,7 +205,7 @@ export class MovementHandler {
         fromCellId: current.id,
         options: nextCandidates.map(c => ({
           cellId: c.id,
-          label: getExtra<string>(c, 'name', `格子 ${c.id}`) ?? `格子 ${c.id}`,
+          label: c.name,
         })),
       });
       logger.debug(`玩家 ${playerId} 遇到岔路，暂停移动，剩余步数 ${remainingSteps}`);

@@ -48,7 +48,7 @@ import {
 
 import { registerSocketHandlers, unregisterSocketHandlers } from '../game/systems/SocketEventHandler.js';
 import { DesignAdapter } from '../design/DesignAdapter.js';
-import { getRegionThemeId, getThemeId, getThemeTokens } from '../design/ThemeConfig.js';
+import { getRegionThemeId, getThemeId, getThemeTokens, SAVED_REGION_THEME_KEY } from '../design/ThemeConfig.js';
 import { localizedText } from '../game/i18n.js';
 
 let gameViewModel: GameViewModel | null = null;
@@ -71,18 +71,19 @@ function invokeGameAction(action: (runtime: GameRuntime) => void): void {
 }
 
 function toInteractivePlayers(snapshot: ReturnType<GameStore['getSnapshot']>): Player[] {
-  return snapshot.currentPlayer
-    ? [snapshot.currentPlayer, ...snapshot.otherPlayers.filter(player => player.status !== 'frozen').map(player => ({
-      id: player.id,
-      username: player.username,
-      position: player.position,
-      status: player.status as Player['status'],
-      values: {},
-      teamId: null,
-      createdAt: 0,
-      lastActiveAt: 0,
-    }))]
-    : [];
+  if (!snapshot.currentPlayer) return [];
+  const teamId = snapshot.currentPlayer.teamId;
+  const teamMemberIds = new Set(snapshot.teamMembers.map(member => member.id));
+  return [snapshot.currentPlayer, ...snapshot.otherPlayers.filter(player => player.status !== 'frozen').map(player => ({
+    id: player.id,
+    username: player.username,
+    position: player.position,
+    status: player.status as Player['status'],
+    values: {},
+    teamId: teamMemberIds.has(player.id) ? teamId : null,
+    createdAt: 0,
+    lastActiveAt: 0,
+  }))];
 }
 
 export function createGamePage(controller: GameController): HTMLElement {
@@ -342,6 +343,11 @@ function applyRegionTheme(page: HTMLElement, cellId: number): void {
     themeId = getRegionThemeId(region ?? { id: 'default' });
   }
   applyGamePageThemeTokens(page, { tokens: getThemeTokens(themeId) });
+
+  // 记录当前玩家所在格子的区域主题，供欢迎/登录等独立页面在下次启动时沿用
+  if (localStorage.getItem(SAVED_REGION_THEME_KEY) !== themeId) {
+    localStorage.setItem(SAVED_REGION_THEME_KEY, themeId);
+  }
 }
 
 function initTeam(): void {

@@ -48,7 +48,7 @@ export interface ClientGameSnapshot {
   rollCooldownMs: number;
   dayNightStartTime: number;
   serverTimeOffset: number;
-  pathChoice: { active: boolean; options: Array<{ cellId: number; label: string }> };
+  pathChoice: { active: boolean; options: Array<{ cellId: number; label: unknown }> };
   previousCellId: number;
   playerDisplayX: number;
   playerDisplayY: number;
@@ -199,7 +199,7 @@ export class GameStore {
     this.publish();
   }
 
-  setPathChoice(options: Array<{ cellId: number; label: string }>): void {
+  setPathChoice(options: Array<{ cellId: number; label: unknown }>): void {
     this.snapshot = { ...this.snapshot, pathChoice: { active: options.length > 0, options: [...options] } };
     this.publish();
   }

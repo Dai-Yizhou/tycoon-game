@@ -99,6 +99,7 @@ release/
 
 # IDE / agent workspace
 .trae/
+.obsidian/
 
 # External rules repo (cloned reference)
 agent-rules/

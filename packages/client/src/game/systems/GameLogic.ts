@@ -1,5 +1,5 @@
-import { t } from '../i18n.js';
-import type { Cell, MapIndex } from '@game/shared';
+import { t, localizedText } from '../i18n.js';
+import type { Cell, MapIndex, Uct } from '@game/shared';
 import type { TypedClientSocket } from '../../hooks/useSocket.js';
 import type { ClientGameSnapshot, GameStore } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
@@ -116,7 +116,103 @@ export function handleTransport(runtime: GameRuntime): void {
   const cell = runtime.mapIndex.getById(snapshot.currentPlayerPosition);
   if (!cell || cellType(cell) !== 'transport' || snapshot.actionUsedThisTurn) return;
   runtime.socket.emit('client.getTransportDestinations', { hubCellId: cell.id }, (result) => {
-    if (!result.ok) addChatMessage(result.error || t('common.unknownError'), 'error');
+    if (!result.ok) {
+      addChatMessage(result.error || t('common.unknownError'), 'error');
+      return;
+    }
+    const data = result.data as { destinations?: TransportDestinationOption[] } | undefined;
+    const destinations = data?.destinations ?? [];
+    if (destinations.length === 0) {
+      addChatMessage(t('transport.noDestinations'), 'system');
+      return;
+    }
+    showTransportModal(runtime, cell.id, destinations, snapshot.valueFieldDefs);
+  });
+}
+
+interface TransportDestinationOption {
+  cellId: number;
+  name: unknown;
+  cost?: Uct;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatTransportCost(cost: Uct | undefined, valueFieldDefs: ClientGameSnapshot['valueFieldDefs']): string {
+  if (!cost) return '';
+  return Object.entries(cost.player ?? {}).concat(Object.entries(cost.region ?? {})).map(([fieldId, value]) => {
+    const definition = valueFieldDefs.find((field) => field.id === fieldId);
+    const label = localizedText(definition?.name, fieldId);
+    return `${label} ${value >= 0 ? '+' : ''}${value}`;
+  }).join(', ');
+}
+
+/**
+ * 展示交通枢纽目的地选择弹窗，选定后发送传送请求。
+ */
+function showTransportModal(
+  runtime: GameRuntime,
+  hubCellId: number,
+  destinations: TransportDestinationOption[],
+  valueFieldDefs: ClientGameSnapshot['valueFieldDefs'],
+): void {
+  const rows = destinations.map((dest) => {
+    const name = localizedText(dest.name);
+    const cost = formatTransportCost(dest.cost, valueFieldDefs);
+    return `
+      <div style="padding:10px 0; border-bottom:1px solid color-mix(in srgb, var(--gp-border) 25%, transparent);">
+        <div style="font-weight:600;">${escapeHtml(name)}</div>
+        ${cost ? `<div style="font-size:0.8rem; opacity:0.8; margin:2px 0 6px;">${escapeHtml(t('transport.costValue', { cost }))}</div>` : ''}
+        <button data-action="teleport" data-cellid="${dest.cellId}" data-name="${escapeHtml(name)}" style="padding:6px 16px; background:var(--accent, #4f46e5); color:#fff; border:none; border-radius:4px; cursor:pointer;">${t('transport.teleport')}</button>
+      </div>
+    `;
+  }).join('');
+
+  const hubCell = runtime.mapIndex.getById(hubCellId);
+  const hubName = localizedText(hubCell?.name ?? hubCell?.extra?.name, `交通枢纽 ${hubCellId}`);
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.style.cssText = 'position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); z-index:1000;';
+  modal.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true" style="width:min(380px,90vw); background:var(--gp-card,#fff); color:var(--gp-fg,#1f2937); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.3); padding:18px; max-height:70vh; overflow:auto;">
+      <div style="font-weight:700; font-size:1rem; margin-bottom:4px;">${escapeHtml(t('transport.selectDestination', { name: hubName }))}</div>
+      <div style="font-size:0.85rem; opacity:0.8; margin-bottom:10px;">${t('transport.title')}</div>
+      ${rows}
+      <div style="margin-top:14px; text-align:right;">
+        <button data-action="cancel" style="padding:8px 16px; background:#6b7280; color:#fff; border:none; border-radius:4px; cursor:pointer;">${t('common.close')}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const close = (): void => modal.remove();
+  modal.querySelector('[data-action="cancel"]')?.addEventListener('click', close);
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) close();
+  });
+  modal.querySelectorAll<HTMLButtonElement>('[data-action="teleport"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const targetCellId = Number(button.dataset.cellId);
+      const name = button.dataset.name ?? '';
+      if (!Number.isInteger(targetCellId)) return;
+      modal.remove();
+      runtime.socket.emit('client.useTransport', { hubCellId, targetCellId }, (result: { ok: boolean; error?: string }) => {
+        if (!result.ok) {
+          addChatMessage(t('transport.teleportFailed'), 'error');
+          if (result.error) addChatMessage(result.error, 'error');
+        } else {
+          addChatMessage(t('transport.teleportSuccess', { name, discount: '' }), 'system');
+        }
+      });
+    });
   });
 }
 

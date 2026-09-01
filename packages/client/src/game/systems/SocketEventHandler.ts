@@ -27,7 +27,7 @@ export interface SocketHandlerOptions {
   controller?: GameController;
   onEvent?: (event: string) => void;
   onNotification?: (payload: { id: string; type: 'info' | 'success' | 'warning' | 'error'; title: string; content: string; durationMs?: number; createdAt?: number }) => void;
-  onPathChoiceOptions?: (options: Array<{ cellId: number; label: string }>) => void;
+  onPathChoiceOptions?: (options: Array<{ cellId: number; label: unknown }>) => void;
   onPathChoiceCleared?: () => void;
   movementEffects?: MovementEffectHooks;
 }
@@ -251,11 +251,11 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     }
   });
 
-  socket.on('server.askPath', (payload: { fromCellId: number; options: Array<{ cellId: number; label?: string }> }) => {
+  socket.on('server.askPath', (payload: { fromCellId: number; options: Array<{ cellId: number; label?: unknown }> }) => {
     if (!store.getSnapshot().currentPlayer) return;
     store.applySnapshot({ sequence: store.nextSequence(), isWaitingForChoice: true });
-    options.onPathChoiceOptions?.(payload.options.map(opt => ({ cellId: opt.cellId, label: opt.label || `格子 ${opt.cellId}` })));
-    const directionLabels = payload.options.map(o => localizedText(o.label, `格子 ${o.cellId}`));
+    options.onPathChoiceOptions?.(payload.options.map(opt => ({ cellId: opt.cellId, label: opt.label })));
+    const directionLabels = payload.options.map(o => localizedText(o.label));
     addChatMessage(t('intersection.chooseDirection', { options: directionLabels.join(' / ') }), 'system');
   });
 

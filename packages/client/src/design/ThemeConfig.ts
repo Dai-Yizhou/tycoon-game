@@ -5,6 +5,9 @@ import west from "../../../shared/design-tokens/themes/west.json";
 
 export type ThemeId = "northeast" | "south" | "midwest" | "west";
 export const themeTokens: Record<ThemeId, Record<string, unknown>> = { northeast, south, midwest, west };
+
+/** 欢迎/登录等独立页面读取玩家所在格子区域主题的 localStorage 键 */
+export const SAVED_REGION_THEME_KEY = "gameRegionTheme";
 export interface RegionThemeConfig {
   id: string;
   themeId?: string;

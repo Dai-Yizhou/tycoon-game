@@ -339,18 +339,14 @@ export class GameHudShell {
     teamEl.textContent = team.members.length > 1 ? t("hud.teamCount", { count: team.members.length }) : t("hud.lone");
   }
 
-  /** 顶部数值条：由地图 valueFieldDefinitions 驱动（名称/数量/作用域均随地图变化，不硬编码前端字段名） */
+  /** 顶部数值条：由地图 valueFieldDefinitions 驱动，仅渲染玩家作用域字段。
+   *  区域作用域字段（如繁荣度）由右上 updateRegionStatus 单独渲染，避免区域字段泄漏进玩家字段区。 */
   private updateValuePills(): void {
     const player = this.vm.getPlayer();
     const defs = this.vm.getRegions().valueFieldDefs;
     const strip = this.root.querySelector("[data-ui=resource-strip]")!;
-    // 字段数值来源：
-    // - scope 'player'：直接从当前玩家的 values[def.id].current 读取
-    // - scope 'region'：从当前格子所属区域的 regionValues 读取（可随地图更换名称/数量）
     const playerValues = player.currentPlayer?.values ?? {};
-    const cell = this.vm.getCell(player.currentPlayerPosition);
-    const regionId = cell?.regionId ?? "";
-    const slots: ValueFieldDef[] = defs;
+    const slots: ValueFieldDef[] = defs.filter((def) => def.scope === "player");
     strip.replaceChildren(...slots.map((def, index) => {
       const pill = document.createElement("div");
       pill.className = `value-pill${index === 0 ? " value-pill--accent" : ""}`;
@@ -359,9 +355,7 @@ export class GameHudShell {
       label.textContent = localizedText(def.name, t("hud." + def.id));
       const num = document.createElement("span");
       num.className = "value-pill__num";
-      const raw = def.scope === "region"
-        ? this.vm.getRegions().regionValues.get(regionId)?.[def.id] ?? 0
-        : playerValues[def.id]?.current ?? 0;
+      const raw = playerValues[def.id]?.current ?? 0;
       const value = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
       num.textContent = String(Math.round(value));
       pill.append(label, num);
@@ -370,6 +364,8 @@ export class GameHudShell {
   }
 
   private showSettings(): void {
+    // 打开设置时自动收起成就面板（两面板互斥）
+    this.root.querySelector('[data-ui="achievement-panel"]')?.remove();
     const existing = this.root.querySelector('[data-ui="settings-panel"]');
     if (existing) {
       existing.remove();
@@ -397,6 +393,8 @@ export class GameHudShell {
   }
 
   private showAchievements(): void {
+    // 打开成就时自动收起设置面板（两面板互斥）
+    this.root.querySelector('[data-ui="settings-panel"]')?.remove();
     const existing = this.root.querySelector('[data-ui="achievement-panel"]');
     if (existing) {
       existing.remove();
@@ -513,7 +511,7 @@ export class GameHudShell {
       button.textContent = `${t("hud.choosePath")} ${String.fromCharCode(65 + index)}`;
       const detail = document.createElement('span');
       detail.className = 'act-btn__price';
-      detail.textContent = `→ ${option.label}`;
+      detail.textContent = `→ ${localizedText(option.label)}`;
       button.appendChild(detail);
       button.addEventListener('click', () => this.config.onPathChoice?.(option.cellId));
       return button;

@@ -63,6 +63,20 @@
         "$type": "color"
       }
     },
+    "player": {
+      "self": {
+        "$value": "#C0392B",
+        "$type": "color"
+      },
+      "teammate": {
+        "$value": "#2C5F8D",
+        "$type": "color"
+      },
+      "other": {
+        "$value": "#4A7C3F",
+        "$type": "color"
+      }
+    },
     "line": {
       "map": {
         "$value": "#B0B0B0",

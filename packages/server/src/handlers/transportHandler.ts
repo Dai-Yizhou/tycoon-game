@@ -460,7 +460,7 @@ export class TransportHandler {
         const cell = mapIndex?.getById(cellId);
         return {
           cellId,
-          name: cell ? getExtra<string>(cell, 'name', `格子 ${cellId}`) : `格子 ${cellId}`,
+          name: cell ? cell.name : undefined,
         };
       }),
     });

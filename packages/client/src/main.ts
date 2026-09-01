@@ -23,7 +23,7 @@ import {
   cleanupBankruptcyPage,
 } from './pages/index.js';
 import { DesignAdapter } from './design/DesignAdapter.js';
-import { getThemeTokens } from './design/ThemeConfig.js';
+import { getThemeTokens, SAVED_REGION_THEME_KEY } from './design/ThemeConfig.js';
 import './style.css';
 
 function disableZoom(): void {
@@ -68,8 +68,10 @@ function bootstrap(): void {
   app.innerHTML = '';
 
   // 在根节点注入主题令牌：欢迎/登录/加载/破产等独立页面不持有自己的 DesignAdapter，
-  // 统一从 :root 继承；游戏页再在自身元素上按地区覆盖。默认取 northeast 主题。
-  const rootSnapshot = new DesignAdapter(getThemeTokens()).createSnapshot('day');
+  // 统一从 :root 继承；游戏页再在自身元素上按地区覆盖。
+  // 默认取 northeast 主题；若已有存档则沿用玩家所在格子的区域主题，保证欢迎页调性与存档一致。
+  const savedTheme = localStorage.getItem(SAVED_REGION_THEME_KEY) ?? undefined;
+  const rootSnapshot = new DesignAdapter(getThemeTokens(savedTheme)).createSnapshot('day');
   for (const [name, value] of Object.entries(rootSnapshot.dom)) {
     document.documentElement.style.setProperty(name, value);
   }

@@ -11,7 +11,7 @@
 
 `src/index.ts` 统一导出这些模块；server/client 通过 `@game/shared` 使用相同的编译期契约。Socket 协议集中在 `src/types/socket-events.ts`。
 
-当前运行时不包含 item、talent、achievement 三个系统。若同名历史类型或配置仍存在，应以实际导出、引用和注册链复核，不能据此描述现行玩法。
+当前运行时不包含 item、talent 两个系统。achievement 契约当前有效（见 `src/types/achievement.ts`）。若同名历史类型或配置仍存在，应以实际导出、引用和注册链复核，不能据此描述现行玩法。
 
 ## 命令
 
