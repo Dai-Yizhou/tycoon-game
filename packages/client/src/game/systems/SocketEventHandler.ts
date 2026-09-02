@@ -11,7 +11,7 @@ import { resolveTimezoneOffsetMinutes } from '../timezone.js';
 import type { OtherPlayerInfo } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
 import { startServerPathAnimation } from './MovementSystem.js';
-import { requestHudRefresh } from '../ClientHudBridge.js';
+import { noopHudRefresh, type HudRefresh } from '../ClientHudBridge.js';
 import type { GameController } from '../GameController.js';
 import { GameStore } from '../../state/GameStore.js';
 import type { MapIndex, Player } from '@game/shared';
@@ -29,6 +29,7 @@ export interface SocketHandlerOptions {
   onNotification?: (payload: { id: string; type: 'info' | 'success' | 'warning' | 'error'; title: string; content: string; durationMs?: number; createdAt?: number }) => void;
   onPathChoiceOptions?: (options: Array<{ cellId: number; label: unknown }>) => void;
   onPathChoiceCleared?: () => void;
+  onHudRefresh?: HudRefresh;
   movementEffects?: MovementEffectHooks;
 }
 
@@ -50,6 +51,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   if (registeredSockets.has(socket)) return;
   registeredSockets.add(socket);
   const store = options.store;
+  const refresh = options.onHudRefresh ?? noopHudRefresh;
   if (options.onEvent && socket.onAny) {
     const observer = (event: string) => {
       queueMicrotask(() => options.onEvent?.(event));
@@ -59,12 +61,12 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   }
   // 每秒进度更新：同步 cycleStartTime 和计算时钟偏移
   socket.on('server.dayNightProgress', (payload: { cycleStartTime: number; cycleMinutes: number; globalTime: number }) => {
-    store.updateDayNight({ dayNightStartTime: payload.cycleStartTime, serverTimeOffset: payload.globalTime - Date.now() });
+    store.updateDayNight({ dayNightStartTime: payload.cycleStartTime, serverTimeOffset: payload.globalTime - Date.now(), cycleMinutes: payload.cycleMinutes });
   });
 
   // 阶段切换：同步时间
   socket.on('server.dayNightChanged', (payload: { cycleStartTime: number; cycleMinutes: number; globalTime: number; isDay: boolean }) => {
-    store.updateDayNight({ dayNightStartTime: payload.cycleStartTime, serverTimeOffset: payload.globalTime - Date.now() });
+    store.updateDayNight({ dayNightStartTime: payload.cycleStartTime, serverTimeOffset: payload.globalTime - Date.now(), cycleMinutes: payload.cycleMinutes });
     const phaseMsg = payload.isDay ? t('dayNight.day') : t('dayNight.night');
     addChatMessage(t('dayNight.dayChanged', { phase: phaseMsg }), 'system');
   });
@@ -76,7 +78,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     const cell = snapshot.cells.get(snapshot.currentPlayerPosition);
     const offsetMinutes = resolveTimezoneOffsetMinutes(cell, snapshot.mapTimezones);
     const serverElapsed = Date.now() + snapshot.serverTimeOffset - snapshot.dayNightStartTime;
-    const localProgress = ((serverElapsed / (15 * 60 * 1000)) + offsetMinutes / (24 * 60)) % 1;
+    const localProgress = ((serverElapsed / (snapshot.cycleMinutes * 60 * 1000)) + offsetMinutes / (24 * 60)) % 1;
     const totalMinutes = Math.floor(localProgress * 24 * 60);
     const timeStr = `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
     const isDay = totalMinutes >= 6 * 60 && totalMinutes < 18 * 60;
@@ -94,33 +96,33 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 
   socket.on('server.leaderboardUpdated', (payload) => {
     store.setLeaderboard(payload);
-    requestHudRefresh();
+    refresh();
   });
 
   socket.on('server.achievementUnlocked', (payload) => {
     const current = store.getSnapshot().achievements.snapshot;
     store.setAchievements(current ? { ...current, generatedAt: Date.now(), achievements: current.achievements.map((item) => item.id === payload.achievement.id ? payload.achievement : item) } : { enabled: true, mapId: payload.achievement.record.mapId ?? '', generatedAt: Date.now(), achievements: [payload.achievement] });
     options.onNotification?.({ id: `achievement-${payload.achievement.id}`, type: 'success', title: t('hud.achievements'), content: localizedText(payload.achievement.name), durationMs: 3000 });
-    requestHudRefresh();
+    refresh();
   });
 
   socket.on('server.error', (payload) => {
     if (payload.code.toLowerCase().includes('leaderboard') || payload.message.toLowerCase().includes('榜单')) {
       store.setLeaderboardError(payload.message);
-      requestHudRefresh();
+      refresh();
     }
   });
 
   socket.on('disconnect', () => {
     store.setAchievementsOffline();
     store.setLeaderboardOffline();
-    requestHudRefresh();
+    refresh();
   });
 
   socket.on('connect', () => {
     if (store.getSnapshot().leaderboard.status === 'offline') {
       store.setLeaderboard(store.getSnapshot().leaderboard.snapshot);
-      requestHudRefresh();
+      refresh();
     }
   });
 
@@ -129,7 +131,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       store.applyEvent({ sequence: store.nextSequence(), type: 'status', playerId: payload.playerId, status: 'bankrupt' });
       options.controller?.setBankrupt();
     }
-    requestHudRefresh();
+    refresh();
   });
 
   socket.on('server.gameState', (payload) => {
@@ -146,14 +148,14 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     store.setCell(payload.cell);
     store.setCellRuntimeState(payload.cell.id, payload.runtime);
     store.applyEvent({ sequence: store.nextSequence(), type: 'property', playerId: payload.playerId, cellId: payload.cell.id, level: 0 });
-    requestHudRefresh();
+    refresh();
   });
 
   socket.on('server.propertyUpgraded', (payload) => {
     store.setCell(payload.cell);
     store.setCellRuntimeState(payload.cell.id, payload.runtime);
     store.applyEvent({ sequence: store.nextSequence(), type: 'property', playerId: payload.playerId, cellId: payload.cell.id, level: payload.newLevel });
-    requestHudRefresh();
+    refresh();
   });
 
   socket.on('server.investmentBought', (payload) => {
@@ -162,7 +164,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     const ownerships = payload.runtime.ownerships;
     const ownership = ownerships.find((item) => item.playerId === payload.playerId);
     if (ownership) store.applyEvent({ sequence: store.nextSequence(), type: 'investment', playerId: payload.playerId, cellId: payload.cell.id, share: ownership.share });
-    requestHudRefresh();
+    refresh();
   });
 
   socket.on('server.playerRestarted', (payload) => {
@@ -170,7 +172,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       store.applySnapshot({ sequence: store.nextSequence(), currentPlayer: payload.player, isBankrupt: false, isInJail: false, currentPlayerPosition: payload.player.position.cellId });
       options.controller?.setRestarted(payload.player);
     }
-    requestHudRefresh();
+    refresh();
   });
 
   // 监听聊天消息
@@ -241,12 +243,12 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       // 动画权威位置直接当成跳转整格覆盖，导致棋子停留在原地而视野已被拉走。
       if (snapshot.isServerAnimating) return;
       if (activeMapIndex && payload.path && payload.path.length > 1) {
-        const started = startServerPathAnimation(store, activeMapIndex, payload.path, () => requestHudRefresh(), options.movementEffects, payload.cellId);
+        const started = startServerPathAnimation(store, activeMapIndex, payload.path, refresh, options.movementEffects, payload.cellId, refresh);
         console.warn('[DBG-START-ANIM] started=', started);
       } else {
         console.warn('[DBG-JUMP-MOVE] no path, direct jump');
         store.applyEvent({ sequence: store.nextSequence(), type: 'move', playerId: payload.playerId, cellId: payload.cellId });
-        requestHudRefresh();
+        refresh();
       }
     }
   });
@@ -267,7 +269,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     if (!isCurrentPlayer && !isOtherPlayer) return;
     store.applyEvent({ sequence: store.nextSequence(), type: 'value', playerId: payload.playerId, fieldId: payload.fieldId, current: payload.current });
     if (isCurrentPlayer) {
-      requestHudRefresh();
+      refresh();
     }
   });
 
@@ -296,7 +298,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     if (isCurrentPlayer) {
       store.applyEvent({ sequence: store.nextSequence(), type: 'status', playerId: payload.playerId, status: 'normal' });
       addChatMessage(t('jail.released'), 'system');
-      requestHudRefresh();
+      refresh();
     } else {
       const otherPlayer = snapshot.otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {
@@ -377,7 +379,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       if (payload.members) {
         store.applyEvent({ sequence: store.nextSequence(), type: 'team', members: payload.members });
       }
-      requestHudRefresh();
+      refresh();
     }
   });
 
@@ -385,7 +387,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   socket.on('server.teamDisbanded', () => {
     store.applyEvent({ sequence: store.nextSequence(), type: 'team', members: [] });
     addChatMessage(t('team.teamDisbanded'), 'system');
-    requestHudRefresh();
+    refresh();
   });
 
   // 监听服务端区域 UCT 数值变化（昼夜切换、纪念碑修缮等统一广播）

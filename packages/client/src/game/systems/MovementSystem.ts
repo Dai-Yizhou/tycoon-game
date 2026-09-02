@@ -4,7 +4,7 @@ import type { TypedClientSocket } from '../../hooks/useSocket.js';
 import type { ClientGameSnapshot, GameStore } from '../../state/GameStore.js';
 import type { MovementEffectHooks } from '../GameEffects.js';
 import { addChatMessage } from './ChatSystem.js';
-import { requestHudRefresh } from '../ClientHudBridge.js';
+import { noopHudRefresh, type HudRefresh } from '../ClientHudBridge.js';
 import { readCssVarNumber } from '../../design/DesignAdapter.js';
 
 /** 单步移动插值时长的兜底默认值；运行时以主题令牌 --motion-step 覆盖 */
@@ -103,7 +103,7 @@ export function animateMoveTo(store: GameStore, map: MapIndex, targetId: number,
   effects?.onStepStart(snapshot.currentPlayerPosition, targetId);
 }
 
-export function startServerPathAnimation(store: GameStore, map: MapIndex, path: number[], onPlayerArrived: () => void, effects?: MovementEffectHooks, authoritativeCellId?: number): void {
+export function startServerPathAnimation(store: GameStore, map: MapIndex, path: number[], onPlayerArrived: () => void, effects?: MovementEffectHooks, authoritativeCellId?: number, onHudRefresh?: HudRefresh): void {
   const current = store.getSnapshot();
   const start = path[0];
   const end = path[path.length - 1];
@@ -116,7 +116,7 @@ export function startServerPathAnimation(store: GameStore, map: MapIndex, path: 
   if (!startCell || !endCell) return;
   updateSnapshot(store, { serverPath: [...path], serverPathIndex: 0, isServerAnimating: true, isMoving: true, currentPlayerPosition: start, playerDisplayX: startCell.x, playerDisplayY: startCell.y, moveFromX: startCell.x, moveFromY: startCell.y, moveToX: endCell.x, moveToY: endCell.y, remainingSteps: 0 });
   window.dispatchEvent(new CustomEvent('game:cell-leave'));
-  requestHudRefresh();
+  (onHudRefresh ?? noopHudRefresh)();
   advanceServerPathStep(store, map, onPlayerArrived, effects);
 }
 

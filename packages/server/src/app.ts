@@ -187,7 +187,7 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
     worldIdentity: { worldId, namespace: config.worldNamespace, temporary: temporaryWorld, expiresAt: worldExpiry },
   });
 
-  // 加载地图数据与元数据（供 ProsperityManager、TimeZoneManager 等使用）
+  // 加载地图数据与元数据（供 GameWorld、TimeZoneManager 等使用）
   try {
     const mapFilePath = resolveConfiguredPath(config.mapPath);
     const mapMetaFilePath = resolveConfiguredPath(config.mapMetaPath);
@@ -374,14 +374,15 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   });
   leaderboardManager.markDirty();
 
-  // 初始化昼夜循环（从服务器启动时开始计时）
+  // 初始化昼夜循环（从服务器启动时开始计时），周期时长以 mapMeta.dayNightCycle 为准
+  const cycleMinutes = mapMeta.dayNightCycle > 0 ? mapMeta.dayNightCycle : DEFAULT_DAY_NIGHT_CONFIG.cycleMinutes;
   const dayNightCycle = new DayNightCycle(
     io,
-    DEFAULT_DAY_NIGHT_CONFIG,
+    { ...DEFAULT_DAY_NIGHT_CONFIG, cycleMinutes },
     handlerRegistry.getTransportHandler(),
   );
   dayNightCycle.start();
-  logger.info(`DayNightCycle started (cycle=${DEFAULT_DAY_NIGHT_CONFIG.cycleMinutes}min)`);
+  logger.info(`DayNightCycle started (cycle=${cycleMinutes}min)`);
 
   // 将 DayNightCycle 注入 SocketManager（供 login handler 同步时间）
   if (socketManager) {

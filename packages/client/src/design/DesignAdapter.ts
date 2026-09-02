@@ -15,6 +15,99 @@ export interface ThemeSnapshot {
   line: { currentWidth: number };
 }
 
+/** 令牌读取源描述：种类决定如何从令牌树取值并格式化 */
+type DomTokenSource =
+  | { kind: 'color'; path: string }
+  | { kind: 'string'; path: string }
+  | { kind: 'px'; path: string }
+  | { kind: 'ms'; path: string };
+
+/** DOM 令牌映射：令牌路径 → CSS 变量名。单一数据源，由 createSnapshot 统一消费。 */
+const DOM_TOKEN_MAP: ReadonlyArray<readonly [cssVar: string, source: DomTokenSource]> = [
+  ['--tycoon-board-background', { kind: 'color', path: 'color.surface.board' }],
+  ['--tycoon-cell-property-fill', { kind: 'color', path: 'color.cell.property.fill' }],
+  ['--tycoon-cell-event-fill', { kind: 'color', path: 'color.cell.event.fill' }],
+  ['--tycoon-cell-transport-fill', { kind: 'color', path: 'color.cell.transport.fill' }],
+  ['--tycoon-piece-head', { kind: 'color', path: 'color.piece.head' }],
+  ['--tycoon-piece-outline', { kind: 'color', path: 'color.piece.outline' }],
+  ['--gp-player-self', { kind: 'color', path: 'color.player.self' }],
+  ['--gp-player-teammate', { kind: 'color', path: 'color.player.teammate' }],
+  ['--gp-player-other', { kind: 'color', path: 'color.player.other' }],
+  ['--tycoon-accent', { kind: 'color', path: 'color.palette.accent' }],
+  ['--tycoon-muted', { kind: 'color', path: 'color.hud.muted' }],
+  // HUD 覆盖层令牌：由主题 JSON 的 color.hud 区段注入，组件只消费 CSS 变量
+  ['--gp-bar-bg', { kind: 'color', path: 'color.hud.barBg' }],
+  ['--gp-sidebar-bg', { kind: 'color', path: 'color.hud.sidebarBg' }],
+  ['--gp-map-bg', { kind: 'color', path: 'color.hud.mapBg' }],
+  ['--gp-card', { kind: 'color', path: 'color.hud.card' }],
+  ['--gp-fg', { kind: 'color', path: 'color.hud.fg' }],
+  ['--gp-border', { kind: 'color', path: 'color.hud.cellBorder' }],
+  ['--gp-muted', { kind: 'color', path: 'color.hud.muted' }],
+  ['--gp-accent', { kind: 'color', path: 'color.palette.accent' }],
+  ['--gp-cell-bg', { kind: 'color', path: 'color.hud.cellBg' }],
+  // 字体（功能/数字 + 通用正文/标题）
+  ['--font-body', { kind: 'color', path: 'font.body' }],
+  ['--font-title', { kind: 'color', path: 'font.title' }],
+  ['--font-func', { kind: 'color', path: 'font.func' }],
+  ['--font-num', { kind: 'color', path: 'font.number' }],
+  // 棋子几何
+  ['--piece-outline-width', { kind: 'px', path: 'dimension.piece.outline' }],
+  // 地域语法（棋盘与 SVG 地图语义令牌）
+  ['--region-board-bg', { kind: 'color', path: 'color.region.board' }],
+  ['--region-fg', { kind: 'color', path: 'color.region.fg' }],
+  ['--region-border', { kind: 'color', path: 'color.region.border' }],
+  ['--region-border-w', { kind: 'px', path: 'color.region.borderWidth' }],
+  ['--region-radius', { kind: 'px', path: 'color.region.radius' }],
+  ['--region-chip-radius', { kind: 'px', path: 'color.region.chipRadius' }],
+  ['--region-accent', { kind: 'color', path: 'color.region.accent' }],
+  ['--region-accent-hover', { kind: 'color', path: 'color.region.accentHover' }],
+  ['--region-label-fg', { kind: 'color', path: 'color.region.labelFg' }],
+  ['--region-motion-fg', { kind: 'color', path: 'color.region.motionFg' }],
+  ['--region-rule', { kind: 'color', path: 'color.region.ruleColor' }],
+  ['--region-cell-bg', { kind: 'color', path: 'color.region.cellBg' }],
+  ['--region-cell-border', { kind: 'color', path: 'color.region.cellBorder' }],
+  ['--region-box-bg', { kind: 'color', path: 'color.region.boxBg' }],
+  ['--region-tab-bg', { kind: 'color', path: 'color.region.tabBg' }],
+  ['--region-frag-bg', { kind: 'color', path: 'color.region.fragBg' }],
+  ['--region-btn-fg', { kind: 'color', path: 'color.region.btnFg' }],
+  ['--region-focus', { kind: 'color', path: 'color.region.focus' }],
+  ['--region-focus-w', { kind: 'px', path: 'color.region.focusWidth' }],
+  ['--region-cycle-day', { kind: 'color', path: 'color.region.cycleDay' }],
+  ['--region-cycle-night', { kind: 'color', path: 'color.region.cycleNight' }],
+  ['--region-error', { kind: 'color', path: 'color.region.error' }],
+  ['--region-texture', { kind: 'color', path: 'texture.region.background' }],
+  // 登录/加载/欢迎：语义令牌映射到同一套地域变量（standalone 时由 :root 兜底）
+  ['--auth-bg', { kind: 'color', path: 'color.region.board' }],
+  ['--auth-fg', { kind: 'color', path: 'color.region.fg' }],
+  ['--auth-card', { kind: 'color', path: 'color.region.boxBg' }],
+  ['--auth-surface', { kind: 'color', path: 'color.region.cellBg' }],
+  ['--auth-muted', { kind: 'color', path: 'color.region.labelFg' }],
+  ['--auth-accent', { kind: 'color', path: 'color.region.accent' }],
+  ['--auth-accent-hover', { kind: 'color', path: 'color.region.accentHover' }],
+  ['--auth-border', { kind: 'color', path: 'color.region.border' }],
+  ['--auth-border-soft', { kind: 'color', path: 'color.region.cellBorder' }],
+  ['--auth-error', { kind: 'color', path: 'color.region.error' }],
+  ['--auth-track', { kind: 'color', path: 'color.region.board' }],
+  ['--auth-paper', { kind: 'color', path: 'color.region.btnFg' }],
+  ['--auth-radius', { kind: 'px', path: 'color.region.radius' }],
+  // HUD 额外令牌
+  ['--gp-paper', { kind: 'color', path: 'color.region.btnFg' }],
+  ['--gp-cycle-day', { kind: 'color', path: 'color.region.cycleDay' }],
+  ['--gp-cycle-night', { kind: 'color', path: 'color.region.cycleNight' }],
+  // 动效时序令牌：串型时长直接作为 CSS 动画时长；数值型转换为毫秒供 JS 动画读取
+  ['--motion-fast', { kind: 'string', path: 'motion.fast' }],
+  ['--motion-normal', { kind: 'string', path: 'motion.normal' }],
+  ['--motion-step', { kind: 'ms', path: 'motion.step' }],
+  ['--motion-step-arrive', { kind: 'ms', path: 'motion.stepArrive' }],
+  ['--motion-move-complete', { kind: 'ms', path: 'motion.moveComplete' }],
+  ['--motion-dice-settled', { kind: 'ms', path: 'motion.diceSettled' }],
+  ['--motion-property-bought', { kind: 'ms', path: 'motion.propertyBought' }],
+  ['--motion-bankrupt', { kind: 'ms', path: 'motion.bankrupt' }],
+  ['--motion-slideup-title', { kind: 'string', path: 'motion.slideUpTitle' }],
+  ['--motion-slideup', { kind: 'string', path: 'motion.slideUp' }],
+  ['--motion-spin', { kind: 'string', path: 'motion.spin' }],
+];
+
 /**
  * 从根元素读取带 `--` 前缀的 CSS 数值变量并解析为毫秒，供 JS 动画时序使用。
  * 解析失败或数值非正时回退 fallback，避免动画时序因缺失变量而失效。
@@ -67,29 +160,44 @@ export class DesignAdapter {
     return token.$value;
   }
 
+  /** 数值令牌基础读取，供 number 投影与 DOM 映射共用 */
+  private readNumber(path: string, tokens: TokenTree): number {
+    const token = path.split('.').reduce<unknown>((node, key) => {
+      return typeof node === 'object' && node !== null ? (node as TokenTree)[key] : undefined;
+    }, tokens);
+    if (!isToken(token) || typeof token.$value !== 'number') throw new Error(`Unknown number token: ${path}`);
+    return token.$value;
+  }
+
+  /** 依据 DOM 令牌映射与阶段合并后的令牌树，将各条目渲染为 CSS 变量值 */
+  private readDomToken([cssVar, source]: readonly [string, DomTokenSource], tokens: TokenTree): [string, string] {
+    switch (source.kind) {
+      case 'color': return [cssVar, this.getColor(source.path, tokens)];
+      case 'string': return [cssVar, this.getString(source.path, tokens)];
+      case 'px': return [cssVar, `${this.readNumber(source.path, tokens)}px`];
+      case 'ms': return [cssVar, `${this.readNumber(source.path, tokens)}ms`];
+    }
+  }
+
   createSnapshot(phase: DayPhase = 'day'): ThemeSnapshot {
     const tokens = phase === 'day'
       ? this.baseTokens
       : mergeTrees(this.baseTokens, ((this.baseTokens.modes as TokenTree | undefined)?.[phase] as TokenTree | undefined) ?? {});
-    const color = (path: string) => this.getColor(path, tokens);
-    const str = (path: string): string => this.getString(path, tokens);
-    const number = (path: string): number => {
-      const token = path.split('.').reduce<unknown>((node, key) => {
-        return typeof node === 'object' && node !== null ? (node as TokenTree)[key] : undefined;
-      }, tokens);
-      if (!isToken(token) || typeof token.$value !== 'number') throw new Error(`Unknown number token: ${path}`);
-      return token.$value;
-    };
 
-    const property = color('color.cell.property.fill');
-    const event = color('color.cell.event.fill');
-    const transport = color('color.cell.transport.fill');
-    const board = color('color.surface.board');
-    const ink = color('color.piece.outline');
-    const connection = color('color.line.map');
-    const accent = color('color.palette.accent');
-    const muted = color('color.hud.muted');
-    const px = (path: string): string => `${number(path)}px`;
+    const property = this.getColor('color.cell.property.fill', tokens);
+    const event = this.getColor('color.cell.event.fill', tokens);
+    const transport = this.getColor('color.cell.transport.fill', tokens);
+    const board = this.getColor('color.surface.board', tokens);
+    const ink = this.getColor('color.piece.outline', tokens);
+    const connection = this.getColor('color.line.map', tokens);
+    const accent = this.getColor('color.palette.accent', tokens);
+    const muted = this.getColor('color.hud.muted', tokens);
+
+    const dom: Record<string, string> = {};
+    for (const entry of DOM_TOKEN_MAP) {
+      const [cssVar, value] = this.readDomToken(entry, tokens);
+      dom[cssVar] = value;
+    }
 
     return {
       canvas: {
@@ -98,94 +206,11 @@ export class DesignAdapter {
         connection,
         accent,
         muted,
-        fg: color("color.hud.fg"),
+        fg: this.getColor('color.hud.fg', tokens),
       },
-      dom: {
-        '--tycoon-board-background': board,
-        '--tycoon-cell-property-fill': property,
-        '--tycoon-cell-event-fill': event,
-        '--tycoon-cell-transport-fill': transport,
-        '--tycoon-piece-head': color('color.piece.head'),
-        '--tycoon-piece-outline': color('color.piece.outline'),
-        '--gp-player-self': color('color.player.self'),
-        '--gp-player-teammate': color('color.player.teammate'),
-        '--gp-player-other': color('color.player.other'),
-        '--tycoon-accent': accent,
-        '--tycoon-muted': muted,
-        // HUD 覆盖层令牌：由主题 JSON 的 color.hud 区段注入，组件只消费 CSS 变量
-        '--gp-bar-bg': color('color.hud.barBg'),
-        '--gp-sidebar-bg': color('color.hud.sidebarBg'),
-        '--gp-map-bg': color('color.hud.mapBg'),
-        '--gp-card': color('color.hud.card'),
-        '--gp-fg': color('color.hud.fg'),
-        '--gp-border': color('color.hud.cellBorder'),
-        '--gp-muted': color('color.hud.muted'),
-        '--gp-accent': accent,
-        '--gp-cell-bg': color('color.hud.cellBg'),
-        // 字体（功能/数字 + 通用正文/标题）
-        '--font-body': color('font.body'),
-        '--font-title': color('font.title'),
-        '--font-func': color('font.func'),
-        '--font-num': color('font.number'),
-        // 棋子几何
-        '--piece-outline-width': px('dimension.piece.outline'),
-        // 1900 地域语法（棋盘与 SVG 地图语义令牌）
-        '--region-board-bg': color('color.region.board'),
-        '--region-fg': color('color.region.fg'),
-        '--region-border': color('color.region.border'),
-        '--region-border-w': px('color.region.borderWidth'),
-        '--region-radius': px('color.region.radius'),
-        '--region-chip-radius': px('color.region.chipRadius'),
-        '--region-accent': color('color.region.accent'),
-        '--region-accent-hover': color('color.region.accentHover'),
-        '--region-label-fg': color('color.region.labelFg'),
-        '--region-motion-fg': color('color.region.motionFg'),
-        '--region-rule': color('color.region.ruleColor'),
-        '--region-cell-bg': color('color.region.cellBg'),
-        '--region-cell-border': color('color.region.cellBorder'),
-        '--region-box-bg': color('color.region.boxBg'),
-        '--region-tab-bg': color('color.region.tabBg'),
-        '--region-frag-bg': color('color.region.fragBg'),
-        '--region-btn-fg': color('color.region.btnFg'),
-        '--region-focus': color('color.region.focus'),
-        '--region-focus-w': px('color.region.focusWidth'),
-        '--region-cycle-day': color('color.region.cycleDay'),
-        '--region-cycle-night': color('color.region.cycleNight'),
-        '--region-error': color('color.region.error'),
-        '--region-texture': color('texture.region.background'),
-        // 登录/加载/欢迎：语义令牌映射到同一套地域变量（standalone 时由 :root 兜底）
-        '--auth-bg': color('color.region.board'),
-        '--auth-fg': color('color.region.fg'),
-        '--auth-card': color('color.region.boxBg'),
-        '--auth-surface': color('color.region.cellBg'),
-        '--auth-muted': color('color.region.labelFg'),
-        '--auth-accent': color('color.region.accent'),
-        '--auth-accent-hover': color('color.region.accentHover'),
-        '--auth-border': color('color.region.border'),
-        '--auth-border-soft': color('color.region.cellBorder'),
-        '--auth-error': color('color.region.error'),
-        '--auth-track': color('color.region.board'),
-        '--auth-paper': color('color.region.btnFg'),
-        '--auth-radius': px('color.region.radius'),
-        // HUD 额外令牌
-        '--gp-paper': color('color.region.btnFg'),
-        '--gp-cycle-day': color('color.region.cycleDay'),
-        '--gp-cycle-night': color('color.region.cycleNight'),
-        // 动效时序令牌：JS 动画通过 CSS 变量读取毫秒数，CSS 动画直接消费时长字符串
-        '--motion-fast': str('motion.fast'),
-        '--motion-normal': str('motion.normal'),
-        '--motion-step': `${number('motion.step')}ms`,
-        '--motion-step-arrive': `${number('motion.stepArrive')}ms`,
-        '--motion-move-complete': `${number('motion.moveComplete')}ms`,
-        '--motion-dice-settled': `${number('motion.diceSettled')}ms`,
-        '--motion-property-bought': `${number('motion.propertyBought')}ms`,
-        '--motion-bankrupt': `${number('motion.bankrupt')}ms`,
-        '--motion-slideup-title': str('motion.slideUpTitle'),
-        '--motion-slideup': str('motion.slideUp'),
-        '--motion-spin': str('motion.spin'),
-      },
-      piece: { outlineWidth: number('dimension.piece.outline') },
-      line: { currentWidth: number('dimension.line.current') },
+      dom,
+      piece: { outlineWidth: this.readNumber('dimension.piece.outline', tokens) },
+      line: { currentWidth: this.readNumber('dimension.line.current', tokens) },
     };
   }
 

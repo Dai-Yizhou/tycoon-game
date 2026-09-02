@@ -35,8 +35,8 @@ packages/server/src/index.ts: bootstrap()
      -> Express / HTTP / Socket.IO
      -> GameWorld + 地图解析
      -> HandlerRegistry
-     -> DayNightCycle / TimeZoneManager / ProsperityManager
-     -> BehaviorEngine / EraManager / PlayerStore
+     -> DayNightCycle / DayNightValueChange / TimeZoneManager
+     -> BehaviorEngine / PlayerManager
   -> startHttpServer()
   -> SIGINT/SIGTERM gracefulShutdown()
 ```
@@ -149,14 +149,14 @@ InteractiveMapSurface：每个格子 <g> 的 mouseenter / tap
   - 游客转正（`AuthService.migrateGuest`）不改变用户 ID，不执行成就迁移/合并；成就按稳定 owner ID 读取。
 - `ai-bot` 与 `ai_bot_try` 不属于本次清理边界。
 - 破产重开仍是基础 Player 状态流程，不提供远程恢复或道具恢复机制。
-- `NotificationManager`、`InMemoryEraStore` 等模块存在但尚无生产调用方：`server.notification` 事件当前不被任何服务端路径发出；时代仅停留在 `GameWorld.setEra/getCurrentEra` 数据层，尚无自动时代推进调度。
+- `server.notification` 由事件/地产/交通/监狱/纪念碑等 handler 就地 `emit`，**没有集中通知管理器**（`NotificationManager` 源码已删）；通知发送散落多处以保载荷一致/限频时需收敛。时代仅停留在 `GameWorld.setEra/getCurrentEra/findEraById` 数据层，并无自动时代推进调度，协议 `server.eraChanged` 仅接线、生产未触发。
 
 ## 残余技术债
 
 - `GamePage` 仍承担页面组合、兼容状态和部分业务接线，`GameStore` 与 `GameViewModel` 并存。
 - `packages/client/src/state/GameStore.ts` 是客户端业务快照源；旧模块级变量仅保留给渲染和兼容接线，不再作为经济业务状态写入口。
 - 客户端 `SocketEventHandler.ts` 残留 `console.warn('[DBG-*]')` 调试日志，Beta 上线前应移除。
-- `NotificationManager` 无生产调用方（`server.notification` 无人发出），认证/持久化能力需以 `app.ts` 注册为准。
+- `server.notification` 无集中通知管理器：由各 handler 就地 `emit`（见事件/地产/交通/监狱/纪念碑 handler），认证/持久化能力以 `app.ts` 注册为准；通知载荷一致性与限频为已知收敛点。
 - `REDIS_URL` 在配置类型和文档中存在，当前 app 未建立 Redis 适配器；不能描述为已实现多实例同步。
 - 服务端存在 REST 地图读取与 Socket 状态两条输入来源，客户端地图请求失败时的回退逻辑增加了状态排查成本。
 

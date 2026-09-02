@@ -33,8 +33,6 @@ import {
   addChatMessage, setChatStore,
 } from '../game/systems/ChatSystem.js';
 
-import { registerHudRefresh } from '../game/ClientHudBridge.js';
-
 import {
   handleRollDice,
   handleBuyProperty, handleUpgradeProperty, handleBuyInvestment, handleCoInvest,
@@ -54,7 +52,6 @@ import { localizedText } from '../game/i18n.js';
 let gameViewModel: GameViewModel | null = null;
 let gameStore: GameStore | null = null;
 let gameHudShell: GameHudShell | null = null;
-let unregisterHudRefresh: (() => void) | null = null;
 let unsubscribeGameStore: (() => void) | null = null;
 let mapIndex: MapIndex | null = null;
 let gameSocket: TypedClientSocket | null = null;
@@ -63,7 +60,7 @@ let movementFrame: number | null = null;
 const pageEventCleanups = new WeakMap<HTMLElement, () => void>();
 
 function createGameRuntime(store: GameStore, socket: NonNullable<typeof gameSocket>, index: NonNullable<typeof mapIndex>): GameRuntime {
-  return { store, socket, mapIndex: index, cooldownTimer: null };
+  return { store, socket, mapIndex: index, cooldownTimer: null, onHudRefresh: () => gameHudShell?.update() };
 }
 
 function invokeGameAction(action: (runtime: GameRuntime) => void): void {
@@ -205,7 +202,6 @@ export function createGamePage(controller: GameController): HTMLElement {
     },
   });
   page.appendChild(gameHudShell.getElement());
-  unregisterHudRefresh = registerHudRefresh(() => { gameHudShell?.update(); });
 
   gameSocket = controller.getSocket();
   if (context.leaderboard) gameStore.setLeaderboard(context.leaderboard);
@@ -276,6 +272,7 @@ export function createGamePage(controller: GameController): HTMLElement {
       getMapIndex: () => mapIndex ?? undefined,
       onPathChoiceOptions: (options) => gameStore?.setPathChoice(options),
       onPathChoiceCleared: () => gameStore?.clearPathChoice(),
+      onHudRefresh: () => gameHudShell?.update(),
       movementEffects,
       onEvent: () => {
         gameHudShell?.update();
@@ -555,8 +552,6 @@ export function cleanupGamePage(page: HTMLElement): void {
   }
   pageEventCleanups.get(page)?.();
   pageEventCleanups.delete(page);
-  unregisterHudRefresh?.();
-  unregisterHudRefresh = null;
   gameHudShell?.destroy();
   gameHudShell = null;
   gameEffects?.destroy();

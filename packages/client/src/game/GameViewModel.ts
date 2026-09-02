@@ -309,7 +309,7 @@ export class GameViewModel {
   // ===== Day/Night =====
   getDayNight(): DayNightSlice {
     const snapshot = this.projectedSnapshot();
-    return { cycleDuration: 15 * 60 * 1000, cycleStartTime: snapshot.dayNightStartTime, serverTimeOffset: snapshot.serverTimeOffset };
+    return { cycleDuration: (snapshot.cycleMinutes > 0 ? snapshot.cycleMinutes : 15) * 60 * 1000, cycleStartTime: snapshot.dayNightStartTime, serverTimeOffset: snapshot.serverTimeOffset };
   }
 
   // ===== Regions =====

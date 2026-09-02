@@ -56,14 +56,10 @@
 | `src/world/GameWorld.ts` | 地图、时代和玩家世界容器，发出世界事件 |
 | `src/world/PlayerManager.ts` | 玩家增删改查、连接绑定、冻结/恢复 |
 | `src/world/DayNightCycle.ts` | 昼夜计时、广播、税收和交通周期联动 |
-| `src/world/DayNightValueChange.ts` | 昼夜驱动的区域 UCT 数值变化（`regionValues` 动态字段） |
+| `src/world/DayNightValueChange.ts` | 昼夜驱动的区域 UCT 数值变化（`regionValues` 动态字段，含区域繁荣度） |
 | `src/world/TimeZoneManager.ts` | 地图时区、本地时间与昼夜判定 |
-| `src/world/ProsperityManager.ts` | 区域繁荣度更新与广播 |
-| `src/storage/PlayerStore.ts`、`InMemoryPlayerStore.ts`、`MongoPlayerStore.ts` | 玩家持久化接口及内存/Mongo 实现 |
-| `src/storage/WorldStore.ts`、`MongoWorldStore.ts` | 世界状态持久化接口及 Mongo 实现（快照恢复） |
+| `src/storage/WorldStore.ts`（含 `FileWorldStore`）、`MongoWorldStore.ts` | 世界状态持久化接口及文件/Mongo 实现（快照恢复；玩家状态统一经世界快照持久化） |
 | `src/state/WorldRuntimeState.ts`、`WorldRuntimeStateStore.ts` | 世界运行时状态聚合与存储 |
-| `src/storage/EraStore.ts`、`InMemoryEraStore.ts` | 时代存储接口及内存实现 |
-| `src/era/EraManager.ts` | 时代初始化、结算、切换、纪念碑铭记 |
 
 ### 业务模块
 
@@ -81,11 +77,11 @@
 | `src/economy/EconomyService.ts` | 经济数值中枢（计税联动、UCT 变更回调） |
 | `src/achievement/AchievementManager.ts`、`AchievementStore.ts`（Mongo/File/InMemory 实现）、`AchievementConfigLoader.ts` | 成就定义加载、六类触发、owner 级并发串行化与持久化 |
 | `src/ranking/LeaderboardManager.ts` | 榜单脏标记与正式刷新广播 |
-| `src/events/EventHandler.ts`、`EventRegistry.ts`、`EventEffects.ts`、`eventTemplates.ts` | 事件注册、模板和效果 |
+| `src/events/EventHandler.ts`、`index.ts` | 事件分发（有 `extra.behavior` 走 BehaviorEngine，否则内置随机） |
 | `src/behavior/BehaviorEngine.ts` | 加载 `config/behaviors/*.json` 并权威执行行为 |
 | `src/team/TeamManager.ts`、`src/handlers/teamHandler.ts` | 队伍纯数据与 Socket 协议 |
 | `src/chat/ChatManager.ts`、`FeedbackManager.ts` | 聊天消息、频道状态与反馈 `/report`（清洗/限长/限频/结构化日志） |
-| `src/notifications/NotificationManager.ts` | 通知管理能力；接线以具体 handler 为准 |
+| `server.notification`（由各 handler 直发） | 通知类事件由事件/地产/交通/监狱/纪念碑等 handler 就地 `emit`，无集中通知管理器 |
 | `src/handlers/debugHandler.ts` | debug flags 开启时的调试请求 |
 
 ### 数据文件

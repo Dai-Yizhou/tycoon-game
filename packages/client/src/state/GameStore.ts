@@ -48,6 +48,7 @@ export interface ClientGameSnapshot {
   rollCooldownMs: number;
   dayNightStartTime: number;
   serverTimeOffset: number;
+  cycleMinutes: number;
   pathChoice: { active: boolean; options: Array<{ cellId: number; label: unknown }> };
   previousCellId: number;
   playerDisplayX: number;
@@ -103,7 +104,7 @@ export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     isBankrupt: false,
-    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], regionValues: new Map(),
+    isInJail: false, jailEndTime: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, cycleMinutes: 15, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], regionValues: new Map(),
       mapRegions: [], mapTimezones: [], valueFieldDefs: [], cellRuntimeStates: new Map(), leaderboard: { status: 'loading', snapshot: null, error: null }, achievements: { status: 'loading', snapshot: null, error: null },
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
@@ -176,7 +177,7 @@ export class GameStore {
     this.publish();
   }
 
-  updateDayNight(partial: Partial<Pick<ClientGameSnapshot, 'dayNightStartTime' | 'serverTimeOffset'>>): void {
+  updateDayNight(partial: Partial<Pick<ClientGameSnapshot, 'dayNightStartTime' | 'serverTimeOffset' | 'cycleMinutes'>>): void {
     this.snapshot = { ...this.snapshot, ...partial };
     this.publish();
   }
@@ -346,6 +347,7 @@ export class GameStore {
       rollCooldownMs: 0,
       dayNightStartTime: Date.now(),
       serverTimeOffset: 0,
+      cycleMinutes: 15,
       pathChoice: { active: false, options: [] },
       previousCellId: -1,
       playerDisplayX: 600,

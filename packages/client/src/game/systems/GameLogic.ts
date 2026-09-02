@@ -3,7 +3,7 @@ import type { Cell, MapIndex, Uct } from '@game/shared';
 import type { TypedClientSocket } from '../../hooks/useSocket.js';
 import type { ClientGameSnapshot, GameStore } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
-import { requestHudRefresh } from '../ClientHudBridge.js';
+import { noopHudRefresh, type HudRefresh } from '../ClientHudBridge.js';
 
 export interface GameRuntime {
   store: GameStore;
@@ -11,6 +11,7 @@ export interface GameRuntime {
   mapIndex: MapIndex;
   rollButton?: HTMLButtonElement | null;
   cooldownTimer: ReturnType<typeof setInterval> | null;
+  onHudRefresh?: HudRefresh;
 }
 
 const cellType = (cell: Cell): string => cell.type;
@@ -83,7 +84,7 @@ export function onPlayerArrived(runtime: GameRuntime): void {
     case 'monument': addChatMessage(t('monument.arrived', { name }), 'system'); break;
     default: addChatMessage(t('cell.arrived', { name }), 'system');
   }
-  requestHudRefresh();
+  (runtime.onHudRefresh ?? noopHudRefresh)();
 }
 
 function emitAction(runtime: GameRuntime, event: 'client.buyProperty' | 'client.upgradeProperty' | 'client.buyInvestment' | 'client.repairMonument', payload: Record<string, number>): void {
