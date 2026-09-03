@@ -33,7 +33,7 @@ import { BehaviorEngine } from './behavior/index.js';
 import { MongoUserStore, FileWorldStore, MongoWorldStore, type WorldStore } from './storage/index.js';
 import { JWTService } from './auth/JWTService.js';
 import { AuthService, type UserStore } from './auth/AuthService.js';
-import { FileUserStore } from './auth/FileUserStore.js';
+import { FileUserStore } from './storage/FileUserStore.js';
 import { createAuthRouter } from './auth/authRoutes.js';
 import { LeaderboardManager } from './ranking/index.js';
 import { AchievementManager, FileAchievementStore, loadAchievementDefinitions, MongoAchievementStore, type AchievementStore } from './achievement/index.js';

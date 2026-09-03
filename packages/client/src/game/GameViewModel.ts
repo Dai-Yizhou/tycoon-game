@@ -10,9 +10,12 @@
  */
 
 import type { Player } from '@game/shared';
-import type { GameStore, ClientGameSnapshot, ClientChatMessage } from '../state/GameStore.js';
+import type { GameStore, ClientGameSnapshot, RegionInfo, ValueFieldDef, TeamMember, OtherPlayerInfo, ClientChatMessage } from '../state/GameStore.js';
 import { localizedText } from './i18n.js';
 import { resolveTimezoneOffsetMinutes } from './timezone.js';
+
+// 领域类型统一以 GameStore 为单一数据源（避免与本地声明重复）
+export type { RegionInfo, ValueFieldDef, TeamMember, OtherPlayerInfo } from '../state/GameStore.js';
 
 // ===== 状态切片类型定义 =====
 
@@ -65,7 +68,6 @@ export interface DiceSlice {
 export interface CooldownSlice {
   rollCooldownEnd: number;
   rollCooldownMs: number;
-  rollCooldownTimer: ReturnType<typeof setInterval> | null;
 }
 
 /** 监狱状态 */
@@ -79,22 +81,6 @@ export interface DayNightSlice {
   cycleDuration: number;
   cycleStartTime: number;
   serverTimeOffset: number;
-}
-
-/** 区域信息 */
-export interface RegionInfo {
-  id: string;
-  name: string;
-  cellIds: number[];
-}
-
-/** 动态数值字段定义 */
-export interface ValueFieldDef {
-  id: string;
-  name: string;
-  scope: 'player' | 'region';
-  min?: number;
-  max?: number;
 }
 
 /** 区域状态 */
@@ -115,7 +101,6 @@ export interface ChatChannelDef {
 
 /** 聊天状态 */
 export interface ChatSlice {
-  activeChannels: Set<string>;
   history: ChatMessage[];
 }
 
@@ -136,26 +121,9 @@ export interface CellActionOption {
   enabled: boolean;
 }
 
-/** 队伍成员 */
-export interface TeamMember {
-  id: string;
-  username: string;
-  values: Record<string, number>;
-  status: string;
-}
-
 /** 队伍状态 */
 export interface TeamSlice {
   members: TeamMember[];
-}
-
-/** 其他在线玩家信息 */
-export interface OtherPlayerInfo {
-  id: string;
-  username: string;
-  position: { cellId: number };
-  status: string;
-  primaryValue: number;
 }
 
 /** 其他玩家状态 */
@@ -301,7 +269,7 @@ export class GameViewModel {
   getDice(): DiceSlice { const snapshot = this.projectedSnapshot(); return { diceValue: snapshot.diceValue, diceAnimating: snapshot.diceAnimating, diceAnimStart: snapshot.diceAnimStart }; }
 
   // ===== Cooldown =====
-  getCooldown(): CooldownSlice { const snapshot = this.projectedSnapshot(); return { rollCooldownEnd: snapshot.rollCooldownEnd, rollCooldownMs: snapshot.rollCooldownMs, rollCooldownTimer: null }; }
+  getCooldown(): CooldownSlice { const snapshot = this.projectedSnapshot(); return { rollCooldownEnd: snapshot.rollCooldownEnd, rollCooldownMs: snapshot.rollCooldownMs }; }
 
   // ===== Jail =====
   getJail(): JailSlice { const snapshot = this.projectedSnapshot(); return { isInJail: snapshot.isInJail, jailEndTime: snapshot.jailEndTime }; }
@@ -329,7 +297,7 @@ export class GameViewModel {
   // ===== Chat =====
   getChat(): ChatSlice {
     const snapshot = this.projectedSnapshot();
-    return { activeChannels: new Set(['region', 'system', 'team']), history: snapshot.chatHistory };
+    return { history: snapshot.chatHistory };
   }
 
   getPathChoice(): PathChoiceSlice {

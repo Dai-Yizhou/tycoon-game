@@ -6,6 +6,7 @@
  * - `MongoWorldStore`: MongoDB 世界实现（有 Mongo 时激活）
  * - `FileWorldStore` : 文件世界实现（内嵌于 WorldStore.ts，无 Mongo 的 dev/单实例回退）
  * - `MongoUserStore` : MongoDB 用户实现
+ * - `FileUserStore`/`InMemoryUserStore`: 文件/内存用户实现（无 Mongo 的开发/测试回退）
  *
  * 说明：玩家状态不再有独立的 PlayerStore 子系统（PlayerManager 纯内存持玩家，
  * 持久化统一走 WorldStore 世界快照）；时代（era）仅数据导出，其 EraStore 已移除。
@@ -14,3 +15,5 @@
 export * from './MongoUserStore.js';
 export * from './WorldStore.js';
 export * from './MongoWorldStore.js';
+export * from './FileUserStore.js';
+export * from './InMemoryUserStore.js';

@@ -12,6 +12,8 @@ module.exports = {
   clearMocks: true,
   restoreMocks: true,
   moduleNameMapper: {
+    // 主题 loader 含 Vite 的 import.meta.glob 宏，Jest 无法解析；定向到读取真实主题 JSON 的桩
+    '(^|.*/)ThemeTokensLoader\\.(js|ts)$': '<rootDir>/tests/ThemeTokensLoader.ts',
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   transform: {

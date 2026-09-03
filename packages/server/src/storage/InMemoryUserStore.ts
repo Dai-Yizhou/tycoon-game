@@ -1,5 +1,5 @@
 import type { UserAccount } from '@game/shared';
-import type { UserStore } from './AuthService.js';
+import type { UserStore } from '../auth/AuthService.js';
 
 export class InMemoryUserStore implements UserStore {
   private readonly users = new Map<string, UserAccount>();

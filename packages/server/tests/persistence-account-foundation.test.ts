@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { FileUserStore } from '../src/auth/FileUserStore';
+import { FileUserStore } from '../src/storage/FileUserStore';
 import { loadConfig } from '../src/config';
 
 describe('persistence account foundation', () => {

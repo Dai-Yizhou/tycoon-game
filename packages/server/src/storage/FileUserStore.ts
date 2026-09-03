@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { UserAccount } from '@game/shared';
-import type { UserStore } from './AuthService.js';
+import type { UserStore } from '../auth/AuthService.js';
 
 export class FileUserStore implements UserStore {
   private readonly filePath: string;

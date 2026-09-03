@@ -53,12 +53,13 @@
 
 | 路径 | 职责 |
 |---|---|
-| `src/world/GameWorld.ts` | 地图、时代和玩家世界容器，发出世界事件 |
+| `src/world/GameWorld.ts` | 地图、时代和玩家世界容器，发出世界事件；（时代仅数据导出，无自动推进调度，见 ARCHITECTURE 时代封印） |
 | `src/world/PlayerManager.ts` | 玩家增删改查、连接绑定、冻结/恢复 |
 | `src/world/DayNightCycle.ts` | 昼夜计时、广播、税收和交通周期联动 |
 | `src/world/DayNightValueChange.ts` | 昼夜驱动的区域 UCT 数值变化（`regionValues` 动态字段，含区域繁荣度） |
 | `src/world/TimeZoneManager.ts` | 地图时区、本地时间与昼夜判定 |
 | `src/storage/WorldStore.ts`（含 `FileWorldStore`）、`MongoWorldStore.ts` | 世界状态持久化接口及文件/Mongo 实现（快照恢复；玩家状态统一经世界快照持久化） |
+| `src/storage/MongoUserStore.ts`、`FileUserStore.ts`、`InMemoryUserStore.ts` | 用户持久化接口实现（Mongo / 文件 / 内存，统一归于 storage/） |
 | `src/state/WorldRuntimeState.ts`、`WorldRuntimeStateStore.ts` | 世界运行时状态聚合与存储 |
 
 ### 业务模块
