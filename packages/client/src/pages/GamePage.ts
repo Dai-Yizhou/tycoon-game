@@ -154,14 +154,10 @@ export function createGamePage(controller: GameController): HTMLElement {
   page.appendChild(boardContainer);
 
 
-  const backButton = document.createElement('button');
-  backButton.className = 'back-button';
-  backButton.textContent = t('common.backToStart');
-  backButton.addEventListener('click', () => controller.reset(true));
-  page.appendChild(backButton);
   gameHudShell = new GameHudShell(gameViewModel, effects, {
     effectsEnabled: effects.isEnabled(),
     onEffectsToggle: (enabled) => effects.setEnabled(enabled),
+    onBack: () => controller.reset(true),
     onRoll: () => {
       if (gameStore && gameSocket) {
         const index = mapIndex ?? ({ getById: () => undefined } as unknown as MapIndex);

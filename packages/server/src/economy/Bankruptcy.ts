@@ -31,10 +31,24 @@ export class Bankruptcy {
   private readonly world: GameWorld;
   private readonly taxation: Taxation;
   private readonly bankruptcyRecords = new Map<string, BankruptcyRecord>();
+  private readonly previousValues = new Map<string, Record<string, number>>();
   private domainEventDispatcher: ((eventName: string) => void) | null = null;
   private ownershipChanged?: (playerId: string, guest: boolean) => void;
+  private readonly onPlayerAdded = ({ player }: { player: import('@game/shared').Player }): void => {
+    this.previousValues.set(player.id, this.snapshotValues(player));
+  };
+  private snapshotValues(player: import('@game/shared').Player): Record<string, number> {
+    return Object.fromEntries(Object.values(player.values).map((field) => [field.id, field.current]));
+  }
+
   private readonly onPlayerUpdated = ({ player }: { player: import('@game/shared').Player }): void => {
-    if (isBankruptcyCheckable(player.status) && Object.values(player.values).some((field) => field.current < (field.min ?? Number.NEGATIVE_INFINITY))) {
+    const previous = this.previousValues.get(player.id) ?? this.snapshotValues(player);
+    const reachedFloor = Object.values(player.values).some((field) => {
+      const minimum = field.min ?? Number.NEGATIVE_INFINITY;
+      return (previous[field.id] ?? field.current) > minimum && field.current <= minimum;
+    });
+    this.previousValues.set(player.id, Object.fromEntries(Object.values(player.values).map((field) => [field.id, field.current])));
+    if (isBankruptcyCheckable(player.status) && reachedFloor) {
       this.triggerBankruptcy(player.id, 'negative_net_worth');
     }
   };
@@ -43,7 +57,9 @@ export class Bankruptcy {
     this.io = io;
     this.world = world;
     this.taxation = taxation;
+    this.world.on('playerAdded', this.onPlayerAdded);
     this.world.on('playerUpdated', this.onPlayerUpdated);
+    for (const player of this.world.getAllPlayers()) this.onPlayerAdded({ player });
   }
 
   triggerBankruptcy(playerId: string, reason: 'negative_net_worth' | 'debt_overdue' | 'manual'): BankruptcyResult {
@@ -121,8 +137,10 @@ export class Bankruptcy {
   manualBankruptcy(playerId: string): BankruptcyResult { return this.triggerBankruptcy(playerId, 'manual'); }
 
   cleanup(): void {
+    this.world.off('playerAdded', this.onPlayerAdded);
     this.world.off('playerUpdated', this.onPlayerUpdated);
     this.bankruptcyRecords.clear();
+    this.previousValues.clear();
     this.domainEventDispatcher = null;
   }
 }

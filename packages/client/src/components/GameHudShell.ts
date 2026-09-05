@@ -17,6 +17,7 @@ function formatTimezoneOffset(offsetMinutes: number): string {
 
 export interface GameHudShellConfig {
   onRoll?: () => void;
+  onBack?: () => void;
   onChatSend?: (message: string, channel: string, onResult?: (ok: boolean) => void) => void;
   onPathChoice?: (cellId: number) => void;
   onCellAction?: (actionId: string) => void;
@@ -94,6 +95,7 @@ export class GameHudShell {
         </header>
 
         <div class="hud-panel-actions" data-ui="panel-actions" role="group">
+           <button class="panel-button" data-action="back" type="button"></button>
            <button class="panel-button" data-action="settings" type="button"></button>
            <button class="panel-button" data-action="achievements" type="button"></button>
         </div>
@@ -146,6 +148,7 @@ export class GameHudShell {
     this.input.addEventListener("keydown", (e) => { if (e.key === "Enter") this.sendChat(); });
     this.root.querySelector('[data-action="achievements"]')?.addEventListener("click", () => this.showAchievements());
     this.root.querySelector('[data-action="settings"]')?.addEventListener("click", () => this.showSettings());
+    this.root.querySelector('[data-action="back"]')?.addEventListener("click", () => this.config.onBack?.());
     this.root.querySelector('[data-action="roll"]')?.addEventListener("click", () => this.config.onRoll?.());
     const toggle = this.root.querySelector('[data-ui="chat-toggle"]');
     const setExpanded = (expanded: boolean): void => {
@@ -207,8 +210,10 @@ export class GameHudShell {
     };
     set('[data-action="roll"]', "dice.roll");
     set('[data-action="chat-send"]', "chat.send");
+    set('[data-action="back"]', "common.backToStart");
     set('[data-action="settings"]', "hud.settings");
     set('[data-action="achievements"]', "hud.achievements");
+    this.root.querySelector('[data-action="back"]')?.setAttribute('aria-label', t('common.backToStart'));
     this.root.querySelector('[data-action="settings"]')?.setAttribute('aria-label', t('hud.settings'));
     this.root.querySelector('[data-action="achievements"]')?.setAttribute('aria-label', t('hud.achievements'));
 

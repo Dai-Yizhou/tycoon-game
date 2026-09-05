@@ -481,12 +481,17 @@ export class PropertyHandler {
       }
       if (!rentUct) return null;
 
-      // 7. 执行租金扣除
-      if (!this.canApplyUct(payer, rentUct)) return null;
-      const payerChanges = this.applyUct(payer, rentUct, 'rent_payment');
+      const receivableShare = ownerships.reduce((total, ownership) => {
+        const owner = this.world.getPlayer(ownership.playerId);
+        return owner && canCollectRent(owner.status) ? total + ownership.share : total;
+      }, 0);
+      if (receivableShare <= 0) return null;
+
+      if (!this.canApplyUct(payer, rentUct, receivableShare)) return null;
+      const payerChanges = this.applyUct(payer, rentUct, 'rent_payment', receivableShare);
       if (payerChanges.length === 0) return null;
 
-      // 增加所有者财产（按持股比例分配）
+      // 增加所有者财产（按当前 ownership 原始比例分配）
       this.distributeRentToOwners(cell, rentUct, 1);
       for (const [fieldId, delta] of Object.entries(rentUct?.region ?? {})) {
         const applied = this.world.changeRegionValue(cell.regionId, fieldId, delta);

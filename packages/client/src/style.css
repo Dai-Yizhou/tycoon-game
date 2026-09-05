@@ -567,15 +567,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 
 .actionbar-spacer { flex: 1; }
 
-/* 返回按钮 */
-.back-button {
-  position: absolute; top: 25px; left: 45%; transform: translateY(-20%); z-index: 50;
-  padding: 4px 10px; font-size: 11px; font-weight: 700;
-  background: var(--gp-card); color: var(--gp-fg);
-  border: var(--region-border-w) solid var(--gp-border); border-radius: var(--region-radius);
-  cursor: pointer;
-}
-
 /* ===== 响应式 ===== */
 @media (max-width: 900px) {
   .gp-topbar { padding: 0 10px; }

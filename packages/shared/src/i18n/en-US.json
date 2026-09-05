@@ -277,6 +277,7 @@
   },
   "event": {
     "triggered": "Event Triggered",
+    "arrived": "Event arrives",
     "effect": "Effect",
     "good": "Good",
     "bad": "Bad",

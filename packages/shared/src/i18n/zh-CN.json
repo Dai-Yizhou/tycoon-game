@@ -277,6 +277,7 @@
   },
   "event": {
     "triggered": "触发事件",
+    "arrived": "到达事件格子",
     "effect": "效果",
     "good": "好事",
     "bad": "坏事",

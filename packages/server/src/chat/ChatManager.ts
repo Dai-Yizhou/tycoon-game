@@ -69,6 +69,7 @@ export const DEFAULT_CHANNEL_CONFIGS: Record<string, ChatChannelConfig> = {
 export interface ChatConfig {
   /** 单条消息最大长度，默认 500 */
   maxMessageLength: number;
+  maxPlayerMessagesPerMinute: number;
   /** 频道配置 */
   channelConfigs: Record<string, ChatChannelConfig>;
   /** 是否启用 XSS 防护，默认 true */
@@ -82,6 +83,7 @@ export interface ChatConfig {
  */
 export const DEFAULT_CHAT_CONFIG: ChatConfig = {
   maxMessageLength: 500,
+  maxPlayerMessagesPerMinute: 10,
   channelConfigs: DEFAULT_CHANNEL_CONFIGS,
   enableXSSProtection: true,
   bannedWords: [],
@@ -92,6 +94,7 @@ export const DEFAULT_CHAT_CONFIG: ChatConfig = {
  */
 export class ChatManager {
   private readonly channelHistories: Map<string, ChatMessage[]> = new Map();
+  private readonly playerMessageTimestamps: Map<string, number[]> = new Map();
   private readonly config: ChatConfig;
 
   constructor(config: ChatConfig = DEFAULT_CHAT_CONFIG) {
@@ -122,6 +125,7 @@ export class ChatManager {
     senderName: string | undefined,
     content: string,
     metadata?: Record<string, unknown>,
+    now = Date.now(),
   ): ChatMessage | null {
     // 检查频道是否存在配置
     const channelConfig = this.config.channelConfigs[channel];
@@ -133,6 +137,11 @@ export class ChatManager {
     // 检查是否允许玩家发送消息
     if (senderId !== null && !channelConfig.allowPlayerMessages) {
       logger.warn(`频道 ${channel} 不允许玩家发送消息`);
+      return null;
+    }
+
+    if (senderId !== null && !this.consumePlayerMessageRate(senderId, now)) {
+      logger.warn(`玩家 ${senderId} 聊天发送频率超过限制`);
       return null;
     }
 
@@ -170,6 +179,16 @@ export class ChatManager {
 
     logger.debug(`消息发送成功：${channel} - ${senderId ?? 'system'}`);
     return message;
+  }
+
+  private consumePlayerMessageRate(playerId: string, now: number): boolean {
+    const windowStart = now - 60_000;
+    const recent = (this.playerMessageTimestamps.get(playerId) ?? []).filter(timestamp => timestamp > windowStart);
+    const maxMessages = Math.max(0, this.config.maxPlayerMessagesPerMinute);
+    if (recent.length >= maxMessages) return false;
+    recent.push(now);
+    this.playerMessageTimestamps.set(playerId, recent);
+    return true;
   }
 
   /**
@@ -414,6 +433,7 @@ export class ChatManager {
    */
   clear(): void {
     this.clearAllHistories();
+    this.playerMessageTimestamps.clear();
     this.config.bannedWords = [];
   }
 }
