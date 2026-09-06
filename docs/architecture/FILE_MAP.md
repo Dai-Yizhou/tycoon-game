@@ -91,7 +91,7 @@
 |---|---|
 | `packages/server/map.json` | 服务端启动读取的棋盘数据 |
 | `packages/server/map-meta.json` | 区域、时区、动态数值字段和地图配置 |
-| `packages/server/config/behaviors/*.json` | 行为引擎脚本 |
+| `packages/server/behaviors/*.json` | 行为引擎脚本；由地图 `behaviorPass` / `behaviorLand` 与 `investmentTriggers` 域事件引用 |
 
 ## client
 
