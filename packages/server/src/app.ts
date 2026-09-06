@@ -18,7 +18,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
 import type { ServerConfig } from '@game/shared';
-import { isFeatureEnabled } from '@game/shared';
+import { DomainEvents, isFeatureEnabled } from '@game/shared';
 import { logger } from './utils/logger.js';
 import { GameWorld } from './world/GameWorld.js';
 import { SocketManager, type TypedServer } from './transport/SocketManager.js';
@@ -75,6 +75,18 @@ export interface AppDependencies {
   handlerRegistry?: HandlerRegistry;
   userStore?: UserStore;
   authService?: AuthService;
+}
+
+function validateBehaviorReferences(mapData: ReturnType<typeof parseMapData>, behaviorDir: string): void {
+  const knownEvents = new Set(Object.values(DomainEvents));
+  for (const cell of mapData) {
+    for (const behaviorId of [cell.behaviorPass, cell.behaviorLand]) {
+      if (behaviorId && !existsSync(path.resolve(behaviorDir, `${behaviorId}.json`))) throw new Error(`行为配置不存在: ${behaviorId}`);
+    }
+    for (const trigger of cell.investmentTriggers ?? []) {
+      if (!knownEvents.has(trigger.on as typeof DomainEvents[keyof typeof DomainEvents])) throw new Error(`投资域事件未知: ${trigger.on}`);
+    }
+  }
 }
 
 function readTaxConfig(mapMeta: ReturnType<typeof parseMapMeta>): TaxConfig {
@@ -197,6 +209,7 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
     const mapMeta = parseMapMeta(rawMeta);
     const result = world.loadMap(mapData, mapMeta);
     if (result.valid) {
+      validateBehaviorReferences(mapData, path.resolve(path.dirname(mapFilePath), 'behaviors'));
       logger.info('地图加载成功', { mapId: mapMeta.id, mapName: mapMeta.name, cellCount: mapData.length });
     } else {
       logger.warn(`地图加载有校验错误：${result.errors.join('; ')}`);
@@ -417,7 +430,11 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   // 初始化行为执行引擎（FR-1/FR-4）
   const behaviorEngine = new BehaviorEngine(io, world, {
     economy,
+    configDir: path.resolve(path.dirname(resolveConfiguredPath(config.mapPath)), 'behaviors'),
   });
+  for (const cell of world.getMapData() ?? []) {
+    for (const behaviorId of [cell.behaviorPass, cell.behaviorLand]) if (behaviorId) behaviorEngine.loadBehaviorConfig(behaviorId);
+  }
   handlerRegistry.setBehaviorEngine(behaviorEngine);
   logger.info('BehaviorEngine initialized and injected into EventHandler');
 

@@ -78,8 +78,8 @@
 | `src/economy/EconomyService.ts` | 经济数值中枢（计税联动、UCT 变更回调） |
 | `src/achievement/AchievementManager.ts`、`AchievementStore.ts`（Mongo/File/InMemory 实现）、`AchievementConfigLoader.ts` | 成就定义加载、六类触发、owner 级并发串行化与持久化 |
 | `src/ranking/LeaderboardManager.ts` | 榜单脏标记与正式刷新广播 |
-| `src/events/EventHandler.ts`、`index.ts` | 事件分发（有 `extra.behavior` 走 BehaviorEngine，否则内置随机） |
-| `src/behavior/BehaviorEngine.ts` | 加载 `config/behaviors/*.json` 并权威执行行为 |
+| `src/events/EventHandler.ts`、`index.ts` | 事件格落地分发；读取 `cell.behaviorLand`，由 BehaviorEngine 执行，行为失败不触发投资域事件 |
+| `src/behavior/BehaviorEngine.ts` | 加载显式注入目录中的行为 JSON；通过 EconomyService 执行玩家数值操作，并支持多玩家目标、所有权和位置操作 |
 | `src/team/TeamManager.ts`、`src/handlers/teamHandler.ts` | 队伍纯数据与 Socket 协议 |
 | `src/chat/ChatManager.ts`、`FeedbackManager.ts` | 聊天消息、频道状态与反馈 `/report`（清洗/限长/限频/结构化日志） |
 | `server.notification`（由各 handler 直发） | 通知类事件由事件/地产/交通/监狱/纪念碑等 handler 就地 `emit`，无集中通知管理器 |

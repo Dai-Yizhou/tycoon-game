@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Cell, MapMeta, Player } from '@game/shared';
 import { BehaviorEngine } from '../../src/behavior/BehaviorEngine';
+import { EconomyService } from '../../src/economy/EconomyService';
 import { GameWorld } from '../../src/world/GameWorld';
 
 function meta(): MapMeta {
@@ -61,6 +62,19 @@ function player(): Player {
 }
 
 describe('BehaviorEngine contract v2', () => {
+  it('applies value operations through the injected EconomyService', () => {
+    const world = new GameWorld();
+    world.loadMap([cell()], meta());
+    world.addPlayer(player());
+    const economy = new EconomyService(world);
+    const changeValue = jest.spyOn(economy, 'changeValue');
+    const engine = new BehaviorEngine({ emit: jest.fn() } as never, world, { economy, configDir: path.resolve(__dirname, '../../behaviors') });
+
+    engine.executeBehavior('contract-test', world.getPlayer('p1')!);
+
+    expect(changeValue).toHaveBeenCalledWith('p1', 'credit', 5, 'behavior:contract-test');
+  });
+
   it('applies one effect with a sparse UCT delta', () => {
     const world = new GameWorld();
     world.loadMap([cell()], meta());

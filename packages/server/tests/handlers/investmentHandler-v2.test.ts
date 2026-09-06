@@ -1,6 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { InvestmentHandler } from '../../src/handlers/investmentHandler.js';
 import { GameWorld } from '../../src/world/GameWorld.js';
+import { DomainEvents } from '@game/shared';
 import type { Cell, MapMeta } from '@game/shared';
 import type { TypedServer } from '../../src/transport/SocketManager.js';
 
@@ -71,7 +72,7 @@ describe('InvestmentHandler v2', () => {
     world.loadMap([investment], meta);
     const handler = new InvestmentHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
 
-    expect((handler as any).dispatchDomainEvent('event')).toEqual([]);
+    expect((handler as any).dispatchDomainEvent(DomainEvents.AnyPlayerLandsEvent)).toEqual([]);
   });
 
   it('scales player and region UCT fields together', () => {

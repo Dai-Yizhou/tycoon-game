@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Cell, Player, Uct } from '@game/shared';
 import type { TypedServer } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
-import type { EconomyService } from '../economy/EconomyService.js';
+import { EconomyService } from '../economy/EconomyService.js';
 import { getOwnerships, syncOwnerships } from '../economy/Ownership.js';
 
 export type BehaviorTarget = 'single' | 'team' | 'region' | 'globe' | { $ref: string };
@@ -53,11 +53,15 @@ function isPlayerLike(value: unknown): value is Player {
 export class BehaviorEngine {
   private readonly configCache = new Map<string, BehaviorConfig>();
   private readonly configDir: string;
+  private readonly economy: EconomyService;
   constructor(
     private readonly io: TypedServer,
     private readonly world: GameWorld,
     options?: { economy?: EconomyService | null; configDir?: string },
-  ) { this.configDir = options?.configDir ?? path.resolve(process.cwd(), 'behaviors'); }
+  ) {
+    this.economy = options?.economy ?? new EconomyService(world);
+    this.configDir = options?.configDir ?? path.resolve(process.cwd(), 'behaviors');
+  }
 
   loadBehaviorConfig(behaviorId: string): BehaviorConfig {
     const cached = this.configCache.get(behaviorId);
@@ -132,12 +136,11 @@ export class BehaviorEngine {
             for (const [fieldId, delta] of Object.entries(op.delta.player ?? {})) {
               const field = target.values[fieldId];
               if (!field) throw new Error(`行为引用未声明玩家字段: ${fieldId}`);
-              const oldValue = field.current;
               const resolvedDelta = this.resolveNumber(delta as unknown as BehaviorScalar, ctx);
-              field.current = Math.min(field.max ?? Number.POSITIVE_INFINITY, Math.max(field.min ?? Number.NEGATIVE_INFINITY, oldValue + resolvedDelta));
-              valueChanges.push({ playerId: target.id, fieldId, oldValue, newValue: field.current, delta: field.current - oldValue });
+              const result = this.economy.changeValue(target.id, fieldId, resolvedDelta, `behavior:${behaviorId}`);
+              if (!result.ok) throw new Error(`行为经济变更失败: ${result.error ?? fieldId}`);
+              valueChanges.push({ playerId: target.id, fieldId, oldValue: result.previous, newValue: result.current, delta: result.delta });
             }
-            this.world.updatePlayer(target);
           }
         }
       }

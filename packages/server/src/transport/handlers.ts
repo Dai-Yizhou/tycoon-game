@@ -14,7 +14,7 @@
  * ```
  */
 
-import { ChatChannels, type ChatChannel, type ChatMessage, parseChatCommand, type CommandResult } from '@game/shared';
+import { ChatChannels, DomainEvents, type ChatChannel, type ChatMessage, parseChatCommand, type CommandResult } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from './SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -297,39 +297,40 @@ export class HandlerRegistry {
   /**
    * 处理到达格子后的事件。
    */
-  handleCellEvent(playerId: string, cellId: number, socket: TypedSocket): void {
+  handleCellEvent(playerId: string, cellId: number, socket: TypedSocket): import('../events/EventHandler.js').EventTriggerResult | null {
     const cell = this.world.getMapIndex()?.getById(cellId);
-    if (!cell) return;
+    if (!cell) return null;
 
     const owner = this.achievementOwnerFor(socket);
     const mapId = this.world.getMapMeta()?.id;
-    if (owner && mapId) {
-      void this.achievementManager?.recordCellVisit(owner, mapId, cellId).catch((error) => logger.error(`achievement landing update failed (map=${mapId}, cell=${cellId})`, error));
+    if (owner && mapId && this.achievementManager) {
+      void this.achievementManager.recordCellVisit(owner, mapId, cellId).catch((error) => logger.error(`achievement landing update failed (map=${mapId}, cell=${cellId})`, error));
     }
 
     switch (cell.type) {
       case 'supply':
         this.handleBehaviorPass(playerId, cellId, socket);
-        return;
-      case 'event':
-        this.eventHandler.handleEventCell(playerId, cellId, socket);
-        this.investmentHandler.dispatchDomainEvent('any-player-lands-event');
-        return;
+        return null;
+      case 'event': {
+        const eventResult = this.eventHandler.handleEventCell(playerId, cellId, socket);
+        if (eventResult) this.investmentHandler.dispatchDomainEvent(DomainEvents.AnyPlayerLandsEvent);
+        return eventResult;
+      }
       case 'jail':
         this.jailHandler.handleEnterJail(playerId, cellId);
-        return;
+        return null;
       case 'transport':
         this.transportHandler.handleTransportCell(playerId, cellId, socket);
-        return;
+        return null;
       case 'monument':
         this.monumentHandler.handleMonumentCell(playerId, cellId, socket);
-        return;
+        return null;
       case 'property':
         this.handleRentPayment(playerId, cellId, socket);
-        return;
+        return null;
       case 'investment':
       case 'empty':
-        return;
+        return null;
     }
   }
 

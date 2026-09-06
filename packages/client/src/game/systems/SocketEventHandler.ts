@@ -14,7 +14,7 @@ import { startServerPathAnimation } from './MovementSystem.js';
 import { noopHudRefresh, type HudRefresh } from '../ClientHudBridge.js';
 import type { GameController } from '../GameController.js';
 import { GameStore } from '../../state/GameStore.js';
-import type { MapIndex, Player } from '@game/shared';
+import { formatUct, type MapIndex, type Player } from '@game/shared';
 import type { MovementEffectHooks } from '../GameEffects.js';
 
 const registeredSockets = new WeakSet<TypedClientSocket>();
@@ -41,7 +41,7 @@ const SOCKET_EVENTS = [
   'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft',
   'server.teamUpdated', 'server.teamDisbanded', 'server.regionValueChanged', 'server.gameState',
   'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.achievementUnlocked', 'server.playerBankrupt', 'server.playerRestarted',
-  'server.propertyBought', 'server.propertyUpgraded', 'server.investmentBought',
+  'server.propertyBought', 'server.propertyUpgraded', 'server.investmentBought', 'server.investmentEventTriggered',
 ] as const;
 
 /**
@@ -390,6 +390,20 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     refresh();
   });
 
+  socket.on('server.investmentEventTriggered', (payload) => {
+    const playerId = store.getSnapshot().currentPlayer?.id;
+    const affected = playerId ? payload.affectedPlayers.find((item) => item.playerId === playerId) : undefined;
+    if (!affected) return;
+    options.onNotification?.({
+      id: `investment-${payload.investmentId}-${store.nextSequence()}`,
+      type: investmentImpactType(affected.amount),
+      title: t('investment.title'),
+      content: formatInvestmentImpact(affected.amount),
+      durationMs: 4000,
+    });
+    refresh();
+  });
+
   // 监听服务端区域 UCT 数值变化（昼夜切换、纪念碑修缮等统一广播）
   socket.on('server.regionValueChanged', (payload: { regionId?: string; fieldId?: string; value?: number; delta: number; reason?: string; timestamp?: number }) => {
     if (payload.regionId && payload.fieldId && typeof payload.value === 'number') {
@@ -401,6 +415,16 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 /**
  * 注销所有 socket 事件处理器
  */
+function formatInvestmentImpact(amount: import('@game/shared').Uct): string {
+  return formatUct(amount, []);
+}
+
+function investmentImpactType(amount: import('@game/shared').Uct): 'success' | 'warning' | 'info' {
+  const values = [...Object.values(amount.player ?? {}), ...Object.values(amount.region ?? {})];
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return total > 0 ? 'success' : total < 0 ? 'warning' : 'info';
+}
+
 export function unregisterSocketHandlers(socket: TypedClientSocket): void {
   if (!registeredSockets.has(socket)) return;
   for (const event of SOCKET_EVENTS) {

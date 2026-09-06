@@ -47,6 +47,52 @@ describe('SocketEventHandler lifecycle', () => {
   });
 });
 
+describe('server.investmentEventTriggered 投资事件', () => {
+  test('仅当前股东收到投资收益或损失明细通知', () => {
+    const store = new GameStore();
+    const handlers = new Map<string, (args: never) => void>();
+    const socket = {
+      on: jest.fn((event: string, handler: (args: never) => void) => { handlers.set(event, handler); }),
+      onAny: jest.fn(),
+      offAny: jest.fn(),
+      off: jest.fn(),
+    } as never;
+    store.applyEvent({ sequence: store.nextSequence(), type: 'player', player: { id: 'owner-a', username: '股东', position: { cellId: 1 }, values: {}, status: 'normal', createdAt: 1, lastActiveAt: 1 } as never });
+    const onNotification = jest.fn();
+    registerSocketHandlers(socket, { store, onNotification });
+
+    handlers.get('server.investmentEventTriggered')!({
+      investmentId: 5,
+      amount: { player: { money: 100 } },
+      affectedPlayers: [{ playerId: 'owner-a', share: 0.5, amount: { player: { money: 50 } } }],
+    } as never);
+
+    expect(onNotification).toHaveBeenCalledWith(expect.objectContaining({ type: 'success', title: expect.any(String), content: expect.stringContaining('50') }));
+  });
+
+  test('非股东不展示投资事件明细', () => {
+    const store = new GameStore();
+    const handlers = new Map<string, (args: never) => void>();
+    const socket = {
+      on: jest.fn((event: string, handler: (args: never) => void) => { handlers.set(event, handler); }),
+      onAny: jest.fn(),
+      offAny: jest.fn(),
+      off: jest.fn(),
+    } as never;
+    store.applyEvent({ sequence: store.nextSequence(), type: 'player', player: { id: 'visitor', username: '旁观者', position: { cellId: 1 }, values: {}, status: 'normal', createdAt: 1, lastActiveAt: 1 } as never });
+    const onNotification = jest.fn();
+    registerSocketHandlers(socket, { store, onNotification });
+
+    handlers.get('server.investmentEventTriggered')!({
+      investmentId: 5,
+      amount: { player: { money: 100 } },
+      affectedPlayers: [{ playerId: 'owner-a', share: 1, amount: { player: { money: 100 } } }],
+    } as never);
+
+    expect(onNotification).not.toHaveBeenCalled();
+  });
+});
+
 describe('server.playerMoved 移动信号竞态', () => {
   function makeSocket(): { handlers: Map<string, (args: never) => void>; socket: never } {
     const handlers = new Map<string, (args: never) => void>();

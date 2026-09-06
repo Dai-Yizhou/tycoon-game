@@ -22,7 +22,7 @@
 | `client.rollDice` | `DiceHandler` | 服务端随机、冷却校验并进入移动链 |
 | `client.choosePath` | `MovementHandler` | 多岔路选择合法下一格 |
 | `client.buyProperty` / `upgradeProperty` | `PropertyHandler` | 买地与升级；可携带 `requestId` 和 `expectedResourceVersion`，版本冲突返回 `resource_version_conflict` |
-| `client.buyInvestment` / `triggerInvestmentEvent` | `InvestmentHandler` | 投资购买与事件结算；购买可携带 `requestId` 和 `expectedResourceVersion` |
+| `client.buyInvestment` | `InvestmentHandler` | 投资购买；可携带 `requestId`、`expectedResourceVersion` 与 `expectedCellVersion`；投资事件由服务端域事件和地图 `investmentTriggers` 配置驱动，不提供客户端主动触发入口 |
 | `client.useTransport` / `getTransportDestinations` | `TransportHandler` | 查询目的地与付费传送 |
 | `client.repairMonument` / `getMonumentStatus` | `MonumentHandler` | 纪念碑状态查询与修缮 |
 | `client.inviteToTeam` / `respondToTeamInvite` / `leaveTeam` / `kickTeamMember` / `getTeamState` | `TeamHandler` | 队伍邀请、成员变更和状态查询 |
@@ -41,7 +41,7 @@
 | `server.diceRolled` | 其他玩家可见的骰子结果 |
 | `server.valueChanged` | 玩家或区域数值增量/新值 |
 | `server.playerStatusChanged` | Frozen、Jail、Bankrupt 等玩家状态变化 |
-| `server.investmentBought` / `investmentEventTriggered` | 投资状态和事件变化 |
+| `server.investmentBought` / `server.investmentEventTriggered` | 投资状态和事件变化；投资事件载荷包含服务端按股权与参与状态计算后的 `affectedPlayers`，客户端只展示当前玩家自己的明细 |
 | `server.transportDestinationsChanged` | 交通目的地变化 |
 | `server.prosperityChanged` | 区域/纪念碑繁荣度变化 |
 | `server.teamUpdated` / `teamDisbanded` / `teamInviteReceived` 等 | 队伍视图与邀请变化 |

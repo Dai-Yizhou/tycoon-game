@@ -14,7 +14,7 @@
  * - 服务端权威校验所有金钱操作
  */
 
-import type { AckResult, Cell, Player, Uct } from '@game/shared';
+import type { AckResult, Cell, DomainEvent, Player, Uct } from '@game/shared';
 import { normalizeCellType, CellTypes, PlayerStatus, canReceiveInvestmentImpact, participatesInEconomy, formatUct } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
@@ -312,7 +312,7 @@ export class InvestmentHandler {
     }
   }
 
-  dispatchDomainEvent(eventName: string): EventTriggerResult[] {
+  dispatchDomainEvent(eventName: DomainEvent): EventTriggerResult[] {
     const results: EventTriggerResult[] = [];
     for (const cell of this.world.getMapData() ?? []) {
       if (normalizeCellType(cell) !== CellTypes.Investment) continue;

@@ -1,5 +1,6 @@
 import type { Cell, MapMeta, Player } from '@game/shared';
 import { MovementHandler } from '../../src/handlers/movementHandler';
+import { HandlerRegistry } from '../../src/transport/handlers';
 import { GameWorld } from '../../src/world/GameWorld';
 
 const meta: MapMeta = {
@@ -28,6 +29,19 @@ function makePlayer(): Player {
 }
 
 describe('settlement contract v2', () => {
+  it('does not dispatch investment events when event behavior fails', () => {
+    const world = new GameWorld();
+    const eventCell = { ...makeCell(0), type: 'event' as const, behaviorLand: 'missing-behavior' };
+    world.loadMap([eventCell], meta);
+    world.addPlayer(makePlayer());
+    const registry = new HandlerRegistry({ emit: jest.fn(), on: jest.fn() } as never, world);
+    const dispatch = jest.spyOn(registry.getInvestmentHandler(), 'dispatchDomainEvent');
+
+    registry.handleCellEvent('p1', 0, { data: {}, emit: jest.fn() } as never);
+
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
   it('settles behaviorPass for every traversed cell before landing settlement', () => {
     const world = new GameWorld();
     world.loadMap([makeCell(0), makeCell(1, 'pass-behavior'), makeCell(2)], meta);

@@ -101,7 +101,7 @@ sequenceDiagram
 
 ## 客户端状态投影与渲染链
 
-`SocketEventHandler` 将 `server.gameState`、`server.playerMoved`、`server.valueChanged`、`server.playerStatusChanged`、`server.teamUpdated`、昼夜和繁荣度事件转写为 `GameStore` 状态；必要时调用 `requestHudRefresh`、移动动画、通知或聊天系统。`GameViewModel` 是 `GameHudShell` 的状态桥梁，按切片通知订阅者，不依赖 Socket 或具体 UI。
+`SocketEventHandler` 将 `server.gameState`、`server.playerMoved`、`server.valueChanged`、`server.playerStatusChanged`、`server.teamUpdated`、`server.investmentEventTriggered`、昼夜和繁荣度事件转写为 `GameStore` 状态；通过注册时注入的 HUD 刷新回调触发通知、聊天、移动动画或界面刷新，不再使用模块级全局刷新槽。`GameViewModel` 是 `GameHudShell` 的状态桥梁，按切片通知订阅者，不依赖 Socket 或具体 UI。
 
 ```text
 server.*
@@ -109,6 +109,7 @@ server.*
   -> GameStore setters / team/chat/movement systems
   -> ClientHudBridge -> GameViewModel.sync -> GameHudShell
   -> GamePage 订阅 GameStore -> InteractiveMapSurface（SVG transform/viewBox）
+  -> GameHudShell（cell-hover / act-bar 等 DOM HUD）
 ```
 
 地图的可见渲染层是 `InteractiveMapSurface` 生成的 SVG，不再是隐藏的 Canvas。移动动画由 `GamePage` 用 `requestAnimationFrame` 循环驱动 `MovementSystem`：`MovementSystem` 对 `playerDisplayX/Y` 做单步插值写入 Store，`GamePage` 每帧把新插值坐标交给 `InteractiveMapSurface` 直接更新棋子节点 transform；动画期间保持移动锁，避免重建 SVG 或干扰棋子节点，仅在动画结束后按最新权威位置校准。动画期间视野通过 `followDisplayPosition` 跟随插值坐标更新 SVG viewBox，避免“地图瞬移”。地图由 `MapLoader` 请求 `/api/map`，经 shared 的解析工具标准化为 `MapIndex` 后交给渲染层。
@@ -158,6 +159,8 @@ InteractiveMapSurface：每个格子 <g> 的 mouseenter / tap
 - 客户端 `SocketEventHandler.ts` 残留 `console.warn('[DBG-*]')` 调试日志，Beta 上线前应移除。
 - `server.notification` 无集中通知管理器：由各 handler 就地 `emit`（见事件/地产/交通/监狱/纪念碑 handler），认证/持久化能力以 `app.ts` 注册为准；通知载荷一致性与限频为已知收敛点。
 - `REDIS_URL` 在配置类型和文档中存在，当前 app 未建立 Redis 适配器；不能描述为已实现多实例同步。
+- 多玩家经济结算仍以逐字段 `server.valueChanged` 下发，暂无结算级批次协议或最终权威快照（`economicSettlement` / batch 尚未实现）。该项已明确记为技术债，暂不作为内测上线阻断项；当前正确性边界是服务端统一经 `EconomyService` 写入、按已确认的有效股东原始持股比例结算、事件触发闭环，以及客户端按服务端绝对 `current` 值投影。后续仅在出现最终状态不一致、经济链路引入异步操作、断线恢复结算或多实例部署需求时，升级为批次协议设计。
+- 经济加锁仅按格子级（`property:<cellId>` / `investment:<cellId>`）进行，无玩家级串行锁；单进程同步执行下暂无明显竞争，若未来引入异步 `await` 经济链路或多实例部署，需另行评估 `player:<playerId>` 锁与跨实例共享锁（Redis），当前未实现。
 - 服务端存在 REST 地图读取与 Socket 状态两条输入来源，客户端地图请求失败时的回退逻辑增加了状态排查成本。
 
 ## 关联文档

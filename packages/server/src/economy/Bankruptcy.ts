@@ -1,4 +1,4 @@
-import { PlayerStatus, isBankruptcyCheckable } from '@game/shared';
+import { DomainEvents, PlayerStatus, isBankruptcyCheckable, type DomainEvent } from '@game/shared';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { Taxation } from './Taxation.js';
@@ -32,7 +32,7 @@ export class Bankruptcy {
   private readonly taxation: Taxation;
   private readonly bankruptcyRecords = new Map<string, BankruptcyRecord>();
   private readonly previousValues = new Map<string, Record<string, number>>();
-  private domainEventDispatcher: ((eventName: string) => void) | null = null;
+  private domainEventDispatcher: ((eventName: DomainEvent) => void) | null = null;
   private ownershipChanged?: (playerId: string, guest: boolean) => void;
   private readonly onPlayerAdded = ({ player }: { player: import('@game/shared').Player }): void => {
     this.previousValues.set(player.id, this.snapshotValues(player));
@@ -86,7 +86,7 @@ export class Bankruptcy {
     this.bankruptcyRecords.set(playerId, record);
 
     this.io.emit('server.playerBankrupt', { playerId, bankruptcyId, bankruptcyTime, reason, netWorthAtBankruptcy: record.netWorthAtBankruptcy });
-    this.domainEventDispatcher?.('shareholder-bankrupt');
+    this.domainEventDispatcher?.(DomainEvents.ShareholderBankrupt);
     return { success: true, bankruptcyId };
   }
 
@@ -94,7 +94,7 @@ export class Bankruptcy {
     this.ownershipChanged = handler;
   }
 
-  setDomainEventDispatcher(dispatcher: (eventName: string) => void): void {
+  setDomainEventDispatcher(dispatcher: (eventName: DomainEvent) => void): void {
     this.domainEventDispatcher = dispatcher;
   }
 

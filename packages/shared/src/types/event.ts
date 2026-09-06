@@ -15,6 +15,13 @@
  * - `onBuy`      : 玩家购买地产/项目时触发
  * - `onPass`     : 玩家路过格子时触发（不停止）
  */
+export const DomainEvents = {
+  AnyPlayerLandsEvent: 'any-player-lands-event',
+  ShareholderBankrupt: 'shareholder-bankrupt',
+} as const;
+
+export type DomainEvent = (typeof DomainEvents)[keyof typeof DomainEvents];
+
 export const EventTriggers = {
   OnLand: 'onLand',
   OnDayChange: 'onDayChange',
