@@ -9,7 +9,7 @@ export interface ValidationResult {
 export const BUILTIN_FIELDS: ReadonlySet<string> = new Set([
   'id', 'x', 'y', 'type', 'name', 'description', 'destinations', 'teleportDestinations',
   'behaviorPass', 'behaviorLand', 'theme', 'regionId', 'timezone', 'maxOwnerCount',
-  'buyInMultiplier', 'price', 'maxLevel', 'rent', 'upgradeCost', 'repairCost',
+  'price', 'maxLevel', 'rent', 'upgradeCost', 'repairCost',
   'jailCooldown', 'jailCost', 'investmentTriggers',
 ]);
 
@@ -48,6 +48,8 @@ function buildCell(raw: unknown, index: number): Cell {
   for (const field of requiredNumbers) if (typeof input[field] !== 'number' || !Number.isFinite(input[field])) throw new MapParseError(`第 ${index + 1} 个格子缺少有效的 ${field}`, { index, field });
   if (typeof input.type !== 'string' || !CELL_TYPES.has(input.type as CellType)) throw new MapParseError(`第 ${index + 1} 个格子 type 无效`, { index, field: 'type' });
   if (typeof input.regionId !== 'string' || !input.regionId) throw new MapParseError(`第 ${index + 1} 个格子缺少有效的 regionId`, { index, field: 'regionId' });
+  if (Object.prototype.hasOwnProperty.call(input, 'buyInMultiplier')) throw new MapParseError(`第 ${index + 1} 个格子不再支持 buyInMultiplier`, { index, field: 'buyInMultiplier' });
+  if ((input.type === 'property' || input.type === 'investment') && (typeof input.maxOwnerCount !== 'number' || !Number.isInteger(input.maxOwnerCount) || input.maxOwnerCount <= 0)) throw new MapParseError(`第 ${index + 1} 个格子缺少有效的 maxOwnerCount`, { index, field: 'maxOwnerCount' });
   if (!Array.isArray(input.destinations) || input.destinations.some((id) => typeof id !== 'number' || !Number.isFinite(id))) throw new MapParseError(`第 ${index + 1} 个格子的 destinations 无效`, { index, field: 'destinations' });
   const teleportDestinations: TeleportDestination[] = Array.isArray(input.teleportDestinations) ? input.teleportDestinations.map((item, itemIndex) => {
     const destination = record(item, `teleportDestinations[${itemIndex}]`);
@@ -57,6 +59,7 @@ function buildCell(raw: unknown, index: number): Cell {
   const cell = { ...input, teleportDestinations, extra: {} } as unknown as Cell;
   cell.name = localized(input.name, `格子 #${input.id}.name`);
   cell.description = localized(input.description, `格子 #${input.id}.description`);
+  if (input.price !== undefined) cell.price = uct(input.price, `格子 #${input.id}.price`);
   return cell;
 }
 

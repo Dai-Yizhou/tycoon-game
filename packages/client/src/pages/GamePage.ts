@@ -36,7 +36,7 @@ import {
 import {
   handleRollDice,
   handleBuyProperty, handleUpgradeProperty, handleBuyInvestment, handleCoInvest,
-  handleTransport, handleRestoreMonument, onPlayerArrived, type GameRuntime,
+  handleTransport, handleUseTransport, handleRestoreMonument, onPlayerArrived, type GameRuntime,
 } from '../game/systems/GameLogic.js';
 
 import {
@@ -47,7 +47,7 @@ import {
 import { registerSocketHandlers, unregisterSocketHandlers } from '../game/systems/SocketEventHandler.js';
 import { DesignAdapter } from '../design/DesignAdapter.js';
 import { getRegionThemeId, getThemeId, getThemeTokens, SAVED_REGION_THEME_KEY } from '../design/ThemeConfig.js';
-import { localizedText } from '../game/i18n.js';
+import { resolveCellActions } from '../game/cellActionResolver.js';
 
 let gameViewModel: GameViewModel | null = null;
 let gameStore: GameStore | null = null;
@@ -168,16 +168,20 @@ export function createGamePage(controller: GameController): HTMLElement {
       if (gameStore && gameSocket) onIntersectionChoice(gameStore, gameSocket, cellId, movementEffects);
       gameStore?.clearPathChoice();
     },
-    onCellAction: (actionId) => {
-      const actions: Record<string, () => void> = {
+    onCellAction: (actionId, data) => {
+      const actions: Record<string, (d?: Record<string, unknown>) => void> = {
         'buy-property': () => invokeGameAction(handleBuyProperty),
         'upgrade-property': () => invokeGameAction(handleUpgradeProperty),
         'buy-investment': () => invokeGameAction(handleBuyInvestment),
         'co-invest': () => invokeGameAction(handleCoInvest),
-        transport: () => invokeGameAction(handleTransport),
+        transport: (d) => {
+          const target = typeof d?.targetCellId === 'number' ? d.targetCellId : undefined;
+          if (target !== undefined) invokeGameAction((rt) => handleUseTransport(rt, target));
+          else invokeGameAction(handleTransport);
+        },
         'restore-monument': () => invokeGameAction(handleRestoreMonument),
       };
-      actions[actionId]?.();
+      actions[actionId]?.(data);
     },
     onChatSend: (message, channel, onResult) => {
       if (!gameSocket) {
@@ -488,53 +492,34 @@ function syncCellActions(cellId: number): void {
     gameStore.setCellActions([]);
     return;
   }
-  const type = cell.type;
-  const price = formatClientUct(cell.price, snapshot.valueFieldDefs);
-  const ownerships = snapshot.cellRuntimeStates.get(cellId)?.ownerships ?? [];
+  // 交通枢纽目的地动作由 loadTransportDestinations 异步获取后写入 act-bar。
+  // 若当前已展示带 targetCellId 的目的地动作（非加载态单按钮），保持其展示，
+  // 避免被下方单按钮解析结果覆盖；玩家离开该格后 cell 类型变化，解析逻辑自会重置。
+  if (cell.type === 'transport' && snapshot.cellActions.some((a) => a.id === 'transport' && typeof a.data?.targetCellId === 'number')) {
+    return;
+  }
+  const runtimeState = snapshot.cellRuntimeStates.get(cellId);
+  const ownerships = runtimeState?.ownerships ?? [];
   const currentPlayerId = snapshot.currentPlayer?.id;
-  const owned = Boolean(currentPlayerId && ownerships.some(ownership => ownership.playerId === currentPlayerId && ownership.share > 0));
-  const level = snapshot.propertyLevels.get(cellId) ?? 0;
-  const canAfford = canApplyClientUct(snapshot.currentPlayer, cell.price);
-  const actions = type === 'property'
-    ? owned
-      ? snapshot.actionUsedThisTurn
-        ? []
-        : (cell.upgradeCost?.[level] ? true : false)
-          ? [{ id: 'upgrade-property', label: t('property.upgradeTitle'), detail: formatClientUct(cell.upgradeCost?.[level], snapshot.valueFieldDefs), enabled: !snapshot.isBankrupt && canApplyClientUct(snapshot.currentPlayer, cell.upgradeCost?.[level]) }]
-          : []
-      : [{ id: 'buy-property', label: t('property.buyTitle'), detail: price, enabled: !snapshot.isBankrupt && canAfford }]
-    : type === 'investment'
-      ? snapshot.ownedInvestments.has(cellId)
-        ? []
-        : [{ id: 'invest', label: t('investment.invest'), detail: price, enabled: !snapshot.isBankrupt && canAfford }]
-      : type === 'transport'
-        ? [{ id: 'transport', label: t('transport.teleport'), detail: '', enabled: !snapshot.isBankrupt }]
-        : type === 'monument'
-          ? [{ id: 'restore-monument', label: t('monument.repair'), detail: '', enabled: !snapshot.isBankrupt }]
-          : [];
+  const actions = resolveCellActions({
+    cell,
+    state: {
+      owned: Boolean(currentPlayerId && ownerships.some(ownership => ownership.playerId === currentPlayerId && ownership.share > 0)),
+      ownerCount: ownerships.length,
+      level: snapshot.propertyLevels.get(cellId) ?? runtimeState?.level ?? 0,
+      ownedInvestment: snapshot.ownedInvestments.has(cellId),
+      isBankrupt: snapshot.isBankrupt,
+      actionUsedThisTurn: snapshot.actionUsedThisTurn,
+    },
+    currentPlayer: snapshot.currentPlayer,
+    valueFieldDefs: snapshot.valueFieldDefs,
+  });
   const currentActions = snapshot.cellActions;
   const unchanged = currentActions.length === actions.length && actions.every((action, index) => {
     const current = currentActions[index];
     return current.id === action.id && current.label === action.label && current.detail === action.detail && current.enabled === action.enabled;
   });
   if (!unchanged) gameStore.setCellActions(actions);
-}
-
-function formatClientUct(uct: import('@game/shared').Uct | undefined, definitions: Array<{ id: string; name: unknown }>): string {
-  if (!uct) return '';
-  return Object.entries(uct.player ?? {}).concat(Object.entries(uct.region ?? {})).map(([fieldId, value]) => {
-    const definition = definitions.find((field) => field.id === fieldId);
-    const name = definition ? localizedText(definition.name, fieldId) : fieldId;
-    return `${name} ${value >= 0 ? '+' : ''}${value}`;
-  }).join(', ');
-}
-
-function canApplyClientUct(player: Player | null, uct: import('@game/shared').Uct | undefined): boolean {
-  if (!player || !uct) return false;
-  return Object.entries(uct.player ?? {}).every(([fieldId, delta]) => {
-    const field = player.values[fieldId];
-    return Boolean(field) && field.current + delta >= (field.min ?? Number.NEGATIVE_INFINITY) && field.current + delta <= (field.max ?? Number.POSITIVE_INFINITY);
-  });
 }
 
 function formatTeamValues(values: Record<string, number>, definitions: Array<{ id: string; name: string }>): string {

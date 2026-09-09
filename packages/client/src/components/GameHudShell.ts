@@ -2,25 +2,14 @@ import type { GameEffectHooks } from "../game/GameEffects.js";
 import type { GameViewModel, ValueFieldDef } from "../game/GameViewModel.js";
 import { t, localizedText } from "../game/i18n.js";
 import { parseChatCommand } from "@game/shared";
-
-/** 时区偏移（分钟）→ "UTC±H:MM"；0 显示 "UTC+0" */
-function formatTimezoneOffset(offsetMinutes: number): string {
-  if (!Number.isFinite(offsetMinutes)) offsetMinutes = 0;
-  const total = Math.round(offsetMinutes);
-  if (total === 0) return "UTC+0";
-  const sign = total < 0 ? "-" : "+";
-  const abs = Math.abs(total);
-  const hh = Math.floor(abs / 60);
-  const mm = abs % 60;
-  return `UTC${sign}${hh}:${String(mm).padStart(2, "0")}`;
-}
+import { resolveCellHoverModel } from "../game/cellDisplayModel.js";
 
 export interface GameHudShellConfig {
   onRoll?: () => void;
   onBack?: () => void;
   onChatSend?: (message: string, channel: string, onResult?: (ok: boolean) => void) => void;
   onPathChoice?: (cellId: number) => void;
-  onCellAction?: (actionId: string) => void;
+  onCellAction?: (actionId: string, data?: Record<string, unknown>) => void;
   onCellHover?: (cellId: number, x: number, y: number) => void;
   onCellLeave?: () => void;
   effectsEnabled?: boolean;
@@ -251,52 +240,16 @@ export class GameHudShell {
   }
 
   private buildCellHoverContent(cell: import('@game/shared').Cell): string {
-    const type = cell.type;
-    const name = localizedText(cell.name, t("cell." + type));
-    const description = localizedText(cell.description, '');
-    const definitions = this.vm.getRegions().valueFieldDefs;
-    const priceUct = cell.price;
-    const price = priceUct ? formatUctText(priceUct, definitions) : '';
     const runtime = this.vm.getCellRuntimeState(cell.id);
-    const level = runtime?.level ?? 0;
-    const holderText = runtime?.ownerships.length
-      ? runtime.ownerships.map((ownership) => `${ownership.playerId} ${(ownership.share * 100).toFixed(0)}%`).join(', ')
-      : t("hud.noOwners");
-    const typeLabel = this.escapeHtml(t(`cell.${type}`));
-
-    // 当前档位租金
-    const rentRaw = cell.rent;
-    let rentText = "";
-    if (Array.isArray(rentRaw) && rentRaw.length > 0) {
-      const rent = rentRaw[Math.min(level, rentRaw.length - 1)];
-      if (rent) rentText = formatUctText(rent, this.vm.getRegions().valueFieldDefs);
-    }
-
-    // 下一级升级费用
-    const upgradeRaw = cell.upgradeCost;
-    let upgradeText = "";
-    if (Array.isArray(upgradeRaw) && upgradeRaw.length > 0) {
-      const next = upgradeRaw[Math.min(level, upgradeRaw.length - 1)];
-      if (next) upgradeText = formatUctText(next, this.vm.getRegions().valueFieldDefs);
-    }
-
-    // 时区偏移（分钟）→ UTC±H:MM
-    const tzText = formatTimezoneOffset(cell.timezone);
-
-    // 根据格子能力决定展示字段：仅价格>0（可购买）的格子显示价格，仅具备升级档位（可升级）的格子显示等级
-    const purchasable = Boolean(priceUct && Object.values(priceUct.player ?? {}).some((value) => value < 0));
-    const upgradeable = (upgradeRaw?.length ?? 0) > 0;
-    const rows: Array<[string, string]> = [];
-    if (purchasable) rows.push([t("hud.price"), price]);
-    if (upgradeable) rows.push([t("hud.level"), level > 0 ? `Lv.${level}` : "—"]);
-    if (rentText) rows.push([t("hud.rent"), rentText]);
-    if (upgradeText) rows.push([t("hud.upgrade"), upgradeText]);
-    rows.push([t("hud.holder"), holderText], [t("hud.timezone"), tzText]);
-
-    const rowsHtml = rows
-      .map(([label, value]) => `<span>${this.escapeHtml(label)}</span><b>${this.escapeHtml(value)}</b>`)
+    const model = resolveCellHoverModel(
+      cell,
+      runtime ? { level: runtime.level, ownerCount: runtime.ownerships.length } : null,
+      this.vm.getRegions().valueFieldDefs,
+    );
+    const rowsHtml = model.rows
+      .map((row) => `<span>${this.escapeHtml(row.label)}</span><b>${this.escapeHtml(row.value)}</b>`)
       .join("");
-    return `<div class="cell-hover-card__type">${typeLabel}</div><div class="cell-hover-card__title">${this.escapeHtml(name)}</div>${description ? `<div class="cell-hover-card__description">${this.escapeHtml(description)}</div>` : ""}<div class="cell-hover-card__rows">${rowsHtml}</div>`;
+    return `<div class="cell-hover-card__type">${this.escapeHtml(model.typeLabel)}</div><div class="cell-hover-card__title">${this.escapeHtml(model.name)}</div>${model.description ? `<div class="cell-hover-card__description">${this.escapeHtml(model.description)}</div>` : ""}<div class="cell-hover-card__rows">${rowsHtml}</div>`;
   }
 
   /** 将卡片定位到格子右侧（空间不足则移至左侧），并夹紧在视口内，避免重叠/出界 */
@@ -534,7 +487,7 @@ export class GameHudShell {
         detail.textContent = action.detail;
         button.appendChild(detail);
       }
-      button.addEventListener('click', () => this.config.onCellAction?.(action.id));
+      button.addEventListener('click', () => this.config.onCellAction?.(action.id, action.data));
       return button;
     });
     actionCluster.replaceChildren(...actionButtons);
@@ -616,12 +569,4 @@ export class GameHudShell {
     div.textContent = s;
     return div.innerHTML;
   }
-}
-
-function formatUctText(uct: import('@game/shared').Uct, definitions: ValueFieldDef[]): string {
-  return Object.entries(uct.player ?? {}).concat(Object.entries(uct.region ?? {})).map(([fieldId, value]) => {
-    const definition = definitions.find((field) => field.id === fieldId);
-    const label = localizedText(definition?.name, fieldId);
-    return `${label} ${value >= 0 ? '+' : ''}${value}`;
-  }).join(', ');
 }

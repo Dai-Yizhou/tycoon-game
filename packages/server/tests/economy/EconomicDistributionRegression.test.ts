@@ -42,6 +42,7 @@ const property: Cell = {
   teleportDestinations: [],
   regionId: 'r1',
   timezone: 0,
+  maxOwnerCount: 5,
   price: { player: { money: -100 } },
   rent: [{ player: { money: -100 } }],
   extra: {},
@@ -85,6 +86,15 @@ describe('经济分配一致性回归', () => {
     expect(world.getPlayer('owner-a')?.values.money.current).toBe(50);
   });
 
+  it('使用格子配置的maxOwnerCount限制新股东加入', () => {
+    const limitedProperty = { ...property, maxOwnerCount: 1 };
+    const world = new GameWorld();
+    world.loadMap([limitedProperty], meta);
+    world.getRuntimeState().replaceOwnerships(1, [{ playerId: 'owner-a', share: 1, purchasePrice: 100 }]);
+
+    expect(addOwnership(limitedProperty, 'owner-b', 100, world.getRuntimeState())).toBeNull();
+  });
+
   it('新股东加入后，property租金按新的ownership结构分配', () => {
     const world = new GameWorld();
     world.loadMap([property], meta);
@@ -92,7 +102,7 @@ describe('经济分配一致性回归', () => {
     world.addPlayer(player('owner-a', 0));
     world.addPlayer(player('owner-b', 0));
     world.getRuntimeState().replaceOwnerships(1, [{ playerId: 'owner-a', share: 1, purchasePrice: 100 }]);
-    expect(addOwnership(property, 'owner-b', 100, { buyInMultiplier: 1, maxShareholders: 8 }, world.getRuntimeState())).not.toBeNull();
+    expect(addOwnership(property, 'owner-b', 100, world.getRuntimeState())).not.toBeNull();
     const handler = new PropertyHandler(server(), world);
 
     expect(handler.handleRentPayment('payer', 1, server())).not.toBeNull();

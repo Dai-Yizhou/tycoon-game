@@ -119,6 +119,7 @@ export interface CellActionOption {
   label: string;
   detail?: string;
   enabled: boolean;
+  data?: Record<string, unknown>;
 }
 
 /** 队伍状态 */

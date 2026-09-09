@@ -46,6 +46,7 @@ const REAL_MAP_JSON = JSON.stringify([
     regionId: 'r1',
     theme: 'northeast',
     timezone: 0,
+    maxOwnerCount: 5,
     teleportDestinations: [],
   },
 ]);

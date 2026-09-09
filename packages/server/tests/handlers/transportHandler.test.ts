@@ -158,6 +158,34 @@ describe('TransportHandler', () => {
     });
   });
 
+  describe('本次停靠单次传送限制', () => {
+    it('本次停靠只允许传送一次，到达重置后恢复', () => {
+      const player = createTestPlayer('player1', 1000);
+      player.position.cellId = 1;
+      world.addPlayer(player);
+
+      const firstAck = jest.fn();
+      (handler as any).handleUseTransport(mockSocket, { hubCellId: 1, targetCellId: 2 }, firstAck);
+      expect(firstAck).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+
+      // 模拟客户端状态不同步：位置与财产被还原后再次请求传送
+      const restored = world.getPlayer('player1')!;
+      restored.position.cellId = 1;
+      restored.values['money'].current = 1000;
+      world.updatePlayer(restored);
+
+      const secondAck = jest.fn();
+      (handler as any).handleUseTransport(mockSocket, { hubCellId: 1, targetCellId: 3 }, secondAck);
+      expect(secondAck).toHaveBeenCalledWith(expect.objectContaining({ ok: false, error: 'action_used_this_stop' }));
+
+      // 重新到达交通枢纽后允许再次传送
+      handler.handleTransportCell('player1', 1, mockSocket);
+      const thirdAck = jest.fn();
+      (handler as any).handleUseTransport(mockSocket, { hubCellId: 1, targetCellId: 3 }, thirdAck);
+      expect(thirdAck).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+    });
+  });
+
   describe('TR-13.2: 目的地定期变更', () => {
     it('交通枢纽初始化时目的地正确', () => {
       const hubState = handler.getHubState(1);

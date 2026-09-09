@@ -23,11 +23,9 @@ import type { GameWorld } from '../world/GameWorld.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
 import type { BehaviorEngine, BehaviorExecuteResult } from '../behavior/BehaviorEngine.js';
 import {
-  DEFAULT_OWNERSHIP_CONFIG,
   addOwnership,
   getOwnerships,
   type Ownership,
-  type OwnershipConfig,
 } from '../economy/index.js';
 import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
 import { EconomyService } from '../economy/EconomyService.js';
@@ -85,18 +83,18 @@ export interface RentResult {
 export class PropertyHandler {
   private readonly io: TypedServer;
   private readonly world: GameWorld;
-  private readonly ownershipConfig: OwnershipConfig;
   private readonly economy: EconomyService;
   private achievementPurchase?: (playerId: string, cellId: number, guest: boolean) => void;
   private achievementOwnershipChanged?: (playerId: string, guest: boolean) => void;
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
+  /** 每位玩家本次停靠是否已执行购买或升级（到达时重置，停一次只允许一次操作） */
+  private readonly actedThisVisit = new Map<string, boolean>();
   private readonly operationGuard = new EconomicOperationGuard<AckResult<{ cell: Cell }>>();
 
-  constructor(io: TypedServer, world: GameWorld, ownershipConfig: OwnershipConfig = DEFAULT_OWNERSHIP_CONFIG, economy: EconomyService = new EconomyService(world)) {
+  constructor(io: TypedServer, world: GameWorld, economy: EconomyService = new EconomyService(world)) {
     this.io = io;
     this.world = world;
-    this.ownershipConfig = ownershipConfig;
     this.economy = economy;
   }
 
@@ -123,6 +121,25 @@ export class PropertyHandler {
    */
   getBehaviorEngine(): BehaviorEngine | null {
     return this.behaviorEngine;
+  }
+
+  /**
+   * 玩家到达地产格时重置本次停靠操作标记（停一次只允许购买或升级一次）
+   */
+  handlePlayerArrive(playerId: string, cellId: number): void {
+    this.actedThisVisit.set(this.visitKey(playerId, cellId), false);
+  }
+
+  private visitKey(playerId: string, cellId: number): string {
+    return `${playerId}:${cellId}`;
+  }
+
+  private hasActedThisVisit(playerId: string, cellId: number): boolean {
+    return this.actedThisVisit.get(this.visitKey(playerId, cellId)) === true;
+  }
+
+  private markActedThisVisit(playerId: string, cellId: number): void {
+    this.actedThisVisit.set(this.visitKey(playerId, cellId), true);
   }
 
   /**
@@ -211,10 +228,15 @@ export class PropertyHandler {
         return;
       }
 
+      // 6.5 本次停靠仅允许执行一次购买或升级
+      if (this.hasActedThisVisit(playerId, cell.id)) {
+        emitError(socket, ErrorCodes.InvalidPayload, '本次停靠已执行过操作');
+        ack?.({ ok: false, error: 'action_used_this_stop' });
+        return;
+      }
+
       // 7. 获取价格
-      const priceUct = ownerships.length > 0
-        ? this.scaleUct(cell.price, this.ownershipConfig.buyInMultiplier)
-        : cell.price;
+      const priceUct = this.resolvePurchasePrice(cell);
       const price = this.getUctCost(priceUct);
       if (Object.keys(priceUct?.player ?? {}).length === 0 || !this.canApplyUct(player, priceUct)) {
         emitError(socket, ErrorCodes.InvalidPayload, '该地产无价格信息');
@@ -278,6 +300,7 @@ export class PropertyHandler {
       const response = { ok: true, data: { cell: result.cell } } as AckResult<{ cell: Cell }>;
       if (requestId) this.operationGuard.complete(requestId, response);
       ack?.(response);
+      this.markActedThisVisit(playerId, cell.id);
       logger.debug(`玩家 ${playerId} 购买了格子 ${payload.cellId}，价格 ${price}`);
       } finally { this.operationGuard.unlock(lockKey); }
     } catch (err) {
@@ -354,6 +377,13 @@ export class PropertyHandler {
         return;
       }
 
+      // 6.5 本次停靠仅允许执行一次购买或升级
+      if (this.hasActedThisVisit(playerId, cell.id)) {
+        emitError(socket, ErrorCodes.InvalidPayload, '本次停靠已执行过操作');
+        ack?.({ ok: false, error: 'action_used_this_stop' });
+        return;
+      }
+
       // 7. 获取当前等级和升级费用
       const currentLevel = this.world.getRuntimeState().getCellState(cell.id).level;
       const upgradeCosts = cell.upgradeCost ?? [];
@@ -401,6 +431,7 @@ export class PropertyHandler {
       const response = { ok: true, data: { cell: result.cell, cost: result.cost } } as AckResult<{ cell: Cell; cost: Uct }>;
       if (requestId) this.operationGuard.complete(requestId, response as never);
       ack?.(response);
+      this.markActedThisVisit(playerId, cell.id);
       logger.debug(`玩家 ${playerId} 升级格子 ${payload.cellId} 到等级 ${result.newLevel}，费用 ${result.cost}`);
       } finally { this.operationGuard.unlock(lockKey); }
     } catch (err) {
@@ -534,7 +565,7 @@ export class PropertyHandler {
       const priceAmount = this.getUctCost(price);
       const buyerChanges = this.applyUct(player, price, 'property_purchase');
       if (buyerChanges.length === 0) return null;
-      const ownership = addOwnership(cell, player.id, priceAmount, this.ownershipConfig, this.world.getRuntimeState());
+      const ownership = addOwnership(cell, player.id, priceAmount, this.world.getRuntimeState());
       if (!ownership || ownership.share <= 0 || ownership.share > 1) {
         this.rollbackUct(player, buyerChanges, 'property_purchase_rollback');
         return null;
@@ -625,16 +656,12 @@ export class PropertyHandler {
     }
   }
 
-  private getUctCost(uct: Uct | undefined): number {
-    return Object.values(uct?.player ?? {}).reduce((total, value) => total + Math.abs(value), 0);
+  private resolvePurchasePrice(cell: Cell): Uct | undefined {
+    return cell.price;
   }
 
-  private scaleUct(uct: Uct | undefined, scale: number): Uct | undefined {
-    if (!uct) return undefined;
-    return {
-      player: Object.fromEntries(Object.entries(uct.player ?? {}).map(([fieldId, delta]) => [fieldId, delta * scale])),
-      region: Object.fromEntries(Object.entries(uct.region ?? {}).map(([fieldId, delta]) => [fieldId, delta * scale])),
-    };
+  private getUctCost(uct: Uct | undefined): number {
+    return Object.values(uct?.player ?? {}).reduce((total, value) => total + Math.abs(value), 0);
   }
 
   private canApplyUct(player: Player, uct: Uct | undefined, scale = 1): boolean {

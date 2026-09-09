@@ -18,6 +18,15 @@ export interface ValueFieldDef {
   min?: number; max?: number;
 }
 
+/** act-bar 动作模型。`data` 用于携带动作级业务参数（如 transport 的目标格子）。 */
+export interface CellAction {
+  id: string;
+  label: string;
+  detail?: string;
+  enabled: boolean;
+  data?: Record<string, unknown>;
+}
+
 export interface TeamMember { id: string; username: string; values: Record<string, number>; status: string; }
 
 export interface ClientGameSnapshot {
@@ -62,7 +71,7 @@ export interface ClientGameSnapshot {
   serverPathIndex: number;
   isWaitingForChoice: boolean;
   isServerAnimating: boolean;
-  cellActions: Array<{ id: string; label: string; detail?: string; enabled: boolean }>;
+  cellActions: CellAction[];
   regionValues: Map<string, Record<string, number>>;
   mapRegions: RegionInfo[];
   mapTimezones: TimeZoneInfo[];
@@ -205,8 +214,8 @@ export class GameStore {
     this.publish();
   }
 
-  setCellActions(actions: Array<{ id: string; label: string; detail?: string; enabled: boolean }>): void {
-    this.snapshot = { ...this.snapshot, cellActions: actions.map(action => ({ ...action })) };
+  setCellActions(actions: CellAction[]): void {
+    this.snapshot = { ...this.snapshot, cellActions: actions.map(action => ({ ...action, data: action.data ? { ...action.data } : undefined })) };
     this.publish();
   }
 

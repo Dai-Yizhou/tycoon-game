@@ -17,6 +17,7 @@ const investment: Cell = {
   theme: 'test',
   regionId: 'r1',
   timezone: 480,
+  maxOwnerCount: 5,
   price: { player: { money: -100, credit: -2 } },
   investmentTriggers: [{ id: 'boom', on: 'event', delta: { player: { money: 10, credit: 2 } } }],
   extra: {},
@@ -35,6 +36,44 @@ const meta: MapMeta = {
 };
 
 describe('InvestmentHandler v2', () => {
+  it('本次停靠投资购买后第二次操作被拒绝', () => {
+    const world = new GameWorld();
+    world.loadMap([investment], meta);
+    const socket = { data: { playerId: 'p1' }, emit: jest.fn(), on: jest.fn() } as any;
+    const player = {
+      id: 'p1',
+      username: 'p1',
+      teamId: null,
+      position: { cellId: 1 },
+      values: {
+        money: { id: 'money', name: 'money', current: 1000, min: 0 },
+        credit: { id: 'credit', name: 'credit', current: 10, min: 0 },
+      },
+      status: 'normal',
+      createdAt: 1,
+      lastActiveAt: 1,
+    } as any;
+    world.addPlayer(player);
+    const handler = new InvestmentHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
+
+    const firstAck = jest.fn();
+    (handler as any).handleBuyInvestment(socket, { cellId: 1 }, firstAck);
+    expect(firstAck).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+
+    const secondAck = jest.fn();
+    (handler as any).handleBuyInvestment(socket, { cellId: 1 }, secondAck);
+    expect(secondAck).toHaveBeenCalledWith(expect.objectContaining({ ok: false, error: 'action_used_this_stop' }));
+  });
+
+  it('uses static cell.price for later investment shareholders despite global multiplier', () => {
+    const world = new GameWorld();
+    world.loadMap([investment], meta);
+    world.getRuntimeState().replaceOwnerships(1, [{ playerId: 'owner', share: 1, purchasePrice: 100 }]);
+    const handler = new InvestmentHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
+
+    expect((handler as any).resolvePurchasePrice(investment)).toEqual(investment.price);
+  });
+
   it('resolves investmentTriggers UCT instead of legacy event impact fields', () => {
     const world = new GameWorld();
     world.loadMap([investment], meta);

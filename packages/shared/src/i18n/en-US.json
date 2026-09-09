@@ -211,7 +211,17 @@
     "achievementError": "Failed to load achievements",
     "achievementDisabled": "Achievements disabled",
     "achievementEmpty": "No achievements",
-    "achievementUnlocked": "Unlocked"
+    "achievementUnlocked": "Unlocked",
+    "levelFormat": "{{current}}/{{max}}",
+    "ownerCountFormat": "{{current}}/{{max}}",
+    "owners": "Owners",
+    "trigger": "Trigger {{id}}",
+    "jailCooldown": "Cooldown",
+    "jailCost": "Jail cost"
+  },
+  "uct": {
+    "player": "Player",
+    "region": "Region"
   },
   "dice": {
     "roll": "Roll Dice",
@@ -250,6 +260,7 @@
   },
   "property": {
     "buyTitle": "Buy Property",
+    "nextRentFormat": "Next-level rent {{rent}}",
     "upgradeTitle": "Upgrade Property",
     "price": "Price",
     "rent": "Rent",
@@ -323,6 +334,7 @@
     "costValue": "{{cost}}",
     "discount": "(30% transport discount)",
     "teleport": "Teleport",
+    "loading": "Fetching destinations...",
     "teleportSuccess": "Teleported to {{name}}! {{discount}}",
     "teleportFailed": "Teleport failed",
     "noDestinations": "No other transport hubs available",

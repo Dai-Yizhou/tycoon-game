@@ -16,6 +16,7 @@ const property: Cell = {
   theme: 'test',
   regionId: 'r1',
   timezone: 480,
+  maxOwnerCount: 5,
   price: { player: { money: -100 } },
   rent: [{ player: { money: -12 }, region: { pros: 2 } }],
   upgradeCost: [{ player: { money: -40 } }],
@@ -40,6 +41,46 @@ const meta: MapMeta = {
 };
 
 describe('PropertyHandler v2', () => {
+  it('本次停靠购买后升级被拒绝，重新到达后恢复', () => {
+    const world = new GameWorld();
+    world.loadMap([property], meta);
+    const socket = { data: { playerId: 'p1' }, emit: jest.fn(), on: jest.fn() } as any;
+    const player = {
+      id: 'p1',
+      username: 'p1',
+      teamId: null,
+      position: { cellId: 1 },
+      values: { money: { id: 'money', name: 'money', current: 1000, min: 0 } },
+      status: 'normal',
+      createdAt: 1,
+      lastActiveAt: 1,
+    } as any;
+    world.addPlayer(player);
+    const handler = new PropertyHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
+
+    const buyAck = jest.fn();
+    (handler as any).handleBuyProperty(socket, { cellId: 1 }, buyAck);
+    expect(buyAck).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+
+    const upgradeAck = jest.fn();
+    (handler as any).handleUpgradeProperty(socket, { cellId: 1 }, upgradeAck);
+    expect(upgradeAck).toHaveBeenCalledWith(expect.objectContaining({ ok: false, error: 'action_used_this_stop' }));
+
+    handler.handlePlayerArrive('p1', 1);
+    const retryAck = jest.fn();
+    (handler as any).handleUpgradeProperty(socket, { cellId: 1 }, retryAck);
+    expect(retryAck).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+  });
+
+  it('uses static cell.price for later property shareholders despite global multiplier', () => {
+    const world = new GameWorld();
+    world.loadMap([property], meta);
+    world.getRuntimeState().replaceOwnerships(1, [{ playerId: 'owner', share: 1, purchasePrice: 100 }]);
+    const handler = new PropertyHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
+
+    expect((handler as any).resolvePurchasePrice(property)).toEqual(property.price);
+  });
+
   it('resolves price, rent and upgrade cost from UCT money fields', () => {
     const world = new GameWorld();
     world.loadMap([property], meta);

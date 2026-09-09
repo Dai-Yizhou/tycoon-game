@@ -43,8 +43,7 @@ export interface Cell {
   theme: string;
   regionId: string;
   timezone: number;
-  maxOwnerCount?: number;
-  buyInMultiplier?: number;
+  maxOwnerCount: number;
   price?: Uct;
   maxLevel?: number;
   rent?: Uct[];

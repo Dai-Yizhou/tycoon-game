@@ -23,7 +23,7 @@ import { logger } from './utils/logger.js';
 import { GameWorld } from './world/GameWorld.js';
 import { SocketManager, type TypedServer } from './transport/SocketManager.js';
 import { HandlerRegistry, registerHandlers } from './transport/handlers.js';
-import { EconomyService, Taxation, Bankruptcy, resolveOwnershipConfig, type TaxConfig, type OwnershipConfig } from './economy/index.js';
+import { EconomyService, Taxation, Bankruptcy, type TaxConfig } from './economy/index.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { parseMapData, parseMapMeta } from '@game/shared';
 import { DayNightCycle, DEFAULT_DAY_NIGHT_CONFIG } from './world/DayNightCycle.js';
@@ -305,7 +305,6 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   if (!mapMeta) {
     throw new Error('无法启动经济系统：地图元数据未加载');
   }
-  const ownershipConfig: OwnershipConfig = resolveOwnershipConfig(undefined);
   const economy = new EconomyService(world);
   const taxation = new Taxation(io, world, readTaxConfig(mapMeta), economy);
   const bankruptcy = new Bankruptcy(io, world, taxation);
@@ -316,7 +315,7 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   logger.info('Economy system initialized (taxation, bankruptcy)');
 
   // 注册业务事件处理器（需要在经济系统初始化后）
-  const handlerRegistry = registerHandlers(io, world, ownershipConfig, config.jailCooldownMs, economy);
+  const handlerRegistry = registerHandlers(io, world, config.jailCooldownMs, economy);
   if (restoredSnapshot) taxation.restoreTaxRecords(restoredSnapshot.taxRecords);
   handlerRegistry.getJailHandler().restoreJailStates(restoredSnapshot?.jailStates);
   world.setSnapshotStateProvider(() => ({

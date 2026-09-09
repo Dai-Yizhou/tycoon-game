@@ -13,12 +13,6 @@ import { DEFAULT_SERVER_CONFIG, type ServerConfig } from '@game/shared';
  *
  * 环境变量约定为字符串，转换失败或负数时回退到 fallback。
  */
-function parseNonNegativeNumber(value: string | undefined, fallback: number): number {
-  if (value === undefined || value === null || value === '') return fallback;
-  const n = Number(value);
-  return Number.isFinite(n) && n >= 0 ? n : fallback;
-}
-
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   if (value === undefined || value === null || value === '') {
     return fallback;
@@ -112,9 +106,5 @@ export function loadConfig(): ServerConfig {
     worldSnapshotTtlMs: parsePositiveDuration(process.env.WORLD_SNAPSHOT_TTL_MS, DEFAULT_SERVER_CONFIG.worldSnapshotTtlMs),
     worldDataPath: parseString(process.env.WORLD_DATA_PATH, DEFAULT_SERVER_CONFIG.worldDataPath),
     userDataPath: parseString(process.env.USER_DATA_PATH, DEFAULT_SERVER_CONFIG.userDataPath),
-    ownership: {
-      buyInMultiplier: parseNonNegativeNumber(process.env.OWNERSHIP_BUY_IN_MULTIPLIER, DEFAULT_SERVER_CONFIG.ownership.buyInMultiplier),
-      maxShareholders: parsePositiveInt(process.env.MAX_PROPERTY_SHAREHOLDERS, DEFAULT_SERVER_CONFIG.ownership.maxShareholders),
-    },
   };
 }

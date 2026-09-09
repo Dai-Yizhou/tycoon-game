@@ -64,6 +64,8 @@ export class TransportHandler {
   private readonly dayNightDuration = 300000;
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
+  /** 每位玩家本次停靠是否已传送（到达时重置，停一次只允许传送一次） */
+  private readonly teleportedThisVisit = new Map<string, boolean>();
 
   constructor(io: TypedServer, world: GameWorld, economy: EconomyService | null = null) {
     this.io = io;
@@ -180,6 +182,13 @@ export class TransportHandler {
         return;
       }
 
+      // 6.5 本次停靠仅允许传送一次
+      if (this.teleportedThisVisit.get(`${playerId}:${payload.hubCellId}`) === true) {
+        emitError(socket, ErrorCodes.InvalidPayload, '本次停靠已传送过');
+        ack?.({ ok: false, error: 'action_used_this_stop' });
+        return;
+      }
+
       // 7. 验证目标格子是否在当前可用目的地中
       const hubState = this.hubStates.get(payload.hubCellId);
       if (!hubState) {
@@ -228,6 +237,7 @@ export class TransportHandler {
 
       // 12. 广播传送事件
       this.broadcastTransport(result);
+      this.teleportedThisVisit.set(`${playerId}:${payload.hubCellId}`, true);
 
       // 13. 返回成功结果
       ack?.({ ok: true, data: result });
@@ -477,6 +487,9 @@ export class TransportHandler {
 
     const hubCell = mapIndex.getById(hubId);
     if (!hubCell) return;
+
+    // 玩家本次停靠（到达）时重置传送标记，实现"停一次只能传送一次"
+    this.teleportedThisVisit.set(`${playerId}:${hubId}`, false);
 
     const hubState = this.hubStates.get(hubId);
     if (!hubState) {

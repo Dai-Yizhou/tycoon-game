@@ -20,7 +20,7 @@ import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
-import { DEFAULT_OWNERSHIP_CONFIG, addOwnership, getOwnerships, type OwnershipConfig } from '../economy/index.js';
+import { addOwnership, getOwnerships } from '../economy/index.js';
 import type { PropertyOwnership } from './propertyHandler.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
 import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
@@ -62,17 +62,24 @@ export class InvestmentHandler {
   private readonly world: GameWorld;
   /** 行为执行引擎（可选，由 app.ts 注入） */
   private behaviorEngine: BehaviorEngine | null = null;
-  private readonly ownershipConfig: OwnershipConfig;
   private readonly economy: EconomyService;
   private achievementPurchase?: (playerId: string, cellId: number, guest: boolean) => void;
   private achievementOwnershipChanged?: (playerId: string, guest: boolean) => void;
   private readonly operationGuard = new EconomicOperationGuard<AckResult<{ cell: Cell }>>();
+  /** 每位玩家本次停靠是否已购买（到达时重置，停一次只允许一次操作） */
+  private readonly actedThisVisit = new Map<string, boolean>();
 
-  constructor(io: TypedServer, world: GameWorld, ownershipConfig: OwnershipConfig = DEFAULT_OWNERSHIP_CONFIG, economy: EconomyService = new EconomyService(world)) {
+  constructor(io: TypedServer, world: GameWorld, economy: EconomyService = new EconomyService(world)) {
     this.io = io;
     this.world = world;
-    this.ownershipConfig = ownershipConfig;
     this.economy = economy;
+  }
+
+  /**
+   * 玩家到达投资格时重置本次停靠操作标记（停一次只允许购买一次）
+   */
+  handlePlayerArrive(playerId: string, cellId: number): void {
+    this.actedThisVisit.set(`${playerId}:${cellId}`, false);
   }
 
   /**
@@ -175,6 +182,13 @@ export class InvestmentHandler {
         return;
       }
 
+      // 5.5 本次停靠仅允许执行一次购买
+      if (this.actedThisVisit.get(`${playerId}:${cell.id}`) === true) {
+        emitError(socket, ErrorCodes.InvalidPayload, '本次停靠已执行过操作');
+        ack?.({ ok: false, error: 'action_used_this_stop' });
+        return;
+      }
+
       // 6. 验证格子是否已被购买
       const ownerships = getOwnerships(cell, this.world.getRuntimeState());
       const alreadyOwned = ownerships.some(o => o.playerId === playerId && o.share > 0);
@@ -186,7 +200,7 @@ export class InvestmentHandler {
       }
 
       // 7. 获取价格
-      const priceUct = ownerships.length > 0 ? this.scaleUct(cell.price, this.ownershipConfig.buyInMultiplier) : cell.price;
+      const priceUct = this.resolvePurchasePrice(cell);
       const price = this.getUctCost(priceUct);
       if (price <= 0) {
         emitError(socket, ErrorCodes.InvalidPayload, '该投资项目无价格信息');
@@ -250,6 +264,7 @@ export class InvestmentHandler {
       const response = { ok: true, data: { cell: result.cell } } as AckResult<{ cell: Cell }>;
       if (requestId) this.operationGuard.complete(requestId, response);
       ack?.(response);
+      this.actedThisVisit.set(`${playerId}:${cell.id}`, true);
       logger.debug(`玩家 ${playerId} 购买了投资项目 ${payload.cellId}，费用 ${this.formatUct(priceUct)}`);
       } finally { this.operationGuard.unlock(lockKey); }
     } catch (err) {
@@ -342,7 +357,7 @@ export class InvestmentHandler {
       const priceAmount = this.getUctCost(price);
       const changes = this.applyUct(player, price, 'investment_purchase');
       if (changes.length === 0) return null;
-      const ownership = addOwnership(cell, player.id, priceAmount, this.ownershipConfig, this.world.getRuntimeState());
+      const ownership = addOwnership(cell, player.id, priceAmount, this.world.getRuntimeState());
       if (!ownership || ownership.share <= 0 || ownership.share > 1) {
         this.rollbackUct(player, changes, 'investment_purchase_rollback');
         return null;
@@ -384,8 +399,12 @@ export class InvestmentHandler {
     return cell.investmentTriggers?.find((trigger) => trigger.on === domainEvent)?.delta ?? null;
   }
 
+  private resolvePurchasePrice(cell: Cell): Uct | undefined {
+    return cell.price;
+  }
+
   private getUctCost(uct: Uct | undefined): number {
-    return Object.values(uct?.player ?? {}).reduce((total, value) => total + Math.abs(value), 0);
+    return Object.values(uct?.player ?? {}).reduce((sum, value) => sum + Math.abs(value), 0);
   }
 
   private canApplyUct(player: Player, uct: Uct | undefined): boolean {

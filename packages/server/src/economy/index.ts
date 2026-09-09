@@ -24,18 +24,14 @@ export {
 } from './Bankruptcy.js';
 
 export {
-  DEFAULT_OWNERSHIP_CONFIG,
   getAccumulatedValue,
-  getBuyInPrice,
   getOwnerships,
   getOwners,
   addOwnership,
   distributeByShare,
   releaseOwnership,
   syncOwnerships,
-  resolveOwnershipConfig,
   type Ownership,
-  type OwnershipConfig,
 } from './Ownership.js';
 
 export { EconomicOperationGuard } from './EconomicOperationGuard.js';

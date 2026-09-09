@@ -211,7 +211,17 @@
     "achievementError": "成就加载失败",
     "achievementDisabled": "成就未启用",
     "achievementEmpty": "暂无成就",
-    "achievementUnlocked": "已解锁"
+    "achievementUnlocked": "已解锁",
+    "levelFormat": "{{current}}/{{max}}",
+    "ownerCountFormat": "{{current}}/{{max}}",
+    "owners": "持股",
+    "trigger": "钩子 {{id}}",
+    "jailCooldown": "冷却时长",
+    "jailCost": "出狱费用"
+  },
+  "uct": {
+    "player": "玩家",
+    "region": "区域"
   },
   "dice": {
     "roll": "掷骰子",
@@ -250,6 +260,7 @@
   },
   "property": {
     "buyTitle": "购买地产",
+    "nextRentFormat": "下一级租金 {{rent}}",
     "upgradeTitle": "升级地产",
     "price": "价格",
     "rent": "租金",
@@ -323,6 +334,7 @@
     "costValue": "{{cost}} 元",
     "discount": "（交通折扣-30%）",
     "teleport": "传送",
+    "loading": "正在获取目的地...",
     "teleportSuccess": "传送到 {{name}}！{{discount}}",
     "teleportFailed": "传送失败",
     "noDestinations": "没有其他交通枢纽可传送",

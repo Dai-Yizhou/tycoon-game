@@ -49,7 +49,6 @@ export interface ServerConfig {
   worldDataPath: string;
   /** 本地账号数据文件 */
   userDataPath: string;
-  ownership: { buyInMultiplier: number; maxShareholders: number };
 }
 
 /**
@@ -76,7 +75,6 @@ export const DEFAULT_SERVER_CONFIG: ServerConfig = {
   worldSnapshotTtlMs: 24 * 60 * 60 * 1000,
   worldDataPath: './data/world.json',
   userDataPath: './data/users.json',
-  ownership: { buyInMultiplier: 1, maxShareholders: 8 },
 };
 
 /**

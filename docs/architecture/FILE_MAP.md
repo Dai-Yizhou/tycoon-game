@@ -119,6 +119,8 @@
 | `src/game/systems/MapLoader.ts` | 请求 `/api/map`、标准化地图、计算本地昼夜 |
 | `src/game/systems/MovementSystem.ts` | 服务端移动路径/单步插值，供 GamePage 的 RAF 循环驱动棋子移动动画与岔路选择界面 |
 | `src/game/systems/ChatSystem.ts`、`TeamSystem.ts`、`TutorialSystem.ts`、`GameLogic.ts` | 对应请求/投影/引导逻辑 |
+| `src/game/cellDisplayModel.ts` | 纯展示模型：UCT 按 Player/Region 分组格式化与 cell-hover 字段边界 |
+| `src/game/cellActionResolver.ts` | 纯动作解析器：act-bar 动作 ID/可见性/可负担性投影（静态 `cell.price`，无倍率） |
 
 `packages/client/public/config/behaviors/` 是客户端可读行为副本。旧 HUD、部分 hooks 和历史文档引用的文件若不在上述当前树中，不得补写为现行文件。`ai-bot` 与 `ai_bot_try` 不在本次运行时文件地图和清理边界内。
 

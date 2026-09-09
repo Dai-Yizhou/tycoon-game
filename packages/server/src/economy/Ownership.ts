@@ -8,28 +8,6 @@ export interface Ownership {
   purchasePrice: number;
 }
 
-export interface OwnershipConfig {
-  buyInMultiplier: number;
-  maxShareholders: number;
-}
-
-export const DEFAULT_OWNERSHIP_CONFIG: OwnershipConfig = {
-  buyInMultiplier: 1,
-  maxShareholders: 8,
-};
-
-export function resolveOwnershipConfig(raw: unknown): OwnershipConfig {
-  const config = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
-  return {
-    buyInMultiplier: typeof config.buyInMultiplier === 'number' && Number.isFinite(config.buyInMultiplier) && config.buyInMultiplier >= 0
-      ? config.buyInMultiplier
-      : DEFAULT_OWNERSHIP_CONFIG.buyInMultiplier,
-    maxShareholders: typeof config.maxShareholders === 'number' && Number.isFinite(config.maxShareholders)
-      ? Math.max(1, Math.floor(config.maxShareholders))
-      : DEFAULT_OWNERSHIP_CONFIG.maxShareholders,
-  };
-}
-
 export function getOwnerships(cell: Cell, runtime: WorldRuntimeStateStore): Ownership[] {
   const state = runtime.getCellState(cell.id);
   return normalizeOwnerships(state.ownerships, state.accumulatedValue);
@@ -76,14 +54,10 @@ export function getAccumulatedValue(cell: Cell, runtime: WorldRuntimeStateStore)
   return state.accumulatedValue > 0 ? state.accumulatedValue : calculated;
 }
 
-export function getBuyInPrice(cell: Cell, config: OwnershipConfig, runtime: WorldRuntimeStateStore): number {
-  return Math.floor(getAccumulatedValue(cell, runtime) * config.buyInMultiplier);
-}
-
-export function addOwnership(cell: Cell, playerId: string, price: number, config: OwnershipConfig, runtime: WorldRuntimeStateStore): Ownership | null {
+export function addOwnership(cell: Cell, playerId: string, price: number, runtime: WorldRuntimeStateStore): Ownership | null {
   const existing = getOwnerships(cell, runtime);
   if (existing.some((ownership) => ownership.playerId === playerId)) return null;
-  if (existing.length >= config.maxShareholders) return null;
+  if (existing.length >= cell.maxOwnerCount) return null;
   if (existing.length === 0) {
     const ownership = { playerId, share: 1, purchasePrice: price };
     syncOwnerships(cell, [ownership], runtime);

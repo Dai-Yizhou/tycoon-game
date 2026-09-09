@@ -71,6 +71,18 @@ describe('map contract v2', () => {
     expect(() => parseMapData([{ ...cellInput, regionId: undefined }])).toThrow(/regionId/);
   });
 
+  it('requires maxOwnerCount on property and investment cells', () => {
+    expect(() => parseMapData([{ ...cellInput, type: 'property', price: { player: { money: -100 } } }])).toThrow(/maxOwnerCount/);
+    expect(() => parseMapData([{ ...cellInput, type: 'investment', price: { player: { money: -100 } } }])).toThrow(/maxOwnerCount/);
+    expect(() => parseMapData([{ ...cellInput, type: 'property', maxOwnerCount: 0 }])).toThrow(/maxOwnerCount/);
+    expect(() => parseMapData([{ ...cellInput, type: 'investment', maxOwnerCount: 1.5 }])).toThrow(/maxOwnerCount/);
+  });
+
+  it('rejects legacy buyInMultiplier and non-static price values', () => {
+    expect(() => parseMapData([{ ...cellInput, type: 'property', maxOwnerCount: 1, buyInMultiplier: 2 }])).toThrow(/buyInMultiplier/);
+    expect(() => parseMapData([{ ...cellInput, type: 'property', maxOwnerCount: 1, price: { player: { money: '${basePrice}' } } }])).toThrow(/有限数字/);
+  });
+
   it('parses UCT metadata without current values or legacy region fields', () => {
     const meta = parseMapMetaData(metaInput);
 
