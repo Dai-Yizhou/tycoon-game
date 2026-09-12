@@ -20,7 +20,7 @@ import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
-import { addOwnership, getOwnerships } from '../economy/index.js';
+import { addOwnership, getOwnerships, distributeByShareFloor } from '../economy/index.js';
 import type { PropertyOwnership } from './propertyHandler.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
 import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
@@ -376,14 +376,19 @@ export class InvestmentHandler {
   }
 
   private distributeBuyInToOwners(cell: Cell, buyerId: string, amount: Uct): void {
-    const buyer = getOwnerships(cell, this.world.getRuntimeState()).find((ownership) => ownership.playerId === buyerId);
+    const ownerships = getOwnerships(cell, this.world.getRuntimeState());
+    const buyer = ownerships.find((ownership) => ownership.playerId === buyerId);
     if (!buyer || buyer.share >= 1) return;
-    for (const ownership of getOwnerships(cell, this.world.getRuntimeState())) {
-      if (ownership.playerId === buyerId) continue;
-      const owner = this.world.getPlayer(ownership.playerId);
-      if (!owner || owner.status === PlayerStatus.Bankrupt) continue;
-      const scale = ownership.share / (1 - buyer.share);
-      this.applyUct(owner, { player: Object.fromEntries(Object.entries(amount.player ?? {}).map(([fieldId, delta]) => [fieldId, -delta * scale])) }, 'investment_buy_in_payout');
+    const existing = ownerships.filter((ownership) => ownership.playerId !== buyerId);
+    for (const [fieldId, delta] of Object.entries(amount.player ?? {})) {
+      const payoutMagnitude = Math.abs(delta);
+      if (payoutMagnitude <= 0) continue;
+      const allocated = distributeByShareFloor(existing, payoutMagnitude);
+      for (const [ownerId, units] of allocated) {
+        const owner = this.world.getPlayer(ownerId);
+        if (!owner || owner.status === PlayerStatus.Bankrupt) continue;
+        this.applyUct(owner, { player: { [fieldId]: units } }, 'investment_buy_in_payout');
+      }
     }
   }
 
@@ -434,47 +439,55 @@ export class InvestmentHandler {
     for (const change of changes) this.economy.changeValue(player.id, change.fieldId, -change.delta, reason);
   }
 
-  private scaleUct(uct: Uct | undefined, scale: number): Uct | undefined {
-    if (!uct) return undefined;
-    return {
-      player: Object.fromEntries(Object.entries(uct.player ?? {}).map(([fieldId, delta]) => [fieldId, delta * scale])),
-      region: Object.fromEntries(Object.entries(uct.region ?? {}).map(([fieldId, delta]) => [fieldId, delta * scale])),
-    };
-  }
-
   /**
-   * 分配收益/损失给所有者（按持股比例）
+   * 分配收益/损失给可收款股东（按持股比例，丢弃尾数）
+   *
+   * 只对可接收影响的股东分配，不把不可接收方份额转给他人；每个股东取整数下限，尾数丢弃。
    */
   private distributeInvestmentImpact(
     cell: Cell,
     impact: Uct,
   ): EventTriggerResult {
     const ownerships = getOwnerships(cell, this.world.getRuntimeState());
-    const affectedPlayers: Array<{ playerId: string; share: number; amount: Uct }> = [];
+    const affectedPlayers: EventTriggerResult['affectedPlayers'] = [];
 
     for (const [fieldId, delta] of Object.entries(impact.region ?? {})) {
       this.world.changeRegionValue(cell.regionId, fieldId, delta);
     }
 
-    for (const ownership of ownerships) {
+    // 仅有效股东（可接收影响）参与整数分配；不可接收者的份额不转给其他股东。
+    const effective = ownerships.filter((ownership) => {
       const player = this.world.getPlayer(ownership.playerId);
-      if (!player || !canReceiveInvestmentImpact(player.status)) {
-        continue;
+      return player !== undefined && canReceiveInvestmentImpact(player.status);
+    });
+    const effectiveShareSum = effective.reduce((sum, ownership) => sum + ownership.share, 0);
+    if (effectiveShareSum > 0) {
+      const perOwner: Map<string, Record<string, number>> = new Map();
+      const ownerShare: Map<string, number> = new Map(effective.map((o) => [o.playerId, o.share]));
+      for (const [fieldId, delta] of Object.entries(impact.player ?? {})) {
+        const magnitude = Math.abs(delta);
+        if (magnitude <= 0) continue;
+        const distributable = Math.floor(magnitude * effectiveShareSum);
+        if (distributable <= 0) continue;
+        const sign = delta > 0 ? 1 : -1;
+        for (const [ownerId, units] of distributeByShareFloor(effective, distributable)) {
+          const player = this.world.getPlayer(ownerId);
+          if (!player) continue;
+          const change = this.economy.changeValue(player.id, fieldId, sign * units, 'investment_impact');
+          if (!change.ok) continue;
+          this.io.emit('server.valueChanged', { playerId: player.id, fieldId, current: change.current, delta: change.delta });
+          const bucket = perOwner.get(ownerId) ?? {};
+          bucket[fieldId] = (bucket[fieldId] ?? 0) + sign * units;
+          perOwner.set(ownerId, bucket);
+        }
       }
-
-      // 计算每个所有者的收益/损失金额（按持股比例）
-      const amount = this.scaleUct({ player: impact.player }, ownership.share) ?? {};
-      const changes = this.applyUct(player, amount, 'investment_impact');
-      if (changes.length === 0) {
-        continue;
+      for (const [ownerId, fields] of perOwner) {
+        affectedPlayers.push({
+          playerId: ownerId,
+          share: ownerShare.get(ownerId) ?? 0,
+          amount: { player: fields },
+        });
       }
-
-      affectedPlayers.push({
-        playerId: ownership.playerId,
-        share: ownership.share,
-        amount,
-      });
-
     }
 
     return {

@@ -64,16 +64,13 @@ export function addOwnership(cell: Cell, playerId: string, price: number, runtim
     runtime.updateCellState(cell.id, (state) => ({ ...state, accumulatedValue: price }));
     return ownership;
   }
-  const oldValue = getAccumulatedValue(cell, runtime);
-  const nextValue = oldValue + price;
-  const newShare = nextValue > 0 ? price / nextValue : 0;
-  const next = existing.map((ownership) => ({
-    ...ownership,
-    share: ownership.share * (oldValue / nextValue),
-  }));
-  const ownership = { playerId, share: newShare, purchasePrice: price };
+  const nextCount = existing.length + 1;
+  // 所有股东平均持股（不按买入价配比）
+  const shared = 1 / nextCount;
+  const next = existing.map((ownership) => ({ ...ownership, share: shared }));
+  const ownership = { playerId, share: shared, purchasePrice: price };
   syncOwnerships(cell, [...next, ownership], runtime);
-  runtime.updateCellState(cell.id, (state) => ({ ...state, accumulatedValue: nextValue }));
+  runtime.updateCellState(cell.id, (state) => ({ ...state, accumulatedValue: state.accumulatedValue + price }));
   return ownership;
 }
 
@@ -85,11 +82,41 @@ export function distributeByShare(
   pay: (player: Player, delta: number) => void,
   excludedStatus?: PlayerStatus,
 ): void {
-  for (const ownership of getOwnerships(cell, runtime)) {
-    const player = getPlayer(ownership.playerId);
-    if (!player || player.status === excludedStatus || !participatesInEconomy(player.status)) continue;
-    pay(player, Math.floor(amount * ownership.share));
+  const payable = getOwnerships(cell, runtime).filter(
+    (ownership) => {
+      const player = getPlayer(ownership.playerId);
+      return !!player && player.status !== excludedStatus && participatesInEconomy(player.status);
+    },
+  );
+  const allocated = distributeByShareFloor(payable, amount);
+  for (const [playerId, units] of allocated) {
+    const player = getPlayer(playerId);
+    if (player === undefined) continue;
+    pay(player, units);
   }
+}
+
+/**
+ * 按持股比例结算（此前决策：丢弃尾数）。
+ *
+ * 传入一组持股（share 无需归一，按相对比例即可），每个股东取 `Math.floor(amount * share)`
+ * 的整数份额，**尾部余数直接丢弃**，不做守恒回补。因此 Σ 分配 <= amount。
+ *
+ * 用途：租金/投资收益/买入补偿等多方按股权结算时，避免浮点股权比（如 1/3）产生
+ * 33.3333… 的小数金额，统一输出整数金额，并对不充分摊的尾数直接舍去。
+ */
+export function distributeByShareFloor(ownerships: Array<{ playerId: string; share: number }>, amount: number): Map<string, number> {
+  const result = new Map<string, number>();
+  if (amount <= 0) return result;
+  const valid = ownerships.filter((o) => o.share > 0 && Number.isFinite(o.share));
+  if (valid.length === 0) return result;
+  const total = valid.reduce((sum, o) => sum + o.share, 0);
+  if (total <= 0) return result;
+  for (const o of valid) {
+    const units = Math.floor(amount * (o.share / total));
+    if (units > 0) result.set(o.playerId, units);
+  }
+  return result;
 }
 
 export function releaseOwnership(cell: Cell, playerId: string, runtime: WorldRuntimeStateStore): void {

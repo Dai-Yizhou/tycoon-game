@@ -29,6 +29,7 @@ export {
   getOwners,
   addOwnership,
   distributeByShare,
+  distributeByShareFloor,
   releaseOwnership,
   syncOwnerships,
   type Ownership,

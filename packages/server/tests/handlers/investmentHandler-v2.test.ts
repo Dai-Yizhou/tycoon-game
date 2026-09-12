@@ -113,18 +113,4 @@ describe('InvestmentHandler v2', () => {
 
     expect((handler as any).dispatchDomainEvent(DomainEvents.AnyPlayerLandsEvent)).toEqual([]);
   });
-
-  it('scales player and region UCT fields together', () => {
-    const world = new GameWorld();
-    world.loadMap([investment], meta);
-    const handler = new InvestmentHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
-
-    expect((handler as any).scaleUct({
-      player: { money: 10, credit: 2 },
-      region: { pros: 4 },
-    }, 0.5)).toEqual({
-      player: { money: 5, credit: 1 },
-      region: { pros: 2 },
-    });
-  });
 });

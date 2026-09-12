@@ -138,7 +138,7 @@ describe('PropertyHandler v2', () => {
     world.getRuntimeState().replaceOwnerships(1, [{ playerId: 'owner', share: 1, purchasePrice: 100 }]);
     const handler = new PropertyHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
 
-    (handler as any).distributeRentToOwners(property, { player: { money: -4, credit: -2 } }, 1);
+    (handler as any).distributeRentToOwners({ player: { money: -4, credit: -2 } }, [{ playerId: 'owner', share: 1 }], 1);
 
     expect(owner.values.money.current).toBe(4);
     expect(owner.values.credit.current).toBe(3);

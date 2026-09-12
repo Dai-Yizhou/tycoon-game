@@ -25,6 +25,7 @@ import type { BehaviorEngine, BehaviorExecuteResult } from '../behavior/Behavior
 import {
   addOwnership,
   getOwnerships,
+  distributeByShareFloor,
   type Ownership,
 } from '../economy/index.js';
 import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
@@ -512,18 +513,30 @@ export class PropertyHandler {
       }
       if (!rentUct) return null;
 
-      const receivableShare = ownerships.reduce((total, ownership) => {
+      // 可收款股东（仅向可收款股东收租，其不可收的份额不凭空转移给其他股东）
+      const collectableOwnerships = ownerships.filter((ownership) => {
         const owner = this.world.getPlayer(ownership.playerId);
-        return owner && canCollectRent(owner.status) ? total + ownership.share : total;
-      }, 0);
-      if (receivableShare <= 0) return null;
+        return owner !== undefined && canCollectRent(owner.status);
+      });
+      if (collectableOwnerships.length === 0) return null;
+      const receivableShare = collectableOwnerships.reduce((total, ownership) => total + ownership.share, 0);
 
-      if (!this.canApplyUct(payer, rentUct, receivableShare)) return null;
-      const payerChanges = this.applyUct(payer, rentUct, 'rent_payment', receivableShare);
+      // 逐字段整数化结算（此前决策：丢弃尾数）：应付取可收份额的整数下限，
+      // Owner 按股权取整数下限分摊，不守恒回补，保证金额不带小数。
+      const payerDeltas: Record<string, number> = {};
+      for (const [fieldId, delta] of Object.entries(rentUct.player ?? {})) {
+        const payableMagnitude = Math.floor(Math.abs(delta) * receivableShare);
+        const field = payer.values[fieldId];
+        if (!field) return null;
+        const next = field.current - payableMagnitude;
+        if (next < (field.min ?? Number.NEGATIVE_INFINITY) || next > (field.max ?? Number.POSITIVE_INFINITY)) return null;
+        payerDeltas[fieldId] = -payableMagnitude;
+      }
+      const payerChanges = this.applyUct(payer, { player: payerDeltas }, 'rent_payment');
       if (payerChanges.length === 0) return null;
 
-      // 增加所有者财产（按当前 ownership 原始比例分配）
-      this.distributeRentToOwners(cell, rentUct, 1);
+      // 增加所有者财产（按股权整数分配）
+      this.distributeRentToOwners(rentUct, collectableOwnerships, receivableShare);
       for (const [fieldId, delta] of Object.entries(rentUct?.region ?? {})) {
         const applied = this.world.changeRegionValue(cell.regionId, fieldId, delta);
         this.io.emit('server.notification', {
@@ -585,18 +598,19 @@ export class PropertyHandler {
   }
 
   private distributeBuyInToOwners(cell: Cell, buyerId: string, amount: Uct): void {
-    const buyer = getOwnerships(cell, this.world.getRuntimeState()).find((ownership) => ownership.playerId === buyerId);
+    const ownerships = getOwnerships(cell, this.world.getRuntimeState());
+    const buyer = ownerships.find((ownership) => ownership.playerId === buyerId);
     if (!buyer || buyer.share >= 1) return;
-    for (const ownership of getOwnerships(cell, this.world.getRuntimeState())) {
-      if (ownership.playerId === buyerId) continue;
-      const owner = this.world.getPlayer(ownership.playerId);
-      if (!owner || owner.status === PlayerStatus.Bankrupt) continue;
-      const scale = ownership.share / (1 - buyer.share);
-      this.applyUct(owner, {
-        player: Object.fromEntries(
-          Object.entries(amount.player ?? {}).map(([fieldId, delta]) => [fieldId, -delta * scale]),
-        ),
-      }, 'property_buy_in_payout');
+    const existing = ownerships.filter((ownership) => ownership.playerId !== buyerId);
+    for (const [fieldId, delta] of Object.entries(amount.player ?? {})) {
+      const payoutMagnitude = Math.abs(delta);
+      if (payoutMagnitude <= 0) continue;
+      const allocated = distributeByShareFloor(existing, payoutMagnitude);
+      for (const [ownerId, units] of allocated) {
+        const owner = this.world.getPlayer(ownerId);
+        if (!owner || owner.status === PlayerStatus.Bankrupt) continue;
+        this.applyUct(owner, { player: { [fieldId]: units } }, 'property_buy_in_payout');
+      }
     }
   }
 
@@ -632,14 +646,21 @@ export class PropertyHandler {
   }
 
   /**
-   * 分配租金给所有者（按持股比例）
+   * 分配租金给可收款股东（按持股比例，丢弃尾数）
+   *
+   * 只对可收款股东分配，且不把不可收方份额转给他人；每个股东取整数下限，尾数丢弃。
    */
-  private distributeRentToOwners(cell: Cell, rent: Uct, scale: number): void {
-    for (const ownership of getOwnerships(cell, this.world.getRuntimeState())) {
-      const owner = this.world.getPlayer(ownership.playerId);
-      if (!owner || !canCollectRent(owner.status)) continue;
-      const shareScale = ownership.share * scale;
-      this.applyUct(owner, { player: Object.fromEntries(Object.entries(rent.player ?? {}).map(([fieldId, delta]) => [fieldId, -delta * shareScale])) }, 'rent_income');
+  private distributeRentToOwners(rent: Uct, collectableOwnerships: Array<{ playerId: string; share: number }>, receivableShare: number): void {
+    for (const [fieldId, delta] of Object.entries(rent.player ?? {})) {
+      const payableMagnitude = Math.floor(Math.abs(delta) * receivableShare);
+      if (payableMagnitude <= 0) continue;
+      // 此前决策：按股权丢弃尾数分摊（不守恒回补），每个股东取整数下限
+      const allocated = distributeByShareFloor(collectableOwnerships, payableMagnitude);
+      for (const [ownerId, units] of allocated) {
+        const owner = this.world.getPlayer(ownerId);
+        if (!owner || !canCollectRent(owner.status)) continue;
+        this.applyUct(owner, { player: { [fieldId]: units } }, 'rent_income');
+      }
     }
   }
 
