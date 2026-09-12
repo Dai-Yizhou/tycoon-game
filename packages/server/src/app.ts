@@ -315,7 +315,7 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   logger.info('Economy system initialized (taxation, bankruptcy)');
 
   // 注册业务事件处理器（需要在经济系统初始化后）
-  const handlerRegistry = registerHandlers(io, world, config.jailCooldownMs, economy);
+  const handlerRegistry = registerHandlers(io, world, economy);
   if (restoredSnapshot) taxation.restoreTaxRecords(restoredSnapshot.taxRecords);
   handlerRegistry.getJailHandler().restoreJailStates(restoredSnapshot?.jailStates);
   world.setSnapshotStateProvider(() => ({

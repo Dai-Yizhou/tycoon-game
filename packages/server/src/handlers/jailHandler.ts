@@ -63,19 +63,16 @@ export class JailHandler {
   /** 监狱状态数据：playerId → JailStateData */
   private readonly jailStates: Map<string, JailStateData> = new Map();
   private readonly jailTimers: Map<string, NodeJS.Timeout> = new Map();
-  private readonly configuredCooldownMs: number;
   private readonly economy: EconomyService | null;
 
   constructor(
     io: TypedServer,
     world: GameWorld,
     _registry: HandlerRegistry,
-    configuredCooldownMs = DEFAULT_JAIL_CONFIG.cooldownMs ?? 10_000,
     economy: EconomyService | null = null,
   ) {
     this.io = io;
     this.world = world;
-    this.configuredCooldownMs = configuredCooldownMs;
     this.economy = economy;
   }
 
@@ -137,8 +134,8 @@ export class JailHandler {
         return false;
       }
 
-      // 获取监狱配置
-      const cooldownMs = cell.jailCooldown ?? this.configuredCooldownMs;
+      // 获取监狱配置（权威来源为格子配置；缺失时使用处理器内置默认值，不再依赖 ServerConfig）
+      const cooldownMs = cell.jailCooldown ?? DEFAULT_JAIL_CONFIG.cooldownMs ?? 10_000;
 
       // 设置监狱状态
       player.status = PlayerStatus.Jail;
@@ -319,7 +316,7 @@ export class JailHandler {
    * 返回运行时默认配置；格子级 cooldown 和 cost 在入狱时读取。
    */
   getJailConfig(): JailConfig {
-    return { cooldownMs: this.configuredCooldownMs };
+    return { cooldownMs: DEFAULT_JAIL_CONFIG.cooldownMs ?? 10_000 };
   }
 
   /**

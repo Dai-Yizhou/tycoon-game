@@ -56,7 +56,7 @@ describe('JailHandler v2', () => {
     const world = new GameWorld();
     world.loadMap([jail], meta);
     world.addPlayer({ ...player, values: { credit: { ...player.values.credit } } });
-    const handler = new JailHandler(io, world, null as any, 10000);
+    const handler = new JailHandler(io, world, null as any);
 
     expect(handler.handleEnterJail('p1', 1)).toBe(true);
     expect(world.getPlayer('p1')?.values.credit.current).toBe(7);

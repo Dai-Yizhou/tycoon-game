@@ -86,7 +86,7 @@ export class HandlerRegistry {
   refreshOwnedCells: (playerId: string, guest: boolean) => void = (_playerId, _guest) => undefined;
   private achievementOwner: ((playerId: string, guest: boolean) => import('../achievement/AchievementStore.js').AchievementOwner) | undefined;
 
-  constructor(io: TypedServer, world: GameWorld, jailCooldownMs?: number, economy?: EconomyService) {
+  constructor(io: TypedServer, world: GameWorld, economy?: EconomyService) {
     this.io = io;
     this.world = world;
 
@@ -107,7 +107,7 @@ export class HandlerRegistry {
     // 初始化地产处理器
     this.propertyHandler = new PropertyHandler(io, world, economy ?? new EconomyService(world));
     // 初始化监狱处理器
-    this.jailHandler = new JailHandler(io, world, this, jailCooldownMs ?? 10_000, economy ?? null);
+    this.jailHandler = new JailHandler(io, world, this, economy ?? null);
     // 初始化事件处理器
     this.eventHandler = new EventHandler(io, world);
     // 初始化投资项目处理器
@@ -551,8 +551,8 @@ export class HandlerRegistry {
 /**
  * 快速注册：创建 HandlerRegistry 并注册全部事件
  */
-export function registerHandlers(io: TypedServer, world: GameWorld, jailCooldownMs?: number, economy?: EconomyService): HandlerRegistry {
-  return new HandlerRegistry(io, world, jailCooldownMs, economy);
+export function registerHandlers(io: TypedServer, world: GameWorld, economy?: EconomyService): HandlerRegistry {
+  return new HandlerRegistry(io, world, economy);
 }
 
 // -----------------------------------------------------------------------------

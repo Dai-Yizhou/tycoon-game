@@ -20,11 +20,6 @@ export interface ServerConfig {
   host: string;
   /** CORS 允许的来源（默认 '*'） */
   corsOrigin: string;
-  /** 昼夜周期（分钟，默认 15） */
-  dayNightCycleMinutes: number;
-  /** 时代长度（天，默认 90，对应现实 3-6 个月） */
-  eraLengthDays: number;
-  jailCooldownMs: number;
   /** 地图文件路径（默认 './map.json'） */
   mapPath: string;
   /** 地图元数据文件路径（默认 './map-meta.json'） */
@@ -60,9 +55,6 @@ export const DEFAULT_SERVER_CONFIG: ServerConfig = {
   port: 3000,
   host: '0.0.0.0',
   corsOrigin: '*',
-  dayNightCycleMinutes: 15,
-  eraLengthDays: 90,
-  jailCooldownMs: 10_000,
   mapPath: './map.json',
   mapMetaPath: './map-meta.json',
   achievementConfigPath: './achievements.json',

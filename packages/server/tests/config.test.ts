@@ -21,8 +21,6 @@ describe('loadConfig', () => {
       'PORT',
       'HOST',
       'CORS_ORIGIN',
-      'DAY_NIGHT_CYCLE_MINUTES',
-      'ERA_LENGTH_DAYS',
       'MAP_PATH',
       'MAP_META_PATH',
       'MONGO_URI',
@@ -57,16 +55,6 @@ describe('loadConfig', () => {
     it('uses host 0.0.0.0 by default', () => {
       const config = loadConfig();
       expect(config.host).toBe('0.0.0.0');
-    });
-
-    it('uses dayNightCycleMinutes 15 by default', () => {
-      const config = loadConfig();
-      expect(config.dayNightCycleMinutes).toBe(15);
-    });
-
-    it('uses eraLengthDays 90 by default', () => {
-      const config = loadConfig();
-      expect(config.eraLengthDays).toBe(90);
     });
 
     it('uses maxPlayers 1000 by default', () => {

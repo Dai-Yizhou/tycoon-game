@@ -237,16 +237,13 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     if (activePlayer && payload.playerId === activePlayer.id) {
       const snapshot = store.getSnapshot();
       const activeMapIndex = options.getMapIndex?.() ?? options.mapIndex;
-      console.warn('[DBG-PLAYERMOVED]', JSON.stringify(payload), 'isServerAnimating=', snapshot.isServerAnimating, 'hasMap=', !!activeMapIndex, 'curPos=', snapshot.currentPlayerPosition);
       // 动画进行中：moveHandler 的 updatePlayer 会额外广播一个不含 path 的
       // server.playerMoved 位置同步（可能先/后到达）。此时必须忽略，避免把
       // 动画权威位置直接当成跳转整格覆盖，导致棋子停留在原地而视野已被拉走。
       if (snapshot.isServerAnimating) return;
       if (activeMapIndex && payload.path && payload.path.length > 1) {
-        const started = startServerPathAnimation(store, activeMapIndex, payload.path, refresh, options.movementEffects, payload.cellId, refresh);
-        console.warn('[DBG-START-ANIM] started=', started);
+        startServerPathAnimation(store, activeMapIndex, payload.path, refresh, options.movementEffects, payload.cellId, refresh);
       } else {
-        console.warn('[DBG-JUMP-MOVE] no path, direct jump');
         store.applyEvent({ sequence: store.nextSequence(), type: 'move', playerId: payload.playerId, cellId: payload.cellId });
         refresh();
       }

@@ -85,15 +85,6 @@ export function loadConfig(): ServerConfig {
     port: parsePositiveInt(process.env.PORT, DEFAULT_SERVER_CONFIG.port),
     host: parseString(process.env.HOST, DEFAULT_SERVER_CONFIG.host),
     corsOrigin: parseString(process.env.CORS_ORIGIN, DEFAULT_SERVER_CONFIG.corsOrigin),
-    dayNightCycleMinutes: parsePositiveInt(
-      process.env.DAY_NIGHT_CYCLE_MINUTES,
-      DEFAULT_SERVER_CONFIG.dayNightCycleMinutes,
-    ),
-    eraLengthDays: parsePositiveInt(
-      process.env.ERA_LENGTH_DAYS,
-      DEFAULT_SERVER_CONFIG.eraLengthDays,
-    ),
-    jailCooldownMs: parsePositiveInt(process.env.JAIL_COOLDOWN_MS, DEFAULT_SERVER_CONFIG.jailCooldownMs),
     mapPath: parseString(process.env.MAP_PATH, DEFAULT_SERVER_CONFIG.mapPath),
     mapMetaPath: parseString(process.env.MAP_META_PATH, DEFAULT_SERVER_CONFIG.mapMetaPath),
     achievementConfigPath: parseString(process.env.ACHIEVEMENT_CONFIG_PATH, DEFAULT_SERVER_CONFIG.achievementConfigPath),
