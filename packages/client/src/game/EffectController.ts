@@ -33,6 +33,12 @@ export class EffectController implements GameEffectHooks {
   onMoveComplete(cellId: number): void { this.invoke('onMoveComplete', cellId); }
   onIntersectionPrompt(options: number[]): void { this.invoke('onIntersectionPrompt', options); }
   onIntersectionResolved(chosenCellId: number): void { this.invoke('onIntersectionResolved', chosenCellId); }
+  onTeleport(toCellId: number, applyMove: () => void): void { this.invoke('onTeleport', toCellId, applyMove); }
+  onThemeChange(moving: boolean, waitingForChoice = false, apply?: () => void): void {
+    if (this.destroyed || !this.enabled) return;
+    const hook = this.hooks as { onThemeChange?: (moving: boolean, waitingForChoice?: boolean, apply?: () => void) => void } | undefined;
+    hook?.onThemeChange?.(moving, waitingForChoice, apply);
+  }
   onMoneyChange(delta: number, newValue: number): void { this.invoke('onMoneyChange', delta, newValue); }
   onCreditChange(delta: number, newValue: number): void { this.invoke('onCreditChange', delta, newValue); }
   onEnvChange(delta: number, newValue: number): void { this.invoke('onEnvChange', delta, newValue); }

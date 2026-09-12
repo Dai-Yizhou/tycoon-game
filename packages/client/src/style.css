@@ -315,6 +315,37 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   stroke: var(--tycoon-piece-outline); stroke-width: 4; stroke-linejoin: round;
 }
 
+/* 待机跳动：仅作用于内层包裹 g，不影响外层 translate 定位；移动时暂停。
+   transform-box: fill-box + transform-origin 底部中心，使缩放表现为落地压扁/上升拉伸 */
+.map-player__bounce {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: player-idle-bounce var(--motion-bounce) infinite;
+}
+.interactive-map-surface.is-moving .map-player__bounce { animation: none; }
+@keyframes player-idle-bounce {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  20% { transform: translateY(-9px) scale(0.99, 1.01); }
+  50%{ transform: translateY(0px) scale(1.005, 0.995); }
+  80% { transform: translateY(-0.5px) scale(0.995, 1.005); }
+}
+
+/* 全屏转场遮罩：从中心扩散/收缩的黑色圆形。
+   进入（is-active）：圆由中心加速扩散至全屏黑屏 → ease-in（速度渐快）；
+   退出（去掉 is-active）：圆自中心收缩露出画面 → ease-out（进入的反效果）。
+   时长由主题令牌 motion.transition（--motion-transition）驱动。 */
+.transition-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #000;
+  pointer-events: none;
+  clip-path: circle(0% at 50% 50%);
+  transition: clip-path var(--motion-transition) ease-out;
+}
+.transition-overlay.is-active {
+  clip-path: circle(150% at 50% 50%);
+  transition: clip-path var(--motion-transition) ease-in;
+}
+
 /* —— HUD 外壳 —— */
 .game-hud-shell {
   position: absolute; inset: 0; z-index: 20; pointer-events: none;
@@ -399,16 +430,21 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 }
 .event-toast__title { font-weight: 800; color: var(--gp-accent); margin-right: 6px; }
 
-/* 当前格悬浮卡片 */
+/* 当前格悬浮卡片
+   定位完全由 JS（positionCellHover）设置 left/top，禁止任何 CSS transform 干扰，
+   避免动画期间与 JS 定位冲突造成瞬移。淡入/淡出仅动画 opacity。
+   动画时长由主题令牌 motion.hover 驱动（--motion-hover）。 */
 .cell-hover-card {
-  left: 50%; top: 24%; transform: translateX(-50%);
   z-index: 40; width: 200px;
+  opacity: 0;
+  transition: opacity var(--motion-hover) ease-out;
   background: var(--gp-card);
   border: var(--region-border-w) solid var(--gp-accent);
   border-radius: var(--region-radius);
   box-shadow: 0 8px 24px color-mix(in srgb, var(--gp-border) 42%, transparent);
   padding: 10px; color: var(--gp-fg); pointer-events: none;
 }
+.cell-hover-card.is-visible { opacity: 1; }
 .cell-hover-card__type { font-family:var(--font-func); font-size: 8px; letter-spacing: 0.08em; color: var(--gp-accent); text-transform: uppercase; }
 .cell-hover-card__title { font-family: var(--font-title); font-weight: 900; font-size: 15px; margin: 3px 0 3px; }
 .cell-hover-card__description { font-family: var(--font-func); margin: 2px 0px 5px; }

@@ -10,10 +10,13 @@ export class InteractiveMapSurface {
   private movementLocked = false;
   private displayedPlayerPositions = new Map<string, { x: number; y: number }>();
   private valueFieldDefinitions: ValueFieldDefinition[] = [];
+  // 本玩家最近一次渲染/放置所在的格子，用于识别瞬时传送等非动画位置跳变
+  private selfCellId: number | null = null;
 
   setMovementLocked(locked: boolean): void {
     if (this.movementLocked === locked) return;
     this.movementLocked = locked;
+    this.root.classList.toggle("is-moving", locked);
     if (!locked) {
       this.displayedPlayerPositions.clear();
       if (this.map.length) this.render(this.map, this.players, this.valueFieldDefinitions);
@@ -37,6 +40,7 @@ export class InteractiveMapSurface {
     this.map = map;
     this.players = players;
     this.valueFieldDefinitions = valueFieldDefinitions;
+    this.selfCellId = players[0]?.position.cellId ?? null;
     const ns = "http://www.w3.org/2000/svg";
     const cells = [...map];
     if (!cells.length) return;
@@ -122,7 +126,7 @@ export class InteractiveMapSurface {
         const b = g.getBoundingClientRect();
         this.root.dispatchEvent(
           new CustomEvent("map:hover", {
-            detail: { cellId: c.id, clientX: b.right, clientY: b.top }
+            detail: { cellId: c.id, clientX: b.right, clientY: b.top, rect: { left: b.left, right: b.right, top: b.top, width: b.width, height: b.height } }
           })
         );
       });
@@ -171,7 +175,11 @@ export class InteractiveMapSurface {
         const color = getComputedStyle(this.root).getPropertyValue(roleVar).trim();
         if (color) g.style.setProperty("--gp-player-color", color);
 
-        g.append(head, body);
+        // 待机跳动包裹层：对外层 g 的 translate 定位无干扰，动画仅作用于内层 transform
+        const bounce = document.createElementNS(ns, "g");
+        bounce.classList.add("map-player__bounce");
+        bounce.append(head, body);
+        g.append(bounce);
         pieces.appendChild(g);
       });
     svg.appendChild(pieces);
@@ -197,6 +205,17 @@ export class InteractiveMapSurface {
         element.setAttribute('transform', `translate(${cell.x + ((index + 1) % 3 - 1) * 18} ${cell.y - 42 - Math.floor((index + 1) / 3) * 8})`);
       }
     });
+    // 本玩家：仅在格子发生非动画跳变（如瞬时传送）时同步到格心。
+    // 行走动画由 setMovementLocked/R AF 驱动，此处锁定态提前返回、不触碰其节点；
+    // 无跳变时保持现状，避免干扰任何已有位置。
+    const self = players[0];
+    if (self && self.position.cellId !== this.selfCellId) {
+      const cell = this.map.find((item) => item.id === self.position.cellId);
+      if (cell) {
+        this.selfCellId = self.position.cellId;
+        this.setPlayerDisplayPosition(self.id, cell.x, cell.y);
+      }
+    }
   }
 
   setPlayerDisplayPosition(playerId: string, x: number, y: number): void {

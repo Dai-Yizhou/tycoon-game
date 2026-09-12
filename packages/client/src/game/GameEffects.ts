@@ -38,6 +38,8 @@ export interface MovementEffectHooks {
   onIntersectionPrompt(options: number[]): void;
   /** 岔路口选择完成 */
   onIntersectionResolved(chosenCellId: number): void;
+  /** 瞬时传送/跳变（无路径直接落地）：先进入黑屏，applyMove 在盖满后移动棋子，再露出画面 */
+  onTeleport(toCellId: number, applyMove: () => void): void;
 }
 
 /** 数值变化视效 */
@@ -115,6 +117,7 @@ export class NoOpEffectHooks implements GameEffectHooks {
   onMoveComplete(_cellId: number): void {}
   onIntersectionPrompt(_options: number[]): void {}
   onIntersectionResolved(_chosenCellId: number): void {}
+  onTeleport(_toCellId: number, _applyMove: () => void): void {}
   onMoneyChange(_delta: number, _newValue: number): void {}
   onCreditChange(_delta: number, _newValue: number): void {}
   onEnvChange(_delta: number, _newValue: number): void {}
@@ -141,6 +144,16 @@ export class NoOpEffectHooks implements GameEffectHooks {
  */
 export class CssTransitionEffectHooks extends NoOpEffectHooks {
   private readonly timers = new Set<ReturnType<typeof setTimeout>>();
+  /** 全屏转场遮罩（黑圆）当前实例；null 表示不存在 */
+  private overlay: HTMLElement | null = null;
+  /** 遮罩状态机：idle 无遮罩 → covering 黑圆扩散中 → covered 全黑 → revealing 黑圆收缩中 */
+  private phase: 'idle' | 'covering' | 'covered' | 'revealing' = 'idle';
+  /** 盖满后需依次执行的操作（如主题切换 / 传送的移动） */
+  private coverOps: Array<() => void> = [];
+  /** 是否已请求退出黑屏；盖满前请求则等到盖满后执行，保证动画完整播放 */
+  private revealRequested = false;
+  /** 是否正停留在岔路口等待路径选择（选择期间不进入/保持黑屏，避免挡住选项） */
+  private inChoice = false;
 
   constructor(private readonly root: HTMLElement) {
     super();
@@ -149,6 +162,9 @@ export class CssTransitionEffectHooks extends NoOpEffectHooks {
   destroy(): void {
     for (const timer of this.timers) clearTimeout(timer);
     this.timers.clear();
+    this.overlay?.remove();
+    this.overlay = null;
+    this.phase = 'idle';
   }
 
   private removeClassAfter(className: string, durationMs: number): void {
@@ -162,6 +178,79 @@ export class CssTransitionEffectHooks extends NoOpEffectHooks {
   /** 从主题令牌读取动效毫秒数；缺失时回退 fallback */
   private motionMs(property: string, fallback: number): number {
     return readCssVarNumber(this.root, property, fallback);
+  }
+
+  /** 新建黑圆遮罩并进入扩散（covering）。盖满后（transitionend）依次执行 coverOps，再按需露出。 */
+  private startCover(initialOp: (() => void) | null): void {
+    this.overlay?.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'transition-overlay';
+    document.body.appendChild(overlay);
+    this.overlay = overlay;
+    this.phase = 'covering';
+    this.coverOps = [];
+    if (initialOp) this.coverOps.push(initialOp);
+    requestAnimationFrame(() => {
+      if (this.overlay !== overlay) return; // 下一帧前已被取消
+      overlay.classList.add('is-active');
+      overlay.addEventListener('transitionend', () => {
+        if (this.overlay !== overlay) return;
+        this.phase = 'covered';
+        const ops = this.coverOps;
+        this.coverOps = [];
+        for (const op of ops) op();
+        if (this.revealRequested) {
+          this.revealRequested = false;
+          this.reveal();
+        }
+      }, { once: true });
+    });
+  }
+
+  /** 进入黑屏：盖满后执行 op（已全黑则立即执行）。 */
+  private cover(op?: () => void): void {
+    if (this.phase === 'covered') { op?.(); return; }
+    if (this.phase === 'covering') { if (op) this.coverOps.push(op); return; }
+    this.startCover(op ?? null);
+  }
+
+  /** 完整转场：进入黑屏 → 盖满后执行 op → 露出画面（进入的反效果）。 */
+  private cycle(op: () => void): void {
+    if (this.phase === 'covered') { op(); this.reveal(); return; }
+    if (this.phase === 'covering') { this.coverOps.push(op); this.revealRequested = true; return; }
+    this.startCover(op);
+    this.revealRequested = true;
+  }
+
+  /** 退出黑屏（露出画面）。盖满前请求则等盖满后执行，保证进入动画完整播放。 */
+  private reveal(): void {
+    if (this.phase === 'idle' || this.phase === 'revealing') return;
+    if (this.phase === 'covering') { this.revealRequested = true; return; }
+    const overlay = this.overlay;
+    if (!overlay) { this.phase = 'idle'; return; }
+    this.phase = 'revealing';
+    overlay.classList.remove('is-active');
+    overlay.addEventListener('transitionend', () => {
+      overlay.remove();
+      if (this.overlay === overlay) this.overlay = null;
+      this.phase = 'idle';
+    }, { once: true });
+  }
+
+  /**
+   * 主题变化时的转场调度（由 GamePage.applyRegionTheme 在真正发生主题切换时调用）。
+   * apply 为主题令牌应用，须在完全进入黑屏后执行（避免切换过程露出）。
+   * - moving：是否处于移动序列中；waitingForChoice：是否正等待路径选择。
+   * - 岔路口选择期间（inChoice 或 waitingForChoice）：不进入黑屏（避免挡住选项，且棋子尚未真正移动），
+   *   立即 apply；
+   * - 移动中：进入黑屏，盖满后 apply 并保持黑屏（连续多个主题变化不反复闪烁），移动结束/出现选择时才退出；
+   * - 空闲：完整转场（进入 → 盖满后 apply → 露出）。
+   */
+  onThemeChange(moving: boolean, waitingForChoice = false, apply?: () => void): void {
+    const run = apply ?? ((): void => {});
+    if (this.inChoice || waitingForChoice) { run(); return; }
+    if (moving) this.cover(run);
+    else this.cycle(run);
   }
 
   onStepStart(fromCellId: number, toCellId: number): void {
@@ -179,8 +268,29 @@ export class CssTransitionEffectHooks extends NoOpEffectHooks {
 
   onMoveComplete(cellId: number): void {
     void cellId;
+    // 移动结束：退出黑屏。若移动在盖满前完成，先完整播放进入动画，再播放露出动画
+    this.reveal();
     this.root.classList.add('fx-move-complete');
     this.removeClassAfter('fx-move-complete', this.motionMs('--motion-move-complete', 320));
+  }
+
+  onIntersectionPrompt(options: number[]): void {
+    void options;
+    // 出现岔路口选择：退出黑屏，让玩家看清可选项
+    this.inChoice = true;
+    this.reveal();
+  }
+
+  onIntersectionResolved(chosenCellId: number): void {
+    void chosenCellId;
+    // 选择完成：解除选择态；若下一个格子变换主题，onThemeChange 会在移动中进入黑屏
+    this.inChoice = false;
+  }
+
+  onTeleport(toCellId: number, applyMove: () => void): void {
+    void toCellId;
+    // 传送/瞬移：先进入黑屏 → 盖满后移动棋子 → 露出画面
+    this.cycle(applyMove);
   }
 
   onDiceSettled(value: number): void {

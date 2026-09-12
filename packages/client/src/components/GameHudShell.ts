@@ -3,6 +3,16 @@ import type { GameViewModel, ValueFieldDef } from "../game/GameViewModel.js";
 import { t, localizedText } from "../game/i18n.js";
 import { parseChatCommand } from "@game/shared";
 import { resolveCellHoverModel } from "../game/cellDisplayModel.js";
+import { readCssVarNumber } from "../design/DesignAdapter.js";
+
+/** 格子在其覆盖层坐标系中的屏幕矩形，用于悬浮卡精确贴边定位 */
+export interface CellScreenRect {
+  left: number;
+  right: number;
+  top: number;
+  width: number;
+  height: number;
+}
 
 export interface GameHudShellConfig {
   onRoll?: () => void;
@@ -38,8 +48,9 @@ export class GameHudShell {
   private readonly activeFilters = new Set(["region", "system", "team"]);
   private isExpanded = false;
   private destroyed = false;
-  private hoveredCell: { id: number; x: number; y: number } | null = null;
+  private hoveredCell: { id: number; rect: CellScreenRect } | null = null;
   private hoverCardCellId: number | null = null;
+  private hoverHideTimer: number | undefined;
   private readonly handleGlobalChatShortcut = (event: KeyboardEvent): void => {
     if (event.key !== "Enter" && event.key !== " ") return;
     const target = event.target as HTMLElement | null;
@@ -218,14 +229,14 @@ export class GameHudShell {
     this.input.placeholder = t("chat.inputPlaceholder");
   }
 
-  showCellHover(cellId: number, x: number, y: number): void {
-    this.hoveredCell = { id: cellId, x, y };
+  showCellHover(cellId: number, rect: CellScreenRect): void {
+    this.hoveredCell = { id: cellId, rect };
     this.renderCellHover();
   }
 
   private renderCellHover(): void {
     if (!this.hoveredCell) return;
-    const { id: cellId, x, y } = this.hoveredCell;
+    const { id: cellId, rect } = this.hoveredCell;
     const card = this.root.querySelector("[data-ui=hover-card]") as HTMLElement;
     // 内容仅在格子切换时重建，避免高频 update() 反复重写 innerHTML 导致闪烁
     if (this.hoverCardCellId !== cellId) {
@@ -235,8 +246,18 @@ export class GameHudShell {
         ? this.buildCellHoverContent(cell)
         : `<div class="cell-hover-card__type">${this.escapeHtml(t("hud.hoverSyncing"))}</div><div class="cell-hover-card__title">${this.escapeHtml(t("hud.hoverFetching"))}</div>`;
     }
-    this.positionCellHover(card, x, y);
-    card.style.display = "block";
+    if (this.hoverHideTimer) {
+      window.clearTimeout(this.hoverHideTimer);
+      this.hoverHideTimer = undefined;
+    }
+    // 先确保卡片可见且已布局，使 offsetWidth/Height 为真实尺寸；
+    // 再定位，避免 display:none 时读到 0 而用回退尺寸定位，导致显示后跳变一次
+    if (card.style.display === "none") {
+      card.style.display = "block";
+      void card.offsetWidth;
+    }
+    this.positionCellHover(card, rect);
+    card.classList.add("is-visible");
   }
 
   private buildCellHoverContent(cell: import('@game/shared').Cell): string {
@@ -252,14 +273,17 @@ export class GameHudShell {
     return `<div class="cell-hover-card__type">${this.escapeHtml(model.typeLabel)}</div><div class="cell-hover-card__title">${this.escapeHtml(model.name)}</div>${model.description ? `<div class="cell-hover-card__description">${this.escapeHtml(model.description)}</div>` : ""}<div class="cell-hover-card__rows">${rowsHtml}</div>`;
   }
 
-  /** 将卡片定位到格子右侧（空间不足则移至左侧），并夹紧在视口内，避免重叠/出界 */
-  private positionCellHover(card: HTMLElement, x: number, y: number): void {
+  /** 将卡片紧贴格子右侧放置（空间不足则移至左侧，避开格子本体），并夹紧在视口内 */
+  private positionCellHover(card: HTMLElement, rect: CellScreenRect): void {
     const cw = card.offsetWidth || 210;
     const ch = card.offsetHeight || 130;
-    let left = x + 100;
-    if (left + cw > window.innerWidth - 8) left = x - cw - 20;
+    const gap = 12;
+    let left = rect.right + gap;
+    // 左侧放置：卡片右缘贴格子左缘外 gap，完全避开格子本体，不遮挡格子
+    if (left + cw > window.innerWidth - 8) left = rect.left - cw - gap;
     left = Math.max(8, Math.min(left, window.innerWidth - cw - 8));
-    let top = y;
+    // 垂直方向相对格子居中，再夹紧到视口（上不越过顶栏，下不越出底部）
+    let top = rect.top + (rect.height - ch) / 2;
     top = Math.max(76, Math.min(top, window.innerHeight - ch - 8));
     card.style.left = `${left}px`;
     card.style.top = `${top}px`;
@@ -267,7 +291,17 @@ export class GameHudShell {
 
   hideCellHover(): void {
     this.hoveredCell = null;
-    (this.root.querySelector("[data-ui=hover-card]") as HTMLElement).style.display="none";
+    const card = this.root.querySelector("[data-ui=hover-card]") as HTMLElement;
+    if (!card) return;
+    card.classList.remove("is-visible");
+    if (card.style.display === "none") return;
+    if (this.hoverHideTimer) window.clearTimeout(this.hoverHideTimer);
+    // 隐藏延时与淡出动画时长一致，取自主题令牌 --motion-hover，避免写死毫秒
+    const duration = readCssVarNumber(this.root, "--motion-hover", 220) + 40;
+    this.hoverHideTimer = window.setTimeout(() => {
+      card.style.display = "none";
+      this.hoverHideTimer = undefined;
+    }, duration);
   }
 
   update(): void {
@@ -543,6 +577,7 @@ export class GameHudShell {
   destroy(): void {
     this.destroyed = true;
     window.removeEventListener("keydown", this.handleGlobalChatShortcut);
+    if (this.hoverHideTimer) window.clearTimeout(this.hoverHideTimer);
     this.unsubscribers.forEach(fn => fn());
     this.effects.onNotifyDismiss("game-hud-shell");
     this.root.remove();

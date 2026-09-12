@@ -227,7 +227,10 @@
     "bankrupt": { "$value": 1000, "$type": "number" },
     "slideUpTitle": { "$value": "0.6s", "$type": "string" },
     "slideUp": { "$value": "0.4s", "$type": "string" },
-    "spin": { "$value": "1s", "$type": "string" }
+    "spin": { "$value": "1s", "$type": "string" },
+    "hover": { "$value": 160, "$type": "number" },
+    "bounce": { "$value": "2s ease-in-out", "$type": "string" },
+    "transition": { "$value": "0.5s", "$type": "string" }
   },
   "dimension": {
     "piece": {

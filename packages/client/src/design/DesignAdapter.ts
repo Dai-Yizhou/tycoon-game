@@ -97,6 +97,9 @@ const DOM_TOKEN_MAP: ReadonlyArray<readonly [cssVar: string, source: DomTokenSou
   // 动效时序令牌：串型时长直接作为 CSS 动画时长；数值型转换为毫秒供 JS 动画读取
   ['--motion-fast', { kind: 'string', path: 'motion.fast' }],
   ['--motion-normal', { kind: 'string', path: 'motion.normal' }],
+  ['--motion-hover', { kind: 'ms', path: 'motion.hover' }],
+  ['--motion-bounce', { kind: 'string', path: 'motion.bounce' }],
+  ['--motion-transition', { kind: 'string', path: 'motion.transition' }],
   ['--motion-step', { kind: 'ms', path: 'motion.step' }],
   ['--motion-step-arrive', { kind: 'ms', path: 'motion.stepArrive' }],
   ['--motion-move-complete', { kind: 'ms', path: 'motion.moveComplete' }],

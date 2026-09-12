@@ -57,6 +57,8 @@ let mapIndex: MapIndex | null = null;
 let gameSocket: TypedClientSocket | null = null;
 let gameEffects: EffectController | null = null;
 let movementFrame: number | null = null;
+// 当前已应用的区域 UI 主题 id；null 表示尚未应用（首次加载）。用于区分"主题切换转场"与"首次加载不转场"。
+let appliedRegionThemeId: string | null = null;
 const pageEventCleanups = new WeakMap<HTMLElement, () => void>();
 
 function createGameRuntime(store: GameStore, socket: NonNullable<typeof gameSocket>, index: NonNullable<typeof mapIndex>): GameRuntime {
@@ -285,14 +287,17 @@ export function createGamePage(controller: GameController): HTMLElement {
   const handleMapHover = (event: Event): void => {
     const detail = (event as CustomEvent).detail;
     const cellId = typeof detail?.cellId === 'number' ? detail.cellId : detail?.cell?.id;
-    if (typeof cellId === 'number' && gameHudShell) gameHudShell.showCellHover(cellId, detail.clientX, detail.clientY);
+    if (typeof cellId === 'number' && gameHudShell) gameHudShell.showCellHover(cellId, detail.rect);
   };
   const handleMapLeave = (): void => gameHudShell?.hideCellHover();
   const handleWindowCellHover = (event: Event): void => {
     const detail = (event as CustomEvent).detail;
     const cellId = typeof detail?.cellId === 'number' ? detail.cellId : detail?.cell?.id;
-    if (typeof cellId === 'number' && gameHudShell) gameHudShell.showCellHover(cellId, detail.clientX, detail.clientY);
-    else gameHudShell?.hideCellHover();
+    if (typeof cellId === 'number' && gameHudShell) {
+      // 兼容无 rect 的遗留事件：以 clientX/clientY 为格子右上角，按默认格子尺寸构造矩形
+      const rect = detail.rect ?? { left: detail.clientX - 112, right: detail.clientX, top: detail.clientY, width: 112, height: 76 };
+      gameHudShell.showCellHover(cellId, rect);
+    } else gameHudShell?.hideCellHover();
   };
   const handleWindowCellLeave = (): void => gameHudShell?.hideCellHover();
   interactiveMapElement.addEventListener('map:hover', handleMapHover);
@@ -339,7 +344,24 @@ function applyRegionTheme(page: HTMLElement, cellId: number): void {
     const region = snapshot?.mapRegions.find(candidate => candidate.id === cellRegionId);
     themeId = getRegionThemeId(region ?? { id: 'default' });
   }
-  applyGamePageThemeTokens(page, { tokens: getThemeTokens(themeId) });
+
+  // 主题未变化：直接返回，避免每次位置同步都重刷令牌或误触转场
+  if (themeId === appliedRegionThemeId) return;
+  const isFirstApply = appliedRegionThemeId === null;
+  appliedRegionThemeId = themeId;
+
+  if (isFirstApply) {
+    // 首次进入不播转场，直接落主题，避免加载时黑屏一闪
+    applyGamePageThemeTokens(page, { tokens: getThemeTokens(themeId) });
+  } else {
+    // UI 主题切换：由视效层在完全进入黑屏后应用主题令牌（apply），
+    // 再按移动/岔路选择状态决定保持或露出；正等待路径选择（棋子未真正移动）时立即应用、不进黑屏。
+    gameEffects?.onThemeChange(
+      !!snapshot?.isMoving,
+      !!snapshot?.isWaitingForChoice,
+      () => applyGamePageThemeTokens(page, { tokens: getThemeTokens(themeId) }),
+    );
+  }
 
   // 记录当前玩家所在格子的区域主题，供欢迎/登录等独立页面在下次启动时沿用
   if (localStorage.getItem(SAVED_REGION_THEME_KEY) !== themeId) {

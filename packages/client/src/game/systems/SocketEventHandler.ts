@@ -244,8 +244,18 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       if (activeMapIndex && payload.path && payload.path.length > 1) {
         startServerPathAnimation(store, activeMapIndex, payload.path, refresh, options.movementEffects, payload.cellId, refresh);
       } else {
-        store.applyEvent({ sequence: store.nextSequence(), type: 'move', playerId: payload.playerId, cellId: payload.cellId });
-        refresh();
+        // 无路径 playerMoved。仅当目标格与当前格不同（真实跳变/传送）才播黑圆转场；
+        // 相同格则为位置同步（如掷骰后等待岔路选择前的确认），不进入黑屏，避免误触发。
+        const applyMove = (): void => {
+          store.applyEvent({ sequence: store.nextSequence(), type: 'move', playerId: payload.playerId, cellId: payload.cellId });
+          refresh();
+        };
+        if (payload.cellId !== snapshot.currentPlayerPosition) {
+          if (options.movementEffects) options.movementEffects.onTeleport(payload.cellId, applyMove);
+          else applyMove();
+        } else {
+          applyMove();
+        }
       }
     }
   });
