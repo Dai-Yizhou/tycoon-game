@@ -293,13 +293,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   stroke: var(--region-border); stroke-width: 3;
 }
 .map-node:hover .map-node__shape { fill: var(--region-box-bg); }
+/* 仅 2 种边框样式：默认（未持股 / 不能持股）与已持股高亮 */
+.map-node--held .map-node__shape { stroke: var(--region-accent); stroke-width: 4; }
 .map-node__type { fill: var(--region-label-fg); font-weight: 700; font-size: 13px; font-family: var(--font-func); letter-spacing: 0.08em; }
 .map-node__name { fill: var(--region-fg); font-weight: 900; font-size: 19px; font-family: var(--font-title); }
 .map-node__price { fill: var(--region-accent); font-weight: 700; font-size: 15px; font-family: var(--font-num); }
-.map-node--event .map-node__shape { stroke: var(--region-error); }
-.map-node--transport .map-node__shape { stroke: var(--region-cycle-night); }
-.map-node--start .map-node__shape { stroke: var(--player-green); }
-.map-node--monument .map-node__shape { stroke: var(--region-cycle-day); }
 
 /* 玩家棋子：语义色由交互层传入（--gp-player-color），头/描边取主题令牌 */
 .map-player {

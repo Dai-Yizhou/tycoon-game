@@ -108,6 +108,12 @@ export function createGamePage(controller: GameController): HTMLElement {
     const players = toInteractivePlayers(snapshot);
     interactiveMap.setMovementLocked(snapshot.isMoving);
     interactiveMap.updatePlayers(players);
+    // 已持股（有股东）格子边框高亮；未持股/不能持股共用默认边框
+    const heldCellIds = new Set<number>();
+    for (const [cellId, state] of snapshot.cellRuntimeStates) {
+      if (state.ownerships.length > 0) heldCellIds.add(cellId);
+    }
+    interactiveMap.setHeldCells(heldCellIds);
     if (!snapshot.isMoving) interactiveMap.followPlayer(snapshot.currentPlayerPosition);
     syncCellActions(snapshot.currentPlayerPosition);
     if (mapIndex) applyRegionTheme(page, snapshot.currentPlayerPosition);

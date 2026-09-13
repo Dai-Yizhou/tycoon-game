@@ -10,6 +10,8 @@ export class InteractiveMapSurface {
   private movementLocked = false;
   private displayedPlayerPositions = new Map<string, { x: number; y: number }>();
   private valueFieldDefinitions: ValueFieldDefinition[] = [];
+  /** 已持股（有股东）的格子 id，用于边框高亮（仅 2 种边框样式：默认 / 已持股） */
+  private heldCellIds = new Set<number>();
   // 本玩家最近一次渲染/放置所在的格子，用于识别瞬时传送等非动画位置跳变
   private selfCellId: number | null = null;
 
@@ -30,6 +32,16 @@ export class InteractiveMapSurface {
 
   getElement(): HTMLElement {
     return this.root;
+  }
+
+  /** 更新已持股格子集合，并就地切换已有节点的边框高亮（无需整图重绘）。 */
+  setHeldCells(held: Set<number>): void {
+    this.heldCellIds = held;
+    if (!this.root.isConnected) return;
+    this.root.querySelectorAll<SVGGElement>(".map-node").forEach(node => {
+      const cellId = Number(node.dataset.cellId);
+      node.classList.toggle("map-node--held", held.has(cellId));
+    });
   }
 
   render(
@@ -91,6 +103,7 @@ export class InteractiveMapSurface {
       const name = localizedText(c.name ?? c.extra?.name, `格子 ${c.id}`);
       const price = c.price ? formatUct(c.price, this.valueFieldDefinitions, getLanguage()) : "";
       g.classList.add("map-node", `map-node--${type}`);
+      if (this.heldCellIds.has(c.id)) g.classList.add("map-node--held");
       g.dataset.cellId = String(c.id);
       g.setAttribute("transform", `translate(${c.x} ${c.y})`);
 

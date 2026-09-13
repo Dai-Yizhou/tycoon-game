@@ -50,6 +50,8 @@ export class GameHudShell {
   private destroyed = false;
   private hoveredCell: { id: number; rect: CellScreenRect } | null = null;
   private hoverCardCellId: number | null = null;
+  /** 已渲染悬浮卡对应的动态运行时签名（等级/持股人数等会变化的部分）；签名变化时重绘内容 */
+  private hoverCardSignature = "";
   private hoverHideTimer: number | undefined;
   private readonly handleGlobalChatShortcut = (event: KeyboardEvent): void => {
     if (event.key !== "Enter" && event.key !== " ") return;
@@ -238,10 +240,14 @@ export class GameHudShell {
     if (!this.hoveredCell) return;
     const { id: cellId, rect } = this.hoveredCell;
     const card = this.root.querySelector("[data-ui=hover-card]") as HTMLElement;
-    // 内容仅在格子切换时重建，避免高频 update() 反复重写 innerHTML 导致闪烁
-    if (this.hoverCardCellId !== cellId) {
+    const cell = this.vm.getCell(cellId);
+    // 动态运行时签名：等级/持股人数等随游戏推进变化，签名变化时同样重建，避免同格内容状态失步
+    const runtime = cell ? this.vm.getCellRuntimeState(cell.id) : null;
+    const signature = runtime ? `${runtime.level}|${runtime.ownerships.length}` : "none";
+    // 内容仅在格子切换或运行时状态变化时重建，避免高频 update() 反复重写 innerHTML 导致闪烁
+    if (this.hoverCardCellId !== cellId || this.hoverCardSignature !== signature) {
       this.hoverCardCellId = cellId;
-      const cell = this.vm.getCell(cellId);
+      this.hoverCardSignature = signature;
       card.innerHTML = cell
         ? this.buildCellHoverContent(cell)
         : `<div class="cell-hover-card__type">${this.escapeHtml(t("hud.hoverSyncing"))}</div><div class="cell-hover-card__title">${this.escapeHtml(t("hud.hoverFetching"))}</div>`;
