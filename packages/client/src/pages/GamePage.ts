@@ -62,7 +62,7 @@ let appliedRegionThemeId: string | null = null;
 const pageEventCleanups = new WeakMap<HTMLElement, () => void>();
 
 function createGameRuntime(store: GameStore, socket: NonNullable<typeof gameSocket>, index: NonNullable<typeof mapIndex>): GameRuntime {
-  return { store, socket, mapIndex: index, cooldownTimer: null, onHudRefresh: () => gameHudShell?.update() };
+  return { store, socket, mapIndex: index, cooldownTimer: null, onHudRefresh: () => gameHudShell?.update(), onRollCooldownTick: () => gameHudShell?.updateDiceButton() };
 }
 
 function invokeGameAction(action: (runtime: GameRuntime) => void): void {

@@ -12,6 +12,8 @@ export interface GameRuntime {
   mapIndex: MapIndex;
   cooldownTimer: ReturnType<typeof setInterval> | null;
   onHudRefresh?: HudRefresh;
+  /** 冷却进度每帧回调：仅刷新掷骰按钮，避免触发全量 HUD 重绘导致 act-btn 闪烁 */
+  onRollCooldownTick?: () => void;
 }
 
 const cellType = (cell: Cell): string => cell.type;
@@ -39,7 +41,7 @@ export function handleRollDice(runtime: GameRuntime): void {
 
 export function startRollCooldownTimer(runtime: GameRuntime): void {
   if (runtime.cooldownTimer) clearInterval(runtime.cooldownTimer);
-  // 冷却期间每 100ms 触发 HUD 刷新，由 GameHudShell 渲染 --cooldown 双层面揭示进度
+  // 冷却期间仅刷新掷骰按钮（--cooldown 双层面揭示），不触碰 act-btn，避免闪烁
   const update = () => {
     const snapshot = runtime.store.getSnapshot();
     const remaining = snapshot.rollCooldownEnd - Date.now();
@@ -49,7 +51,7 @@ export function startRollCooldownTimer(runtime: GameRuntime): void {
       setRuntimeSnapshot(runtime, { canRoll: true, diceAnimating: false });
       return;
     }
-    (runtime.onHudRefresh ?? noopHudRefresh)();
+    (runtime.onRollCooldownTick ?? noopHudRefresh)();
   };
   update();
   runtime.cooldownTimer = setInterval(update, 100);

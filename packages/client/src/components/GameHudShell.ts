@@ -486,8 +486,8 @@ export class GameHudShell {
     dotEl.className = `cycle-dot ${day.isDay ? "cycle-dot--day" : "cycle-dot--night"}`;
   }
 
-  /** 掷骰按钮状态与文案（双层切分冷却揭示） */
-  private updateDiceButton(): void {
+  /** 掷骰按钮状态与文案（双层切分冷却揭示）。公开以支持冷却定时器只刷新本按钮 */
+  updateDiceButton(): void {
     const player = this.vm.getPlayer();
     const movement = this.vm.getMovement();
     const dice = this.vm.getDice();
