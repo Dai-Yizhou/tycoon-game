@@ -574,16 +574,35 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 /* 掷骰与行动按钮 */
 .dice-zone { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
 .dice-btn {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
   font-weight: 800; font-size: 13px;
   padding: 8px 18px;
   border: calc(var(--region-border-w) + 1px) solid var(--gp-border);
   border-radius: var(--region-radius);
-  background: var(--gp-accent); color: var(--gp-paper);
+  background: var(--gp-card); color: var(--gp-muted);
   cursor: pointer; box-shadow: 2px 2px 0 var(--gp-border);
+  overflow: hidden;
   transition: transform var(--motion-fast), box-shadow var(--motion-fast);
 }
+/* 底层：禁用/冷却观感（灰底灰字），正常流撑开按钮尺寸 */
+.dice-btn__face { position: relative; display: flex; align-items: center; gap: 6px; }
+/* 顶层：可用态观感，按 --cooldown 用 clip-path 从左向右揭示（无 blend、文字不反色） */
+.dice-btn__fill {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  pointer-events: none;
+  background: var(--gp-accent); color: var(--gp-paper);
+  will-change: clip-path;
+  transition: clip-path 0.1s linear;
+  clip-path: inset(0 calc(100% - 100% * var(--cooldown, 0)) 0 0);
+}
+.dice-btn:not(:disabled) .dice-btn__fill {
+  clip-path: inset(0 0 0 0);
+  transition: clip-path 0.25s ease-out;
+}
 .dice-btn:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--gp-border); }
-.dice-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; background: var(--gp-card); }
+.dice-btn:disabled { cursor: not-allowed; transform: none; box-shadow: none; }
 .dice-status { font-size: 10px; color: var(--gp-muted); font-family: var(--font-num); }
 
 .action-cluster { display: flex; gap: 6px; flex-shrink: 0; }
@@ -635,7 +654,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 
 /* 减少动效偏好 */
 @media (prefers-reduced-motion: reduce) {
-  .dice-btn, .act-btn, .start-button, .confirm-button, .retry-button,
+  .dice-btn, .dice-btn__fill, .act-btn, .start-button, .confirm-button, .retry-button,
   .username-input, .password-input, .progress-bar::after { transition: none; }
   .fx-step-start, .fx-step-arrive, .fx-move-complete { animation: none; }
 }

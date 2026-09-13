@@ -130,7 +130,10 @@ export class GameHudShell {
 
         <footer class="gp-actionbar" data-ui="action-dock">
           <div class="dice-zone">
-            <button class="dice-btn" data-action="roll"></button>
+            <button class="dice-btn" data-action="roll">
+              <span class="dice-btn__face"></span>
+              <span class="dice-btn__fill" aria-hidden="true"></span>
+            </button>
             <span class="dice-status" data-ui="dice-status"></span>
           </div>
           <div class="action-cluster" data-ui="action-cluster">
@@ -210,7 +213,10 @@ export class GameHudShell {
       const el = this.root.querySelector(selector);
       if (el) el.textContent = t(key);
     };
-    set('[data-action="roll"]', "dice.roll");
+    // 掷骰按钮为双层切分：底层(face)与顶层(fill)文案相同，才能无缝揭示
+    const rollLabel = t("dice.roll");
+    this.root.querySelector('[data-action="roll"] .dice-btn__face')!.textContent = rollLabel;
+    this.root.querySelector('[data-action="roll"] .dice-btn__fill')!.textContent = rollLabel;
     set('[data-action="chat-send"]', "chat.send");
     set('[data-action="back"]', "common.backToStart");
     set('[data-action="settings"]', "hud.settings");
@@ -480,7 +486,7 @@ export class GameHudShell {
     dotEl.className = `cycle-dot ${day.isDay ? "cycle-dot--day" : "cycle-dot--night"}`;
   }
 
-  /** 掷骰按钮状态与文案 */
+  /** 掷骰按钮状态与文案（双层切分冷却揭示） */
   private updateDiceButton(): void {
     const player = this.vm.getPlayer();
     const movement = this.vm.getMovement();
@@ -492,6 +498,13 @@ export class GameHudShell {
     const jailCooldownActive = jail.isInJail && jail.jailEndTime > Date.now();
     const canRoll = movement.canRoll && !movement.isMoving && !dice.diceAnimating && !player.isBankrupt && !cooldownActive && !jailCooldownActive;
     rollBtn.disabled = !canRoll;
+
+    // 冷却进度 0→1：顶层 fill 用 clip-path 从左侧逐步揭示可用态；其余禁用场景按 0 露出底层灰禁外观
+    const progress = cooldownActive
+      ? Math.min(1, Math.max(0, 1 - Math.max(cooldown.rollCooldownEnd - Date.now(), 0) / Math.max(cooldown.rollCooldownMs, 1)))
+      : 0;
+    rollBtn.style.setProperty("--cooldown", String(progress));
+
     const statusEl = this.root.querySelector("[data-ui=dice-status]")!;
     statusEl.textContent = movement.isMoving
       ? t("hud.moving")
