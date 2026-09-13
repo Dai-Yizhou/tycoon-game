@@ -7,7 +7,6 @@
 
 import type { TypedClientSocket } from '../../hooks/useSocket.js';
 import { localizedText, t } from '../i18n.js';
-import { resolveTimezoneOffsetMinutes } from '../timezone.js';
 import type { OtherPlayerInfo } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
 import { startServerPathAnimation } from './MovementSystem.js';
@@ -34,7 +33,7 @@ export interface SocketHandlerOptions {
 }
 
 const SOCKET_EVENTS = [
-  'server.dayNightProgress', 'server.dayNightChanged', 'server.timezoneChanged', 'server.pong',
+  'server.dayNightProgress', 'server.dayNightChanged', 'server.pong',
   'server.chat', 'server.leaderboardUpdated', 'connect', 'disconnect',
   'server.playerJoined', 'server.playerLeft', 'server.playerMoved', 'server.askPath',
   'server.valueChanged', 'server.error', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
@@ -67,20 +66,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   // 阶段切换：同步时间。昼夜状态由 HUD 昼夜指示器直观呈现，不再推送聊天提示
   socket.on('server.dayNightChanged', (payload: { cycleStartTime: number; cycleMinutes: number; globalTime: number; isDay: boolean }) => {
     store.updateDayNight({ dayNightStartTime: payload.cycleStartTime, serverTimeOffset: payload.globalTime - Date.now(), cycleMinutes: payload.cycleMinutes });
-  });
-
-  // 时区变化
-  socket.on('server.timezoneChanged', (payload: { toTimezoneName?: string; toTimezoneId?: string }) => {
-    const tzName = payload.toTimezoneName || payload.toTimezoneId || '';
-    const snapshot = store.getSnapshot();
-    const cell = snapshot.cells.get(snapshot.currentPlayerPosition);
-    const offsetMinutes = resolveTimezoneOffsetMinutes(cell, snapshot.mapTimezones);
-    const serverElapsed = Date.now() + snapshot.serverTimeOffset - snapshot.dayNightStartTime;
-    const localProgress = ((serverElapsed / (snapshot.cycleMinutes * 60 * 1000)) + offsetMinutes / (24 * 60)) % 1;
-    const totalMinutes = Math.floor(localProgress * 24 * 60);
-    const timeStr = `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
-    const isDay = totalMinutes >= 6 * 60 && totalMinutes < 18 * 60;
-    addChatMessage(t('dayNight.timezoneChanged', { tz: tzName, time: timeStr, dayNight: isDay ? t('dayNight.dayTime') : t('dayNight.nightTime') }), 'system');
   });
 
   // 心跳校正时钟偏移

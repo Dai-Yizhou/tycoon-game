@@ -492,20 +492,6 @@ export class GameHudShell {
     const jailCooldownActive = jail.isInJail && jail.jailEndTime > Date.now();
     const canRoll = movement.canRoll && !movement.isMoving && !dice.diceAnimating && !player.isBankrupt && !cooldownActive && !jailCooldownActive;
     rollBtn.disabled = !canRoll;
-
-    // 冷却/掷骰中：按钮显示上次点数，冷却用渐变进度做视觉引导（无需精确倒计时）
-    if (cooldownActive || dice.diceAnimating) {
-      const duration = Math.max(cooldown.rollCooldownMs, 1);
-      const progress = Math.min(1, Math.max(0, 1 - Math.max(cooldown.rollCooldownEnd - Date.now(), 0) / duration));
-      rollBtn.textContent = dice.diceValue > 0 ? String(dice.diceValue) : t("dice.rolling");
-      rollBtn.classList.add("cooldown");
-      rollBtn.style.background = `linear-gradient(to right, var(--accent, #4f46e5) ${progress * 100}%, rgba(255,255,255,0.15) ${progress * 100}%)`;
-    } else {
-      rollBtn.classList.remove("cooldown");
-      rollBtn.textContent = t("dice.roll");
-      rollBtn.style.background = "";
-    }
-
     const statusEl = this.root.querySelector("[data-ui=dice-status]")!;
     statusEl.textContent = movement.isMoving
       ? t("hud.moving")

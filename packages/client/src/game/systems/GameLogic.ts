@@ -10,6 +10,7 @@ export interface GameRuntime {
   store: GameStore;
   socket: TypedClientSocket;
   mapIndex: MapIndex;
+  rollButton?: HTMLButtonElement | null;
   cooldownTimer: ReturnType<typeof setInterval> | null;
   onHudRefresh?: HudRefresh;
 }
@@ -39,7 +40,6 @@ export function handleRollDice(runtime: GameRuntime): void {
 
 export function startRollCooldownTimer(runtime: GameRuntime): void {
   if (runtime.cooldownTimer) clearInterval(runtime.cooldownTimer);
-  // 冷却期间每 100ms 触发 HUD 刷新，由 GameHudShell 渲染点数与冷却进度（视觉引导）
   const update = () => {
     const snapshot = runtime.store.getSnapshot();
     const remaining = snapshot.rollCooldownEnd - Date.now();
@@ -47,9 +47,21 @@ export function startRollCooldownTimer(runtime: GameRuntime): void {
       if (runtime.cooldownTimer) clearInterval(runtime.cooldownTimer);
       runtime.cooldownTimer = null;
       setRuntimeSnapshot(runtime, { canRoll: true, diceAnimating: false });
+      if (runtime.rollButton) {
+        runtime.rollButton.disabled = false;
+        runtime.rollButton.classList.remove('disabled', 'cooldown');
+        runtime.rollButton.textContent = t('dice.roll');
+        runtime.rollButton.style.background = '';
+      }
       return;
     }
-    (runtime.onHudRefresh ?? noopHudRefresh)();
+    if (runtime.rollButton) {
+      const cooldownDuration = Math.max(snapshot.rollCooldownMs, 1);
+      const progress = Math.min(1, Math.max(0, 1 - Math.max(remaining, 0) / cooldownDuration));
+      runtime.rollButton.textContent = t('dice.cooldownBar');
+      runtime.rollButton.classList.add('cooldown');
+      runtime.rollButton.style.background = `linear-gradient(to right, var(--accent, #4f46e5) ${progress * 100}%, rgba(255,255,255,0.15) ${progress * 100}%)`;
+    }
   };
   update();
   runtime.cooldownTimer = setInterval(update, 100);
