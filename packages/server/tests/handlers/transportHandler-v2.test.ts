@@ -68,4 +68,35 @@ describe('TransportHandler v2', () => {
     expect((handler as any).getTeleportCost(world.getMapIndex()!.getById(1), 2)).toEqual({ player: { money: -10 } });
     expect((handler as any).getTeleportCost(world.getMapIndex()!.getById(1), 3)).toEqual({ player: { money: -30, credit: 2 } });
   });
+
+  it('applies the destination region UCT effect (pros decay) to the hub region during transport', () => {
+    const regionMeta: MapMeta = {
+      ...meta,
+      valueFieldDefinitions: [
+        { id: 'money', name: { 'zh-CN': '财产', 'en-US': 'Money' }, scope: 'player', min: 0 },
+        { id: 'credit', name: { 'zh-CN': '信用', 'en-US': 'Credit' }, scope: 'player', min: 0 },
+        { id: 'pros', name: { 'zh-CN': '繁荣', 'en-US': 'Prosperity' }, scope: 'region', min: 0 },
+      ],
+      uct: { player: ['money', 'credit'], region: ['pros'] },
+      regions: [{ id: 'r1', name: { 'zh-CN': '区域', 'en-US': 'Region' }, initial: { region: { pros: 10 } } }],
+    };
+    const hubCell = hub();
+    hubCell.teleportDestinations = [{ cellId: 2, cost: { player: { money: -10 }, region: { pros: -1 } } }];
+    const world = new GameWorld();
+    world.loadMap([hubCell, destination(2)], regionMeta);
+    world.addPlayer({ id: 'p1', username: 'p1', teamId: null, position: { cellId: 1 }, values: { money: { id: 'money', name: 'Money', current: 100, min: 0 }, credit: { id: 'credit', name: 'Credit', current: 0, min: 0 } }, status: 'normal', createdAt: 1, lastActiveAt: 1 } as Player);
+    const handler = new TransportHandler(io, world);
+    const player = world.getPlayer('p1')!;
+
+    const result = (handler as any).executeTransport(
+      player,
+      world.getMapIndex()!.getById(1) as Cell,
+      world.getMapIndex()!.getById(2) as Cell,
+      { player: { money: -10 }, region: { pros: -1 } },
+    );
+
+    expect(result).not.toBeNull();
+    expect(world.getRegionValue('r1', 'pros')).toBe(9);
+    expect(player.position.cellId).toBe(2);
+  });
 });

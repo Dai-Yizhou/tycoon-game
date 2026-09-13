@@ -16,7 +16,6 @@ export interface GameRuntime {
 }
 
 const cellType = (cell: Cell): string => cell.type;
-const cellName = (cell: Cell): string => cell.name['zh-CN'] || cell.name['en-US'];
 
 function setRuntimeSnapshot(runtime: GameRuntime, partial: Partial<ClientGameSnapshot>): void {
   runtime.store.applySnapshot({ sequence: runtime.store.nextSequence(), ...partial });
@@ -35,7 +34,6 @@ export function handleRollDice(runtime: GameRuntime): void {
       return;
     }
     setRuntimeSnapshot(runtime, { diceValue: result.data.dice, diceAnimating: true, diceAnimStart: performance.now(), rollCooldownEnd: Math.max(Date.now(), result.data.cooldownEndsAt), rollCooldownMs: result.data.cooldownMs });
-    addChatMessage(t('dice.rolled', { value: result.data.dice }), 'system');
     startRollCooldownTimer(runtime);
   });
 }
@@ -74,23 +72,18 @@ export function onPlayerArrived(runtime: GameRuntime): void {
   const cell = runtime.mapIndex.getById(snapshot.currentPlayerPosition);
   if (!cell) return;
   setRuntimeSnapshot(runtime, { playerDisplayX: cell.x, playerDisplayY: cell.y, cameraTargetX: cell.x, cameraTargetY: cell.y });
-  const name = cellName(cell);
-  switch (cellType(cell)) {
-    case 'supply': addChatMessage(t('player.passedStart'), 'system'); break;
-    case 'property': addChatMessage(t(snapshot.ownedProperties.has(cell.id) ? 'property.alreadyOwned' : 'property.availableForPurchase', { name }), 'system'); break;
-    case 'investment': addChatMessage(t(snapshot.ownedInvestments.has(cell.id) ? 'investment.arrivedSettlement' : 'investment.available', { name }), 'system'); break;
-    case 'event': addChatMessage(t('event.arrived'), 'system'); break;
-    case 'transport': addChatMessage(t('transport.arrived', { name }), 'system'); break;
-    case 'jail': addChatMessage(t('jail.arrived'), 'system'); break;
-    case 'monument': addChatMessage(t('monument.arrived', { name }), 'system'); break;
-    default: addChatMessage(t('cell.arrived', { name }), 'system');
-  }
+  // 停靠格、所在区域/繁荣度与可用动作均已由游戏页面（格子高亮 + act-bar + 区域 tag）直观呈现，不再向聊天区推送抵达提示
   (runtime.onHudRefresh ?? noopHudRefresh)();
 }
 
 function emitAction(runtime: GameRuntime, event: 'client.buyProperty' | 'client.upgradeProperty' | 'client.buyInvestment' | 'client.repairMonument', payload: Record<string, number>): void {
   runtime.socket.emit(event, payload as never, (result: { ok: boolean; error?: string }) => {
-    if (!result.ok) addChatMessage(result.error || t('common.unknownError'), 'error');
+    if (!result.ok) {
+      addChatMessage(result.error || t('common.unknownError'), 'error');
+      return;
+    }
+    // 动作成功后锁定本回合行动权，避免按钮复用（如修缮后仍可点击导致服务端回 err）
+    runtime.store.markActionUsed();
   });
 }
 
@@ -159,9 +152,8 @@ export function handleUseTransport(runtime: GameRuntime, targetCellId: number): 
     if (!result.ok) {
       addChatMessage(t('transport.teleportFailed'), 'error');
       if (result.error) addChatMessage(result.error, 'error');
-    } else {
-      addChatMessage(t('transport.teleportSuccess', { name: '', discount: '' }), 'system');
     }
+    // 传送成功时以全屏转场 + 棋子位移直观呈现，不再推送聊天提示
   });
 }
 

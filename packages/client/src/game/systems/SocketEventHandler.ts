@@ -64,11 +64,9 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     store.updateDayNight({ dayNightStartTime: payload.cycleStartTime, serverTimeOffset: payload.globalTime - Date.now(), cycleMinutes: payload.cycleMinutes });
   });
 
-  // 阶段切换：同步时间
+  // 阶段切换：同步时间。昼夜状态由 HUD 昼夜指示器直观呈现，不再推送聊天提示
   socket.on('server.dayNightChanged', (payload: { cycleStartTime: number; cycleMinutes: number; globalTime: number; isDay: boolean }) => {
     store.updateDayNight({ dayNightStartTime: payload.cycleStartTime, serverTimeOffset: payload.globalTime - Date.now(), cycleMinutes: payload.cycleMinutes });
-    const phaseMsg = payload.isDay ? t('dayNight.day') : t('dayNight.night');
-    addChatMessage(t('dayNight.dayChanged', { phase: phaseMsg }), 'system');
   });
 
   // 时区变化

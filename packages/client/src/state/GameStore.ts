@@ -214,6 +214,12 @@ export class GameStore {
     this.publish();
   }
 
+  /** 动作成功后锁定本回合行动权（repair 等无服务端专用事件驱动该标志） */
+  markActionUsed(): void {
+    this.snapshot = { ...this.snapshot, actionUsedThisTurn: true };
+    this.publish();
+  }
+
   setCellActions(actions: CellAction[]): void {
     this.snapshot = { ...this.snapshot, cellActions: actions.map(action => ({ ...action, data: action.data ? { ...action.data } : undefined })) };
     this.publish();

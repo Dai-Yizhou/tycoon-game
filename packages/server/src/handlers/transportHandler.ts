@@ -314,14 +314,34 @@ export class TransportHandler {
   ): TransportResult | null {
     try {
       // 1. 扣除玩家财产
+      const appliedPlayerChanges: Array<[string, number]> = [];
       for (const [fieldId, delta] of Object.entries(cost.player ?? {})) {
         const change = this.economy
           ? this.economy.changeValue(player.id, fieldId, delta, 'transport')
           : this.changePlayerValue(player, fieldId, delta);
         if (!change) return null;
+        appliedPlayerChanges.push([fieldId, delta]);
       }
 
-      // 2. 更新玩家位置
+      // 2. 应用区域 UCT 效果（如繁荣度衰减），与纪念碑修缮一致。
+      //    传送费用 `cost.region` 作用于交通枢纽所在区域，广播由 world.changeRegionValue 负责。
+      const regionId = hubCell.regionId;
+      if (regionId) {
+        try {
+          for (const [fieldId, delta] of Object.entries(cost.region ?? {})) {
+            this.world.changeRegionValue(regionId, fieldId, delta);
+          }
+        } catch {
+          // 区域更新失败时回滚玩家扣款，避免数值不一致
+          for (const [fieldId, delta] of appliedPlayerChanges) {
+            if (this.economy) this.economy.changeValue(player.id, fieldId, -delta, 'transport_rollback');
+            else this.changePlayerValue(player, fieldId, -delta);
+          }
+          return null;
+        }
+      }
+
+      // 3. 更新玩家位置
       const fromCellId = player.position.cellId;
       player.position.cellId = targetCell.id;
       player.lastActiveAt = Date.now();
