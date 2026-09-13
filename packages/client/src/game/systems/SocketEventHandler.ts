@@ -262,8 +262,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     if (!store.getSnapshot().currentPlayer) return;
     store.applySnapshot({ sequence: store.nextSequence(), isWaitingForChoice: true });
     options.onPathChoiceOptions?.(payload.options.map(opt => ({ cellId: opt.cellId, label: opt.label })));
-    const directionLabels = payload.options.map(o => localizedText(o.label));
-    addChatMessage(t('intersection.chooseDirection', { options: directionLabels.join(' / ') }), 'system');
+    // 岔路方向已由路径选择器（act-bar A/B 按钮）直观呈现，不再推送聊天提示
   });
 
   socket.on('server.valueChanged', (payload: { playerId: string; fieldId: string; current: number; delta: number }) => {
@@ -281,12 +280,10 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   socket.on('server.playerJailed', (payload: { playerId: string; durationMs: number; expiresAt?: number }) => {
     const snapshot = store.getSnapshot();
     if (snapshot.currentPlayer?.id === payload.playerId) store.applyEvent({ sequence: store.nextSequence(), type: 'jail', isInJail: true, jailEndTime: payload.expiresAt ?? Date.now() + payload.durationMs });
-    addChatMessage(t('jail.enteredDetailed', { playerId: payload.playerId, duration: payload.durationMs }), 'system');
-    // 服务端权威：监狱状态由服务端驱动
+    // 进出监狱由掷骰按钮的禁用/可用状态直观体现，不再推送聊天提示
     const isCurrentPlayer = snapshot.currentPlayer?.id === payload.playerId;
     if (isCurrentPlayer) {
       store.applyEvent({ sequence: store.nextSequence(), type: 'status', playerId: payload.playerId, status: 'jail' });
-      addChatMessage(t('jail.inJail'), 'system');
     } else {
       const otherPlayer = snapshot.otherPlayers.find(p => p.id === payload.playerId);
       if (otherPlayer) {
@@ -302,7 +299,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     const isCurrentPlayer = snapshot.currentPlayer?.id === payload.playerId;
     if (isCurrentPlayer) {
       store.applyEvent({ sequence: store.nextSequence(), type: 'status', playerId: payload.playerId, status: 'normal' });
-      addChatMessage(t('jail.released'), 'system');
       refresh();
     } else {
       const otherPlayer = snapshot.otherPlayers.find(p => p.id === payload.playerId);
