@@ -18,15 +18,3 @@ export function resolveTimezoneOffsetMinutes(
   }
   return 0;
 }
-
-/**
- * 将时区偏移（分钟）格式化为可读标签，如 UTC+8 / UTC-5.
- */
-export function formatTimezoneLabel(offsetMinutes: number): string {
-  const totalMinutes = Number.isFinite(offsetMinutes) ? Math.round(offsetMinutes) : 0;
-  const sign = totalMinutes < 0 ? '-' : '+';
-  const abs = Math.abs(totalMinutes);
-  const hours = Math.floor(abs / 60);
-  const minutes = abs % 60;
-  return `UTC${sign}${hours}${minutes ? `:${String(minutes).padStart(2, '0')}` : ''}`;
-}

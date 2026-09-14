@@ -286,7 +286,6 @@ export function createGamePage(controller: GameController): HTMLElement {
       onPathChoiceOptions: (options) => gameStore?.setPathChoice(options),
       onPathChoiceCleared: () => gameStore?.clearPathChoice(),
       onHudRefresh: () => gameHudShell?.update(),
-      onNotification: (payload) => gameHudShell?.showNotification(payload),
       movementEffects,
       onEvent: () => {
         gameHudShell?.update();

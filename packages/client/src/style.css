@@ -358,34 +358,19 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 14px 18px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--gp-bar-bg) 25%, transparent) 0%, transparent 100%);
 }
-.region-cluster {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
-  max-width: 52%; margin-left: auto;
-}
 .region-status {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right;
-  padding: 2px 8px; border: var(--region-border-w) solid var(--gp-border);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; max-width: 52%;
+  padding: 4px 8px; border: var(--region-border-w) solid var(--gp-border);
   border-radius: var(--region-radius); background: var(--gp-card);
 }
 .region-status__row { display: flex; align-items: center; gap: 8px; max-width: 100%; }
 .region-status__name,
 .region-status__value { white-space: nowrap; }
 .region-status__name { font-weight: 800; font-size: 12px; color: var(--gp-fg); }
-.region-status__tz { white-space: nowrap; font-size: 9px; color: var(--gp-muted); font-family: var(--font-num); }
 .region-status__value { color: var(--gp-muted); font-family: var(--font-num); }
 .region-status .cycle-indicator { padding-left: 7px; border-left: 1px solid var(--gp-border); }
-/* UCT 区域数值独立小框 */
-.region-values {
-  display: block; max-width: 100%; padding: 2px 8px; text-align: right;
-  border: var(--region-border-w) solid var(--gp-border);
-  border-radius: var(--region-radius); background: var(--gp-card);
-}
-.region-values__tag { color: var(--gp-muted); font-family: var(--font-num); white-space: nowrap; }
-/* 榜单独立小框 */
-.region-cluster .leaderboard-panel {
-  display: block; max-width: 100%; padding: 1px 8px; color: var(--gp-muted); font-family: var(--font-num);
-  border: var(--region-border-w) solid var(--gp-border);
-  border-radius: var(--region-radius); background: var(--gp-card);
+.region-status .leaderboard-panel {
+  display: block; max-width: 100%; color: var(--gp-muted); font-family: var(--font-num);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .gp-actionbar {
@@ -394,7 +379,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   background: linear-gradient(0deg, color-mix(in srgb, var(--gp-bar-bg) 25%, transparent) 0%, transparent 100%);
 }
 .gp-topbar .player-badge { margin-right: auto; }
-.gp-topbar .region-cluster { margin-left: auto; }
+.gp-topbar .region-status { margin-left: auto; }
 
 .player-badge { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .player-badge__avatar {
@@ -434,19 +419,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 
 /* 事件提示 */
 .event-toast {
-  position: absolute; top: 10%; left: 50%; transform: translateX(-50%);
-  z-index: 12; min-width: 260px; max-width: min(420px, 80vw); text-align: center;
+  top: 10%; left: 50%; transform: translateX(-50%);
+  z-index: 12; min-width: 260px; text-align: center;
   padding: 8px 16px; background: var(--gp-card);
   border: var(--region-border-w) solid var(--gp-accent); border-radius: var(--region-radius);
-  font-size: 11px; color: var(--gp-fg); display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--gp-fg);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--gp-border) 40%, transparent);
 }
-.event-toast__icon { font-weight: 900; font-family: var(--font-num); color: var(--gp-accent); flex-shrink: 0; }
-.event-toast__title { font-weight: 800; color: var(--gp-accent); flex-shrink: 0; }
-.event-toast__content { color: var(--gp-fg); white-space: pre-line; }
-.event-toast--success { border-color: var(--gp-good, var(--gp-accent)); }
-.event-toast--warning { border-color: var(--gp-warn, var(--gp-accent)); }
-.event-toast--error { border-color: var(--gp-danger, var(--gp-accent)); }
+.event-toast__title { font-weight: 800; color: var(--gp-accent); margin-right: 6px; }
 
 /* 当前格悬浮卡片
    定位完全由 JS（positionCellHover）设置 left/top，禁止任何 CSS transform 干扰，
