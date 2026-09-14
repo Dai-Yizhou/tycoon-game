@@ -164,7 +164,12 @@ export function createGamePage(controller: GameController): HTMLElement {
 
   gameHudShell = new GameHudShell(gameViewModel, effects, {
     effectsEnabled: effects.isEnabled(),
-    onEffectsToggle: (enabled) => effects.setEnabled(enabled),
+    onEffectsToggle: (enabled) => {
+      effects.setEnabled(enabled);
+      gameHudShell?.setEffectsEnabled(enabled);
+      // 即时反映到掷骰按钮的冷却提示（动效关闭时不再揭示填充动画）
+      gameHudShell?.updateDiceButton();
+    },
     onBack: () => controller.reset(true),
     onRoll: () => {
       if (gameStore && gameSocket) {
@@ -281,6 +286,7 @@ export function createGamePage(controller: GameController): HTMLElement {
       onPathChoiceOptions: (options) => gameStore?.setPathChoice(options),
       onPathChoiceCleared: () => gameStore?.clearPathChoice(),
       onHudRefresh: () => gameHudShell?.update(),
+      onNotification: (payload) => gameHudShell?.showNotification(payload),
       movementEffects,
       onEvent: () => {
         gameHudShell?.update();

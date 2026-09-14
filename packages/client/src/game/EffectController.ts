@@ -1,7 +1,27 @@
 import type { GameEffectHooks } from './GameEffects.js';
 
+/** 动效开关的持久化键（localStorage）；'1' 开、'0' 关，缺省为开 */
+export const EFFECTS_ENABLED_KEY = 'tycoon.effectsEnabled';
+
+/** 从 localStorage 读取动效开关，缺省开；localStorage 不可用时静默回退 open */
+function readEffectsEnabled(): boolean {
+  try {
+    return localStorage.getItem(EFFECTS_ENABLED_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+function writeEffectsEnabled(enabled: boolean): void {
+  try {
+    localStorage.setItem(EFFECTS_ENABLED_KEY, enabled ? '1' : '0');
+  } catch {
+    // 隐私模式等场景 localStorage 不可用，静默忽略
+  }
+}
+
 export class EffectController implements GameEffectHooks {
-  private enabled = true;
+  private enabled = readEffectsEnabled();
   private destroyed = false;
   private readonly hooks: Partial<GameEffectHooks>;
 
@@ -22,6 +42,7 @@ export class EffectController implements GameEffectHooks {
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
+    writeEffectsEnabled(enabled);
   }
 
   onDiceRollStart(): void { this.invoke('onDiceRollStart'); }

@@ -4,6 +4,7 @@ import { t, localizedText } from "../game/i18n.js";
 import { parseChatCommand } from "@game/shared";
 import { resolveCellHoverModel } from "../game/cellDisplayModel.js";
 import { readCssVarNumber } from "../design/DesignAdapter.js";
+import { formatTimezoneLabel } from "../game/timezone.js";
 
 /** 格子在其覆盖层坐标系中的屏幕矩形，用于悬浮卡精确贴边定位 */
 export interface CellScreenRect {
@@ -53,6 +54,7 @@ export class GameHudShell {
   /** 已渲染悬浮卡对应的动态运行时签名（等级/持股人数等会变化的部分）；签名变化时重绘内容 */
   private hoverCardSignature = "";
   private hoverHideTimer: number | undefined;
+  private notificationTimer: number | undefined;
   private readonly handleGlobalChatShortcut = (event: KeyboardEvent): void => {
     if (event.key !== "Enter" && event.key !== " ") return;
     const target = event.target as HTMLElement | null;
@@ -71,6 +73,8 @@ export class GameHudShell {
   ) {
     this.root.className = "game-hud-shell";
     this.root.dataset.ui = "game-hud-shell";
+    // 动效关闭时在根上标记 effects-disabled，CSS 据此禁用冷却填充的过渡动画
+    if (this.config.effectsEnabled === false) this.root.classList.add("effects-disabled");
     this.root.innerHTML = `
       <div class="gp-layout" data-ui="hud-layout">
         <header class="gp-topbar" data-ui="top-bar">
@@ -83,17 +87,22 @@ export class GameHudShell {
           </div>
           <div class="value-pills" data-ui="resource-strip"></div>
           <div class="topbar-spacer"></div>
-          <section class="region-status" data-ui="region-status" aria-live="polite" role="status">
-            <div class="region-status__row">
-              <div class="region-status__name" data-ui="zone-tag">--</div>
-              <div class="region-status__value" data-ui="prosperity-tag">--</div>
-              <div class="cycle-indicator" data-ui="day-night">
-                <div class="cycle-dot" data-ui="cycle-dot"></div>
-                <span class="cycle-text" data-ui="day-time">--:--</span>
+          <div class="region-cluster">
+            <section class="region-status" data-ui="region-status" aria-live="polite" role="status">
+              <div class="region-status__row">
+                <div class="region-status__name" data-ui="zone-tag">--</div>
+                <div class="region-status__tz" data-ui="tz-tag">--</div>
+                <div class="cycle-indicator" data-ui="day-night">
+                  <div class="cycle-dot" data-ui="cycle-dot"></div>
+                  <span class="cycle-text" data-ui="day-time">--:--</span>
+                </div>
               </div>
+            </section>
+            <div class="region-values" data-ui="region-values">
+              <span class="region-values__tag" data-ui="prosperity-tag">--</span>
             </div>
             <section class="leaderboard-panel" data-ui="leaderboard" aria-live="polite"></section>
-          </section>
+          </div>
         </header>
 
         <div class="hud-panel-actions" data-ui="panel-actions" role="group">
@@ -103,7 +112,9 @@ export class GameHudShell {
         </div>
 
         <div class="event-toast" data-ui="event-toast" style="display:none">
+          <span class="event-toast__icon" aria-hidden="true"></span>
           <span class="event-toast__title"></span>
+          <span class="event-toast__content"></span>
         </div>
 
         <div class="cell-hover-card" data-ui="hover-card">
@@ -468,8 +479,10 @@ export class GameHudShell {
     const cell = this.vm.getCell(position);
     const region = this.vm.getRegions().mapRegions.find((item) => item.id === cell?.regionId);
     const name = this.root.querySelector('[data-ui="zone-tag"]');
+    const tz = this.root.querySelector('[data-ui="tz-tag"]');
     const value = this.root.querySelector('[data-ui="prosperity-tag"]');
     if (name) name.textContent = localizedText(region?.name, t('game.unknownRegion'));
+    if (tz) tz.textContent = t('hud.timezone', { tz: formatTimezoneLabel(this.vm.getPlayerTimezoneOffset()) });
     if (value) {
       const regionValues = this.vm.getRegions().regionValues.get(cell?.regionId ?? '') ?? {};
       const definitions = this.vm.getRegions().valueFieldDefs.filter((definition) => definition.scope === 'region');
@@ -486,6 +499,12 @@ export class GameHudShell {
     dotEl.className = `cycle-dot ${day.isDay ? "cycle-dot--day" : "cycle-dot--night"}`;
   }
 
+  /** 同步动效开关到本组件，保证设置面板重开时反映最新状态，并按需停用冷却填充过渡动画 */
+  setEffectsEnabled(enabled: boolean): void {
+    this.config.effectsEnabled = enabled;
+    this.root.classList.toggle("effects-disabled", !enabled);
+  }
+
   /** 掷骰按钮状态与文案（双层切分冷却揭示）。公开以支持冷却定时器只刷新本按钮 */
   updateDiceButton(): void {
     const player = this.vm.getPlayer();
@@ -494,13 +513,15 @@ export class GameHudShell {
     const cooldown = this.vm.getCooldown();
     const jail = this.vm.getJail();
     const rollBtn = this.root.querySelector('[data-action="roll"]') as HTMLButtonElement;
+    const effectsOn = this.config.effectsEnabled !== false;
     const cooldownActive = cooldown.rollCooldownEnd > Date.now();
     const jailCooldownActive = jail.isInJail && jail.jailEndTime > Date.now();
     const canRoll = movement.canRoll && !movement.isMoving && !dice.diceAnimating && !player.isBankrupt && !cooldownActive && !jailCooldownActive;
     rollBtn.disabled = !canRoll;
 
-    // 冷却进度 0→1：顶层 fill 用 clip-path 从左侧逐步揭示可用态；其余禁用场景按 0 露出底层灰禁外观
-    const progress = cooldownActive
+    // 冷却进度 0→1：顶层 fill 用 clip-path 从左侧逐步揭示可用态；其余禁用场景按 0 露出底层灰禁外观。
+    // 动效关闭时不再揭示填充动画（仅保留禁用功能态），避免对关闭动效的用户播放冷却提示动画
+    const progress = effectsOn && cooldownActive
       ? Math.min(1, Math.max(0, 1 - Math.max(cooldown.rollCooldownEnd - Date.now(), 0) / Math.max(cooldown.rollCooldownMs, 1)))
       : 0;
     rollBtn.style.setProperty("--cooldown", String(progress));
@@ -593,10 +614,33 @@ export class GameHudShell {
     });
   }
 
+  /** 顶部居中事件提示：展示服务端推送的配置消息（普通/事件），durationMs 后自动隐藏 */
+  showNotification(payload: { type?: 'info' | 'success' | 'warning' | 'error'; title: string; content: string; durationMs?: number }): void {
+    const toast = this.root.querySelector('[data-ui="event-toast"]') as HTMLElement | null;
+    if (!toast) return;
+    const iconMap: Record<string, string> = { success: '✓', warning: '!', error: '✕' };
+    const icon = toast.querySelector('.event-toast__icon') as HTMLElement | null;
+    if (icon) icon.textContent = iconMap[payload.type ?? 'info'] ?? 'ℹ';
+    const title = toast.querySelector('.event-toast__title') as HTMLElement | null;
+    if (title) title.textContent = payload.title;
+    const content = toast.querySelector('.event-toast__content') as HTMLElement | null;
+    if (content) content.textContent = payload.content;
+    toast.classList.toggle('event-toast--success', payload.type === 'success');
+    toast.classList.toggle('event-toast--warning', payload.type === 'warning');
+    toast.classList.toggle('event-toast--error', payload.type === 'error');
+    toast.style.display = 'block';
+    if (this.notificationTimer) window.clearTimeout(this.notificationTimer);
+    this.notificationTimer = window.setTimeout(() => {
+      toast.style.display = 'none';
+      this.notificationTimer = undefined;
+    }, payload.durationMs ?? 5000);
+  }
+
   destroy(): void {
     this.destroyed = true;
     window.removeEventListener("keydown", this.handleGlobalChatShortcut);
     if (this.hoverHideTimer) window.clearTimeout(this.hoverHideTimer);
+    if (this.notificationTimer) window.clearTimeout(this.notificationTimer);
     this.unsubscribers.forEach(fn => fn());
     this.effects.onNotifyDismiss("game-hud-shell");
     this.root.remove();
