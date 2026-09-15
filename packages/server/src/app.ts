@@ -396,6 +396,9 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   dayNightCycle.start();
   logger.info(`DayNightCycle started (cycle=${cycleMinutes}min)`);
 
+  // 将 DayNightCycle 接入 D8 数值调节（白天=0/夜晚=1）
+  world.setRegionTimeProvider(() => (dayNightCycle.isDay() ? 0 : 1));
+
   // 将 DayNightCycle 注入 SocketManager（供 login handler 同步时间）
   if (socketManager) {
     socketManager.setDayNightCycle(dayNightCycle);

@@ -22,7 +22,7 @@
  */
 
 import { EventEmitter } from 'node:events';
-import { buildPlayerValues, type EraInfo, type MapData, type MapMeta, type Player, type Team } from '@game/shared';
+import { buildPlayerValues, type Cell, type CellTypeId, type EraInfo, type MapData, type MapMeta, type Player, type Team, type Uct, type ValueModifierRule, type WorldView } from '@game/shared';
 import { MapIndex, type ValidationResult, validateMapData, validateMapMeta } from '@game/shared';
 import { PlayerEvents, PlayerManager, type PlayerEventName, type PlayerEventListener, type PlayerRemovedEvent } from './PlayerManager.js';
 import type { WorldSnapshot, WorldStore } from '../storage/WorldStore.js';
@@ -143,6 +143,8 @@ export class GameWorld {
   private runtimeState: WorldRuntimeStateStore | null = null;
   private lastValidation: ValidationResult | null = null;
   private snapshotStateProvider: (() => Pick<WorldSnapshot, 'taxRecords' | 'jailStates'>) | null = null;
+  /** D8：区域环境时刻读取器（白天=0/夜晚=1，缺省恒 0；由 app.ts 从 DayNightCycle 接入） */
+  private regionTimeProvider: (() => number) | null = null;
   private persistenceQueue: Promise<void> = Promise.resolve();
   private persistenceInitialized = false;
   private persistedRevision: number | undefined;
@@ -178,6 +180,11 @@ export class GameWorld {
 
   setSnapshotStateProvider(provider: () => Pick<WorldSnapshot, 'taxRecords' | 'jailStates'>): void {
     this.snapshotStateProvider = provider;
+  }
+
+  /** 设置 D8 区域环境时刻读取器（白天=0/夜晚=1）；未设置时恒返回 0 */
+  setRegionTimeProvider(provider: () => number): void {
+    this.regionTimeProvider = provider;
   }
 
   // ---------------------------------------------------------------------------
@@ -435,6 +442,104 @@ export class GameWorld {
   buildInitialPlayerValues(): Record<string, ReturnType<typeof buildPlayerValues>[string]> {
     if (!this.mapMeta) return {};
     return buildPlayerValues(this.mapMeta);
+  }
+
+  // ---------------------------------------------------------------------------
+  // D8 数值调节：refs 求值读数上下文（两端同构，服务端权威方）
+  // ---------------------------------------------------------------------------
+
+  /** 查询 cellType+base 的 valueModifier 规则；无则 undefined */
+  getBaseModifier(cellType: CellTypeId, base: string): ValueModifierRule | undefined {
+    return this.mapMeta?.valueModifiers?.find((r) => r.scope.cellType === cellType && r.scope.base === base) ?? undefined;
+  }
+
+  /** 区域环境时刻（白天=0/夜晚=1） */
+  getRegionTime(): number {
+    return this.regionTimeProvider?.() ?? 0;
+  }
+
+  /** 构建某区域的 region 作用域 UCT（仅取 valueFieldDefinitions 中 scope=region 的字段） */
+  getRegionUct(regionId: string): Uct {
+    if (!this.mapMeta) return {};
+    const region: Record<string, number> = {};
+    for (const def of this.mapMeta.valueFieldDefinitions) {
+      if (def.scope !== 'region') continue;
+      region[def.id] = this.getRegionValue(regionId, def.id);
+    }
+    return { region };
+  }
+
+  /** 从玩家构造 player 作用域 UCT（仅取 valueFieldDefinitions 中 player 作用域的字段） */
+  playerToUct(player: Player): Uct {
+    if (!this.mapMeta) return {};
+    const out: Record<string, number> = {};
+    for (const def of this.mapMeta.valueFieldDefinitions) {
+      if (def.scope === 'region') continue;
+      out[def.id] = player.values[def.id]?.current ?? 0;
+    }
+    return { player: out };
+  }
+
+  /**
+   * 计算队员某字段的算术均值（团队 UCT 聚合约定）。
+   * - 无团队 → 视为单人自己的团队（memberCnt=1，均值=自己该字段值）
+   * - player 作用域字段 → 取各成员自己的 player.values.current
+   * - region 作用域字段 → 取各成员所在区域的 region 值
+   * 该字段无任何成员取值时返回 undefined。
+   */
+  computeTeamValue(payerId: string, fieldId: string): number | undefined {
+    const team = this.getTeamByPlayer(payerId);
+    const memberIds = team?.memberIds.length ? team.memberIds : [payerId];
+    const def = this.mapMeta?.valueFieldDefinitions.find((d) => d.id === fieldId);
+    const values: number[] = [];
+    for (const memberId of memberIds) {
+      const member = this.getPlayer(memberId);
+      if (!member) continue;
+      if (def?.scope === 'region') {
+        const regionId = this.getRegionId(member.position.cellId);
+        if (regionId === undefined) continue;
+        values.push(this.getRegionValue(regionId, fieldId));
+      } else {
+        const v = member.values[fieldId]?.current;
+        if (v === undefined) continue;
+        values.push(v);
+      }
+    }
+    if (values.length === 0) return undefined;
+    return values.reduce((a, b) => a + b, 0) / values.length;
+  }
+
+  private getTeamByPlayer(playerId: string): Team | undefined {
+    const player = this.getPlayer(playerId);
+    if (!player?.teamId) return undefined;
+    return this.teams.get(player.teamId);
+  }
+
+  /**
+   * 组装一次结算的 WorldView（付款方 + 目标格）。
+   * - `playerUct` 可显式覆盖（如投资 delta 求值时需置空 payer 上下文）
+   * - `teamValue` 缺省走 computeTeamValue（无团队时等价单人）
+   */
+  buildResolutionView(opts: {
+    payer: Player;
+    base: number | Uct;
+    cell: Cell;
+    level: number;
+    ownerCount: number;
+    playerUct?: Uct;
+    teamValue?: (fieldId: string) => number | undefined;
+  }): WorldView {
+    const team = this.getTeamByPlayer(opts.payer.id);
+    return {
+      base: opts.base,
+      playerUct: opts.playerUct ?? this.playerToUct(opts.payer),
+      teamMemberCount: team?.memberIds.length ?? 1,
+      teamValue: opts.teamValue ?? ((fieldId: string) => this.computeTeamValue(opts.payer.id, fieldId)),
+      regionUct: this.getRegionUct(opts.cell.regionId),
+      regionTime: this.getRegionTime(),
+      curCellLevel: opts.level,
+      curCellOwnerCount: opts.ownerCount,
+    };
   }
 
   // ---------------------------------------------------------------------------
