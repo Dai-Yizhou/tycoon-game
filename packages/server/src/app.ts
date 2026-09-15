@@ -256,16 +256,18 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
       // 尝试加载地图元数据（区域、时区、数值字段定义等）
       let regions: unknown[] = [];
       let valueFieldDefinitions: unknown[] = [];
+      let valueModifiers: unknown[] = [];
       try {
         const rawMeta = JSON.parse(readFileSync(mapMetaPath, 'utf-8'));
         const mapMeta = parseMapMeta(rawMeta);
         regions = mapMeta.regions;
         valueFieldDefinitions = mapMeta.valueFieldDefinitions;
+        valueModifiers = mapMeta.valueModifiers ?? [];
       } catch {
         // map-meta.json 不存在时使用空数组
       }
 
-      res.json({ mapData, regions, valueFieldDefinitions });
+      res.json({ mapData, regions, valueFieldDefinitions, valueModifiers });
     } catch (err) {
       logger.error('failed to load map', err);
       res.status(500).json({ error: 'Failed to load map data', detail: err instanceof Error ? err.message : String(err) });

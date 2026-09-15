@@ -9,8 +9,9 @@
  * 只负责 UI 投影与变更通知。业务事件统一进入 GameStore。
  */
 
-import type { Player } from '@game/shared';
+import type { Player, Uct, ValueModifierRule } from '@game/shared';
 import type { GameStore, ClientGameSnapshot, RegionInfo, ValueFieldDef, TeamMember, OtherPlayerInfo, ClientChatMessage } from '../state/GameStore.js';
+import { type CellHoverResolutionCtx } from './cellDisplayModel.js';
 import { localizedText } from './i18n.js';
 import { resolveTimezoneOffsetMinutes } from './timezone.js';
 
@@ -87,6 +88,7 @@ export interface DayNightSlice {
 export interface RegionSlice {
   mapRegions: RegionInfo[];
   valueFieldDefs: ValueFieldDef[];
+  valueModifiers: ValueModifierRule[];
   regionValues: Map<string, Record<string, number>>;
 }
 
@@ -284,7 +286,7 @@ export class GameViewModel {
   // ===== Regions =====
   getRegions(): RegionSlice {
     const snapshot = this.projectedSnapshot();
-    return { mapRegions: snapshot.mapRegions, valueFieldDefs: snapshot.valueFieldDefs, regionValues: snapshot.regionValues };
+    return { mapRegions: snapshot.mapRegions, valueFieldDefs: snapshot.valueFieldDefs, valueModifiers: snapshot.valueModifiers, regionValues: snapshot.regionValues };
   }
 
   getLeaderboard(): LeaderboardSlice {
@@ -322,6 +324,38 @@ export class GameViewModel {
   }
 
   getCellActions(): CellActionOption[] { return [...this.projectedSnapshot().cellActions]; }
+
+  /**
+   * 为当前格构建 D8 展示求值上下文（宽松实现，用于 base → final 摘要）。
+   * - 无任何 valueModifiers 时返回 null（跳过求值，展示 base 原样）。
+   * - playerUct/regionUct 仅取地图声明的作用域字段；团队均值未实现 → teamValue 置 undefined。
+   * - regionTime 按当前昼夜相位：白天=0/夜晚=1。
+   */
+  getCellResolutionCtx(cell: import('@game/shared').Cell): CellHoverResolutionCtx | null {
+    const snapshot = this.projectedSnapshot();
+    if (!snapshot.valueModifiers.length) return null;
+    const playerUct: Uct = { player: {} };
+    const regionUct: Uct = { region: {} };
+    const currentPlayer = snapshot.currentPlayer;
+    const regionValues = snapshot.regionValues.get(cell.regionId) ?? {};
+    for (const def of snapshot.valueFieldDefs) {
+      if (def.scope === 'region') {
+        const v = regionValues[def.id];
+        if (typeof v === 'number') regionUct.region![def.id] = v;
+      } else {
+        const v = currentPlayer?.values?.[def.id]?.current;
+        if (typeof v === 'number') playerUct.player![def.id] = v;
+      }
+    }
+    const local = this.getLocalDayNight(this.getPlayerTimezoneOffset());
+    return {
+      valueModifiers: snapshot.valueModifiers,
+      playerUct,
+      teamMemberCount: snapshot.teamMembers.length || 1,
+      regionUct,
+      regionTime: local.isDay ? 0 : 1,
+    };
+  }
 
   // ===== Team =====
   getTeam(): TeamSlice { return { members: this.projectedSnapshot().teamMembers }; }

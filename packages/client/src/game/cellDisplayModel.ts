@@ -12,7 +12,8 @@
  * - 其余类型不附加字段；不展示持有者列表和时区。
  */
 
-import type { Cell, Uct } from '@game/shared';
+import type { Cell, Uct, ValueModifierRule, WorldView } from '@game/shared';
+import { resolveField } from '@game/shared';
 import { t, localizedText } from './i18n.js';
 
 /** 字段定义最小结构：兼容 shared ValueFieldDefinition 与客户端 ValueFieldDef（name 为已本地化字符串） */
@@ -94,10 +95,62 @@ export interface CellHoverRuntime {
   ownerCount: number;
 }
 
+/**
+ * D8 展信用求值上下文（同构于服务端 WorldView 的读数面）。
+ * - 团队字段宽松实现：`teamValue` 置 undefined（引用 team.uct 在客户端按 0 显示），不阻塞展示。
+ * - 仅用于"当前格"展示，不做观看方/结算方归属歧义防护（沿用既有决策）。
+ */
+export interface CellHoverResolutionCtx {
+  valueModifiers: ValueModifierRule[];
+  playerUct: Uct;
+  teamMemberCount: number;
+  regionUct: Uct;
+  regionTime: number;
+}
+
+/** 若存在当前 cellType+base 的规则，返回 `base → final` 摘要；否则返回 null（展示 base 原样）。 */
+function resolveModifierText(
+  cellType: Cell['type'],
+  baseField: string,
+  base: number | Uct,
+  level: number,
+  ownerCount: number,
+  ctx: CellHoverResolutionCtx,
+  mapValue: (val: number | Uct) => string,
+): string | null {
+  if (!ctx.valueModifiers.length) return null;
+  const rule = ctx.valueModifiers.find((r) => r.scope.cellType === cellType && r.scope.base === baseField);
+  if (!rule) return null;
+  const view: WorldView = {
+    base,
+    playerUct: ctx.playerUct,
+    teamMemberCount: ctx.teamMemberCount,
+    teamValue: undefined,
+    regionUct: ctx.regionUct,
+    regionTime: ctx.regionTime,
+    curCellLevel: level,
+    curCellOwnerCount: ownerCount,
+  };
+  let final: string;
+  try {
+    final = mapValue(resolveField(rule.calc, view) as number | Uct);
+  } catch {
+    // 求值异常时退回 base 展示，不阻塞悬浮
+    return null;
+  }
+  return `${mapValue(base)} → ${final}`;
+}
+
+/** UCT 字段展示用映射 */
+function uctMap(definitions: ValueFieldDefLike[]): (val: number | Uct) => string {
+  return (val) => formatUctDisplay(val as Uct, definitions);
+}
+
 export function resolveCellHoverModel(
   cell: Cell,
   runtime: CellHoverRuntime | null,
   definitions: ValueFieldDefLike[],
+  ctx?: CellHoverResolutionCtx,
 ): CellHoverModel {
   const model: CellHoverModel = {
     type: cell.type,
@@ -106,27 +159,50 @@ export function resolveCellHoverModel(
     description: localizedText(cell.description, ''),
     rows: [],
   };
+  const mapUct = uctMap(definitions);
 
   if (cell.type === 'property') {
     const level = runtime?.level ?? 0;
     const ownerCount = runtime?.ownerCount ?? 0;
-    model.rows.push({ label: t('hud.price'), value: formatUctDisplay(cell.price, definitions) });
+    const price = cell.price;
+    if (price) {
+      const value = ctx ? resolveModifierText('property', 'price', price, level, ownerCount, ctx, mapUct) ?? mapUct(price) : mapUct(price);
+      model.rows.push({ label: t('hud.price'), value });
+    }
     const rent = cell.rent?.[Math.min(level, (cell.rent?.length ?? 1) - 1)];
-    if (rent) model.rows.push({ label: t('hud.rent'), value: formatUctDisplay(rent, definitions) });
+    if (rent) {
+      const value = ctx ? resolveModifierText('property', 'rent', rent, level, ownerCount, ctx, mapUct) ?? mapUct(rent) : mapUct(rent);
+      model.rows.push({ label: t('hud.rent'), value });
+    }
     if ((cell.upgradeCost?.length ?? 0) > 0) {
       model.rows.push({ label: t('hud.level'), value: t('hud.levelFormat', { current: level, max: cell.upgradeCost!.length }) });
     }
     model.rows.push({ label: t('hud.owners'), value: t('hud.ownerCountFormat', { current: ownerCount, max: cell.maxOwnerCount }) });
   } else if (cell.type === 'investment') {
     const ownerCount = runtime?.ownerCount ?? 0;
-    model.rows.push({ label: t('hud.price'), value: formatUctDisplay(cell.price, definitions) });
+    const price = cell.price;
+    if (price) {
+      const value = ctx ? resolveModifierText('investment', 'price', price, 0, ownerCount, ctx, mapUct) ?? mapUct(price) : mapUct(price);
+      model.rows.push({ label: t('hud.price'), value });
+    }
     model.rows.push({ label: t('hud.owners'), value: t('hud.ownerCountFormat', { current: ownerCount, max: cell.maxOwnerCount }) });
     for (const trigger of cell.investmentTriggers ?? []) {
-      model.rows.push({ label: t('hud.trigger', { id: trigger.id }), value: formatUctDisplay(trigger.delta, definitions) });
+      const delta = trigger.delta;
+      const value = ctx ? resolveModifierText('investment', 'investmentTriggers.delta', delta, 0, ownerCount, ctx, mapUct) ?? mapUct(delta) : mapUct(delta);
+      model.rows.push({ label: t('hud.trigger', { id: trigger.id }), value });
     }
   } else if (cell.type === 'jail') {
-    if (cell.jailCooldown !== undefined) model.rows.push({ label: t('hud.jailCooldown'), value: String(cell.jailCooldown) });
-    if (cell.jailCost) model.rows.push({ label: t('hud.jailCost'), value: formatUctDisplay(cell.jailCost, definitions) });
+    const ownerCount = runtime?.ownerCount ?? 0;
+    if (cell.jailCooldown !== undefined) {
+      const numMap = (val: number | Uct) => String(val as number);
+      const base = cell.jailCooldown;
+      const value = ctx ? resolveModifierText('jail', 'jailCooldown', base, 0, ownerCount, ctx, numMap) ?? String(base) : String(base);
+      model.rows.push({ label: t('hud.jailCooldown'), value });
+    }
+    if (cell.jailCost) {
+      const value = ctx ? resolveModifierText('jail', 'jailCost', cell.jailCost, 0, ownerCount, ctx, mapUct) ?? mapUct(cell.jailCost) : mapUct(cell.jailCost);
+      model.rows.push({ label: t('hud.jailCost'), value });
+    }
   }
 
   return model;

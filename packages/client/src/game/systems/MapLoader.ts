@@ -1,4 +1,4 @@
-import type { MapData } from '@game/shared';
+import type { MapData, ValueModifierRule } from '@game/shared';
 import type { RegionInfo, TimeZoneInfo, ValueFieldDef } from '../../state/GameStore.js';
 
 const MAP_SCALE = 5.0;
@@ -15,6 +15,7 @@ export async function loadMapData(): Promise<{
   regions: RegionInfo[];
   timezones: TimeZoneInfo[];
   valueFields: ValueFieldDef[];
+  valueModifiers: ValueModifierRule[];
 } | null> {
   try {
     const response = await fetch('/api/map');
@@ -37,7 +38,8 @@ export async function loadMapData(): Promise<{
       ...(typeof field['min'] === 'number' ? { min: field['min'] } : {}),
       ...(typeof field['max'] === 'number' ? { max: field['max'] } : {}),
     }));
-    return { mapData, regions, timezones, valueFields };
+    const valueModifiers: ValueModifierRule[] = Array.isArray(data.valueModifiers) ? (data.valueModifiers as ValueModifierRule[]) : [];
+    return { mapData, regions, timezones, valueFields, valueModifiers };
   } catch {
     return null;
   }

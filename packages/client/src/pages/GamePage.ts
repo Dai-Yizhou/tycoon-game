@@ -232,7 +232,7 @@ export function createGamePage(controller: GameController): HTMLElement {
       }
       const { mapData, regions, timezones } = mapResult;
       // 初始化区域繁荣度快照
-      gameStore?.setRegions(regions, mapResult.valueFields, timezones);
+      gameStore?.setRegions(regions, mapResult.valueFields, timezones, mapResult.valueModifiers);
       mapIndex = new MapIndex(mapData);
       gameStore?.setCells(mapData);
       const snapshot = gameStore!.getSnapshot();

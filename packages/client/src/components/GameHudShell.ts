@@ -280,6 +280,7 @@ export class GameHudShell {
       cell,
       runtime ? { level: runtime.level, ownerCount: runtime.ownerships.length } : null,
       this.vm.getRegions().valueFieldDefs,
+      this.vm.getCellResolutionCtx(cell) ?? undefined,
     );
     const rowsHtml = model.rows
       .map((row) => `<span>${this.escapeHtml(row.label)}</span><b>${this.escapeHtml(row.value)}</b>`)
