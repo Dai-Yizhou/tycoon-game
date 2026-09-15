@@ -14,7 +14,7 @@
  * - 监狱中禁用收租功能
  */
 
-import type { Player } from '@game/shared';
+import type { Player, Uct } from '@game/shared';
 import { CellTypes, PlayerStatus, t } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
@@ -135,11 +135,28 @@ export class JailHandler {
       }
 
       // 获取监狱配置（权威来源为格子配置；缺失时使用处理器内置默认值，不再依赖 ServerConfig）
-      const cooldownMs = cell.jailCooldown ?? DEFAULT_JAIL_CONFIG.cooldownMs ?? 10_000;
+      const cooldownMs = this.world.resolveValueModifier({
+        cellType: 'jail',
+        baseField: 'jailCooldown',
+        base: cell.jailCooldown ?? DEFAULT_JAIL_CONFIG.cooldownMs ?? 10_000,
+        cell,
+        level: 0,
+        ownerCount: 0,
+        payer: player,
+      }) as number;
 
       // 设置监狱状态
       player.status = PlayerStatus.Jail;
-      this.applyJailCost(player, cell.jailCost);
+      const jailCost = this.world.resolveValueModifier({
+        cellType: 'jail',
+        baseField: 'jailCost',
+        base: cell.jailCost ?? {},
+        cell,
+        level: 0,
+        ownerCount: 0,
+        payer: player,
+      }) as Uct;
+      this.applyJailCost(player, jailCost);
       this.world.updatePlayer(player);
 
       // 记录监狱状态数据

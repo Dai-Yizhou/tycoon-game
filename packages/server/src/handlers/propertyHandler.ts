@@ -237,7 +237,7 @@ export class PropertyHandler {
       }
 
       // 7. 获取价格
-      const priceUct = this.resolvePurchasePrice(cell);
+      const priceUct = this.resolvePurchasePrice(cell, player);
       const price = this.getUctCost(priceUct);
       if (Object.keys(priceUct?.player ?? {}).length === 0 || !this.canApplyUct(player, priceUct)) {
         emitError(socket, ErrorCodes.InvalidPayload, '该地产无价格信息');
@@ -397,8 +397,23 @@ export class PropertyHandler {
         return;
       }
 
-      // 8. 获取升级费用
-      if (!upgradeCosts[currentLevel] || !this.canApplyUct(player, upgradeCosts[currentLevel])) {
+      // 8. 获取升级费用（结算时刻按 D8 规则求一次并固定）
+      const baseUpgradeCost = upgradeCosts[currentLevel];
+      if (!baseUpgradeCost) {
+        emitError(socket, ErrorCodes.InvalidPayload, '升级费用无效');
+        ack?.({ ok: false, error: 'invalid_upgrade_cost' });
+        return;
+      }
+      const upgradeCost = this.world.resolveValueModifier({
+        cellType: 'property',
+        baseField: 'upgradeCost',
+        base: baseUpgradeCost,
+        cell,
+        level: currentLevel,
+        ownerCount: ownerships.length,
+        payer: player,
+      }) as Uct;
+      if (!this.canApplyUct(player, upgradeCost)) {
         emitError(socket, ErrorCodes.InvalidPayload, '升级费用无效');
         ack?.({ ok: false, error: 'invalid_upgrade_cost' });
         return;
@@ -409,7 +424,7 @@ export class PropertyHandler {
         ack?.({ ok: false, error: payload.expectedCellVersion !== undefined ? 'cell_version_conflict' : 'resource_version_conflict' });
         return;
       }
-      const result = this.executeUpgradeProperty(player, cell, upgradeCosts[currentLevel]);
+      const result = this.executeUpgradeProperty(player, cell, upgradeCost);
       if (!result) {
         emitError(socket, ErrorCodes.InternalError, '升级失败');
         ack?.({ ok: false, error: 'upgrade_failed' });
@@ -503,15 +518,24 @@ export class PropertyHandler {
         return null;
       }
 
-      // 6. 获取租金
+      // 6. 获取租金（结算时刻按 D8 规则求一次并固定）
       const level = this.world.getRuntimeState().getCellState(cell.id).level;
-      const rentUct = cell.rent?.[level];
+      const baseRentUct = cell.rent?.[level];
+      if (!baseRentUct) return null;
+      const rentUct = this.world.resolveValueModifier({
+        cellType: 'property',
+        baseField: 'rent',
+        base: baseRentUct,
+        cell,
+        level,
+        ownerCount: ownerships.length,
+        payer,
+      }) as Uct;
       const rent = this.getUctCost(rentUct);
 
       if (rent <= 0) {
         return null;
       }
-      if (!rentUct) return null;
 
       // 可收款股东（仅向可收款股东收租，其不可收的份额不凭空转移给其他股东）
       const collectableOwnerships = ownerships.filter((ownership) => {
@@ -677,8 +701,18 @@ export class PropertyHandler {
     }
   }
 
-  private resolvePurchasePrice(cell: Cell): Uct | undefined {
-    return cell.price;
+  private resolvePurchasePrice(cell: Cell, player: Player): Uct | undefined {
+    const base = cell.price;
+    if (!base) return undefined;
+    return this.world.resolveValueModifier({
+      cellType: 'property',
+      baseField: 'price',
+      base,
+      cell,
+      level: 0,
+      ownerCount: this.world.getRuntimeState().getOwnerships(cell.id).length,
+      payer: player,
+    }) as Uct;
   }
 
   private getUctCost(uct: Uct | undefined): number {

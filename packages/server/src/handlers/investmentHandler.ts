@@ -200,7 +200,7 @@ export class InvestmentHandler {
       }
 
       // 7. 获取价格
-      const priceUct = this.resolvePurchasePrice(cell);
+      const priceUct = this.resolvePurchasePrice(cell, player);
       const price = this.getUctCost(priceUct);
       if (price <= 0) {
         emitError(socket, ErrorCodes.InvalidPayload, '该投资项目无价格信息');
@@ -401,11 +401,32 @@ export class InvestmentHandler {
     cell: Cell,
     domainEvent: string,
   ): Uct | null {
-    return cell.investmentTriggers?.find((trigger) => trigger.on === domainEvent)?.delta ?? null;
+    const trigger = cell.investmentTriggers?.find((trigger) => trigger.on === domainEvent);
+    if (!trigger) return null;
+    // 域事件按股东分摊、无单一付款方：payer 上下文置空只求解一次
+    return this.world.resolveValueModifier({
+      cellType: 'investment',
+      baseField: 'investmentTriggers.delta',
+      base: trigger.delta,
+      cell,
+      level: this.world.getRuntimeState().getCellState(cell.id).level,
+      ownerCount: this.world.getRuntimeState().getOwnerships(cell.id).length,
+      playerUct: {},
+    }) as Uct;
   }
 
-  private resolvePurchasePrice(cell: Cell): Uct | undefined {
-    return cell.price;
+  private resolvePurchasePrice(cell: Cell, player: Player): Uct | undefined {
+    const base = cell.price;
+    if (!base) return undefined;
+    return this.world.resolveValueModifier({
+      cellType: 'investment',
+      baseField: 'price',
+      base,
+      cell,
+      level: this.world.getRuntimeState().getCellState(cell.id).level,
+      ownerCount: this.world.getRuntimeState().getOwnerships(cell.id).length,
+      payer: player,
+    }) as Uct;
   }
 
   private getUctCost(uct: Uct | undefined): number {

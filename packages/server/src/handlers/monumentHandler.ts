@@ -295,8 +295,16 @@ export class MonumentHandler {
     monumentCell: Cell,
   ): RepairResult | null {
     try {
-      const repairCost = monumentCell.repairCost;
-      if (!repairCost) return null;
+      if (!monumentCell.repairCost) return null;
+      const repairCost = this.world.resolveValueModifier({
+        cellType: 'monument',
+        baseField: 'repairCost',
+        base: monumentCell.repairCost,
+        cell: monumentCell,
+        level: 0,
+        ownerCount: 0,
+        payer: player,
+      }) as Uct;
       const playerChanges = Object.entries(repairCost.player ?? {});
       const appliedPlayerChanges: Array<[string, number]> = [];
       for (const [fieldId, delta] of playerChanges) {

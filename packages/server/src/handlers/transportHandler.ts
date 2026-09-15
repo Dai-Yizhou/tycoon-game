@@ -212,7 +212,7 @@ export class TransportHandler {
       }
 
       // 9. 获取传送费用
-      const teleportCost = this.getTeleportCost(hubCell, payload.targetCellId);
+      const teleportCost = this.getTeleportCost(hubCell, payload.targetCellId, player);
       if (!teleportCost) {
         emitError(socket, ErrorCodes.InvalidPayload, '目标格子没有传送费用配置');
         ack?.({ ok: false, error: 'transport_cost_not_found' });
@@ -456,8 +456,18 @@ export class TransportHandler {
     return cell.destinations ?? [];
   }
 
-  private getTeleportCost(cell: Cell | undefined, targetCellId: number): Uct | undefined {
-    return cell?.teleportDestinations?.find((destination) => destination.cellId === targetCellId)?.cost;
+  private getTeleportCost(cell: Cell | undefined, targetCellId: number, payer?: Player): Uct | undefined {
+    const destination = cell?.teleportDestinations?.find((d) => d.cellId === targetCellId);
+    if (!destination || !cell) return undefined;
+    return this.world.resolveValueModifier({
+      cellType: 'transport',
+      baseField: 'teleportDestinations.cost',
+      base: destination.cost,
+      cell,
+      level: 0,
+      ownerCount: 0,
+      payer,
+    }) as Uct;
   }
 
   /**
