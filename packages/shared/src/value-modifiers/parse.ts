@@ -110,21 +110,104 @@ export function lintValueModifiers(rules: ValueModifierRule[], definitions: Valu
   return { valid: errors.length === 0, errors, warnings: monotonicityWarnings(rules) };
 }
 
-/** 单调性线性符号提示（警告，不阻塞）：对存在 region.uct.* / curCell.* / player.* 引用的规则给出提示。 */
+/** 线性符号：0=常量/不依赖，1=随其增，-1=随其减，null=非线性（疑非单调） */
+type Sign = 1 | -1 | 0;
+
+function clampSign(n: number): Sign {
+  return n > 0 ? 1 : n < 0 ? -1 : 0;
+}
+
+/** numNode 是否（线性意义上）依赖 target ref 路径字符串 */
+function dependsOnNode(node: NumNode, target: string): boolean {
+  if (typeof node === 'number') return false;
+  if ('$ref' in node) return node['$ref'] === target;
+  return node.args.some((a) => dependsOnNode(a, target));
+}
+
+/** 求 numNode 对 target 的线性符号链：null 表示该算子引入非线性（abs/min/max/条件/if/乘法多输入/分母含目标等）。 */
+function signOfNode(node: NumNode, target: string): Sign | null {
+  if (typeof node === 'number') return 0;
+  if (!dependsOnNode(node, target)) return 0;
+  if ('$ref' in node) return 1;
+  const op = node['$op'];
+  const args = node.args;
+  switch (op) {
+    case 'add': {
+      let s = 0;
+      for (const a of args) { const sa = signOfNode(a, target); if (sa === null) return null; s += sa; }
+      return clampSign(s);
+    }
+    case 'sub': {
+      let s = signOfNode(args[0], target);
+      if (s === null) return null;
+      for (let i = 1; i < args.length; i++) { const sa = signOfNode(args[i], target); if (sa === null) return null; s -= sa; }
+      return clampSign(s);
+    }
+    case 'neg': { const s = signOfNode(args[0], target); return s === null ? null : clampSign(0 - s); }
+    case 'round': return signOfNode(args[0], target);
+    case 'mul': {
+      let sign = 1, depends = 0;
+      for (const a of args) {
+        const sa = signOfNode(a, target);
+        if (sa === null) return null;
+        if (sa !== 0) { depends++; sign *= sa; }
+        else if (typeof a === 'number') { if (a === 0) return 0; sign *= Math.sign(a); }
+      }
+      if (depends !== 1) return null; // 多个可变输入相乘 → 非线性
+      return clampSign(sign);
+    }
+    case 'div': {
+      const sn = signOfNode(args[0], target);
+      const sd = signOfNode(args[1], target);
+      if (sn === null || sd === null) return null;
+      if (sd !== 0) return null; // 分母含目标 → 非线性
+      if (typeof args[1] === 'number') return clampSign(sn * Math.sign(args[1]));
+      return sn;
+    }
+    case 'clamp':
+    default:
+      // abs/min/max/条件/if/clamp → 存在饱和/分支，无法保证单调
+      return null;
+  }
+}
+
+/** 对目标字段整体 calc（NumNode 或 ExprUct）求 target 的符号链（各子字段叠加）。 */
+function analyzeSign(calc: Calc, target: string): Sign | null {
+  if (typeof calc === 'number') return 0;
+  if ('$ref' in calc || '$op' in calc) return signOfNode(calc as NumNode, target);
+  let any = false, s = 0;
+  for (const scope of ['player', 'region'] as const) {
+    const group = (calc as Record<string, Record<string, NumNode>>)[scope];
+    if (!group) continue;
+    for (const nodeItem of Object.values(group)) {
+      const sg = signOfNode(nodeItem, target);
+      if (sg === null) return null;
+      if (sg !== 0) { any = true; s += sg; }
+    }
+  }
+  return any ? clampSign(s) : 0;
+}
+
+/** 单调性线性符号提示（警告，不阻塞）：对规则内引用的 region.uct.* / curCell.* / player.* 做 ± 符号链提示。 */
 function monotonicityWarnings(rules: ValueModifierRule[]): string[] {
   const warnings: string[] = [];
   for (const rule of rules) {
     const refs: string[] = [];
     collectRefFields(rule.calc, refs);
-    const linked = refs.filter((path) => {
+    const linked = [...new Set(refs)].filter((path) => {
       const p = parseRefPath(path);
-      if (!p) return false;
-      return p.head === 'player' || p.head === 'region' || p.head === 'curCell';
+      return !!p && (p.head === 'player' || p.head === 'region' || p.head === 'curCell');
     });
-    if (linked.length > 0) {
-      const label = rule.id ?? `${rule.scope.cellType}.${rule.scope.base}`;
-      warnings.push(`规则 ${label} 引用联动变量 ${[...new Set(linked)].join('、')}，结果随其变化；请确认目标值随被引用量单调增/减（仅提示，不强制）`);
-    }
+    if (linked.length === 0) continue;
+    const label = rule.id ?? `${rule.scope.cellType}.${rule.scope.base}`;
+    const signTexts = linked.map((path) => {
+      const sign = analyzeSign(rule.calc, path);
+      if (sign === null) return `${path}(疑似非单调)`;
+      if (sign > 0) return `${path}(随其增)`;
+      if (sign < 0) return `${path}(随其减)`;
+      return `${path}(常量)`;
+    });
+    warnings.push(`规则 ${label} 引用联动变量 ${signTexts.join('、')}；请确认目标值随被引用量单调增/减（仅提示，不强制）`);
   }
   return warnings;
 }

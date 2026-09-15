@@ -27,4 +27,21 @@ describe('valueModifiers 解析与 lint', () => {
     ], definitions);
     expect(r.valid).toBe(false);
   });
+
+  it('单调性提示：正系数随其增、负系数随其减、非线性标疑似非单调', () => {
+    const inc = lintValueModifiers([
+      { id: 'inc', scope: { cellType: 'property', base: 'price' }, calc: { player: { money: { '$op': 'add', args: [ { '$ref': 'region.uct.pros' }, 10 ] } } } },
+    ], definitions);
+    expect(inc.warnings[0]).toContain('region.uct.pros(随其增)');
+
+    const dec = lintValueModifiers([
+      { id: 'dec', scope: { cellType: 'property', base: 'price' }, calc: { player: { money: { '$op': 'mul', args: [ -1, { '$ref': 'region.uct.pros' } ] } } } },
+    ], definitions);
+    expect(dec.warnings[0]).toContain('region.uct.pros(随其减)');
+
+    const nonlin = lintValueModifiers([
+      { id: 'nonlin', scope: { cellType: 'property', base: 'price' }, calc: { player: { money: { '$op': 'mul', args: [ { '$ref': 'region.uct.pros' }, { '$ref': 'region.uct.pros' } ] } } } },
+    ], definitions);
+    expect(nonlin.warnings[0]).toContain('region.uct.pros(疑似非单调)');
+  });
 });
