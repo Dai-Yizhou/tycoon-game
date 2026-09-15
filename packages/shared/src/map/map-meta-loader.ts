@@ -3,6 +3,7 @@ import type { MapMeta, Region, TaxConfig, ValueFieldDefinition, DayNightValueCha
 import type { RankingConfig } from '../types/leaderboard';
 import type { ValidationResult } from './map-parser';
 import { MapParseError } from './map-parser';
+import { parseValueModifiers, lintValueModifiers } from '../value-modifiers/index';
 
 export class MapMetaParseError extends MapParseError {}
 
@@ -71,7 +72,7 @@ export function parseMapMeta(raw: unknown): MapMeta {
   });
   const uct = object(input.uct, 'uct');
   const regions: Region[] = (input.regions as unknown[]).map((value) => { const region = object(value, 'regions'); const regionName = object(region.name, 'regions.name'); if (typeof region.id !== 'string') throw new MapMetaParseError('region id 无效'); return { id: region.id, name: regionName as Region['name'], initial: region.initial as Region['initial'] }; });
-  return { id: input.id as string, version: input.version as string, name: name as MapMeta['name'], valueFieldDefinitions: fields, uct: { player: Array.isArray(uct.player) ? uct.player as string[] : [], region: Array.isArray(uct.region) ? uct.region as string[] : [] }, playerInitial: input.playerInitial as MapMeta['playerInitial'], startCellId: input.startCellId as number, regions, dayNightCycle: input.dayNightCycle as number, dice: input.dice as MapMeta['dice'], tax: parseTax(input.tax), ranking: parseRanking(input.ranking), dayNight: parseDayNight(input.dayNight) };
+  return { id: input.id as string, version: input.version as string, name: name as MapMeta['name'], valueFieldDefinitions: fields, uct: { player: Array.isArray(uct.player) ? uct.player as string[] : [], region: Array.isArray(uct.region) ? uct.region as string[] : [] }, playerInitial: input.playerInitial as MapMeta['playerInitial'], startCellId: input.startCellId as number, regions, dayNightCycle: input.dayNightCycle as number, dice: input.dice as MapMeta['dice'], tax: parseTax(input.tax), ranking: parseRanking(input.ranking), dayNight: parseDayNight(input.dayNight), valueModifiers: parseValueModifiers(input.valueModifiers, fields) };
 }
 
 export function validateMapMeta(meta: MapMeta, map: MapData): ValidationResult {
@@ -83,5 +84,7 @@ export function validateMapMeta(meta: MapMeta, map: MapData): ValidationResult {
   const fieldIds = new Set(meta.valueFieldDefinitions.map((field) => field.id));
   if (fieldIds.size !== meta.valueFieldDefinitions.length) errors.push('数值字段定义重复');
   for (const fieldId of [...(meta.uct?.player ?? []), ...(meta.uct?.region ?? [])]) if (!fieldIds.has(fieldId)) errors.push(`UCT 引用了未定义字段: ${fieldId}`);
-  return { valid: errors.length === 0, errors, warnings: [] };
+  const lint = lintValueModifiers(meta.valueModifiers ?? [], meta.valueFieldDefinitions);
+  errors.push(...lint.errors);
+  return { valid: errors.length === 0, errors, warnings: lint.warnings };
 }
