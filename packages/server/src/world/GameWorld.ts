@@ -22,7 +22,7 @@
  */
 
 import { EventEmitter } from 'node:events';
-import { buildPlayerValues, type Cell, type CellTypeId, type EraInfo, type MapData, type MapMeta, type Player, type Team, type Uct, type ValueModifierRule, type WorldView } from '@game/shared';
+import { buildPlayerValues, resolveField, type Cell, type CellTypeId, type EraInfo, type MapData, type MapMeta, type Player, type Team, type Uct, type ValueModifierRule, type WorldView } from '@game/shared';
 import { MapIndex, type ValidationResult, validateMapData, validateMapMeta } from '@game/shared';
 import { PlayerEvents, PlayerManager, type PlayerEventName, type PlayerEventListener, type PlayerRemovedEvent } from './PlayerManager.js';
 import type { WorldSnapshot, WorldStore } from '../storage/WorldStore.js';
@@ -540,6 +540,46 @@ export class GameWorld {
       curCellLevel: opts.level,
       curCellOwnerCount: opts.ownerCount,
     };
+  }
+
+  /**
+   * 结算时刻按规则求一次最终值并固定；无规则则返回 base 原值。
+   * - `base` 为 number（如 jailCooldown）→ 返回 number；为 Uct → 返回覆盖合并后的 Uct。
+   * - `payer` 缺失时用中性上下文（空 playerUct、无团队、teamMemberCount=1），用于无单一付款方的展示/域事件。
+   * - `playerUct` 可显式覆盖（如投资 delta 求值时置空 payer 上下文只求解一次）。
+   */
+  resolveValueModifier(opts: {
+    cellType: CellTypeId;
+    baseField: string;
+    base: number | Uct;
+    cell: Cell;
+    level: number;
+    ownerCount: number;
+    payer?: Player;
+    playerUct?: Uct;
+  }): number | Uct {
+    const rule = this.getBaseModifier(opts.cellType, opts.baseField);
+    if (!rule) return opts.base;
+    const view: WorldView = opts.payer
+      ? this.buildResolutionView({
+          payer: opts.payer,
+          base: opts.base,
+          cell: opts.cell,
+          level: opts.level,
+          ownerCount: opts.ownerCount,
+          playerUct: opts.playerUct,
+        })
+      : {
+          base: opts.base,
+          playerUct: opts.playerUct ?? {},
+          teamMemberCount: 1,
+          teamValue: undefined,
+          regionUct: this.getRegionUct(opts.cell.regionId),
+          regionTime: this.getRegionTime(),
+          curCellLevel: opts.level,
+          curCellOwnerCount: opts.ownerCount,
+        };
+    return resolveField(rule.calc, view);
   }
 
   // ---------------------------------------------------------------------------
