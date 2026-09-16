@@ -25,6 +25,16 @@ export class InteractiveMapSurface {
     }
   }
 
+  /**
+   * 权威设置本玩家当前所在格（用于 hover 时"仅当前格可查看"判定）。
+   * 移动动画由 currentPlayerPosition 字段驱动，而 players[0].position 在 serverPath
+   * 动画过程中可能滞后不更新，若沿用 position 会导致 selfCellId 停留初始格、hover 全部失效。
+   */
+  setSelfCell(cellId: number): void {
+    if (this.selfCellId === cellId) return;
+    this.selfCellId = cellId;
+  }
+
   constructor() {
     this.root.className = "interactive-map-surface";
     this.root.dataset.ui = "interactive-map";

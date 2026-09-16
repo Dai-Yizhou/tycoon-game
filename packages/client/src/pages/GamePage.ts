@@ -108,6 +108,8 @@ export function createGamePage(controller: GameController): HTMLElement {
     const players = toInteractivePlayers(snapshot);
     interactiveMap.setMovementLocked(snapshot.isMoving);
     interactiveMap.updatePlayers(players);
+    // hover 用权威移动字段定位本玩家所在格（players[0].position 在 serverPath 移动中可能滞后）
+    interactiveMap.setSelfCell(snapshot.currentPlayerPosition);
     // 已持股（有股东）格子边框高亮；未持股/不能持股共用默认边框
     const heldCellIds = new Set<number>();
     for (const [cellId, state] of snapshot.cellRuntimeStates) {
