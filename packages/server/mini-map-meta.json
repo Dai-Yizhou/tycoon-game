@@ -1,0 +1,168 @@
+{
+  "id": "mini-map",
+  "version": "3.0.0",
+  "name": { "zh-CN": "迷你地图 - 全机制验证", "en-US": "Mini Map - Full Mechanics" },
+  "valueFieldDefinitions": [
+    { "id": "money", "name": { "zh-CN": "财产", "en-US": "Money" }, "scope": "player", "min": 0 },
+    { "id": "credit", "name": { "zh-CN": "信用值", "en-US": "Credit" }, "scope": "player", "min": 0 },
+    { "id": "pros", "name": { "zh-CN": "繁荣度", "en-US": "Prosperity" }, "scope": "region", "min": 0, "max": 100 }
+  ],
+  "uct": {
+    "player": ["money", "credit"],
+    "region": ["pros"]
+  },
+  "playerInitial": {
+    "player": { "money": 2000, "credit": 50 }
+  },
+  "startCellId": 0,
+  "regions": [
+    { "id": "northeast", "name": { "zh-CN": "东北区域", "en-US": "Northeast" }, "initial": { "region": { "pros": 5 } } },
+    { "id": "south", "name": { "zh-CN": "南部区域", "en-US": "South" }, "initial": { "region": { "pros": 4 } } },
+    { "id": "midwest", "name": { "zh-CN": "中西部区域", "en-US": "Midwest" }, "initial": { "region": { "pros": 3 } } },
+    { "id": "west", "name": { "zh-CN": "西部区域", "en-US": "West" }, "initial": { "region": { "pros": 2 } } }
+  ],
+  "dayNightCycle": 24,
+  "dayNight": {
+    "day": { "region": { "pros": 1 } },
+    "night": { "region": { "pros": -1 } }
+  },
+  "dice": { "cooldownMs": 3000, "min": 1, "max": 3 },
+  "ranking": { "enabled": true, "topN": 5, "refreshMs": 1000, "score": { "constant": 0, "player": { "money": 1, "credit": 0.5 }, "region": { "pros": 0 } } },
+  "tax": {
+    "baseTax": {
+      "rates": { "player": { "money": 0.02 } },
+      "exemptBelow": { "player": { "money": 1000 } },
+      "taxInterval": 900000
+    },
+    "shareTax": {
+      "rates": { "player": { "money": 0 } },
+      "exemptBelow": 0,
+      "taxInterval": 900000
+    }
+  },
+  "valueModifiers": [
+    {
+      "id": "property-price-pros",
+      "scope": { "cellType": "property", "base": "price" },
+      "calc": {
+        "player": {
+          "money": {
+            "$op": "sub",
+            "args": [
+              { "$ref": "base.player.money" },
+              { "$op": "mul", "args": [{ "$ref": "region.uct.pros" }, 50] }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "property-rent-night-owner",
+      "scope": { "cellType": "property", "base": "rent" },
+      "calc": {
+        "player": {
+          "money": {
+            "$op": "add",
+            "args": [
+              {
+                "$op": "if",
+                "args": [
+                  { "$op": "eq", "args": [{ "$ref": "region.time" }, 1] },
+                  { "$op": "round", "args": [{ "$op": "mul", "args": [{ "$ref": "base.player.money" }, 1.25] }] },
+                  { "$ref": "base.player.money" }
+                ]
+              },
+              { "$op": "mul", "args": [{ "$ref": "curCell.ownerCount" }, 2] }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "property-upgrade-level",
+      "scope": { "cellType": "property", "base": "upgradeCost" },
+      "calc": {
+        "player": {
+          "money": {
+            "$op": "sub",
+            "args": [
+              { "$ref": "base.player.money" },
+              { "$op": "mul", "args": [{ "$ref": "curCell.level" }, 5] }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "transport-fee-fixed",
+      "scope": { "cellType": "transport", "base": "teleportDestinations.cost" },
+      "calc": {
+        "player": {
+          "money": {
+            "$op": "sub",
+            "args": [{ "$ref": "base.player.money" }, 10]
+          }
+        }
+      }
+    },
+    {
+      "id": "investment-price-teamcredit",
+      "scope": { "cellType": "investment", "base": "price" },
+      "calc": {
+        "player": {
+          "money": {
+            "$op": "sub",
+            "args": [{ "$ref": "base.player.money" }, { "$ref": "team.uct.credit" }]
+          }
+        }
+      }
+    },
+    {
+      "id": "investment-trigger-pros",
+      "scope": { "cellType": "investment", "base": "investmentTriggers.delta" },
+      "calc": {
+        "player": {
+          "money": {
+            "$op": "add",
+            "args": [{ "$ref": "base.player.money" }, { "$op": "mul", "args": [{ "$ref": "region.uct.pros" }, 2] }]
+          }
+        },
+        "region": {
+          "pros": { "$op": "add", "args": [{ "$ref": "base.region.pros" }, 1] }
+        }
+      }
+    },
+    {
+      "id": "jail-cooldown-clamp",
+      "scope": { "cellType": "jail", "base": "jailCooldown" },
+      "calc": { "$op": "clamp", "args": [{ "$op": "mul", "args": [{ "$ref": "base" }, 3] }, 8000, 9000] }
+    },
+    {
+      "id": "jail-cost-credit",
+      "scope": { "cellType": "jail", "base": "jailCost" },
+      "calc": {
+        "player": {
+          "credit": { "$op": "sub", "args": [{ "$ref": "base.player.credit" }, 1] }
+        }
+      }
+    },
+    {
+      "id": "monument-repair-teamcost",
+      "scope": { "cellType": "monument", "base": "repairCost" },
+      "calc": {
+        "player": {
+          "money": {
+            "$op": "sub",
+            "args": [
+              { "$ref": "base.player.money" },
+              { "$op": "add", "args": [
+                { "$op": "round", "args": [{ "$op": "div", "args": [{ "$ref": "player.uct.money" }, 100] }] },
+                { "$op": "mul", "args": [{ "$ref": "team.memberCount" }, 5] }
+              ] }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

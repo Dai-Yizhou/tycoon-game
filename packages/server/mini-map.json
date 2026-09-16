@@ -1,0 +1,153 @@
+[
+  {
+    "id": 0,
+    "x": 400,
+    "y": 300,
+    "type": "supply",
+    "name": { "zh-CN": "起点补给站", "en-US": "Starting Supply" },
+    "description": { "zh-CN": "经过时获得补给", "en-US": "Receive supplies when passing" },
+    "destinations": [1],
+    "behaviorPass": "start-supply",
+    "behaviorLand": "",
+    "theme": "northeast",
+    "regionId": "northeast",
+    "timezone": 480,
+    "teleportDestinations": []
+  },
+  {
+    "id": 1,
+    "x": 520,
+    "y": 300,
+    "type": "property",
+    "name": { "zh-CN": "樱花大道", "en-US": "Sakura Avenue" },
+    "description": { "zh-CN": "浪漫商业街", "en-US": "Romantic commercial street" },
+    "destinations": [2],
+    "theme": "northeast",
+    "regionId": "northeast",
+    "timezone": 480,
+    "price": { "player": { "money": -100 } },
+    "maxOwnerCount": 5,
+    "maxLevel": 4,
+    "rent": [
+      { "player": { "money": -8 }, "region": { "pros": 1 } },
+      { "player": { "money": -40 }, "region": { "pros": 2 } },
+      { "player": { "money": -120 }, "region": { "pros": 3 } },
+      { "player": { "money": -280 }, "region": { "pros": 4 } },
+      { "player": { "money": -450 }, "region": { "pros": 5 } }
+    ],
+    "upgradeCost": [
+      { "player": { "money": -50 } },
+      { "player": { "money": -100 } },
+      { "player": { "money": -150 } },
+      { "player": { "money": -200 } }
+    ],
+    "teleportDestinations": []
+  },
+  {
+    "id": 2,
+    "x": 680,
+    "y": 350,
+    "type": "event",
+    "name": { "zh-CN": "事件", "en-US": "Event" },
+    "description": { "zh-CN": "随机事件", "en-US": "Random event" },
+    "destinations": [3],
+    "behaviorLand": "event-generic",
+    "theme": "south",
+    "regionId": "south",
+    "timezone": 330,
+    "teleportDestinations": []
+  },
+  {
+    "id": 3,
+    "x": 650,
+    "y": 480,
+    "type": "transport",
+    "name": { "zh-CN": "交通枢纽", "en-US": "Transit Hub" },
+    "description": { "zh-CN": "快速传送点", "en-US": "Fast travel point" },
+    "destinations": [4],
+    "theme": "midwest",
+    "regionId": "midwest",
+    "timezone": 0,
+    "teleportDestinations": [
+      { "cellid": 6, "cost": { "player": { "money": -10 } } },
+      { "cellid": 1, "cost": { "player": { "money": -20 }, "region": { "pros": -1 } } }
+    ]
+  },
+  {
+    "id": 4,
+    "x": 520,
+    "y": 580,
+    "type": "investment",
+    "name": { "zh-CN": "投资中心", "en-US": "Investment Center" },
+    "description": { "zh-CN": "金融投资项目", "en-US": "Financial investment project" },
+    "destinations": [5],
+    "theme": "midwest",
+    "regionId": "midwest",
+    "timezone": 0,
+    "price": { "player": { "money": -200 } },
+    "maxOwnerCount": 5,
+    "teleportDestinations": [],
+    "investmentTriggers": [
+      { "id": "event-dividend", "on": "any-player-lands-event", "delta": { "player": { "money": 5 }, "region": { "pros": 1 } } },
+      { "id": "shareholder-loss", "on": "shareholder-bankrupt", "delta": { "player": { "money": -3 } } }
+    ]
+  },
+  {
+    "id": 5,
+    "x": 380,
+    "y": 580,
+    "type": "jail",
+    "name": { "zh-CN": "监狱", "en-US": "Jail" },
+    "description": { "zh-CN": "违反规则会被关进来", "en-US": "Players who break rules are sent here" },
+    "destinations": [6],
+    "theme": "west",
+    "regionId": "west",
+    "timezone": -480,
+    "jailCooldown": 8000,
+    "jailCost": { "player": { "credit": -3 } },
+    "teleportDestinations": []
+  },
+  {
+    "id": 6,
+    "x": 280,
+    "y": 460,
+    "type": "monument",
+    "name": { "zh-CN": "纪念碑", "en-US": "Monument" },
+    "description": { "zh-CN": "时代纪念碑", "en-US": "Monument of the era" },
+    "destinations": [7],
+    "theme": "south",
+    "regionId": "south",
+    "timezone": 330,
+    "repairCost": { "player": { "money": -20, "credit": 5 }, "region": { "pros": 10 } },
+    "teleportDestinations": []
+  },
+  {
+    "id": 7,
+    "x": 380,
+    "y": 360,
+    "type": "property",
+    "name": { "zh-CN": "荒原驿站", "en-US": "Wilderness Post" },
+    "description": { "zh-CN": "西部荒原驿站", "en-US": "Western wilderness post" },
+    "destinations": [0],
+    "theme": "west",
+    "regionId": "west",
+    "timezone": -480,
+    "price": { "player": { "money": -150 } },
+    "maxOwnerCount": 5,
+    "maxLevel": 4,
+    "rent": [
+      { "player": { "money": -12 }, "region": { "pros": 1 } },
+      { "player": { "money": -60 }, "region": { "pros": 2 } },
+      { "player": { "money": -180 }, "region": { "pros": 3 } },
+      { "player": { "money": -400 }, "region": { "pros": 4 } },
+      { "player": { "money": -600 }, "region": { "pros": 5 } }
+    ],
+    "upgradeCost": [
+      { "player": { "money": -70 } },
+      { "player": { "money": -110 } },
+      { "player": { "money": -160 } },
+      { "player": { "money": -220 } }
+    ],
+    "teleportDestinations": []
+  }
+]
