@@ -61,6 +61,12 @@ export function parseRefPath(path: string): RefPath | null {
     return null;
   }
   if (head === 'player' || head === 'region' || head === 'team') {
+    // 标量叶：region.time（昼夜）、team.memberCount（成员数）
+    if (rest.length === 1 && (rest[0] === 'time' || rest[0] === 'memberCount')) {
+      if (head === 'region' && rest[0] === 'time') return { head, field: 'time' };
+      if (head === 'team' && rest[0] === 'memberCount') return { head, field: 'memberCount' };
+      return null;
+    }
     // player/region/team.uct.<fieldId>：scope 由 head 决定（team 用 fieldId 查找声明，scope 置空）
     if (rest.length !== 2 || rest[0] !== 'uct' || !rest[1]) return null;
     const scope = head === 'player' ? 'player' : head === 'region' ? 'region' : undefined;
@@ -71,7 +77,6 @@ export function parseRefPath(path: string): RefPath | null {
     if (leaf === 'level' || leaf === 'ownerCount') return { head, field: leaf };
     return null;
   }
-  if (head === 'region' && rest.length === 1 && rest[0] === 'time') return { head: 'region', field: 'time' };
   return null;
 }
 
@@ -81,5 +86,5 @@ export function isCompositeHead(head: string, hasSub: boolean): boolean {
   return head === 'player' || head === 'region' || head === 'team';
 }
 
-/** 标量 ref 叶节点 */
-export const SCALAR_LEAF = new Set(['time', 'level', 'ownerCount']);
+/** 标量 ref 叶节点（不属 valueFieldDefinitions，需在字段声明检查中放行） */
+export const SCALAR_LEAF = new Set(['time', 'level', 'ownerCount', 'memberCount']);

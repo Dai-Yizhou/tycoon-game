@@ -1,7 +1,7 @@
 import type { ValueFieldDefinition } from '../types/map-meta';
 import type { ValidationResult } from '../map/map-parser';
 import type { Calc, CellTypeId, NumNode, ValueModifierRule } from './types';
-import { BASE_FIELDS, OP_ARITY, parseRefPath } from './refs';
+import { BASE_FIELDS, OP_ARITY, parseRefPath, SCALAR_LEAF } from './refs';
 
 /**
  * D8 —— valueModifiers 解析与加载期 lint
@@ -73,6 +73,7 @@ function assertValidNodes(node: Calc, fieldIds: Set<string>): void {
 function assertRef(path: string, fieldIds: Set<string>): void {
   const p = parseRefPath(path);
   if (!p) throw new Error(`非法 ref 路径: ${path}`);
+  if (p.field && SCALAR_LEAF.has(p.field)) return;
   if (p.field && (p.head === 'player' || p.head === 'region' || p.head === 'team')) {
     if (!fieldIds.has(p.field)) throw new Error(`ref ${path} 引用了未声明字段: ${p.field}`);
   }
@@ -102,6 +103,7 @@ export function lintValueModifiers(rules: ValueModifierRule[], definitions: Valu
     for (const path of refs) {
       const p = parseRefPath(path);
       if (!p) { errors.push(`非法 ref 路径: ${path}`); continue; }
+      if (p.field && SCALAR_LEAF.has(p.field)) continue;
       if (p.field && (p.head === 'player' || p.head === 'region' || p.head === 'team')) {
         if (!fieldIds.has(p.field)) errors.push(`ref ${path} 引用了未声明字段: ${p.field}`);
       }
