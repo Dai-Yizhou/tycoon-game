@@ -135,7 +135,9 @@ export class InteractiveMapSurface {
 
       g.append(r, t, n, pr);
 
+      // 客户端宽松防护：仅当悬停格是本玩家当前所在格时才上报 hover，其余格子不显示
       g.addEventListener("mouseenter", () => {
+        if (c.id !== this.selfCellId) return;
         const b = g.getBoundingClientRect();
         this.root.dispatchEvent(
           new CustomEvent("map:hover", {
