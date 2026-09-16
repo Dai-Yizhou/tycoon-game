@@ -17,7 +17,7 @@
 |---|---|
 | 玩家初始 | `money 2000`、`credit 50`（`mapMeta.playerInitial`） |
 | 区域繁荣度 | `northeast 5`、`south 4`、`midwest 3`、`west 2` |
-| 格子循环 | `0 supply → 1 property → 2 event → 3 transport → 4 investment → 5 jail → 6 monument → 7 property → 0` |
+| 格子循环 | 主线环 `0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 0`；格 `0` 为岔路口，`destinations: [1, 7]`（前行走主线，右转经 `7` 抄西线） |
 | 昼夜 | `day`：区域 `pros +1`；`night`：区域 `pros -1`（`region.time=0` 白天 / `=1` 夜晚） |
 
 `valueFieldDefinitions`：`money`（player）、`credit`（player）、`pros`（region，max 100）。
@@ -30,7 +30,7 @@
 
 | 格 | 类型 | 静态 base | 生效规则（`scope.cellType.base`） | 效果说明 |
 |---|---|---|---|---|
-| 0 | supply | — | behavior `start-supply` | 经过即触发补给，`money +200` |
+| 0 | supply | — | behavior `start-supply` | **岔路口**：`destinations [1, 7]`（前行走主线、右转经西线驿站抄近道）。经过即触发补给，`money +200` |
 | 1 | property | price `money -100`；rent[0] `money -8, pros +1`；upgradeCost[0] `money -50` | `property.price`、`property.rent`、`property.upgradeCost` | 价格随**所在区域繁荣度**上浮（越繁荣越贵）；租金**昼夜联动 + 股东人数加成**；升级费随**等级**递增 |
 | 2 | event | — | behavior `event-generic` | 停驻突发事件，`money +20` |
 | 3 | transport | teleportDestinations[0] `money -10`；[1] `money -20, pros -1` | `transport.teleportDestinations.cost` | 固定传送费，额外再扣 `10`；目的地 `1` 额外削减**区域繁荣度** |
@@ -114,3 +114,15 @@
 - `§3 读写分离`：求值覆盖合并，未列字段保持 base（R4b 的 `pros -1`、R2 的 `pros +1`、M9 的 `credit +5`/`pros +10` 均被保留，断言成立）。
 - `§8 结算时机`：server 在购买/付租/升级/传送/进监/修复的消费点 resolve 一次并固定，`server.valueChanged` 载荷即该 fixed 值。
 - `§2 边界`：behavior 仅存在于无 base 的 `supply/event`，与 modifier 不相交，无生效顺序冲突。
+
+---
+
+## 7. 换图回归验证（岔路 + hover 定位）
+
+换图前该机制正常、换图后失效，根因有二，均已修复并补测试。
+
+**岔路（`mini-map-fork.test.ts`，server 端）**：原先 `mini-map` 为单环，任一格子 `destinations` 只有单一出口，`continueMovement` 的 `unvisited.length > 1` 永不满足 → `server.askPath` 永不发出，客户端无岔路选择。修复：格 `0` 改为 `destinations: [1, 7]`。测试锁定：进入格 `0` 且剩余步数 > 0 时暂停、发出 `server.askPath`（options=1/7）、玩家位置不变；`handleChoosePath` 选中 `7` 后续走且动画路径以岔路口为起点（`path[0]=0`）；拒绝非 `destinations` 目标（如 `3`）。
+
+**hover 定位（`interactive-map-hover.test.ts`，client 端）**：悬浮防护（`mouseenter` 仅本玩家当前格可查看）原先用 `players[0].position.cellId` 定位。但 serverPath 动画只更新 `currentPlayerPosition`（权威），`players[0].position` 在动画期间滞后，导致 `selfCellId` 停格初始格、所有格子悬停失效（`base → final` 展示随之不可见）。修复：`InteractiveMapSurface` 新增 `setSelfCell(cellId)`，由 `GamePage` 订阅回调用权威字段 `currentPlayerPosition` 覆盖，且置于 `render()/updatePlayers()` 之后兜底。测试锁定：`render` 后自定位起点格，`setSelfCell` 后仅当前格通过防护；`render` 重置 `selfCellId` 后需再以 `setSelfCell` 兜底。客户端结算展示与悬浮 `base → final` 的正确性由第 5 节双端一致测试保证（换图后仍显示，说明此前"无变换展示"实为 hover 不可达的下游现象）。
+
+> 说明：换图初期出现的"大量按钮异常禁用"，经核对为共享服务器多玩家环境中的 `currentPlayer` 定位噪声；单玩家路径下 `server.gameState`（`SocketManager`）均已带 `player.values`（含 `money/credit`），`canApplyUct` 依 `values` 判定启停，无代码缺陷。
