@@ -65,7 +65,11 @@ export function onPlayerArrived(runtime: GameRuntime): void {
   const snapshot = runtime.store.getSnapshot();
   const cell = runtime.mapIndex.getById(snapshot.currentPlayerPosition);
   if (!cell) return;
-  setRuntimeSnapshot(runtime, { playerDisplayX: cell.x, playerDisplayY: cell.y, cameraTargetX: cell.x, cameraTargetY: cell.y });
+  // 移动到达即视为一次新回合：复位本回合已操作标记，让新格动作可用。
+  // 此前复位依赖服务端无 path 的 position 同步，而它在动画期间会被 isServerAnimating
+  // 拦截丢弃（局域网 RTT 近 0、几乎总比动画先到），导致 actionUsedThisTurn 误保持 true、
+  // 所有动作按钮被禁、仅掷骰正常。此处以移动完成为准可靠复位。
+  setRuntimeSnapshot(runtime, { playerDisplayX: cell.x, playerDisplayY: cell.y, cameraTargetX: cell.x, cameraTargetY: cell.y, actionUsedThisTurn: false });
   // 停靠格、所在区域/繁荣度与可用动作均已由游戏页面（格子高亮 + act-bar + 区域 tag）直观呈现，不再向聊天区推送抵达提示
   (runtime.onHudRefresh ?? noopHudRefresh)();
 }

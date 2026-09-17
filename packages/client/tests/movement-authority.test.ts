@@ -1,4 +1,5 @@
 import { animateMoveTo, startNextStep, startServerPathAnimation, updateMovement } from '../src/game/systems/MovementSystem.js';
+import { onPlayerArrived } from '../src/game/systems/GameLogic.js';
 import { GameStore } from '../src/state/GameStore.js';
 
 describe('MovementSystem authority', () => {
@@ -78,5 +79,18 @@ describe('MovementSystem authority', () => {
 
     expect(store.getSnapshot().isMoving).toBe(false);
     expect(store.getSnapshot().serverPath).toEqual([]);
+  });
+
+  it('移动到达（onPlayerArrived）时复位 actionUsedThisTurn，让新格动作可用', () => {
+    const store = new GameStore();
+    store.applySnapshot({ sequence: store.nextSequence(), currentPlayerPosition: 2, actionUsedThisTurn: true });
+    const runtime = {
+      store,
+      mapIndex: { getById: () => ({ id: 2, x: 100, y: 60 }) },
+    } as never;
+
+    onPlayerArrived(runtime);
+
+    expect(store.getSnapshot().actionUsedThisTurn).toBe(false);
   });
 });
