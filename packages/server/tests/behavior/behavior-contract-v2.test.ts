@@ -147,4 +147,21 @@ describe('BehaviorEngine contract v2', () => {
     expect(world.getPlayer('p1')?.values.money.current).toBe(100);
     expect(world.getPlayer('p1')?.values.credit.current).toBe(0);
   });
+
+  it('emits server.behaviorMessage with the affected players when the behavior carries a msg', () => {
+    const world = new GameWorld();
+    world.loadMap([cell()], meta());
+    world.addPlayer(player());
+    const emit = jest.fn();
+    const engine = new BehaviorEngine({ emit } as never, world, { configDir: path.resolve(__dirname, '../../behaviors') });
+
+    engine.executeBehavior('contract-test', world.getPlayer('p1')!);
+
+    const call = emit.mock.calls.find((args) => args[0] === 'server.behaviorMessage');
+    expect(call).toBeDefined();
+    const payload = call![1] as { behaviorId: string; msg: Record<string, string>; playerIds: string[]; timestamp: number };
+    expect(payload.behaviorId).toBe('contract-test');
+    expect(payload.msg['zh-CN']).toBeTruthy();
+    expect(payload.playerIds).toContain('p1');
+  });
 });

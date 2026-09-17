@@ -39,6 +39,7 @@ const SOCKET_EVENTS = [
   'server.chat', 'server.leaderboardUpdated', 'connect', 'disconnect',
   'server.playerJoined', 'server.playerLeft', 'server.playerMoved', 'server.askPath',
   'server.valueChanged', 'server.error', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
+  'server.behaviorMessage',
   'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft',
   'server.teamUpdated', 'server.teamDisbanded', 'server.regionValueChanged', 'server.gameState',
   'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.achievementUnlocked', 'server.playerBankrupt', 'server.playerRestarted',
@@ -166,6 +167,13 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     if (message?.content) {
       store.appendChatMessage(message);
     }
+  });
+
+  // 监听行为消息：仅当当前玩家是目标玩家时推送到其聊天区（系统频道）
+  socket.on('server.behaviorMessage', (payload) => {
+    const selfId = store.getSnapshot().currentPlayer?.id;
+    if (!selfId || !payload.playerIds.includes(selfId)) return;
+    store.appendChatMessage({ text: localizedText(payload.msg, payload.behaviorId), channel: 'system', timestamp: payload.timestamp ?? Date.now() });
   });
 
   // 监听其他玩家事件（payload 为服务端权威 Player，字段由 valueFieldDefinitions 动态定义）

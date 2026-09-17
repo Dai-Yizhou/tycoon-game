@@ -150,6 +150,12 @@ export class BehaviorEngine {
       throw error;
     }
     for (const change of valueChanges) this.io.emit('server.valueChanged', { playerId: change.playerId, fieldId: change.fieldId, current: change.newValue, delta: change.delta });
+    // behavior 携带的 msg：发送到受影响/目标玩家的聊天区（双语文案由客户端按本机语言本地化）
+    if (effect.msg) {
+      const playerIds = [...affectedPlayerIds];
+      if (playerIds.length === 0) playerIds.push(player.id);
+      this.io.emit('server.behaviorMessage', { behaviorId, msg: effect.msg, playerIds, timestamp: Date.now() });
+    }
     return { behaviorId, effect, event: effect, target: resultTarget, affectedPlayerIds: [...affectedPlayerIds], resolvedTargetIds: [...affectedPlayerIds], valueChanges };
   }
 

@@ -93,6 +93,47 @@ describe('server.investmentEventTriggered 投资事件', () => {
   });
 });
 
+describe('server.behaviorMessage 行为消息', () => {
+  function makeSocket(): { handlers: Map<string, (args: never) => void>; socket: never } {
+    const handlers = new Map<string, (args: never) => void>();
+    return {
+      handlers,
+      socket: {
+        on: jest.fn((event: string, handler: (args: never) => void) => { handlers.set(event, handler); }),
+        onAny: jest.fn(),
+        offAny: jest.fn(),
+        off: jest.fn(),
+      } as never,
+    };
+  }
+
+  const msg = { 'zh-CN': '触发了行为', 'en-US': 'Behavior triggered' };
+
+  test('当前玩家是目标玩家时，msg 作为系统消息追加到聊天区', () => {
+    const store = new GameStore();
+    const { handlers, socket } = makeSocket();
+    store.applyEvent({ sequence: store.nextSequence(), type: 'player', player: { id: 'owner-a', username: '股东', position: { cellId: 1 }, values: {}, status: 'normal', createdAt: 1, lastActiveAt: 1 } as never });
+    registerSocketHandlers(socket, { store });
+
+    handlers.get('server.behaviorMessage')!({ behaviorId: 'b1', msg, playerIds: ['owner-a'], timestamp: 111 } as never);
+
+    const history = store.getSnapshot().chatHistory;
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({ channel: 'system', text: msg['zh-CN'] });
+  });
+
+  test('当前玩家不是目标玩家时，不向聊天区追加消息', () => {
+    const store = new GameStore();
+    const { handlers, socket } = makeSocket();
+    store.applyEvent({ sequence: store.nextSequence(), type: 'player', player: { id: 'visitor', username: '旁观者', position: { cellId: 1 }, values: {}, status: 'normal', createdAt: 1, lastActiveAt: 1 } as never });
+    registerSocketHandlers(socket, { store });
+
+    handlers.get('server.behaviorMessage')!({ behaviorId: 'b1', msg, playerIds: ['owner-a'], timestamp: 111 } as never);
+
+    expect(store.getSnapshot().chatHistory).toHaveLength(0);
+  });
+});
+
 describe('server.playerMoved 移动信号竞态', () => {
   function makeSocket(): { handlers: Map<string, (args: never) => void>; socket: never } {
     const handlers = new Map<string, (args: never) => void>();

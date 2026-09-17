@@ -297,6 +297,17 @@ export interface ServerToClientEvents {
   'server.chat': (payload: { message: ChatMessage }) => void;
 
   /**
+   * 行为触发聊天消息：behavior 的 msg 为双语文案，客户端按本机语言本地化后
+   * 在目标玩家（playerIds 中的玩家）的聊天区展示为系统消息。
+   */
+  'server.behaviorMessage': (payload: {
+    behaviorId: string;
+    msg: import('./cell.js').LocalizedText | string;
+    playerIds: string[];
+    timestamp?: number;
+  }) => void;
+
+  /**
    * 队伍状态更新广播（服务端权威）
    *
    * members 携带每个成员的实时显示数据，客户端据此完整重建本地队伍视图。
