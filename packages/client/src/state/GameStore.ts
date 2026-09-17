@@ -37,6 +37,7 @@ export interface ClientGameSnapshot {
   isBankrupt: boolean;
   isInJail: boolean;
   jailEndTime: number;
+  jailDurationMs: number;
   canRoll: boolean;
   diceAnimating: boolean;
   actionUsedThisTurn: boolean;
@@ -85,7 +86,7 @@ export interface ClientGameSnapshot {
 export type ClientGameEvent =
   | { sequence: number; type: 'player'; player: Player }
   | { sequence: number; type: 'players'; players: OtherPlayerInfo[] }
-  | { sequence: number; type: 'jail'; isInJail: boolean; jailEndTime: number }
+  | { sequence: number; type: 'jail'; isInJail: boolean; jailEndTime: number; jailDurationMs: number }
   | { sequence: number; type: 'team'; members: TeamMember[] }
   | { sequence: number; type: 'value'; playerId: string; fieldId: string; current: number }
   | { sequence: number; type: 'status'; playerId: string; status: Player['status'] }
@@ -293,7 +294,7 @@ export class GameStore {
     } else if (event.type === 'players') {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, otherPlayers: event.players };
     } else if (event.type === 'jail') {
-      this.snapshot = { ...this.snapshot, sequence: event.sequence, isInJail: event.isInJail, jailEndTime: event.jailEndTime, canRoll: true };
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, isInJail: event.isInJail, jailEndTime: event.jailEndTime, jailDurationMs: event.jailDurationMs, canRoll: true };
     } else if (event.type === 'team') {
       this.snapshot = { ...this.snapshot, sequence: event.sequence, teamMembers: event.members };
     } else if (event.type === 'property') {
@@ -344,6 +345,7 @@ export class GameStore {
       isBankrupt: false,
       isInJail: false,
       jailEndTime: 0,
+      jailDurationMs: 0,
       canRoll: true,
       diceAnimating: false,
       actionUsedThisTurn: false,

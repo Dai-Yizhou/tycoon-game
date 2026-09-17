@@ -35,20 +35,24 @@ export function handleRollDice(runtime: GameRuntime): void {
       return;
     }
     setRuntimeSnapshot(runtime, { diceValue: result.data.dice, diceAnimating: true, diceAnimStart: performance.now(), rollCooldownEnd: Math.max(Date.now(), result.data.cooldownEndsAt), rollCooldownMs: result.data.cooldownMs });
-    startRollCooldownTimer(runtime);
+    ensureCooldownRevealTicker(runtime);
   });
 }
 
-export function startRollCooldownTimer(runtime: GameRuntime): void {
+/**
+ * 统一冷却揭示 ticker：掷骰冷却（rollCooldown）与监狱冷却（jail）都驱动掷骰按钮的
+ * --cooldown 揭示动画。两者不同时生效，按 store 中当前活跃者持续刷新，直至全部结束。
+ */
+export function ensureCooldownRevealTicker(runtime: GameRuntime): void {
   if (runtime.cooldownTimer) clearInterval(runtime.cooldownTimer);
-  // 冷却期间仅刷新掷骰按钮（--cooldown 双层面揭示），不触碰 act-btn，避免闪烁
   const update = () => {
     const snapshot = runtime.store.getSnapshot();
-    const remaining = snapshot.rollCooldownEnd - Date.now();
-    if (remaining <= 0) {
+    const rollActive = snapshot.rollCooldownEnd > Date.now();
+    const jailActive = snapshot.isInJail && snapshot.jailEndTime > Date.now();
+    if (!rollActive && !jailActive) {
       if (runtime.cooldownTimer) clearInterval(runtime.cooldownTimer);
       runtime.cooldownTimer = null;
-      setRuntimeSnapshot(runtime, { canRoll: true, diceAnimating: false });
+      if (!snapshot.canRoll || snapshot.diceAnimating) setRuntimeSnapshot(runtime, { canRoll: true, diceAnimating: false });
       return;
     }
     (runtime.onRollCooldownTick ?? noopHudRefresh)();

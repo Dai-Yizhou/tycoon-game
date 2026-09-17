@@ -510,9 +510,12 @@ export class GameHudShell {
     rollBtn.disabled = !canRoll;
 
     // 冷却进度 0→1：顶层 fill 用 clip-path 从左侧逐步揭示可用态；其余禁用场景按 0 露出底层灰禁外观。
+    // 掷骰冷却（rollCooldown）与监狱冷却（jail）都能揭示；两者不同时生效，按当前活跃者计算。
     // 动效关闭时不再揭示填充动画（仅保留禁用功能态），避免对关闭动效的用户播放冷却提示动画
-    const progress = effectsOn && cooldownActive
-      ? Math.min(1, Math.max(0, 1 - Math.max(cooldown.rollCooldownEnd - Date.now(), 0) / Math.max(cooldown.rollCooldownMs, 1)))
+    const activeEnd = cooldownActive && !jailCooldownActive ? cooldown.rollCooldownEnd : (jailCooldownActive ? jail.jailEndTime : 0);
+    const activeMs = cooldownActive && !jailCooldownActive ? cooldown.rollCooldownMs : (jailCooldownActive ? jail.jailDurationMs : 0);
+    const progress = effectsOn && activeEnd > Date.now() && activeMs > 0
+      ? Math.min(1, Math.max(0, 1 - Math.max(activeEnd - Date.now(), 0) / activeMs))
       : 0;
     rollBtn.style.setProperty("--cooldown", String(progress));
 

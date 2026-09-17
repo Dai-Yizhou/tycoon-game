@@ -91,10 +91,29 @@ describe("GameHudShell", () => {
     const shell = new GameHudShell(vm, new NoOpEffectHooks());
     const button = rootButton(shell);
 
-    store.applyEvent({ sequence: 1, type: 'jail', isInJail: true, jailEndTime: Date.now() + 10000 });
+    store.applyEvent({ sequence: 1, type: 'jail', isInJail: true, jailEndTime: Date.now() + 10000, jailDurationMs: 10000 });
     store.updateCooldown({ rollCooldownEnd: Date.now() - 1, rollCooldownMs: 5000 });
 
     expect(button.disabled).toBe(true);
+    shell.destroy();
+  });
+
+  it('监狱冷却期间的掷骰按钮按 jailDuration 揭示（--cooldown 随时长推进）', () => {
+    const store = new GameStore();
+    const vm = new GameViewModel(store);
+    const shell = new GameHudShell(vm, new NoOpEffectHooks());
+    const button = rootButton(shell);
+    // --cooldown 揭示变量挂在掷骰按钮上，CSS 由 .dice-btn__fill 通过 var 引用
+    // 刚开始：duration 10000，已过极少 → progress 接近 0
+    const start = Date.now();
+    store.applyEvent({ sequence: 1, type: 'jail', isInJail: true, jailEndTime: start + 10000, jailDurationMs: 10000 });
+    expect(button.disabled).toBe(true);
+    const early = Number(button.style.getPropertyValue('--cooldown'));
+    // 接近结束：剩余 1000/10000 → progress 接近 0.9，应明显大于起步阶段
+    store.applyEvent({ sequence: 2, type: 'jail', isInJail: true, jailEndTime: start + 1000, jailDurationMs: 10000 });
+    const late = Number(button.style.getPropertyValue('--cooldown'));
+    expect(late).toBeGreaterThan(0.8);
+    expect(late).toBeGreaterThan(early);
     shell.destroy();
   });
 

@@ -36,7 +36,7 @@ import {
 import {
   handleRollDice,
   handleBuyProperty, handleUpgradeProperty, handleBuyInvestment, handleCoInvest,
-  handleTransport, handleUseTransport, handleRestoreMonument, onPlayerArrived, type GameRuntime,
+  handleTransport, handleUseTransport, handleRestoreMonument, onPlayerArrived, ensureCooldownRevealTicker, type GameRuntime,
 } from '../game/systems/GameLogic.js';
 
 import {
@@ -288,6 +288,7 @@ export function createGamePage(controller: GameController): HTMLElement {
       onPathChoiceOptions: (options) => gameStore?.setPathChoice(options),
       onPathChoiceCleared: () => gameStore?.clearPathChoice(),
       onHudRefresh: () => gameHudShell?.update(),
+      onJailCooldownStart: () => invokeGameAction((runtime) => ensureCooldownRevealTicker(runtime)),
       movementEffects,
       onEvent: () => {
         gameHudShell?.update();

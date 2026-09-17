@@ -29,6 +29,8 @@ export interface SocketHandlerOptions {
   onPathChoiceOptions?: (options: Array<{ cellId: number; label: unknown }>) => void;
   onPathChoiceCleared?: () => void;
   onHudRefresh?: HudRefresh;
+  /** 进入监狱时触发：用于启动监狱冷却揭示动画 ticker */
+  onJailCooldownStart?: () => void;
   movementEffects?: MovementEffectHooks;
 }
 
@@ -264,7 +266,8 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 
   socket.on('server.playerJailed', (payload: { playerId: string; durationMs: number; expiresAt?: number }) => {
     const snapshot = store.getSnapshot();
-    if (snapshot.currentPlayer?.id === payload.playerId) store.applyEvent({ sequence: store.nextSequence(), type: 'jail', isInJail: true, jailEndTime: payload.expiresAt ?? Date.now() + payload.durationMs });
+    if (snapshot.currentPlayer?.id === payload.playerId) store.applyEvent({ sequence: store.nextSequence(), type: 'jail', isInJail: true, jailEndTime: payload.expiresAt ?? Date.now() + payload.durationMs, jailDurationMs: payload.durationMs });
+    options.onJailCooldownStart?.();
     // 进出监狱由掷骰按钮的禁用/可用状态直观体现，不再推送聊天提示
     const isCurrentPlayer = snapshot.currentPlayer?.id === payload.playerId;
     if (isCurrentPlayer) {
@@ -279,7 +282,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
 
   socket.on('server.playerReleased', (payload: { playerId: string }) => {
     const snapshot = store.getSnapshot();
-    if (snapshot.currentPlayer?.id === payload.playerId) store.applyEvent({ sequence: store.nextSequence(), type: 'jail', isInJail: false, jailEndTime: 0 });
+    if (snapshot.currentPlayer?.id === payload.playerId) store.applyEvent({ sequence: store.nextSequence(), type: 'jail', isInJail: false, jailEndTime: 0, jailDurationMs: 0 });
     // 服务端权威：出狱状态由服务端驱动
     const isCurrentPlayer = snapshot.currentPlayer?.id === payload.playerId;
     if (isCurrentPlayer) {

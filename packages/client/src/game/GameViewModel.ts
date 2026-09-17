@@ -75,6 +75,7 @@ export interface CooldownSlice {
 export interface JailSlice {
   isInJail: boolean;
   jailEndTime: number;
+  jailDurationMs: number;
 }
 
 /** 昼夜与繁荣度状态 */
@@ -275,7 +276,7 @@ export class GameViewModel {
   getCooldown(): CooldownSlice { const snapshot = this.projectedSnapshot(); return { rollCooldownEnd: snapshot.rollCooldownEnd, rollCooldownMs: snapshot.rollCooldownMs }; }
 
   // ===== Jail =====
-  getJail(): JailSlice { const snapshot = this.projectedSnapshot(); return { isInJail: snapshot.isInJail, jailEndTime: snapshot.jailEndTime }; }
+  getJail(): JailSlice { const snapshot = this.projectedSnapshot(); return { isInJail: snapshot.isInJail, jailEndTime: snapshot.jailEndTime, jailDurationMs: snapshot.jailDurationMs }; }
 
   // ===== Day/Night =====
   getDayNight(): DayNightSlice {
