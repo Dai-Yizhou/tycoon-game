@@ -540,6 +540,9 @@ export class SocketManager {
             };
           }) ?? [],
           serverTime: now,
+          // 各区域当前权威 UCT 值（登录即下发），客户端据此初始化 regionValues，
+          // 避免用静态配置 initial（否则 HUD/购买预览读到过期波纹前快照）
+          regionValues: this.buildRegionValuesSnapshot(),
           leaderboard: this.leaderboardManager?.getCurrentSnapshot(player.id, now) ?? undefined,
         });
 
@@ -553,6 +556,20 @@ export class SocketManager {
     // getTeamState）由 TeamHandler 统一处理（服务端权威），
     // 注册见 HandlerRegistry.registerForSocket。此处不再保留旧实现，避免
     // 双重注册导致的状态不一致。
+  }
+
+  /** 各区域当前权威 region 作用域 UCT 值快照（登录 gameState 下发用） */
+  private buildRegionValuesSnapshot(): Record<string, Record<string, number>> {
+    const meta = this.world.getMapMeta();
+    if (!meta) return {};
+    const regionFieldIds = meta.valueFieldDefinitions.filter((f) => f.scope === 'region').map((f) => f.id);
+    const out: Record<string, Record<string, number>> = {};
+    for (const region of meta.regions) {
+      const row: Record<string, number> = {};
+      for (const fieldId of regionFieldIds) row[fieldId] = this.world.getRegionValue(region.id, fieldId);
+      if (Object.keys(row).length > 0) out[region.id] = row;
+    }
+    return out;
   }
 
   setLeaderboardManager(manager: LeaderboardManager | undefined): void {

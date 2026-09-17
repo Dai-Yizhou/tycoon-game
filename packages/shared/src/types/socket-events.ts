@@ -211,6 +211,8 @@ export interface ServerToClientEvents {
     visibleCells?: Cell[];
     /** 服务端时间 */
     serverTime: number;
+    /** 各区域当前权威 UCT 值（regionId → { fieldId: 值 }），客户端据此初始化 regionValues，避免只用静态配置 initial */
+    regionValues?: Record<string, Record<string, number>>;
     /** 当前排行榜快照 */
     leaderboard?: LeaderboardSnapshot;
     /** 是否启用排行榜 */

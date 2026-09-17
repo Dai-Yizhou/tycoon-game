@@ -127,6 +127,13 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     if (payload.leaderboard) store.setLeaderboard(payload.leaderboard);
     if (payload.achievements) store.setAchievements(payload.achievements);
     if (payload.visibleCells?.length) store.setCells(payload.visibleCells);
+    // 登录即以服务端权威 region UCT 覆盖 regionValues，替换静态配置 initial 的过期快照
+    if (payload.regionValues && Object.keys(payload.regionValues).length > 0) {
+      store.applySnapshot({
+        sequence: store.nextSequence(),
+        regionValues: new Map(Object.entries(payload.regionValues).map(([id, values]) => [id, { ...values }])),
+      });
+    }
     store.applySnapshot({ sequence: store.nextSequence(), player: payload.player, teamMembers, ownedProperties: payload.ownedProperties, ownedInvestments: payload.ownedInvestments });
   });
 
