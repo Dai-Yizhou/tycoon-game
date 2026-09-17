@@ -52,6 +52,8 @@ describe('InteractiveMapSurface 格子渲染', () => {
     surface.setPlayerDisplayPosition('p1', 55, 65);
     const arrivedPlayer = { ...player, position: { cellId: 2 } };
     surface.updatePlayers([arrivedPlayer]);
+    // 真实订阅顺序中 setSelfCell 以权威 currentPlayerPosition 维护落点；到达格 2 即传入 2
+    surface.setSelfCell(2);
     surface.setMovementLocked(false);
 
     expect(root.querySelector('[data-player-id="p1"]')?.getAttribute('transform')).toBe('translate(100 120)');

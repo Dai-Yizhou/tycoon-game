@@ -62,7 +62,9 @@ export class InteractiveMapSurface {
     this.map = map;
     this.players = players;
     this.valueFieldDefinitions = valueFieldDefinitions;
-    this.selfCellId = players[0]?.position.cellId ?? null;
+    // selfCellId 由 setSelfCell 以 currentPlayerPosition（权威移动字段）维护；
+    // 这里仅在尚未初始化时回填一次，避免 render 用滞后的 position.cellId 覆盖权威值
+    if (this.selfCellId === null) this.selfCellId = players[0]?.position.cellId ?? null;
     const ns = "http://www.w3.org/2000/svg";
     const cells = [...map];
     if (!cells.length) return;
@@ -170,7 +172,9 @@ export class InteractiveMapSurface {
     this.players
       .filter((player): player is Player => Boolean(player))
       .forEach((player, i) => {
-        const cell = byId.get(player.position.cellId);
+        // 本玩家落点以权威 selfCellId 为准（serverPath 动画期间 position.cellId 可能滞后）
+        const restId = i === 0 ? (this.selfCellId ?? player.position.cellId) : player.position.cellId;
+        const cell = byId.get(restId);
         if (!cell) return;
         const g = document.createElementNS(ns, "g");
         g.classList.add("map-player");
@@ -230,16 +234,14 @@ export class InteractiveMapSurface {
         element.setAttribute('transform', `translate(${cell.x + ((index + 1) % 3 - 1) * 18} ${cell.y - 42 - Math.floor((index + 1) / 3) * 8})`);
       }
     });
-    // 本玩家：仅在格子发生非动画跳变（如瞬时传送）时同步到格心。
-    // 行走动画由 setMovementLocked/R AF 驱动，此处锁定态提前返回、不触碰其节点；
-    // 无跳变时保持现状，避免干扰任何已有位置。
+    // 本玩家：无论 position.cellId 是否滞后，都回落到权威 selfCellId 对应格。
+    // 行走动画由 setMovementLocked/RAF 驱动，此处锁定态提前返回、不触碰其节点；
+    // selfCellId 由 setSelfCell(currentPlayerPosition) 权威维护，绝不以滞后的 position.cellId 覆写。
     const self = players[0];
-    if (self && self.position.cellId !== this.selfCellId) {
-      const cell = this.map.find((item) => item.id === self.position.cellId);
-      if (cell) {
-        this.selfCellId = self.position.cellId;
-        this.setPlayerDisplayPosition(self.id, cell.x, cell.y);
-      }
+    if (self) {
+      if (this.selfCellId === null) this.selfCellId = self.position.cellId;
+      const cell = this.map.find((item) => item.id === this.selfCellId);
+      if (cell) this.setPlayerDisplayPosition(self.id, cell.x, cell.y);
     }
   }
 
