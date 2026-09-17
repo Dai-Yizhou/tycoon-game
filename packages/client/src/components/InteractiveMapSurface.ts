@@ -1,5 +1,5 @@
-import { formatUct, type MapData, type Player, type ValueFieldDefinition } from "@game/shared";
-import { getLanguage, localizedText } from "../game/i18n.js";
+import { type MapData, type Player, type ValueFieldDefinition } from "@game/shared";
+import { localizedText } from "../game/i18n.js";
 
 export class InteractiveMapSurface {
   private root = document.createElement("div");
@@ -113,7 +113,6 @@ export class InteractiveMapSurface {
       const g = document.createElementNS(ns, "g");
       const type = String(c.type ?? c.extra?.type ?? "property");
       const name = localizedText(c.name ?? c.extra?.name, `格子 ${c.id}`);
-      const price = c.price ? formatUct(c.price, this.valueFieldDefinitions, getLanguage()) : "";
       g.classList.add("map-node", `map-node--${type}`);
       if (this.heldCellIds.has(c.id)) g.classList.add("map-node--held");
       g.dataset.cellId = String(c.id);
@@ -139,13 +138,7 @@ export class InteractiveMapSurface {
       n.classList.add("map-node__name");
       n.textContent = name;
 
-      const pr = document.createElementNS(ns, "text");
-      pr.setAttribute("x", "-45");
-      pr.setAttribute("y", "29");
-      pr.classList.add("map-node__price");
-      pr.textContent = price || "—";
-
-      g.append(r, t, n, pr);
+      g.append(r, t, n);
 
       // 客户端宽松防护：仅当悬停格是本玩家当前所在格时才上报 hover，其余格子不显示
       g.addEventListener("mouseenter", () => {

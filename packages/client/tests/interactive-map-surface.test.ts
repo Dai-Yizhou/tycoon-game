@@ -22,6 +22,27 @@ describe('InteractiveMapSurface 格子渲染', () => {
     expect(root.querySelector('text.map-node__name')!.textContent).toBe('起点');
   });
 
+  it('格子节点仅显示类型与名称，不渲染价格等额外信息', () => {
+    const surface = new InteractiveMapSurface();
+    const root = surface.getElement();
+    surface.render([
+      { id: 1, x: 10, y: 20, destinations: [], extra: { type: 'property', name: '地产', price: { player: { money: -100 } } } },
+      { id: 2, x: 100, y: 20, destinations: [], extra: { type: 'investment', name: '投资', price: { player: { money: -200 } } } },
+    ]);
+    for (const id of [1, 2]) {
+      const node = root.querySelector(`[data-cell-id="${id}"]`);
+      expect(node).not.toBeNull();
+      const texts = node!.querySelectorAll('text');
+      // 仅 type 与 name 两个文本，不再包含价格等其他信息
+      expect(texts.length).toBe(2);
+      expect(texts[0].classList.contains('map-node__type')).toBe(true);
+      expect(texts[1].classList.contains('map-node__name')).toBe(true);
+    }
+    expect(root.querySelector('[data-cell-id="1"] .map-node__type')!.textContent).toBe('PROPERTY');
+    expect(root.querySelector('[data-cell-id="2"] .map-node__type')!.textContent).toBe('INVESTMENT');
+    expect(root.querySelector('[data-cell-id="1"] .map-node__name')!.textContent).toBe('地产');
+  });
+
   it('移动显示坐标不会被权威位置更新覆盖', () => {
     const surface = new InteractiveMapSurface();
     const root = surface.getElement();
