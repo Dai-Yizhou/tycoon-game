@@ -97,13 +97,15 @@ export interface CellHoverRuntime {
 
 /**
  * D8 展信用求值上下文（同构于服务端 WorldView 的读数面）。
- * - 团队字段宽松实现：`teamValue` 置 undefined（引用 team.uct 在客户端按 0 显示），不阻塞展示。
+ * - 团队字段宽松实现：客户端仅持本玩家视角，`teamValue` 回退为当前玩家自身字段值
+ *   （真实多人团队无法在本端合成均值；无团队时 teamMemberCount=1）。
  * - 仅用于"当前格"展示，不做观看方/结算方归属歧义防护（沿用既有决策）。
  */
 export interface CellHoverResolutionCtx {
   valueModifiers: ValueModifierRule[];
   playerUct: Uct;
   teamMemberCount: number;
+  teamValue?: (fieldId: string) => number | undefined;
   regionUct: Uct;
   regionTime: number;
 }
@@ -125,7 +127,7 @@ function resolveModifierText(
     base,
     playerUct: ctx.playerUct,
     teamMemberCount: ctx.teamMemberCount,
-    teamValue: undefined,
+    teamValue: ctx.teamValue,
     regionUct: ctx.regionUct,
     regionTime: ctx.regionTime,
     curCellLevel: level,

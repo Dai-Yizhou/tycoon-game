@@ -103,7 +103,7 @@
 | monument | 单人 `-20 → -45`（投影 1955）；团队 `-20 → -50`（投影 1950） |
 | behavior | start-supply（投影 2200）；event-generic（投影 2020） |
 
-> 客户端悬浮仅显示 `base → final`（不暴露计算式），与 cell-hover 边界规格一致；`investment.price` 依赖 `team.uct.credit`，客户端悬浮 ctx 不提供 teamValue，故该字段以 shared `resolveField` + server 上下文结算验证一致，不纳入悬浮文本断言。
+> 客户端悬浮仅显示 `base → final`（不暴露计算式），与 cell-hover 边界规格一致；`investment.price`（依赖 `team.uct.credit`）的悬浮 ctx 已提供 `teamValue`（单人宽松回退为当前玩家自身字段值），经 `resolveCellHoverModel` 断言悬浮价格行 `-200 → -250` 与 server 结算一致（见 mini-map-dual-end.test.ts「investment.price 团队信用」用例）。
 
 ---
 

@@ -328,7 +328,9 @@ export class GameViewModel {
   /**
    * 为当前格构建 D8 展示求值上下文（宽松实现，用于 base → final 摘要）。
    * - 无任何 valueModifiers 时返回 null（跳过求值，展示 base 原样）。
-   * - playerUct/regionUct 仅取地图声明的作用域字段；团队均值未实现 → teamValue 置 undefined。
+   * - playerUct/regionUct 仅取地图声明的作用域字段。
+   * - 团队均值：客户端仅持本玩家视角，按 D8 "无团队时 memberCnt=1、teamValue 取成员自身值"
+   *   宽松实现，teamValue 回退为当前玩家自身字段值（真实多人团队无法在本端合成均值）。
    * - regionTime 按当前昼夜相位：白天=0/夜晚=1。
    */
   getCellResolutionCtx(cell: import('@game/shared').Cell): CellHoverResolutionCtx | null {
@@ -347,11 +349,13 @@ export class GameViewModel {
         if (typeof v === 'number') playerUct.player![def.id] = v;
       }
     }
+    const teamValue = (fieldId: string): number | undefined => currentPlayer?.values?.[fieldId]?.current;
     const local = this.getLocalDayNight(this.getPlayerTimezoneOffset());
     return {
       valueModifiers: snapshot.valueModifiers,
       playerUct,
       teamMemberCount: snapshot.teamMembers.length || 1,
+      teamValue,
       regionUct,
       regionTime: local.isDay ? 0 : 1,
     };

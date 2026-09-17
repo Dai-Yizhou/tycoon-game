@@ -165,6 +165,10 @@ describe('mini-map 双端一致：server计算&发送 → client接收&显示', 
     seedStore(store);
     project(store, 2, 'p1', 'money', 1750);
     expect(store.getSnapshot().currentPlayer!.values.money.current).toBe(1750);
+    // 悬浮展示：单人 teamValue 回退自身 50，价格行应显示 base → final = -200 → -250（而非旧的 -200 → -200）
+    const hoverCtx = { valueModifiers: mapMeta.valueModifiers as ValueModifierRule[], playerUct: { player: { money: 2000, credit: 50 } }, teamMemberCount: 1, teamValue: () => 50, regionUct: { region: { pros: 3 } }, regionTime: 0 };
+    const model = resolveCellHoverModel(cell, { level: 0, ownerCount: 1 }, defs, hoverCtx);
+    expect(model.rows.find((r) => r.label === '价格')!.value).toBe(`${formatUctDisplay(base, defs)} → ${formatUctDisplay(solo, defs)}`);
   });
 
   it('jail：冷却 clamp(8000*3)=9000；费用 credit -4 → 46；展示一致', () => {
