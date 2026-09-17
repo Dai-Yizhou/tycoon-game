@@ -108,9 +108,15 @@ export function startServerPathAnimation(store: GameStore, map: MapIndex, path: 
   const start = path[0];
   const end = path[path.length - 1];
   const authoritativeEnd = authoritativeCellId ?? current.currentPlayer?.position.cellId;
-  if (path.length < 2 || start !== current.currentPlayerPosition || end !== authoritativeEnd) return;
+  if (path.length < 2 || end !== authoritativeEnd) return;
   if (path.some((cellId) => !Number.isInteger(cellId) || !map.getById(cellId))) return;
   if (path.slice(0, -1).some((cellId, index) => !map.getById(cellId)?.destinations.includes(path[index + 1]))) return;
+  // 起点错位自愈：currentPlayerPosition 可能残留上一次未完成动画的中间态（动画中断
+  // 时停在路径中途）。权威移动以 path[0] 为准，先归位再启动，避免 start!==curPos 判等
+  // 失败而静默跳过动画——表现为"棋子未移动"。成功路径下 start 本就等于 curPos，无影响。
+  if (start !== current.currentPlayerPosition) {
+    updateSnapshot(store, { currentPlayerPosition: start });
+  }
   const startCell = map.getById(start);
   const endCell = map.getById(end);
   if (!startCell || !endCell) return;

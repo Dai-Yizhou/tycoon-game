@@ -183,4 +183,30 @@ describe('server.playerMoved 移动信号竞态', () => {
     expect(store.getSnapshot().isServerAnimating).toBe(true);
     expect(store.getSnapshot().isMoving).toBe(true);
   });
+
+  test('带 path 的权威移动不被残留的 isServerAnimating 拦截：动画中断后再次掷骰仍能启动', () => {
+    const store = new GameStore();
+    const { handlers, socket } = makeSocket();
+    const mapIndex = {
+      getById: (id: number) => ({ id, x: id * 20, y: 0, destinations: id === 0 ? [2] : id === 2 ? [5] : [], extra: {} }),
+    };
+    registerSocketHandlers(socket, { store, getMapIndex: () => mapIndex });
+
+    store.applyEvent({
+      sequence: store.nextSequence(),
+      type: 'player',
+      player: { id: 'p1', username: '玩家', teamId: null, position: { cellId: 0 }, values: {}, status: 'normal', createdAt: 1, lastActiveAt: 1 } as never,
+    });
+    // 模拟某次动画中断后残留的动画锁，且位置停在错位的中间态 3
+    store.applySnapshot({ sequence: store.nextSequence(), isServerAnimating: true, isMoving: true, currentPlayerPosition: 3 } as never);
+
+    // 再次掷骰，服务端广播权威带 path 移动：不得因 isServerAnimating 残留而静默丢弃
+    const onPlayerMoved = handlers.get('server.playerMoved')!;
+    onPlayerMoved({ playerId: 'p1', cellId: 5, path: [0, 2, 5] } as never);
+
+    // 动画已重新启动：位置归位到 path[0] 并推进到首步目标，而非停留在错位中间态
+    expect(store.getSnapshot().currentPlayerPosition).toBe(2);
+    expect(store.getSnapshot().serverPath).toEqual([0, 2, 5]);
+    expect(store.getSnapshot().isMoving).toBe(true);
+  });
 });

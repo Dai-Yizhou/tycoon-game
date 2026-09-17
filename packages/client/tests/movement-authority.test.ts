@@ -81,6 +81,21 @@ describe('MovementSystem authority', () => {
     expect(store.getSnapshot().serverPath).toEqual([]);
   });
 
+  it('起点错位自愈：currentPlayerPosition 残留中断动画中间态时，以 path[0] 归位并启动动画', () => {
+    const store = new GameStore();
+    const mapIndex = { getById: (id: number) => ({ id, x: id * 10, y: id * 10, destinations: id === 0 ? [2] : id === 2 ? [5] : [] }) } as never;
+    // 模拟上一次动画中断：currentPlayerPosition 残留错位的中间态 3，而权威起点应为 0
+    store.applySnapshot({ sequence: store.nextSequence(), currentPlayer: { id: 'p1', username: '玩家', teamId: null, position: { cellId: 5 }, values: {}, status: 'normal', createdAt: 1, lastActiveAt: 1 } as never, currentPlayerPosition: 3 });
+
+    startServerPathAnimation(store, mapIndex, [0, 2, 5], jest.fn(), undefined, 5);
+
+    // 权威移动不再被 start!==curPos 判等失败静默跳过：归位到 path[0] 并持续推进到首步目标
+    expect(store.getSnapshot().currentPlayerPosition).toBe(2);
+    expect(store.getSnapshot().isMoving).toBe(true);
+    expect(store.getSnapshot().isServerAnimating).toBe(true);
+    expect(store.getSnapshot().serverPath).toEqual([0, 2, 5]);
+  });
+
   it('移动到达（onPlayerArrived）时复位 actionUsedThisTurn，让新格动作可用', () => {
     const store = new GameStore();
     store.applySnapshot({ sequence: store.nextSequence(), currentPlayerPosition: 2, actionUsedThisTurn: true });

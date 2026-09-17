@@ -238,13 +238,16 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     if (activePlayer && payload.playerId === activePlayer.id) {
       const snapshot = store.getSnapshot();
       const activeMapIndex = options.getMapIndex?.() ?? options.mapIndex;
-      // 动画进行中：moveHandler 的 updatePlayer 会额外广播一个不含 path 的
-      // server.playerMoved 位置同步（可能先/后到达）。此时必须忽略，避免把
-      // 动画权威位置直接当成跳转整格覆盖，导致棋子停留在原地而视野已被拉走。
-      if (snapshot.isServerAnimating) return;
+      // 权威带路径移动：任何时刻都必须启动一段新动画，不能像无路径位置同步那样
+      // 在动画期丢弃。否则一旦某次动画中断残留 isServerAnimating=true，后续所有
+      // 权威移动都会被拦截——表现为"掷骰后卡在移动状态，但棋子未移动"。
       if (activeMapIndex && payload.path && payload.path.length > 1) {
         startServerPathAnimation(store, activeMapIndex, payload.path, refresh, options.movementEffects, payload.cellId, refresh);
       } else {
+        // 无路径位置同步：动画进行中忽略（moveHandler 的 updatePlayer 会额外广播
+        // 一个不含 path 的 server.playerMoved，可能先/后到达），避免把动画权威位置
+        // 直接当成跳转整格覆盖。带 path 的先生成，随后无 path 的会被此守卫拦截。
+        if (snapshot.isServerAnimating) return;
         // 无路径 playerMoved。仅当目标格与当前格不同（真实跳变/传送）才播黑圆转场；
         // 相同格则为位置同步（如掷骰后等待岔路选择前的确认），不进入黑屏，避免误触发。
         const applyMove = (): void => {
