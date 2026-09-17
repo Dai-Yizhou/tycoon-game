@@ -92,5 +92,10 @@ describe('D8 valueModifiers 端到端结算一致性', () => {
     expect(buyAck).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
     // 解析价 -600 → 购买后 money 1000 - 600 = 400
     expect(player.values.money.current).toBe(400);
+
+    // B：ack 回传权威结算价，且与实际扣款（money 400-1000=-600）一致，客户端据此展示实际扣款
+    const ackArg = buyAck.mock.calls[0][0] as { data: { price?: Uct } };
+    expect(ackArg.data?.price).toEqual({ player: { money: -600 } });
+    expect((ackArg.data?.price?.player?.money ?? 0)).toBe(player.values.money.current - 1000);
   });
 });

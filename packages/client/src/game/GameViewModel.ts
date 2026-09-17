@@ -359,6 +359,7 @@ export class GameViewModel {
       teamValue,
       regionUct,
       regionTime: local.isDay ? 0 : 1,
+      authoritativePrice: snapshot.boughtPrices.get(cell.id),
     };
   }
 

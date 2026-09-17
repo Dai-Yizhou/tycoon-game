@@ -82,6 +82,12 @@ function emitAction(runtime: GameRuntime, event: 'client.buyProperty' | 'client.
     }
     // 动作成功后锁定本回合行动权，避免按钮复用（如修缮后仍可点击导致服务端回 err）
     runtime.store.markActionUsed();
+    // 购买：用服务端权威结算价覆盖展示，避免客户端乐观预览因 region.uct 采样差异而失真
+    if (event === 'client.buyProperty' && result.ok) {
+      const data = result as { ok: boolean; price?: import('@game/shared').Uct; data?: { price?: import('@game/shared').Uct } };
+      const price = data.data?.price ?? data.price;
+      if (price) runtime.store.setBoughtPrice(payload.cellId, price);
+    }
   });
 }
 

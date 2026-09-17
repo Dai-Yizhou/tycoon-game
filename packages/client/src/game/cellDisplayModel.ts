@@ -108,6 +108,8 @@ export interface CellHoverResolutionCtx {
   teamValue?: (fieldId: string) => number | undefined;
   regionUct: Uct;
   regionTime: number;
+  /** 服务端权威结算购买价（购买成功后回传）；存在时价格行直接展示实际扣款，不再走乐观重算 */
+  authoritativePrice?: Uct;
 }
 
 /** 若存在当前 cellType+base 的规则，返回 `base → final` 摘要；否则返回 null（展示 base 原样）。 */
@@ -168,7 +170,9 @@ export function resolveCellHoverModel(
     const ownerCount = runtime?.ownerCount ?? 0;
     const price = cell.price;
     if (price) {
-      const value = ctx ? resolveModifierText('property', 'price', price, level, ownerCount, ctx, mapUct) ?? mapUct(price) : mapUct(price);
+      const value = ctx?.authoritativePrice
+        ? mapUct(ctx.authoritativePrice)
+        : ctx ? resolveModifierText('property', 'price', price, level, ownerCount, ctx, mapUct) ?? mapUct(price) : mapUct(price);
       model.rows.push({ label: t('hud.price'), value });
     }
     const rent = cell.rent?.[Math.min(level, (cell.rent?.length ?? 1) - 1)];
@@ -184,7 +188,9 @@ export function resolveCellHoverModel(
     const ownerCount = runtime?.ownerCount ?? 0;
     const price = cell.price;
     if (price) {
-      const value = ctx ? resolveModifierText('investment', 'price', price, 0, ownerCount, ctx, mapUct) ?? mapUct(price) : mapUct(price);
+      const value = ctx?.authoritativePrice
+        ? mapUct(ctx.authoritativePrice)
+        : ctx ? resolveModifierText('investment', 'price', price, 0, ownerCount, ctx, mapUct) ?? mapUct(price) : mapUct(price);
       model.rows.push({ label: t('hud.price'), value });
     }
     model.rows.push({ label: t('hud.owners'), value: t('hud.ownerCountFormat', { current: ownerCount, max: cell.maxOwnerCount }) });

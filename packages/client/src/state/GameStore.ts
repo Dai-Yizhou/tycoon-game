@@ -74,6 +74,8 @@ export interface ClientGameSnapshot {
   isServerAnimating: boolean;
   cellActions: CellAction[];
   regionValues: Map<string, Record<string, number>>;
+  /** 权威结算购买价（购买成功后由服务端回传，按格子缓存；用于展示实际扣款） */
+  boughtPrices: Map<number, import('@game/shared').Uct>;
   mapRegions: RegionInfo[];
   mapTimezones: TimeZoneInfo[];
   valueFieldDefs: ValueFieldDef[];
@@ -116,6 +118,7 @@ export class GameStore {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     isBankrupt: false,
     isInJail: false, jailEndTime: 0, jailDurationMs: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, cycleMinutes: 15, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], regionValues: new Map(),
+      boughtPrices: new Map(),
       mapRegions: [], mapTimezones: [], valueFieldDefs: [], valueModifiers: [], cellRuntimeStates: new Map(), leaderboard: { status: 'loading', snapshot: null, error: null }, achievements: { status: 'loading', snapshot: null, error: null },
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
@@ -197,6 +200,14 @@ export class GameStore {
     const regionValues = new Map(this.snapshot.regionValues);
     regionValues.set(regionId, { ...(regionValues.get(regionId) ?? {}), [fieldId]: value });
     this.snapshot = { ...this.snapshot, regionValues };
+    this.publish();
+  }
+
+  /** 记录服务端权威购买价（按格子缓存），后续展示实际扣款用 */
+  setBoughtPrice(cellId: number, price: import('@game/shared').Uct): void {
+    const boughtPrices = new Map(this.snapshot.boughtPrices);
+    boughtPrices.set(cellId, price);
+    this.snapshot = { ...this.snapshot, boughtPrices };
     this.publish();
   }
 
@@ -386,6 +397,7 @@ export class GameStore {
       valueFieldDefs: [],
       valueModifiers: [],
       regionValues: new Map(),
+      boughtPrices: new Map(),
       cellRuntimeStates: new Map(),
       leaderboard: { status: 'loading', snapshot: null, error: null },
       achievements: { status: 'loading', snapshot: null, error: null },

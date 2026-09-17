@@ -278,10 +278,11 @@ export class PropertyHandler {
         }
       }
 
-      // 12. 广播购买事件
+      // 12. 广播购买事件（携带权威结算价，供客户端购买后展示以权威值为准）
       this.io.emit('server.propertyBought', {
         cell: result.cell,
         playerId,
+        price: priceUct,
         runtime: this.world.getRuntimeState().getCellState(result.cell.id),
       });
 
@@ -297,8 +298,8 @@ export class PropertyHandler {
         }
       }
 
-      // 13. 返回成功结果
-      const response = { ok: true, data: { cell: result.cell } } as AckResult<{ cell: Cell }>;
+      // 13. 返回成功结果（携带权威结算价，客户端据此展示实际扣款）
+      const response = { ok: true, data: { cell: result.cell, price: priceUct } } as AckResult<{ cell: Cell; price: Uct }>;
       if (requestId) this.operationGuard.complete(requestId, response);
       ack?.(response);
       this.markActedThisVisit(playerId, cell.id);

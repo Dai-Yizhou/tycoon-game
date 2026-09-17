@@ -110,7 +110,7 @@ export interface ClientToServerEvents {
   /** 购买地产/项目 */
   'client.buyProperty': (
     payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
-    ack?: (result: AckResult<{ cell: Cell }>) => void,
+    ack?: (result: AckResult<{ cell: Cell; price: import('./cell.js').Uct }>) => void,
   ) => void;
 
   /** 升级地产 */
@@ -248,7 +248,7 @@ export interface ServerToClientEvents {
   }) => void;
 
   /** 地产被购买 */
-  'server.propertyBought': (payload: { cell: Cell; playerId: string; runtime: { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number } }) => void;
+  'server.propertyBought': (payload: { cell: Cell; playerId: string; price: import('./cell.js').Uct; runtime: { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number } }) => void;
 
   /** 地产被升级 */
   'server.propertyUpgraded': (payload: {

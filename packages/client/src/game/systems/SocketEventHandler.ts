@@ -133,6 +133,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   socket.on('server.propertyBought', (payload) => {
     store.setCell(payload.cell);
     store.setCellRuntimeState(payload.cell.id, payload.runtime);
+    store.setBoughtPrice(payload.cell.id, payload.price);
     store.applyEvent({ sequence: store.nextSequence(), type: 'property', playerId: payload.playerId, cellId: payload.cell.id, level: 0 });
     refresh();
   });
