@@ -528,6 +528,12 @@ function syncCellActions(cellId: number): void {
     gameStore.setCellActions([]);
     return;
   }
+  // 移动动画中 currentPlayerPosition 逐格推进：只展示最终停靠格的动作。
+  // 防止把移动经过（非停靠）格的 act-btm 弹到按钮簇，误触指向越权操作。
+  if (snapshot.isMoving) {
+    gameStore.setCellActions([]);
+    return;
+  }
   // 交通枢纽目的地动作由 loadTransportDestinations 异步获取后写入 act-bar。
   // 若当前已展示带 targetCellId 的目的地动作（非加载态单按钮），保持其展示，
   // 避免被下方单按钮解析结果覆盖；玩家离开该格后 cell 类型变化，解析逻辑自会重置。
@@ -537,10 +543,14 @@ function syncCellActions(cellId: number): void {
   const runtimeState = snapshot.cellRuntimeStates.get(cellId);
   const ownerships = runtimeState?.ownerships ?? [];
   const currentPlayerId = snapshot.currentPlayer?.id;
+  // 持股判定：cellRuntimeStates(实时事件) 在重连/页面重建后可能为空，
+  // 需并入 gameState 下发的 ownedProperties，否则已持股 property 被误判为可购买。
+  const owned = Boolean(currentPlayerId && (ownerships.some(ownership => ownership.playerId === currentPlayerId && ownership.share > 0)
+    || (cell.type === 'property' && snapshot.ownedProperties.has(cellId))));
   const actions = resolveCellActions({
     cell,
     state: {
-      owned: Boolean(currentPlayerId && ownerships.some(ownership => ownership.playerId === currentPlayerId && ownership.share > 0)),
+      owned,
       ownerCount: ownerships.length,
       level: snapshot.propertyLevels.get(cellId) ?? runtimeState?.level ?? 0,
       ownedInvestment: snapshot.ownedInvestments.has(cellId),
