@@ -1,4 +1,5 @@
 import { resolveCellActions } from '../src/game/cellActionResolver.js';
+import type { CellHoverResolutionCtx } from '../src/game/cellDisplayModel.js';
 import type { Cell, Player, Uct, ValueFieldDefinition } from '@game/shared';
 
 const definitions: ValueFieldDefinition[] = [
@@ -141,5 +142,20 @@ describe('act-bar 动作解析器', () => {
     for (const type of ['empty', 'event', 'jail', 'supply'] as const) {
       expect(resolveCellActions({ cell: makeCell(type), state: makeState(), currentPlayer: makePlayer(10), valueFieldDefs: definitions })).toEqual([]);
     }
+  });
+
+  it('传入 resolution 且命中 valueModifier 规则时，动作成本 detail 显示 base → final', () => {
+    const cell = makeCell('property', { maxOwnerCount: 5, price });
+    const resolution = {
+      valueModifiers: [{ scope: { cellType: 'property', base: 'price' }, calc: { player: { money: { $ref: 'base.player.money' } } } }],
+      playerUct: { player: {} },
+      teamMemberCount: 1,
+      regionUct: { region: {} },
+      regionTime: 0,
+    } as unknown as CellHoverResolutionCtx;
+    const actions = resolveCellActions({ cell, state: makeState(), currentPlayer: makePlayer(200), valueFieldDefs: definitions, resolution });
+
+    expect(actions[0].detail).toContain('→');
+    expect(actions[0].detail).toContain('财产 -100');
   });
 });

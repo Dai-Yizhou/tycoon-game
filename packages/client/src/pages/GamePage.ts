@@ -549,6 +549,8 @@ function syncCellActions(cellId: number): void {
     },
     currentPlayer: snapshot.currentPlayer,
     valueFieldDefs: snapshot.valueFieldDefs,
+    // 动作成本 base → final 展示（同 hover），有 valueModifier 时生效
+    resolution: gameViewModel?.getCellResolutionCtx(cell),
   });
   const currentActions = snapshot.cellActions;
   const unchanged = currentActions.length === actions.length && actions.every((action, index) => {

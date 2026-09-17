@@ -14,7 +14,7 @@
 
 import type { Cell, Player, Uct } from '@game/shared';
 import { t } from './i18n.js';
-import { formatUctDisplay, type ValueFieldDefLike } from './cellDisplayModel.js';
+import { formatUctDisplay, resolveModifierText, type CellHoverResolutionCtx, type ValueFieldDefLike } from './cellDisplayModel.js';
 
 export interface CellActionModel {
   id: string;
@@ -41,6 +41,8 @@ export interface CellActionInput {
   state: CellActionRuntimeState;
   currentPlayer: Player | null;
   valueFieldDefs: ValueFieldDefLike[];
+  /** D8 展示求值上下文：非空时动作成本按 base → final 展示（同 hover） */
+  resolution?: CellHoverResolutionCtx | null;
 }
 
 /** 检查玩家能否承受 UCT 扣减（逐字段校验 min/max 边界） */
@@ -55,9 +57,19 @@ export function canApplyUct(player: Player | null, uct: Uct | undefined): boolea
 }
 
 export function resolveCellActions(input: CellActionInput): CellActionModel[] {
-  const { cell, state, currentPlayer, valueFieldDefs } = input;
+  const { cell, state, currentPlayer, valueFieldDefs, resolution } = input;
   const actionAvailable = !state.isBankrupt && !state.actionUsedThisTurn;
-  const detail = (uct: Uct | undefined): string => formatUctDisplay(uct, valueFieldDefs);
+  const mapUct = (val: number | Uct): string => formatUctDisplay(val as Uct, valueFieldDefs);
+
+  /** 动作成本摘要：存在匹配 valueModifier 时显示 `base → final`，否则仅 base；无成本值返回空串 */
+  const modDetail = (baseField: string, base: Uct | undefined, level: number): string => {
+    if (!base) return '';
+    if (resolution) {
+      const text = resolveModifierText(cell.type, baseField, base, level, state.ownerCount, resolution, mapUct);
+      if (text) return text;
+    }
+    return formatUctDisplay(base, valueFieldDefs);
+  };
 
   if (cell.type === 'property') {
     const maxLevel = cell.upgradeCost?.length ?? 0;
@@ -65,11 +77,11 @@ export function resolveCellActions(input: CellActionInput): CellActionModel[] {
       const cost = cell.upgradeCost?.[state.level];
       if (!cost || state.level >= maxLevel) return [];
       const nextRent = cell.rent?.[state.level + 1];
-      const rentText = nextRent ? ` · ${t('property.nextRentFormat', { rent: detail(nextRent) })}` : '';
+      const rentText = nextRent ? ` · ${t('property.nextRentFormat', { rent: modDetail('rent', nextRent, state.level + 1) })}` : '';
       return [{
         id: 'upgrade-property',
         label: t('property.upgradeTitle'),
-        detail: `${detail(cost)}${rentText}`,
+        detail: `${modDetail('upgradeCost', cost, state.level)}${rentText}`,
         enabled: actionAvailable && canApplyUct(currentPlayer, cost),
       }];
     }
@@ -77,7 +89,7 @@ export function resolveCellActions(input: CellActionInput): CellActionModel[] {
     return [{
       id: 'buy-property',
       label: t('property.buyTitle'),
-      detail: detail(cell.price),
+      detail: modDetail('price', cell.price, 0),
       enabled: actionAvailable && canApplyUct(currentPlayer, cell.price),
     }];
   }
@@ -88,7 +100,7 @@ export function resolveCellActions(input: CellActionInput): CellActionModel[] {
     return [{
       id: 'buy-investment',
       label: t('investment.invest'),
-      detail: detail(cell.price),
+      detail: modDetail('price', cell.price, 0),
       enabled: actionAvailable && canApplyUct(currentPlayer, cell.price),
     }];
   }
@@ -106,7 +118,7 @@ export function resolveCellActions(input: CellActionInput): CellActionModel[] {
     return [{
       id: 'restore-monument',
       label: t('monument.repair'),
-      detail: detail(cell.repairCost),
+      detail: modDetail('repairCost', cell.repairCost, 0),
       enabled: actionAvailable,
     }];
   }

@@ -111,7 +111,7 @@ export interface CellHoverResolutionCtx {
 }
 
 /** 若存在当前 cellType+base 的规则，返回 `base → final` 摘要；否则返回 null（展示 base 原样）。 */
-function resolveModifierText(
+export function resolveModifierText(
   cellType: Cell['type'],
   baseField: string,
   base: number | Uct,
