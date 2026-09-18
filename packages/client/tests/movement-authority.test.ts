@@ -164,7 +164,7 @@ describe('Other player path movement', () => {
     const store = otherStore();
     store.applySnapshot({ sequence: store.nextSequence(), otherPlayerMoves: new Map([['p2', { fromX: 10, fromY: 10, toX: 20, toY: 20, startTime: performance.now() - 140, path: [1, 2], pathIndex: 1 }]]) });
     const onDisplay = jest.fn();
-    projectOtherPlayerDisplays(store.getSnapshot(), mapIndex as never, onDisplay);
+    projectOtherPlayerDisplays(store.getSnapshot(), onDisplay);
     // 140ms / 280ms = 0.5 → easeInOutQuad(0.5)=0.5 → x≈15（performance.now 逐次调用有微秒级漂移）
     expect(onDisplay).toHaveBeenCalledWith('p2', expect.closeTo(15, 0.2), expect.closeTo(15, 0.2));
   });

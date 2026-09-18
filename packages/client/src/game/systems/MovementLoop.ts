@@ -81,7 +81,7 @@ export function createMovementLoop(store: GameStore, host: MovementLoopHost, opt
         options.onDisplay(next.currentPlayer.id, next.playerDisplayX, next.playerDisplayY);
       }
       try {
-        projectOtherPlayerDisplays(next, mapIndex, options.onDisplay);
+        projectOtherPlayerDisplays(next, options.onDisplay);
       } catch (err) {
         console.error('[movementLoop] 其他玩家动画投影异常，已跳过本帧', err);
       }

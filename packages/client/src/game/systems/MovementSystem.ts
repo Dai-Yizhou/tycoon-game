@@ -151,11 +151,6 @@ export function onIntersectionChoice(store: GameStore, socket: TypedClientSocket
   });
 }
 
-/** 服务端权威带路径移动是否正是"当前无动画"状态（self 移动或任一其他玩家动画任一活跃即视为有动画） */
-function hasActiveAnimation(snapshot: ClientGameSnapshot): boolean {
-  return snapshot.isMoving || (snapshot.otherPlayerMoves?.size ?? 0) > 0;
-}
-
 /**
  * 启动其他玩家的权威带路径移动动画（与 self 的 startServerPathAnimation 同构）。
  * 服务端对所有客户端广播带完整 path 的 server.playerMoved，这里为其他玩家建立
@@ -207,7 +202,7 @@ export function updateOtherPlayerMoveSteps(store: GameStore, map: MapIndex): voi
 }
 
 /** 投影其他玩家当前步的插值位置到展示层（不发布快照，仅驱动 DOM） */
-export function projectOtherPlayerDisplays(snapshot: ClientGameSnapshot, map: MapIndex, onDisplay: (playerId: string, x: number, y: number) => void): void {
+export function projectOtherPlayerDisplays(snapshot: ClientGameSnapshot, onDisplay: (playerId: string, x: number, y: number) => void): void {
   const anims = snapshot.otherPlayerMoves;
   if (!anims || anims.size === 0) return;
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
