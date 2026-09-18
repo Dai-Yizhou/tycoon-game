@@ -106,9 +106,30 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   socket.on('connect', () => {
-    if (store.getSnapshot().leaderboard.status === 'offline') {
-      store.setLeaderboard(store.getSnapshot().leaderboard.snapshot);
+    const currentSnapshot = store.getSnapshot();
+    if (currentSnapshot.leaderboard.status === 'offline') {
+      store.setLeaderboard(currentSnapshot.leaderboard.snapshot);
       refresh();
+    }
+    // 重连对账：若已登录（currentPlayer 存在），此 connect 为断线重连而非首次连接。
+    // 重发 client.login（服务端幂等，仅解冻）拉取权威 existingPlayers，重建 otherPlayers，
+    // 避免断线期间 playerLeft/playerJoined 增量丢失导致"视野内其他玩家不显示"。
+    const currentPlayer = currentSnapshot.currentPlayer;
+    const username = currentPlayer?.username;
+    if (currentPlayer && username) {
+      socket.emit('client.login', { username }, (result) => {
+        if (!store || !result?.ok) return;
+        const players = (result.data?.existingPlayers ?? []).map((p) => ({
+          id: p.id,
+          username: p.username,
+          position: p.position,
+          status: p.status || 'normal',
+          primaryValue: Object.values(p.values ?? {}).find((field) => field.scope !== 'region')?.current ?? 0,
+        }));
+        if (players.length === 0) return;
+        store.applyEvent({ sequence: store.nextSequence(), type: 'players', players });
+        refresh();
+      });
     }
   });
 

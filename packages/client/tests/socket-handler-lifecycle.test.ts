@@ -134,6 +134,62 @@ describe('server.behaviorMessage 行为消息', () => {
   });
 });
 
+describe('connect 重连对账 其他玩家重建', () => {
+  function makeSocket(): { handlers: Map<string, (args: never) => void>; socket: any } {
+    const handlers = new Map<string, (args: never) => void>();
+    return {
+      handlers,
+      socket: {
+        on: jest.fn((event: string, handler: (args: never) => void) => { handlers.set(event, handler); }),
+        onAny: jest.fn(),
+        offAny: jest.fn(),
+        off: jest.fn(),
+        emit: jest.fn(),
+      },
+    };
+  }
+
+  test('断线重连（currentPlayer 已存在）时重发 login 并用返回的 existingPlayers 重建 otherPlayers', () => {
+    const store = new GameStore();
+    const { handlers, socket } = makeSocket();
+    // 模拟已登录：当前玩家存在，且登录时视野内有一名已有玩家
+    store.applyEvent({ sequence: store.nextSequence(), type: 'player', player: { id: 'self', username: '自己', teamId: null, position: { cellId: 0 }, values: {}, status: 'normal', createdAt: 1, lastActiveAt: 1 } as never });
+    store.applyEvent({ sequence: store.nextSequence(), type: 'players', players: [{ id: 'old', username: '旧玩家', position: { cellId: 2 }, status: 'normal', primaryValue: 0 }] });
+    registerSocketHandlers(socket, { store });
+
+    // 断线期间另一玩家加入/离开，服务端 existingPlayers 只含权威当前在线的他者
+    const ackResult = { ok: true, data: { existingPlayers: [
+      { id: 'alice', username: '爱丽丝', teamId: null, position: { cellId: 3 }, values: { money: { id: 'money', current: 500 } }, status: 'normal', createdAt: 1, lastActiveAt: 1 },
+      { id: 'bob', username: '鲍勃', teamId: null, position: { cellId: 4 }, values: {}, status: 'normal', createdAt: 1, lastActiveAt: 1 },
+    ] } };
+
+    const connectHandler = handlers.get('connect')!;
+    // 捕获 emit('client.login') 的 ack 回调，模拟服务端返回
+    (socket.emit as jest.Mock).mockImplementation((event: string, _payload: never, ack?: (r: never) => void) => {
+      if (event === 'client.login') ack?.(ackResult);
+    });
+    connectHandler();
+
+    expect(socket.emit).toHaveBeenCalledWith('client.login', { username: '自己' }, expect.any(Function));
+    const others = store.getSnapshot().otherPlayers;
+    expect(others.map((o) => o.id)).toEqual(['alice', 'bob']);
+    // 旧的 'old' 玩家被权威列表替换（重连后不再残留离线玩家）
+    expect(others.map((o) => o.id)).not.toContain('old');
+    // primaryValue 取自首个非 region 字段 current
+    expect(others.find((o) => o.id === 'alice')?.primaryValue).toBe(500);
+  });
+
+  test('首次连接（currentPlayer 为空）不重发 login', () => {
+    const store = new GameStore();
+    const { handlers, socket } = makeSocket();
+    registerSocketHandlers(socket, { store });
+
+    handlers.get('connect')!();
+
+    expect(socket.emit).not.toHaveBeenCalled();
+  });
+});
+
 describe('server.playerMoved 移动信号竞态', () => {
   function makeSocket(): { handlers: Map<string, (args: never) => void>; socket: never } {
     const handlers = new Map<string, (args: never) => void>();
