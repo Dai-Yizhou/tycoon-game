@@ -402,7 +402,10 @@ export class GameViewModel {
     const hour = Math.floor(totalMinutes / 60);
     const minute = totalMinutes % 60;
     const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-    const isDay = localProgress >= 0.25 && localProgress < 0.75;
+    // 白天边界须与服务端 DayNightCycle 的 dayRatio（默认 0.5，白天=周期起始的 [0,dayRatio) 块）一致。
+    // 服务端在 progress=dayRatio 处切换相位并触发区域 pros 等 applyPhase；若此处使用固定 [0.25,0.75)
+    // 会让客户端 HUD 由昼转夜比服务端相位晚 0.25 周期，导致"HUD 转夜但区域值已提前变化/无同步变化"。
+    const isDay = localProgress < 0.5;
     return { isDay, progress: localProgress, hour, minute, timeStr };
   }
 
