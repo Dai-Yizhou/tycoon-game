@@ -9,7 +9,7 @@ import type { TypedClientSocket } from '../../hooks/useSocket.js';
 import { localizedText, t } from '../i18n.js';
 import type { OtherPlayerInfo } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
-import { startServerPathAnimation } from './MovementSystem.js';
+import { startServerPathAnimation, startOtherPlayerMove } from './MovementSystem.js';
 import { noopHudRefresh, type HudRefresh } from '../ClientHudBridge.js';
 import type { GameController } from '../GameController.js';
 import { GameStore } from '../../state/GameStore.js';
@@ -232,7 +232,14 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     const currentPlayers = store.getSnapshot().otherPlayers;
     const player = currentPlayers.find(p => p.id === payload.playerId);
     if (player) {
-      store.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerMove', playerId: payload.playerId, cellId: payload.cellId });
+      // 其他玩家：优先做权威带路径的逐格插值动画（避免跳变）；无有效路径则退回瞬移对齐权威格。
+      // self 的带路径移动由下方 activePlayer 分支走 startServerPathAnimation。
+      const mapIndex = options.getMapIndex?.() ?? options.mapIndex;
+      if (mapIndex && payload.path && payload.path.length > 1) {
+        startOtherPlayerMove(store, mapIndex, payload.playerId, payload.path);
+      } else {
+        store.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerMove', playerId: payload.playerId, cellId: payload.cellId });
+      }
     }
     const activePlayer = store.getSnapshot().currentPlayer;
     if (activePlayer && payload.playerId === activePlayer.id) {

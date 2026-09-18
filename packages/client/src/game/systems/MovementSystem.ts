@@ -150,3 +150,73 @@ export function onIntersectionChoice(store: GameStore, socket: TypedClientSocket
     if (!result.ok) addChatMessage(t('path.selectFailed', { error: result.error || t('common.unknownError') }), 'error');
   });
 }
+
+/** 服务端权威带路径移动是否正是"当前无动画"状态（self 移动或任一其他玩家动画任一活跃即视为有动画） */
+function hasActiveAnimation(snapshot: ClientGameSnapshot): boolean {
+  return snapshot.isMoving || (snapshot.otherPlayerMoves?.size ?? 0) > 0;
+}
+
+/**
+ * 启动其他玩家的权威带路径移动动画（与 self 的 startServerPathAnimation 同构）。
+ * 服务端对所有客户端广播带完整 path 的 server.playerMoved，这里为其他玩家建立
+ * 逐格插值，避免直接瞬移到目标格造成"跳变"。无 path 或路径校验失败则退回瞬移。
+ */
+export function startOtherPlayerMove(store: GameStore, map: MapIndex, playerId: string, path: number[]): void {
+  if (!path || path.length < 2) return;
+  if (path.some((cellId) => !Number.isInteger(cellId) || !map.getById(cellId))) return;
+  if (path.slice(0, -1).some((cellId, index) => !map.getById(cellId)?.destinations.includes(path[index + 1]))) return;
+  const startCell = map.getById(path[0]);
+  const target = map.getById(path[1]);
+  if (!startCell || !target) return;
+  refreshStepDuration();
+  const current = store.getSnapshot().otherPlayerMoves ?? new Map();
+  const next = new Map(current);
+  next.set(playerId, { fromX: startCell.x, fromY: startCell.y, toX: target.x, toY: target.y, startTime: performance.now(), path: [...path], pathIndex: 1 });
+  updateSnapshot(store, { otherPlayerMoves: next });
+}
+
+/**
+ * 逐帧推进其他玩家的移动动画：把已到步的玩家推进到下一步，动画结束则移除并落格到路径终点。
+ * 由移动循环在每帧调用；推进发生在单次快照发布内（与 self 的 updateMovement 同帧或独立帧）。
+ */
+export function updateOtherPlayerMoveSteps(store: GameStore, map: MapIndex): void {
+  const snapshot = store.getSnapshot();
+  const anims = snapshot.otherPlayerMoves;
+  if (!anims || anims.size === 0) return;
+  const now = performance.now();
+  const next = new Map(anims);
+  let changed = false;
+  for (const [playerId, anim] of next) {
+    const progress = Math.min((now - anim.startTime) / stepDurationMs, 1);
+    if (progress < 1) continue;
+    // 本步到达
+    if (anim.pathIndex >= anim.path.length - 1) {
+      // 已到路径终点：通过权威位置事件落格并存,移除动画（updatePlayers 会将其投影到终点格）
+      next.delete(playerId);
+      changed = true;
+      store.applyEvent({ sequence: store.nextSequence(), type: 'otherPlayerMove', playerId, cellId: anim.path[anim.path.length - 1] });
+      continue;
+    }
+    const nextId = anim.path[anim.pathIndex + 1];
+    const nextCell = map.getById(nextId);
+    if (!nextCell) { next.delete(playerId); changed = true; continue; }
+    next.set(playerId, { ...anim, pathIndex: anim.pathIndex + 1, fromX: anim.toX, fromY: anim.toY, toX: nextCell.x, toY: nextCell.y, startTime: now });
+    changed = true;
+  }
+  if (changed) updateSnapshot(store, { otherPlayerMoves: next });
+}
+
+/** 投影其他玩家当前步的插值位置到展示层（不发布快照，仅驱动 DOM） */
+export function projectOtherPlayerDisplays(snapshot: ClientGameSnapshot, map: MapIndex, onDisplay: (playerId: string, x: number, y: number) => void): void {
+  const anims = snapshot.otherPlayerMoves;
+  if (!anims || anims.size === 0) return;
+  const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const now = performance.now();
+  for (const [playerId, anim] of anims) {
+    const progress = reducedMotion ? 1 : Math.min((now - anim.startTime) / stepDurationMs, 1);
+    const eased = easeInOutQuad(progress);
+    const x = anim.fromX + (anim.toX - anim.fromX) * eased;
+    const y = anim.fromY + (anim.toY - anim.fromY) * eased;
+    onDisplay(playerId, x, y);
+  }
+}

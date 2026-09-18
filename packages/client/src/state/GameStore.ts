@@ -10,6 +10,17 @@ export interface OtherPlayerInfo {
   primaryValue: number;
 }
 
+/** 其他玩家移动动画的当前步状态（由服务端权威带路径移动驱动，与 self 走 serverPath 同构） */
+export interface OtherPlayerMoveState {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  startTime: number;
+  path: number[];
+  pathIndex: number;
+}
+
 export interface RegionInfo { id: string; name: string; cellIds: number[]; initialValues: Record<string, number>; themeId?: 'northeast' | 'south' | 'midwest' | 'west'; }
 export interface TimeZoneInfo { id: string; name?: string; offsetMinutes: number; }
 
@@ -81,6 +92,8 @@ export interface ClientGameSnapshot {
   valueFieldDefs: ValueFieldDef[];
   valueModifiers: ValueModifierRule[];
   cellRuntimeStates: Map<number, { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number; repairedBy?: string; repairedAt?: number }>;
+  /** 其他玩家的当前步移动动画（按玩家 id），由移动循环逐帧推进；空 Map 表示无其他玩家动画 */
+  otherPlayerMoves: Map<string, OtherPlayerMoveState>;
   leaderboard: LeaderboardState;
   achievements: { status: 'loading' | 'ready' | 'empty' | 'error' | 'offline' | 'disabled'; snapshot: AchievementSnapshot | null; error: string | null };
 }
@@ -119,7 +132,7 @@ export class GameStore {
     isBankrupt: false,
     isInJail: false, jailEndTime: 0, jailDurationMs: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, cycleMinutes: 15, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], regionValues: new Map(),
       boughtPrices: new Map(),
-      mapRegions: [], mapTimezones: [], valueFieldDefs: [], valueModifiers: [], cellRuntimeStates: new Map(), leaderboard: { status: 'loading', snapshot: null, error: null }, achievements: { status: 'loading', snapshot: null, error: null },
+      mapRegions: [], mapTimezones: [], valueFieldDefs: [], valueModifiers: [], cellRuntimeStates: new Map(), otherPlayerMoves: new Map(), leaderboard: { status: 'loading', snapshot: null, error: null }, achievements: { status: 'loading', snapshot: null, error: null },
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
 
@@ -422,6 +435,7 @@ export class GameStore {
       regionValues: new Map(),
       boughtPrices: new Map(),
       cellRuntimeStates: new Map(),
+      otherPlayerMoves: new Map(),
       leaderboard: { status: 'loading', snapshot: null, error: null },
       achievements: { status: 'loading', snapshot: null, error: null },
     };

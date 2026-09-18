@@ -240,9 +240,14 @@ export class InteractiveMapSurface {
 
   setPlayerDisplayPosition(playerId: string, x: number, y: number): void {
     this.displayedPlayerPositions.set(playerId, { x, y });
+    // 其他玩家带错位偏移（与 render/updatePlayers 的默认落格一致），self 精确落格，
+    // 使插值轨迹与静止时的错位位置一致，避免动画起始/结束的微小跳动。
+    const idx = this.players.findIndex((player) => player?.id === playerId);
+    const tx = idx > 0 ? x + ((idx % 3) - 1) * 18 : x;
+    const ty = idx > 0 ? y - 42 - Math.floor(idx / 3) * 8 : y;
     const player = Array.from(this.root.querySelectorAll('[data-player-id]'))
       .find((element) => element.getAttribute('data-player-id') === playerId);
-    if (player) player.setAttribute('transform', `translate(${x} ${y})`);
+    if (player) player.setAttribute('transform', `translate(${tx} ${ty})`);
   }
 
   setDisplayPosition(x: number, y: number): void {

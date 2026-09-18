@@ -14,7 +14,7 @@
 
 import type { MapIndex } from '@game/shared';
 import type { GameStore } from '../../state/GameStore.js';
-import { updateMovement } from './MovementSystem.js';
+import { updateMovement, updateOtherPlayerMoveSteps, projectOtherPlayerDisplays } from './MovementSystem.js';
 import type { MovementEffectHooks } from '../GameEffects.js';
 
 export interface MovementLoopHost {
@@ -59,7 +59,8 @@ export function createMovementLoop(store: GameStore, host: MovementLoopHost, opt
     }
     try {
       const current = store.getSnapshot();
-      if (!current?.isMoving) return;
+      const hasAnim = current?.isMoving || (current?.otherPlayerMoves?.size ?? 0) > 0;
+      if (!hasAnim) return;
       const mapIndex = options.getMapIndex();
       if (!mapIndex) return; // 地图尚未就绪：停在循环内待命，由 finally 续排，不推进
       try {
@@ -69,15 +70,26 @@ export function createMovementLoop(store: GameStore, host: MovementLoopHost, opt
         // 避免循环死亡导致 isMoving 卡真、棋子永在不移动。
         console.error('[movementLoop] 移动步进异常，已跳过本帧', err);
       }
+      try {
+        // 其他玩家的权威带路径移动步进（角色 self 由 updateMovement 处理）
+        updateOtherPlayerMoveSteps(store, mapIndex);
+      } catch (err) {
+        console.error('[movementLoop] 其他玩家动画步进异常，已跳过本帧', err);
+      }
       const next = store.getSnapshot();
       if (next?.currentPlayer) {
         options.onDisplay(next.currentPlayer.id, next.playerDisplayX, next.playerDisplayY);
+      }
+      try {
+        projectOtherPlayerDisplays(next, mapIndex, options.onDisplay);
+      } catch (err) {
+        console.error('[movementLoop] 其他玩家动画投影异常，已跳过本帧', err);
       }
     } catch (err) {
       console.error('[movementLoop] 移动帧异常，已跳过本帧', err);
     } finally {
       const snap = store.getSnapshot();
-      if (snap?.isMoving) {
+      if (snap?.isMoving || (snap?.otherPlayerMoves?.size ?? 0) > 0) {
         frameId = host.raf(tick);
       } else {
         frameId = null;
@@ -99,7 +111,7 @@ export function createMovementLoop(store: GameStore, host: MovementLoopHost, opt
       if (disposed) return;
       if (frameId !== null) return; // 已有活跃循环，幂等
       const snap = store.getSnapshot();
-      if (!snap?.isMoving) return;
+      if (!(snap?.isMoving || (snap?.otherPlayerMoves?.size ?? 0) > 0)) return;
       frameId = host.raf(tick);
     },
     stop(): void {

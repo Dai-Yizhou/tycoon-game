@@ -1,5 +1,5 @@
 import { createMovementLoop, type MovementLoopHost } from '../src/game/systems/MovementLoop.js';
-import { startServerPathAnimation } from '../src/game/systems/MovementSystem.js';
+import { startServerPathAnimation, startOtherPlayerMove } from '../src/game/systems/MovementSystem.js';
 import { GameStore } from '../src/state/GameStore.js';
 
 /** 手动驱动的 RAF 宿主：用 step() 手动触发每帧，step 数由 calls 记录，不用真实 requestAnimationFrame */
@@ -147,5 +147,43 @@ describe('MovementLoop', () => {
     host.step();
     expect(store.getSnapshot().isMoving).toBe(false);
     restoreReduced();
+  });
+
+  it('驱动其他玩家带路径移动直到完成：逐步投影、落格到权威格并停表', () => {
+    const store = new GameStore();
+    // 独立的 1→2→3 连通地图（模块级 mapIndex 仅连接 1↔2，不支持 3 格路径）
+    const otherMap = { getById: (id: number) => ({ id, x: id * 10, y: id * 10, destinations: id === 1 ? [2] : id === 2 ? [3] : [] }) } as never;
+    store.applySnapshot({ sequence: store.nextSequence(), otherPlayers: [{ id: 'p2', username: '乙', position: { cellId: 1 }, status: 'normal', primaryValue: 0 }] });
+    startOtherPlayerMove(store, otherMap, 'p2', [1, 2, 3]);
+    const anim = store.getSnapshot().otherPlayerMoves.get('p2')!;
+    // 把第一步 startTime 拨到过去，让单步在下一帧到达（280ms 步长）
+    store.applySnapshot({ sequence: store.nextSequence(), otherPlayerMoves: new Map([['p2', { ...anim, startTime: performance.now() - 280 }]]) });
+
+    const host = manualHost();
+    const onDisplay = jest.fn();
+    const loop = createMovementLoop(store, host.host, {
+      getMapIndex: () => otherMap,
+      onArrived: jest.fn(),
+      onDisplay,
+      onSettled: jest.fn(),
+    });
+
+    loop.ensureRunning();
+    expect(host.isArmed()).toBe(true);
+
+    // 第 1 帧：第一步到达 → 推进到第 2 步（仍在移动），投影输出，循环续排
+    host.step();
+    expect(store.getSnapshot().otherPlayerMoves.size).toBe(1);
+    expect(store.getSnapshot().otherPlayers.find(p => p.id === 'p2')!.position.cellId).toBe(1);
+    expect(host.isArmed()).toBe(true);
+    expect(onDisplay).toHaveBeenCalled();
+
+    // 拨快第二步时间后完成：动画移除、落格到 path 终点格3、循环停表
+    const anim2 = store.getSnapshot().otherPlayerMoves.get('p2')!;
+    store.applySnapshot({ sequence: store.nextSequence(), otherPlayerMoves: new Map([['p2', { ...anim2, startTime: performance.now() - 280 }]]) });
+    host.step();
+    expect(store.getSnapshot().otherPlayerMoves.size).toBe(0);
+    expect(store.getSnapshot().otherPlayers.find(p => p.id === 'p2')!.position.cellId).toBe(3);
+    expect(host.isArmed()).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import { animateMoveTo, startNextStep, startServerPathAnimation, updateMovement } from '../src/game/systems/MovementSystem.js';
+import { animateMoveTo, startNextStep, startServerPathAnimation, updateMovement, startOtherPlayerMove, updateOtherPlayerMoveSteps, projectOtherPlayerDisplays } from '../src/game/systems/MovementSystem.js';
 import { onPlayerArrived } from '../src/game/systems/GameLogic.js';
 import { GameStore } from '../src/state/GameStore.js';
 
@@ -107,5 +107,65 @@ describe('MovementSystem authority', () => {
     onPlayerArrived(runtime);
 
     expect(store.getSnapshot().actionUsedThisTurn).toBe(false);
+  });
+});
+
+describe('Other player path movement', () => {
+  const mapIndex = {
+    getById: (id: number) => ({ id, x: id * 10, y: id * 10, destinations: id === 1 ? [2] : id === 2 ? [3] : [] }),
+  } as never;
+
+  function otherStore(): GameStore {
+    const store = new GameStore();
+    store.applySnapshot({ sequence: store.nextSequence(), otherPlayers: [{ id: 'p2', username: '乙', position: { cellId: 1 }, status: 'normal', primaryValue: 0 }] });
+    return store;
+  }
+
+  it('startOtherPlayerMove 为其他玩家建立逐格插值动画（起点 path[0]、当前步目标 path[1]）', () => {
+    const store = otherStore();
+    startOtherPlayerMove(store, mapIndex, 'p2', [1, 2]);
+    const anim = store.getSnapshot().otherPlayerMoves.get('p2');
+    expect(anim).toBeDefined();
+    expect(anim!.fromX).toBe(10);
+    expect(anim!.fromY).toBe(10);
+    expect(anim!.toX).toBe(20);
+    expect(anim!.toY).toBe(20);
+    expect(anim!.path).toEqual([1, 2]);
+    expect(anim!.pathIndex).toBe(1);
+  });
+
+  it('startOtherPlayerMove 拒绝无效路径（目标格缺失）且不覆盖已有动画', () => {
+    const store = otherStore();
+    startOtherPlayerMove(store, mapIndex, 'p2', [1, 2]);
+    startOtherPlayerMove(store, mapIndex, 'p2', [1, 99]);
+    expect(store.getSnapshot().otherPlayerMoves.get('p2')!.path).toEqual([1, 2]);
+  });
+
+  it('updateOtherPlayerMoveSteps 把已到步推到下一步，到终点则移除动画并落格到权威格', () => {
+    const store = otherStore();
+    // 起点 path[1](格2)；pathIndex=1 < path.length-1(2) → 推进到 path[2](格3)
+    store.applySnapshot({ sequence: store.nextSequence(), otherPlayerMoves: new Map([['p2', { fromX: 10, fromY: 10, toX: 20, toY: 20, startTime: performance.now() - 280, path: [1, 2, 3], pathIndex: 1 }]]) });
+
+    updateOtherPlayerMoveSteps(store, mapIndex);
+    let anim = store.getSnapshot().otherPlayerMoves.get('p2')!;
+    expect(anim.pathIndex).toBe(2);
+    expect(anim.toX).toBe(30);
+    expect(anim.toY).toBe(30);
+    expect(store.getSnapshot().otherPlayers.find(p => p.id === 'p2')!.position.cellId).toBe(1);
+
+    // 到达终点步：pathIndex=2 == path.length-1 → 移除动画、位置落格到格3
+    store.applySnapshot({ sequence: store.nextSequence(), otherPlayerMoves: new Map([['p2', { ...anim, startTime: performance.now() - 280 }]]) });
+    updateOtherPlayerMoveSteps(store, mapIndex);
+    expect(store.getSnapshot().otherPlayerMoves.size).toBe(0);
+    expect(store.getSnapshot().otherPlayers.find(p => p.id === 'p2')!.position.cellId).toBe(3);
+  });
+
+  it('projectOtherPlayerDisplays 按当前步插值输出展示位置', () => {
+    const store = otherStore();
+    store.applySnapshot({ sequence: store.nextSequence(), otherPlayerMoves: new Map([['p2', { fromX: 10, fromY: 10, toX: 20, toY: 20, startTime: performance.now() - 140, path: [1, 2], pathIndex: 1 }]]) });
+    const onDisplay = jest.fn();
+    projectOtherPlayerDisplays(store.getSnapshot(), mapIndex as never, onDisplay);
+    // 140ms / 280ms = 0.5 → easeInOutQuad(0.5)=0.5 → x≈15（performance.now 逐次调用有微秒级漂移）
+    expect(onDisplay).toHaveBeenCalledWith('p2', expect.closeTo(15, 0.2), expect.closeTo(15, 0.2));
   });
 });
