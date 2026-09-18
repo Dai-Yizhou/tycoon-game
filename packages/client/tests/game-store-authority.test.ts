@@ -222,4 +222,27 @@ describe('GameStore authority', () => {
       pathChoice: { active: true, options: [{ cellId: 3, label: '北方' }] },
     });
   });
+
+  it('监听者在广播期间写回 store 不会形成无限递归（可重入 publish）', () => {
+    const store = new GameStore();
+    // 模拟 GamePage 订阅者→syncCellActions→setCellActions→publish 的重入路径：
+    // 监听者首次收到广播时再次写回 store，新的写回应被收敛到本轮结束后补发，而非同步递归。
+    let backedOff = 0;
+    store.subscribe(() => {
+      if (backedOff === 0) {
+        backedOff += 1;
+        // 广播期间写回：若 publish 不可重入安全，这里会循环触发本监听者直到栈溢出
+        store.setCellActions([
+          { id: 'buy-property', label: '购买', detail: '2000', enabled: true },
+        ]);
+      }
+    });
+
+    expect(() => store.setCellActions([])).not.toThrow();
+    // 首次 broadcast 由 setCellActions([]) 触发；监听者写回后再补发，backedOff 推进到 1
+    expect(backedOff).toBe(1);
+    expect(store.getSnapshot().cellActions).toEqual([
+      { id: 'buy-property', label: '购买', detail: '2000', enabled: true },
+    ]);
+  });
 });

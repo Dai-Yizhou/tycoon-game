@@ -511,7 +511,8 @@ function syncCellActions(cellId: number): void {
   // 移动动画中 currentPlayerPosition 逐格推进：只展示最终停靠格的动作。
   // 防止把移动经过（非停靠）格的 act-btm 弹到按钮簇，误触指向越权操作。
   if (snapshot.isMoving) {
-    gameStore.setCellActions([]);
+    // 移动期每次广播都会进入本分支；已有 [] 时不再重写，避免「重写 cellActions→再广播→再进入→…」的同步写回死循环
+    if (gameStore.getSnapshot().cellActions.length > 0) gameStore.setCellActions([]);
     return;
   }
   // 交通枢纽目的地动作由 loadTransportDestinations 异步获取后写入 act-bar。

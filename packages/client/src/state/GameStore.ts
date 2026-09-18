@@ -271,8 +271,31 @@ export class GameStore {
     return () => this.listeners.delete(listener);
   }
 
+  /** 当前是否正在广播；广播期间发生的嵌套写回会被收敛到本轮结束后补发一次 */
+  private publishing = false;
+  /** 广播期间是否又发生了写回（需要补发） */
+  private republishPending = false;
+
   private publish(): void {
-    for (const listener of this.listeners) listener(this.snapshot);
+    // 可重入保护：订阅者在监听回调里对 store 写回会再次触发 publish。
+    // 若不加保护，publish → 监听者写回 → publish → … 形成无界同步递归，直接栈溢出，
+    // 进而打断移动 RAF 循环，造成"掷骰后卡在冷却+移动中、棋子不动"。
+    if (this.publishing) {
+      this.republishPending = true;
+      return;
+    }
+    this.publishing = true;
+    try {
+      for (const listener of this.listeners) listener(this.snapshot);
+    } finally {
+      this.publishing = false;
+      // 收敛：广播期间被标记的嵌套写回，结束后补发一次，保证监听者最终收到最新态。
+      // 补发由变更守卫（syncCellActions 等）保证幂等，不会形成新的写回循环。
+      if (this.republishPending) {
+        this.republishPending = false;
+        this.publish();
+      }
+    }
   }
 
   applySnapshot(snapshot: (Partial<ClientGameSnapshot> & Pick<ClientGameSnapshot, 'sequence'>) | ServerGameSnapshot): void {
