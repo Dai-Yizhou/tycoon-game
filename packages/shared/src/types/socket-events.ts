@@ -213,6 +213,8 @@ export interface ServerToClientEvents {
     serverTime: number;
     /** 各区域当前权威 UCT 值（regionId → { fieldId: 值 }），客户端据此初始化 regionValues，避免只用静态配置 initial */
     regionValues?: Record<string, Record<string, number>>;
+    /** 当前玩家团队的 UCT 汇总表（服务端权威均值；无团队/单人时为自身各字段值） */
+    teamValues?: Record<string, number>;
     /** 当前排行榜快照 */
     leaderboard?: LeaderboardSnapshot;
     /** 是否启用排行榜 */
@@ -396,6 +398,9 @@ export interface ServerToClientEvents {
 
   /** 骰子结果广播（其他玩家可见） */
   'server.diceRolled': (payload: { playerId: string; dice: number; steps: number; cooldownMs: number; cooldownEndsAt: number }) => void;
+
+  /** 当前玩家的团队 UCT 汇总表（Payer 团队成员字段均值）变更，客户端据此权威驱动 teamValue 展示 */
+  'server.teamValueTable': (payload: { playerId: string; teamValues: Record<string, number> }) => void;
 
   /** 全局初始数值字段定义（用于客户端 UI 渲染） */
   'server.valueFieldDefinitions': (payload: { definitions: ValueField[] }) => void;

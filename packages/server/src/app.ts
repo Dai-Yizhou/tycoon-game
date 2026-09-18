@@ -349,6 +349,8 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
     const currentPlayer = world.getPlayer(player.id);
     if (!currentPlayer) return;
     void achievementManager.recordUct({ accountId: currentPlayer.id, guest: isGuestPlayer(currentPlayer.username) }, mapMeta.id, currentPlayer).catch((error) => logger.error('achievement UCT update failed', error));
+    // 玩家数值变更即团队均值随之变化：随时下推其团队 UCT 汇总表，保证客户端 teamValue 展示权威
+    socketManager?.emitToPlayer(currentPlayer.id, 'server.teamValueTable', { playerId: currentPlayer.id, teamValues: world.computeTeamValueTable(currentPlayer.id) });
   });
   const leaderboardManager = new LeaderboardManager({
     worldId: world.getWorldIdentity()?.worldId ?? mapMeta.id,
@@ -426,6 +428,12 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
       reason: 'region_value_change',
       timestamp: Date.now(),
     });
+    // 区域值变化会改变 region 作用域字段的团队均值：向所有团队成员下推最新团队 UCT 汇总表
+    for (const member of world.getAllPlayers()) {
+      if (member.teamId) {
+        io.emit('server.teamValueTable', { playerId: member.id, teamValues: world.computeTeamValueTable(member.id) });
+      }
+    }
   });
 
   // 将 TimeZoneManager 注入 MovementHandler（移动时检测时区变化）

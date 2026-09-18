@@ -543,6 +543,8 @@ export class SocketManager {
           // 各区域当前权威 UCT 值（登录即下发），客户端据此初始化 regionValues，
           // 避免用静态配置 initial（否则 HUD/购买预览读到过期波纹前快照）
           regionValues: this.buildRegionValuesSnapshot(),
+          // 当前玩家的团队 UCT 汇总表：客户端据此以权威均值驱动 teamValue 展示（避免本地回退自身）
+          teamValues: this.world.computeTeamValueTable(player.id),
           leaderboard: this.leaderboardManager?.getCurrentSnapshot(player.id, now) ?? undefined,
         });
 

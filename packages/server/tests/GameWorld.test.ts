@@ -288,6 +288,32 @@ describe('GameWorld', () => {
     });
   });
 
+  describe('computeTeamValueTable', () => {
+    it('returns the arithmetic mean of team members per declared player field', () => {
+      const world = new GameWorld();
+      world.loadMap(buildLinearMap(3), buildMapMeta(), { skipValidation: true });
+      const team: Team = { id: 't1', name: 'T', memberIds: [], createdAt: Date.now(), disbanded: false };
+      world.createTeam(team);
+      world.addPlayer(buildPlayer('p1', { teamId: 't1', values: { money: { id: 'money', name: '金钱', current: 100 } } }));
+      world.addPlayer(buildPlayer('p2', { teamId: 't1', values: { money: { id: 'money', name: '金钱', current: 200 } } }));
+      world.addTeamMember('t1', 'p1');
+      world.addTeamMember('t1', 'p2');
+
+      expect(world.computeTeamValueTable('p1').money).toBe(150);
+      expect(world.computeTeamValueTable('p2').money).toBe(150);
+    });
+
+    it('falls back to the payer own value when the player has no team', () => {
+      const world = new GameWorld();
+      world.loadMap(buildLinearMap(3), buildMapMeta(), { skipValidation: true });
+      world.addPlayer(buildPlayer('p1', { values: { money: { id: 'money', name: '金钱', current: 80 } } }));
+
+      expect(world.computeTeamValueTable('p1').money).toBe(80);
+      // region 作用域字段默认取区域初始值（buildMapMeta 初始 prosperity=100）
+      expect(world.computeTeamValueTable('p1').prosperity).toBe(100);
+    });
+  });
+
   describe('Events', () => {
     it('emits playerAdded once when addPlayer is called', () => {
       const world = new GameWorld();

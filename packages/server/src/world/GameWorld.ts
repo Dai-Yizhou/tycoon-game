@@ -509,6 +509,20 @@ export class GameWorld {
     return values.reduce((a, b) => a + b, 0) / values.length;
   }
 
+  /**
+   * 计算某玩家所属团队的 UCT 汇总表：对地图声明的每个 value field（player/region 作用域）
+   * 求团队均值。无值（字段未声明/成员缺该字段）的字段不进入结果。
+   * 客户端据此以权威均值驱动 teamValue 展示，消除本地回退自身的乐观偏差（L-7）。
+   */
+  computeTeamValueTable(playerId: string): Record<string, number> {
+    const table: Record<string, number> = {};
+    for (const def of this.mapMeta?.valueFieldDefinitions ?? []) {
+      const value = this.computeTeamValue(playerId, def.id);
+      if (value !== undefined) table[def.id] = value;
+    }
+    return table;
+  }
+
   private getTeamByPlayer(playerId: string): Team | undefined {
     const player = this.getPlayer(playerId);
     if (!player?.teamId) return undefined;

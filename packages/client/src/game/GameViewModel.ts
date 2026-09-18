@@ -350,7 +350,13 @@ export class GameViewModel {
         if (typeof v === 'number') playerUct.player![def.id] = v;
       }
     }
-    const teamValue = (fieldId: string): number | undefined => currentPlayer?.values?.[fieldId]?.current;
+    // 团队均值优先取服务端权威的 teamValueTable（当前玩家团队的字段均值），避免多人团队下
+    // 乐观回退自身值导致 rent/升级费等展示偏差；缺失（单人/无该字段推送）时回退为当前玩家自身值。
+    const teamValueTable = snapshot.teamValueTable;
+    const teamValue = (fieldId: string): number | undefined => {
+      const v = teamValueTable[fieldId];
+      return typeof v === 'number' ? v : currentPlayer?.values?.[fieldId]?.current;
+    };
     const local = this.getLocalDayNight(this.getPlayerTimezoneOffset());
     return {
       valueModifiers: snapshot.valueModifiers,

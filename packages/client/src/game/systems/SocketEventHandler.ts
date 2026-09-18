@@ -41,7 +41,7 @@ const SOCKET_EVENTS = [
   'server.valueChanged', 'server.error', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
   'server.behaviorMessage',
   'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft',
-  'server.teamUpdated', 'server.teamDisbanded', 'server.regionValueChanged', 'server.gameState',
+  'server.teamUpdated', 'server.teamDisbanded', 'server.regionValueChanged', 'server.teamValueTable', 'server.gameState',
   'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.achievementUnlocked', 'server.playerBankrupt', 'server.playerRestarted',
   'server.propertyBought', 'server.propertyUpgraded', 'server.investmentBought', 'server.investmentEventTriggered',
 ] as const;
@@ -133,6 +133,10 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
         sequence: store.nextSequence(),
         regionValues: new Map(Object.entries(payload.regionValues).map(([id, values]) => [id, { ...values }])),
       });
+    }
+    // 登录/重连即用服务端权威团队 UCT 汇总表覆盖 teamValueTable
+    if (payload.teamValues && payload.player?.id === currentSnapshot.currentPlayer?.id) {
+      store.setTeamValueTable(payload.teamValues);
     }
     store.applySnapshot({ sequence: store.nextSequence(), player: payload.player, teamMembers, ownedProperties: payload.ownedProperties, ownedInvestments: payload.ownedInvestments });
   });
@@ -423,6 +427,14 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   socket.on('server.regionValueChanged', (payload: { regionId?: string; fieldId?: string; value?: number; delta: number; reason?: string; timestamp?: number }) => {
     if (payload.regionId && payload.fieldId && typeof payload.value === 'number') {
       store.setRegionValue(payload.regionId, payload.fieldId, payload.value);
+    }
+  });
+
+  // 监听当前玩家团队的 UCT 汇总表变化（服务端权威均值，随数值/队伍变更推送）
+  socket.on('server.teamValueTable', (payload: { playerId: string; teamValues: Record<string, number> }) => {
+    if (payload.playerId === store.getSnapshot().currentPlayer?.id) {
+      store.setTeamValueTable(payload.teamValues);
+      refresh();
     }
   });
 }

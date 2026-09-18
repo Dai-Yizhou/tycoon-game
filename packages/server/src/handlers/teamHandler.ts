@@ -365,6 +365,10 @@ export class TeamHandler {
         team: updatedTeam,
         members,
       });
+      // 成员变更即团队均值集合变化：向每个成员下推最新团队 UCT 汇总表（客户端权威 teamValue）
+      for (const memberId of updatedTeam.memberIds) {
+        this.emitToPlayer(memberId, 'server.teamValueTable', { playerId: memberId, teamValues: this.world.computeTeamValueTable(memberId) });
+      }
     }
   }
 
