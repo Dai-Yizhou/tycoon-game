@@ -41,8 +41,8 @@ import {
 
 import {
   onIntersectionChoice,
-  updateMovement,
 } from '../game/systems/MovementSystem.js';
+import { createMovementLoop, browserLoopHost, type MovementLoop } from '../game/systems/MovementLoop.js';
 
 import { registerSocketHandlers, unregisterSocketHandlers } from '../game/systems/SocketEventHandler.js';
 import { DesignAdapter } from '../design/DesignAdapter.js';
@@ -56,7 +56,7 @@ let unsubscribeGameStore: (() => void) | null = null;
 let mapIndex: MapIndex | null = null;
 let gameSocket: TypedClientSocket | null = null;
 let gameEffects: EffectController | null = null;
-let movementFrame: number | null = null;
+let gameMovementLoop: MovementLoop | null = null;
 // 当前已应用的区域 UI 主题 id；null 表示尚未应用（首次加载）。用于区分"主题切换转场"与"首次加载不转场"。
 let appliedRegionThemeId: string | null = null;
 const pageEventCleanups = new WeakMap<HTMLElement, () => void>();
@@ -104,6 +104,18 @@ export function createGamePage(controller: GameController): HTMLElement {
   boardContainer.className = 'board-container';
   const interactiveMap = new InteractiveMapSurface();
   boardContainer.appendChild(interactiveMap.getElement());
+  const ensureMovementLoop = (): MovementLoop | null => {
+    if (gameMovementLoop) return gameMovementLoop;
+    if (!gameStore || !gameEffects) return null;
+    gameMovementLoop = createMovementLoop(gameStore, browserLoopHost(), {
+      getMapIndex: () => mapIndex ?? undefined,
+      onArrived: () => invokeGameAction(onPlayerArrived),
+      effects: gameEffects,
+      onDisplay: (id, x, y) => interactiveMap.setPlayerDisplayPosition(id, x, y),
+      onSettled: (id, x, y) => interactiveMap.setPlayerDisplayPosition(id, x, y),
+    });
+    return gameMovementLoop;
+  };
   unsubscribeGameStore = gameStore.subscribe((snapshot) => {
     const players = toInteractivePlayers(snapshot);
     interactiveMap.setMovementLocked(snapshot.isMoving);
@@ -124,42 +136,10 @@ export function createGamePage(controller: GameController): HTMLElement {
       interactiveMap.setPlayerDisplayPosition(displayPlayer.id, snapshot.playerDisplayX, snapshot.playerDisplayY);
       interactiveMap.followDisplayPosition(snapshot.playerDisplayX, snapshot.playerDisplayY);
     }
-    if (snapshot.isMoving && movementFrame === null) {
-      // RAF 循环必须由本回调启动一次，并仅在无循环运行时（movementFrame === null）才再次启动。
-      // 严禁在 tick 开头将 movementFrame 置空：tick 内 updateMovement 通过
-      // applySnapshot 同步触发本订阅回调，若此时 movementFrame 已为 null，会重复
-      // requestAnimationFrame 排入并发循环，导致同一帧内路径步进与棋子位置被多个
-      // 回调交错覆盖——视野瞬移、棋子停在原地/错位。
-      const tick = (): void => {
-        const current = gameStore?.getSnapshot();
-        if (!current?.isMoving) {
-          movementFrame = null;
-          return;
-        }
-        if (mapIndex) {
-          updateMovement(gameStore!, mapIndex, () => {
-            invokeGameAction(onPlayerArrived);
-          }, movementEffects);
-        }
-        const next = gameStore?.getSnapshot();
-        if (next?.currentPlayer) {
-          interactiveMap.setPlayerDisplayPosition(next.currentPlayer.id, next.playerDisplayX, next.playerDisplayY);
-          if (next.isMoving) interactiveMap.followDisplayPosition(next.playerDisplayX, next.playerDisplayY);
-        }
-        if (next?.isMoving) {
-          movementFrame = window.requestAnimationFrame(tick);
-        } else if (next?.currentPlayer) {
-          movementFrame = null;
-          const finalCell = mapIndex?.getById(next.currentPlayerPosition);
-          if (finalCell) {
-            interactiveMap.setPlayerDisplayPosition(next.currentPlayer.id, finalCell.x, finalCell.y);
-          }
-        } else {
-          movementFrame = null;
-        }
-      };
-      movementFrame = window.requestAnimationFrame(tick);
-    }
+    // 移动步进循环由独立、异常安全、可单测的 MovementLoop 驱动。此处仅"确保其运行"：
+    // 未运行且 isMoving 为真时才启动（幂等），循环内部自续排，单帧抛错不会被吞成死循环，
+    // 从而杜绝"isMoving 卡真、棋子永在不移动"的卡死。
+    ensureMovementLoop()?.ensureRunning();
   });
   page.appendChild(boardContainer);
 
@@ -575,10 +555,8 @@ function formatTeamValues(values: Record<string, number>, definitions: Array<{ i
 }
 
 export function cleanupGamePage(page: HTMLElement): void {
-  if (movementFrame !== null) {
-    window.cancelAnimationFrame(movementFrame);
-    movementFrame = null;
-  }
+  gameMovementLoop?.stop();
+  gameMovementLoop = null;
   pageEventCleanups.get(page)?.();
   pageEventCleanups.delete(page);
   gameHudShell?.destroy();
