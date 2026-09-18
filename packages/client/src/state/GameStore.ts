@@ -239,7 +239,12 @@ export class GameStore {
       mapTimezones: timezones.map(timezone => ({ ...timezone })),
       valueFieldDefs: valueFields.map(field => ({ ...field })),
       valueModifiers: valueModifiers.map(rule => ({ ...rule })),
-      regionValues: new Map(regions.map((region) => [region.id, { ...region.initialValues }])),
+      regionValues: new Map(regions.map((region) => [
+        region.id,
+        // 仅对缺失区域回填静态初值：若该区域已存在值（来自登录权威 server.gameState），
+        // 保留权威值，避免异步下 setRegions 晚于权威快照执行时把累计区域值覆盖回配置初值（同区玩家 HUD 漂移）
+        this.snapshot.regionValues.get(region.id) ?? { ...region.initialValues },
+      ])),
     };
     this.publish();
   }
