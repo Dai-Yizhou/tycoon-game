@@ -103,6 +103,41 @@ describe('Taxation UCT', () => {
     expect(world.getPlayer('p1')!.values.credit.current).toBe(9);
   });
 
+  it('broadcasts server.valueChanged per-field after a successful tax debit so client HUD reflects deduction', () => {
+    const world = new GameWorld();
+    world.loadMap([baseCell], meta);
+    world.addPlayer(makePlayer('p1', 2000, 50));
+    const emit = jest.fn();
+    const taxation = new Taxation({ emit } as never, world, makeConfig({ money: 0.1, credit: 0.2 }, {}, {}));
+
+    taxation.triggerManualTax('p1');
+
+    const valueChanged = emit.mock.calls.filter(([event]) => event === 'server.valueChanged');
+    expect(valueChanged).toEqual([
+      ['server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1800, delta: -200 }],
+      ['server.valueChanged', { playerId: 'p1', fieldId: 'credit', current: 40, delta: -10 }],
+    ]);
+    expect(world.getPlayer('p1')!.values.money.current).toBe(1800);
+    expect(world.getPlayer('p1')!.values.credit.current).toBe(40);
+  });
+
+  it('does not broadcast server.valueChanged when the whole tax debit rolls back', () => {
+    const world = new GameWorld();
+    world.loadMap([baseCell], meta);
+    const p1 = makePlayer('p1', 1000, 0);
+    delete (p1.values as Record<string, unknown>).credit;
+    world.addPlayer(p1);
+    world.getRuntimeState().replaceOwnerships(0, [{ playerId: 'p1', share: 1, purchasePrice: 100 }]);
+    const emit = jest.fn();
+    const taxation = new Taxation({ emit } as never, world, makeConfig({ money: 0.1 }, {}, { credit: 10 }));
+
+    const result = taxation.triggerManualTax('p1');
+    expect(result.success).toBe(false);
+    // 回滚路径不广播扣款，避免客户端看到未持久化的扣减
+    const valueChanged = emit.mock.calls.filter(([event]) => event === 'server.valueChanged');
+    expect(valueChanged).toHaveLength(0);
+  });
+
   it('rolls back applied fields and returns failure when a later tax debit fails on a missing field', () => {
     const world = new GameWorld();
     world.loadMap([baseCell], meta);

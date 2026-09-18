@@ -192,6 +192,8 @@ export class Taxation {
     // 事务式扣款：先快照玩家税前状态；任一步扣款失败则回滚已扣字段，不写税收记录、不广播成功。
     // createIfMissing = false：被征税字段必须先存在于玩家，缺失当作配置/状态不一致而失败，而非静默补建。
     const rollbackSnapshot: Player = { ...player, values: clonePlayerValues(player) };
+    // 逐字段扣款成功后统一广播 valueChanged，供客户端 HUD 即时反馈（taxCollected 无客户端监听，仅作记录）
+    const debits: Array<{ fieldId: string; current: number; delta: number }> = [];
     for (const [fieldId, amount] of Object.entries(baseTax.player ?? {})) {
       const result = this.economy.changeValue(playerId, fieldId, -amount, 'tax', false);
       if (!result.ok) {
@@ -199,6 +201,7 @@ export class Taxation {
         logger.warn(`玩家 ${playerId} 基础税扣款失败（${fieldId}）：${result.error ?? '未知错误'}，已回滚`);
         return { success: false, error: `基础税扣款失败（${fieldId}）：${result.error ?? '未知错误'}` };
       }
+      debits.push({ fieldId, current: result.current, delta: result.delta });
     }
     for (const [fieldId, amount] of Object.entries(shareTax.player ?? {})) {
       const result = this.economy.changeValue(playerId, fieldId, -amount, 'share-tax', false);
@@ -207,6 +210,7 @@ export class Taxation {
         logger.warn(`玩家 ${playerId} 股份税扣款失败（${fieldId}）：${result.error ?? '未知错误'}，已回滚`);
         return { success: false, error: `股份税扣款失败（${fieldId}）：${result.error ?? '未知错误'}` };
       }
+      debits.push({ fieldId, current: result.current, delta: result.delta });
     }
 
     const taxRecord: TaxRecord = {
@@ -219,6 +223,11 @@ export class Taxation {
     };
 
     this.addTaxRecord(playerId, taxRecord);
+
+    // 4.5 广播逐字段扣款，客户端 HUD 得以即时反映计税结果
+    for (const debit of debits) {
+      this.io.emit('server.valueChanged', { playerId, fieldId: debit.fieldId, current: debit.current, delta: debit.delta });
+    }
 
     // 5. 广播税收事件
     this.io.emit('server.taxCollected', {
