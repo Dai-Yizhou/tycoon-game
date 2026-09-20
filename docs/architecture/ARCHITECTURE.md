@@ -103,6 +103,8 @@ sequenceDiagram
 
 `SocketEventHandler` 将 `server.gameState`、`server.playerMoved`、`server.valueChanged`、`server.playerStatusChanged`、`server.teamUpdated`、`server.investmentEventTriggered`、昼夜和繁荣度事件转写为 `GameStore` 状态；通过注册时注入的 HUD 刷新回调触发通知、聊天、移动动画或界面刷新，不再使用模块级全局刷新槽。`GameViewModel` 是 `GameHudShell` 的状态桥梁，按切片通知订阅者，不依赖 Socket 或具体 UI。
 
+昼夜属**权威区域时钟域**：服务端下发 `dayRatio`（白天占周期比例，经 `server.dayNightProgress` / `server.dayNightChanged` 下发），客户端仅按 `localProgress < dayRatio` 插值判定 `isDay`、不自行决定边界；`region.time`（白天=0/夜晚=1）由该权威时钟推导，属本域而非逐字段数值变更，客户端据此做 `region.time` 一致性预览。
+
 ```text
 server.*
   -> SocketEventHandler
@@ -154,11 +156,12 @@ InteractiveMapSurface：每个格子 <g> 的 mouseenter / tap
 
 ## 残余技术债
 
-- `GamePage` 仍承担页面组合、兼容状态和部分业务接线，`GameStore` 与 `GameViewModel` 并存。
-- `packages/client/src/state/GameStore.ts` 是客户端业务快照源；旧模块级变量仅保留给渲染和兼容接线，不再作为经济业务状态写入口。
+- `GameStore` 是客户端**唯一**业务快照源，全客户端仅一份实例，属硬约束：`SocketEventHandler.registerSocketHandlers` 的 `store` 为必填参数、禁止内部实例化默认实例；`GameViewModel`/`cellDisplayModel` 仅为只读投影，不再作为经济业务状态写入口。
+- 客户端经济数值投影遵循服务端绝对值覆写契约：`server.valueChanged` 广播 `current`（当前值）+ `delta:0`，客户端对该字段直接覆写、不累加，不做本地结算写入口。
 - 客户端 `SocketEventHandler.ts` 残留 `console.warn('[DBG-*]')` 调试日志，Beta 上线前应移除。
 - `server.notification` 无集中通知管理器：由各 handler 就地 `emit`（见事件/地产/交通/监狱/纪念碑 handler），认证/持久化能力以 `app.ts` 注册为准；通知载荷一致性与限频为已知收敛点。
 - `REDIS_URL` 在配置类型和文档中存在，当前 app 未建立 Redis 适配器；不能描述为已实现多实例同步。
+- 客户端缺低频一致性兜底（`client.heartbeat` 摘要 / `server.resyncDomain` 定向域重拉）**尚未实现**；当前重连靠重复 `login` 拉权威快照对账。已明确**不采用版本号/gap-resync** 方案，后续若引入心跳对账，仅在摘要不一致时补发对应域。
 - 多玩家经济结算仍以逐字段 `server.valueChanged` 下发，暂无结算级批次协议或最终权威快照（`economicSettlement` / batch 尚未实现）。该项已明确记为技术债，暂不作为内测上线阻断项；当前正确性边界是服务端统一经 `EconomyService` 写入、按已确认的有效股东原始持股比例结算、事件触发闭环，以及客户端按服务端绝对 `current` 值投影。后续仅在出现最终状态不一致、经济链路引入异步操作、断线恢复结算或多实例部署需求时，升级为批次协议设计。
 - 经济加锁仅按格子级（`property:<cellId>` / `investment:<cellId>`）进行，无玩家级串行锁；单进程同步执行下暂无明显竞争，若未来引入异步 `await` 经济链路或多实例部署，需另行评估 `player:<playerId>` 锁与跨实例共享锁（Redis），当前未实现。
 - 服务端存在 REST 地图读取与 Socket 状态两条输入来源，客户端地图请求失败时的回退逻辑增加了状态排查成本。
