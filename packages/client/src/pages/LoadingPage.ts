@@ -10,7 +10,6 @@
 import type { GameController } from '../game/GameController.js';
 import { createSocket, waitForConnection } from '../hooks/useSocket.js';
 import { t } from '../game/i18n.js';
-import { GameStore } from '../state/GameStore.js';
 
 
 const loadingPageCleanups = new WeakMap<HTMLElement, () => void>();
@@ -20,7 +19,6 @@ const loadingPageCleanups = new WeakMap<HTMLElement, () => void>();
  */
 export function createLoadingPage(controller: GameController): HTMLElement {
   const container = controller.getContainer();
-  const gameStore = new GameStore();
 
   const page = document.createElement('div');
   page.className = 'page loading-page';
@@ -110,7 +108,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
       },
       onStatus: (status) => {
         if (!active || attempt !== connectionAttempt) return;
-        if (status === 'offline') gameStore.setLeaderboardOffline();
+        if (status === 'offline') controller.setLeaderboardOffline();
       },
       onError: (error) => {
         if (!active || attempt !== connectionAttempt) return;

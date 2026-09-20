@@ -205,6 +205,14 @@ export class GameController {
     this.notifyListeners();
   }
 
+  /**
+   * 标记榜单离线（加载期未连接成功时由 controller 统一持有，避免在 LoadingPage 另建 GameStore）
+   */
+  setLeaderboardOffline(): void {
+    this.context.leaderboard = null;
+    this.notifyListeners();
+  }
+
   setBankrupt(): void {
     if (this.context.player) this.context.player.status = 'bankrupt';
     this.setState('bankruptcy');

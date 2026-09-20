@@ -49,7 +49,7 @@ const SOCKET_EVENTS = [
 /**
  * 注册所有 socket 事件处理器
  */
-export function registerSocketHandlers(socket: TypedClientSocket, options: SocketHandlerOptions = { store: new GameStore() }): void {
+export function registerSocketHandlers(socket: TypedClientSocket, options: SocketHandlerOptions): void {
   if (registeredSockets.has(socket)) return;
   registeredSockets.add(socket);
   const store = options.store;

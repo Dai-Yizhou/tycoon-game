@@ -17,8 +17,8 @@ describe('SocketEventHandler lifecycle', () => {
       }),
     } as any;
 
-    registerSocketHandlers(socket);
-    registerSocketHandlers(socket);
+    registerSocketHandlers(socket, { store: new GameStore() });
+    registerSocketHandlers(socket, { store: new GameStore() });
 
     expect(Math.max(...[...handlers.values()].map(eventHandlers => eventHandlers.length))).toBe(1);
 
@@ -38,9 +38,8 @@ describe('SocketEventHandler lifecycle', () => {
       off: jest.fn(),
     } as any;
 
-    registerSocketHandlers(socket);
+    registerSocketHandlers(socket, { store: new GameStore() });
     unregisterSocketHandlers(socket);
-
     expect(socket.on).toHaveBeenCalled();
     expect(socket.off).toHaveBeenCalled();
     expect(socket.off.mock.calls.map(([event]: [string]) => event)).toEqual(expect.arrayContaining([...handlers.keys()]));
