@@ -354,6 +354,8 @@ export interface ServerToClientEvents {
     cycleStartTime: number;
     /** 周期时长（分钟） */
     cycleMinutes: number;
+    /** 白天占周期比例（权威值，客户端 isDay 边界据此判定） */
+    dayRatio: number;
   }) => void;
 
   /** 昼夜进度更新（每秒广播） */
@@ -362,6 +364,8 @@ export interface ServerToClientEvents {
     phase: 'day' | 'night';
     /** 周期内进度（0-1） */
     progress: number;
+    /** 白天占周期比例（权威值，客户端 isDay 边界据此判定） */
+    dayRatio: number;
     /** 全局时间（Unix 毫秒） */
     globalTime: number;
     /** 周期起始时间（Unix 毫秒），客户端据此同步 */

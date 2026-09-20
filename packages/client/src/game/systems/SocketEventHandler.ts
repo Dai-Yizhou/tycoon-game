@@ -62,13 +62,13 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     socket.onAny(observer);
   }
   // 每秒进度更新：同步 cycleStartTime 和计算时钟偏移
-  socket.on('server.dayNightProgress', (payload: { cycleStartTime: number; cycleMinutes: number; globalTime: number }) => {
-    store.updateDayNight({ dayNightStartTime: payload.cycleStartTime, serverTimeOffset: payload.globalTime - Date.now(), cycleMinutes: payload.cycleMinutes });
+  socket.on('server.dayNightProgress', (payload: { cycleStartTime: number; cycleMinutes: number; globalTime: number; dayRatio?: number }) => {
+    store.updateDayNight({ dayNightStartTime: payload.cycleStartTime, serverTimeOffset: payload.globalTime - Date.now(), cycleMinutes: payload.cycleMinutes, dayNightRatio: payload.dayRatio ?? store.getSnapshot().dayNightRatio });
   });
 
   // 阶段切换：同步时间。昼夜状态由 HUD 昼夜指示器直观呈现，不再推送聊天提示
-  socket.on('server.dayNightChanged', (payload: { cycleStartTime: number; cycleMinutes: number; globalTime: number; isDay: boolean }) => {
-    store.updateDayNight({ dayNightStartTime: payload.cycleStartTime, serverTimeOffset: payload.globalTime - Date.now(), cycleMinutes: payload.cycleMinutes });
+  socket.on('server.dayNightChanged', (payload: { cycleStartTime: number; cycleMinutes: number; globalTime: number; isDay: boolean; dayRatio?: number }) => {
+    store.updateDayNight({ dayNightStartTime: payload.cycleStartTime, serverTimeOffset: payload.globalTime - Date.now(), cycleMinutes: payload.cycleMinutes, dayNightRatio: payload.dayRatio ?? store.getSnapshot().dayNightRatio });
   });
 
   // 心跳校正时钟偏移

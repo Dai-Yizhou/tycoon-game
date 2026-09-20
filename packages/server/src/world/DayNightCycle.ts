@@ -204,6 +204,7 @@ export class DayNightCycle extends EventEmitter {
       this.io.emit('server.dayNightProgress', {
         phase: snapshot.phase,
         progress: snapshot.progress,
+        dayRatio: this.config.dayRatio,
         globalTime: snapshot.globalTime,
         cycleStartTime: this.cycleStartTime,
         cycleMinutes: this.config.cycleMinutes,
@@ -299,6 +300,7 @@ export class DayNightCycle extends EventEmitter {
     const snapshot = this.getSnapshot();
     this.io.emit('server.dayNightChanged', {
       isDay: snapshot.phase === DayNightPhase.Day,
+      dayRatio: this.config.dayRatio,
       globalTime: snapshot.globalTime,
       progress: snapshot.progress,
       cycleStartTime: this.cycleStartTime,

@@ -33,3 +33,22 @@ describe('day/night boundary aligns client isDay with server dayRatio (0.5)', ()
     expect(day.isDay).toBe(true);
   });
 });
+
+describe('day/night dayRatio 权威下发（非硬编码 0.5）', () => {
+  function vmAtProgress(progress: number, dayRatio: number): GameViewModel {
+    const store = new GameStore();
+    const now = Date.now();
+    store.updateDayNight({ cycleMinutes: 1, serverTimeOffset: 0, dayNightStartTime: now - progress * 60_000, dayNightRatio: dayRatio });
+    return new GameViewModel(store);
+  }
+
+  it('服务端下发 dayRatio=0.25 时：progress 0.1 判昼，0.4 判夜（边界跟随权威值）', () => {
+    expect(vmAtProgress(0.1, 0.25).getLocalDayNight(0).isDay).toBe(true);
+    expect(vmAtProgress(0.4, 0.25).getLocalDayNight(0).isDay).toBe(false);
+  });
+
+  it('dayRatio=0.75 时：progress 0.6 仍判昼，0.85 判夜', () => {
+    expect(vmAtProgress(0.6, 0.75).getLocalDayNight(0).isDay).toBe(true);
+    expect(vmAtProgress(0.85, 0.75).getLocalDayNight(0).isDay).toBe(false);
+  });
+});
