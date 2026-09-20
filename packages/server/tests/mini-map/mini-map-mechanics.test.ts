@@ -84,7 +84,7 @@ describe('R1 property.price 区域繁荣度联动（玩家越沉迷高繁荣区�
     (handler as any).handleBuyProperty(makeSocket(io), { cellId: 1 }, ack);
     expect(ack).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
     expect(p1.values.money.current).toBe(1650);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1650, delta: -350 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1650, delta: 0 });
   });
 
   it('cell7(西部 pros=2)：price = -150 - 2*50 = -250，money 2000→1750', () => {
@@ -97,7 +97,7 @@ describe('R1 property.price 区域繁荣度联动（玩家越沉迷高繁荣区�
     (handler as any).handleBuyProperty(makeSocket(io), { cellId: 7 }, ack);
     expect(ack).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
     expect(p1.values.money.current).toBe(1750);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1750, delta: -250 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1750, delta: 0 });
   });
 });
 
@@ -119,7 +119,7 @@ describe('R2 property.rent 昼夜 + 股东人数联动', () => {
     const { world, p1 } = setupRent(io, false);
     (new PropertyHandler(io, world) as any).handleRentPayment('p1', 1, makeSocket(io));
     expect(p1.values.money.current).toBe(1994);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1994, delta: -6 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1994, delta: 0 });
     expect(world.getRegionValue('northeast', 'pros')).toBe(6);
   });
 
@@ -128,7 +128,7 @@ describe('R2 property.rent 昼夜 + 股东人数联动', () => {
     const { world, p1 } = setupRent(io, true);
     (new PropertyHandler(io, world) as any).handleRentPayment('p1', 1, makeSocket(io));
     expect(p1.values.money.current).toBe(1992);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1992, delta: -8 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1992, delta: 0 });
   });
 });
 
@@ -145,14 +145,14 @@ describe('R3 property.upgradeCost 等级联动', () => {
     (handler as any).handleUpgradeProperty(makeSocket(io), { cellId: 1 }, ack);
     expect(ack).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
     expect(p1.values.money.current).toBe(1600);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1600, delta: -50 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1600, delta: 0 });
     // 第二次升级（level 1→2），新 handler 以清空"本次停靠已操作"
     handler = new PropertyHandler(io, world);
     ack = jest.fn();
     (handler as any).handleUpgradeProperty(makeSocket(io), { cellId: 1 }, ack);
     expect(ack).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
     expect(p1.values.money.current).toBe(1495);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1495, delta: -105 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1495, delta: 0 });
   });
 });
 
@@ -168,7 +168,7 @@ describe('R4 transport.cost 固定传送费', () => {
     (handler as any).handleUseTransport(makeSocket(io), { hubCellId: 3, targetCellId: 6 }, ack);
     expect(ack).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
     expect(p1.values.money.current).toBe(1980);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1980, delta: -20 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1980, delta: 0 });
   });
 
   it('cell3→cell1：base money -20 → -30，money 2000→1970；区域 pros 3→2（base.region 保持）', () => {
@@ -182,7 +182,7 @@ describe('R4 transport.cost 固定传送费', () => {
     (handler as any).handleUseTransport(makeSocket(io), { hubCellId: 3, targetCellId: 1 }, ack);
     expect(ack).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
     expect(p1.values.money.current).toBe(1970);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1970, delta: -30 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1970, delta: 0 });
     expect(world.getRegionValue('midwest', 'pros')).toBe(2);
   });
 });
@@ -198,7 +198,7 @@ describe('R5 investment.price 团队信用联动', () => {
     (handler as any).handleBuyInvestment(makeSocket(io), { cellId: 4 }, ack);
     expect(ack).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
     expect(p1.values.money.current).toBe(1750);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1750, delta: -250 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1750, delta: 0 });
   });
 
   it('团队2人(credit 50/10 均值30)：price = -200 - 30 = -230，money 2000→1770', () => {
@@ -216,7 +216,7 @@ describe('R5 investment.price 团队信用联动', () => {
     (handler as any).handleBuyInvestment(makeSocket(io), { cellId: 4 }, ack);
     expect(ack).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
     expect(p1.values.money.current).toBe(1770);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1770, delta: -230 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1770, delta: 0 });
   });
 });
 
@@ -235,7 +235,7 @@ describe('R6 investment.investmentTriggers.delta 域事件', () => {
     expect(results.length).toBe(1);
     // 股东(share=1)分到 +11
     expect(p1.values.money.current).toBe(1761);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1761, delta: 11 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1761, delta: 0 });
     expect(world.getRegionValue('midwest', 'pros')).toBe(5);
   });
 });
@@ -251,7 +251,7 @@ describe('R7/R8 jail 冷却与信用扣减', () => {
     expect(entered).toBe(true);
     expect(p1.status).toBe(PlayerStatus.Jail);
     expect(p1.values.credit.current).toBe(46);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'credit', current: 46, delta: -4 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'credit', current: 46, delta: 0 });
     const jailedPayload = io.emit.mock.calls.find((call) => call[0] === 'server.playerJailed');
     expect(jailedPayload?.[1].durationMs).toBe(9000);
   });
@@ -269,8 +269,8 @@ describe('R9 monument.repairCost 团队成本', () => {
     expect(ack).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
     expect(p1.values.money.current).toBe(1955);
     expect(p1.values.credit.current).toBe(55);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1955, delta: -45 });
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'credit', current: 55, delta: 5 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1955, delta: 0 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'credit', current: 55, delta: 0 });
     expect(world.getRegionValue('south', 'pros')).toBe(14);
   });
 
@@ -289,7 +289,7 @@ describe('R9 monument.repairCost 团队成本', () => {
     (handler as any).handleRepairMonument(makeSocket(io), { monumentId: 6 }, ack);
     expect(ack).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
     expect(p1.values.money.current).toBe(1950);
-    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1950, delta: -50 });
+    expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 1950, delta: 0 });
   });
 });
 

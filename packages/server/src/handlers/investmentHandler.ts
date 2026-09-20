@@ -21,6 +21,7 @@ import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
 import { addOwnership, getOwnerships, distributeByShareFloor } from '../economy/index.js';
+import { publishValueChanged } from '../net/valuePublisher.js';
 import type { PropertyOwnership } from './propertyHandler.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
 import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
@@ -451,7 +452,7 @@ export class InvestmentHandler {
         return [];
       }
       changes.push({ fieldId, delta: change.delta });
-      this.io.emit('server.valueChanged', { playerId: player.id, fieldId, current: change.current, delta: change.delta });
+      publishValueChanged(this.io, player.id, fieldId, change.current);
     }
     return changes;
   }
@@ -496,7 +497,7 @@ export class InvestmentHandler {
           if (!player) continue;
           const change = this.economy.changeValue(player.id, fieldId, sign * units, 'investment_impact');
           if (!change.ok) continue;
-          this.io.emit('server.valueChanged', { playerId: player.id, fieldId, current: change.current, delta: change.delta });
+          publishValueChanged(this.io, player.id, fieldId, change.current);
           const bucket = perOwner.get(ownerId) ?? {};
           bucket[fieldId] = (bucket[fieldId] ?? 0) + sign * units;
           perOwner.set(ownerId, bucket);

@@ -30,6 +30,7 @@ import {
 } from '../economy/index.js';
 import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
 import { EconomyService } from '../economy/EconomyService.js';
+import { publishValueChanged } from '../net/valuePublisher.js';
 
 /**
  * 地产所有权信息
@@ -91,7 +92,7 @@ export class PropertyHandler {
   private behaviorEngine: BehaviorEngine | null = null;
   /** 每位玩家本次停靠是否已执行购买或升级（到达时重置，停一次只允许一次操作） */
   private readonly actedThisVisit = new Map<string, boolean>();
-  private readonly operationGuard = new EconomicOperationGuard<AckResult<{ cell: Cell }>>();
+  private readonly operationGuard = new EconomicOperationGuard<AckResult<{ cell: Cell; price: Uct }>>();
 
   constructor(io: TypedServer, world: GameWorld, economy: EconomyService = new EconomyService(world)) {
     this.io = io;
@@ -162,7 +163,7 @@ export class PropertyHandler {
   private handleBuyProperty(
     socket: TypedSocket,
     payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
-    ack?: (result: AckResult<{ cell: Cell }>) => void,
+    ack?: (result: AckResult<{ cell: Cell; price: Uct }>) => void,
   ): void {
     try {
       const requestId = payload.requestId;
@@ -282,7 +283,7 @@ export class PropertyHandler {
       this.io.emit('server.propertyBought', {
         cell: result.cell,
         playerId,
-        price: priceUct,
+        price: priceUct!,
         runtime: this.world.getRuntimeState().getCellState(result.cell.id),
       });
 
@@ -324,7 +325,7 @@ export class PropertyHandler {
       const requestId = payload.requestId;
       if (requestId) {
         const previous = this.operationGuard.getResult(requestId);
-        if (previous) { ack?.(previous as AckResult<{ cell: Cell; cost: Uct }>); return; }
+        if (previous) { ack?.(previous as unknown as AckResult<{ cell: Cell; cost: Uct }>); return; }
       }
       const lockKey = `property-upgrade:${payload.cellId}`;
       if (!this.operationGuard.tryLock(lockKey)) { ack?.({ ok: false, error: 'operation_in_progress' }); return; }
@@ -740,7 +741,7 @@ export class PropertyHandler {
         return [];
       }
       changes.push({ fieldId, delta, previous });
-      this.io.emit('server.valueChanged', { playerId: player.id, fieldId, current: change.current, delta: change.delta });
+      publishValueChanged(this.io, player.id, fieldId, change.current);
     }
     return changes;
   }

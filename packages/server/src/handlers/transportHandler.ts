@@ -22,6 +22,7 @@ import type { GameWorld } from '../world/GameWorld.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
 import type { EconomyService } from '../economy/EconomyService.js';
+import { publishValueChanged } from '../net/valuePublisher.js';
 
 /**
  * 传送结果
@@ -384,13 +385,8 @@ export class TransportHandler {
     // 3. 广播数值变化
     const player = this.world.getPlayer(result.playerId);
     if (player) {
-      for (const [fieldId, delta] of Object.entries(result.cost.player ?? {})) {
-        this.io.emit('server.valueChanged', {
-          playerId: result.playerId,
-          fieldId,
-          current: player.values[fieldId]?.current ?? 0,
-          delta,
-        });
+      for (const fieldId of Object.keys(result.cost.player ?? {})) {
+        publishValueChanged(this.io, result.playerId, fieldId, player.values[fieldId]?.current ?? 0);
       }
     }
   }

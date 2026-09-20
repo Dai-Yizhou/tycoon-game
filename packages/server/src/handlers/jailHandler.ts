@@ -22,6 +22,7 @@ import type { GameWorld } from '../world/GameWorld.js';
 import type { HandlerRegistry } from '../transport/handlers.js';
 import type { EconomyService } from '../economy/EconomyService.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
+import { publishValueChanged } from '../net/valuePublisher.js';
 
 /**
  * 监狱运行时配置
@@ -379,7 +380,7 @@ export class JailHandler {
     for (const [fieldId, delta] of Object.entries(cost?.player ?? {})) {
       if (this.economy) {
         const change = this.economy.changeValue(player.id, fieldId, delta, 'jail_entry');
-        if (change.ok) this.io.emit('server.valueChanged', { playerId: player.id, fieldId, current: change.current, delta: change.delta });
+        if (change.ok) publishValueChanged(this.io, player.id, fieldId, change.current);
         continue;
       }
       const field = player.values[fieldId];
@@ -387,7 +388,7 @@ export class JailHandler {
       const previous = field.current;
       field.current = Math.max(field.min ?? Number.NEGATIVE_INFINITY, Math.min(field.max ?? Number.POSITIVE_INFINITY, previous + delta));
       this.world.updatePlayer(player as any);
-      this.io.emit('server.valueChanged', { playerId: player.id, fieldId, current: field.current, delta: field.current - previous });
+      publishValueChanged(this.io, player.id, fieldId, field.current);
     }
   }
 
