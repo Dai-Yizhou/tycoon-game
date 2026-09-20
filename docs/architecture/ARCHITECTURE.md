@@ -103,7 +103,7 @@ sequenceDiagram
 
 `SocketEventHandler` 将 `server.gameState`、`server.playerMoved`、`server.valueChanged`、`server.playerStatusChanged`、`server.teamUpdated`、`server.investmentEventTriggered`、昼夜和繁荣度事件转写为 `GameStore` 状态；通过注册时注入的 HUD 刷新回调触发通知、聊天、移动动画或界面刷新，不再使用模块级全局刷新槽。`GameViewModel` 是 `GameHudShell` 的状态桥梁，按切片通知订阅者，不依赖 Socket 或具体 UI。
 
-昼夜属**权威区域时钟域**：服务端下发 `dayRatio`（白天占周期比例，经 `server.dayNightProgress` / `server.dayNightChanged` 下发），客户端仅按 `localProgress < dayRatio` 插值判定 `isDay`、不自行决定边界；`region.time`（白天=0/夜晚=1）由该权威时钟推导，属本域而非逐字段数值变更，客户端据此做 `region.time` 一致性预览。
+昼夜属**权威区域时钟域**：服务端下发 `dayRatio`（白天占周期比例，经 `server.dayNightProgress` / `server.dayNightChanged` 下发），客户端 HUD 按玩家所在格时区偏移插值 `isDay`。D8 结算/预览的 `region.time`（白天=0/夜晚=1）则一律按**目标格时区**的本地昼夜取值：服务端经 `TimeZoneManager.getCellLocalTime(cell.id)` 结算，客户端 `getCellResolutionCtx` 以目标格时区求值，两端同源（目标格与玩家格时区不一致时不得用玩家格时区）。
 
 ```text
 server.*

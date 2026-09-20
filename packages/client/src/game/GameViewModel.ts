@@ -334,7 +334,7 @@ export class GameViewModel {
    * - playerUct/regionUct 仅取地图声明的作用域字段。
    * - 团队均值：客户端仅持本玩家视角，按 D8 "无团队时 memberCnt=1、teamValue 取成员自身值"
    *   宽松实现，teamValue 回退为当前玩家自身字段值（真实多人团队无法在本端合成均值）。
-   * - regionTime 按当前昼夜相位：白天=0/夜晚=1。
+   * - regionTime 按目标格时区的本地昼夜：白天=0/夜晚=1，与服务端权威结算（目标格时区）同源。
    */
   getCellResolutionCtx(cell: import('@game/shared').Cell): CellHoverResolutionCtx | null {
     const snapshot = this.projectedSnapshot();
@@ -359,7 +359,10 @@ export class GameViewModel {
       const v = teamValueTable[fieldId];
       return typeof v === 'number' ? v : currentPlayer?.values?.[fieldId]?.current;
     };
-    const local = this.getLocalDayNight(this.getPlayerTimezoneOffset());
+    // regionTime 按目标格时区求本地昼夜（与服务端权威结算同源）。HUD 时钟仍按玩家格时区，
+    // 但 D8 结算/预览的目标格 region.time 必须以目标格时区为准，否则目标格与玩家格时区不一致时会漂移。
+    const targetOffset = resolveTimezoneOffsetMinutes(cell, snapshot.mapTimezones);
+    const local = this.getLocalDayNight(targetOffset);
     return {
       valueModifiers: snapshot.valueModifiers,
       playerUct,

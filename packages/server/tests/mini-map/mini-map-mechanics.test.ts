@@ -322,3 +322,22 @@ describe('behavior 供给/事件', () => {
     expect(io.emit).toHaveBeenCalledWith('server.valueChanged', { playerId: 'p1', fieldId: 'money', current: 2020, delta: 20 });
   });
 });
+
+describe('D8 region.time 按目标格时区接入（provider 收到结算目标格）', () => {
+  it('provider 对 day 目标格返回 0、night 目标格返回 1，resolveValueModifier 按目标格分别求值', () => {
+    const { world, mapData, mapMeta } = makeWorld();
+    // 用唯一的 jail/cd 规则把 region.time 直接作为结算值（覆盖既有 valueModifiers，避免 .find 命中旧规则）
+    mapMeta.valueModifiers = [{
+      id: 't-region-time',
+      scope: { cellType: 'jail', base: 'cd' },
+      calc: { $ref: 'region.time' },
+    }];
+    const p1 = makePlayer('p1', 1, 2000, 50);
+    world.addPlayer(p1);
+    const cellDay = mapData.find((c) => c.id === 1)!;
+    const cellNight = mapData.find((c) => c.id === 2)!;
+    world.setRegionTimeProvider((cell) => (cell.id === cellDay.id ? 0 : 1));
+    expect(world.resolveValueModifier({ cellType: 'jail', baseField: 'cd', base: 100, cell: cellDay, level: 0, ownerCount: 0, payer: p1 })).toBe(0);
+    expect(world.resolveValueModifier({ cellType: 'jail', baseField: 'cd', base: 100, cell: cellNight, level: 0, ownerCount: 0, payer: p1 })).toBe(1);
+  });
+});

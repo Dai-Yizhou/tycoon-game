@@ -400,17 +400,18 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   dayNightCycle.start();
   logger.info(`DayNightCycle started (cycle=${cycleMinutes}min)`);
 
-  // 将 DayNightCycle 接入 D8 数值调节（白天=0/夜晚=1）
-  world.setRegionTimeProvider(() => (dayNightCycle.isDay() ? 0 : 1));
-
   // 将 DayNightCycle 注入 SocketManager（供 login handler 同步时间）
   if (socketManager) {
     socketManager.setDayNightCycle(dayNightCycle);
   }
 
-  // 初始化时区管理器（依赖 GameWorld 和 DayNightCycle）
+  // 初始化时区管理器（依赖 GameWorld 和 DayNightCycle；须先于 regionTime provider 创建）
   const timeZoneManager = new TimeZoneManager(world, dayNightCycle);
   logger.info(`TimeZoneManager initialized (${timeZoneManager.getTimezoneCount()} timezones)`);
+
+  // 将时区时钟接入 D8 数值调节：region.time = 结算目标格时区的本地昼夜（白天=0/夜晚=1）。
+  // 区域无时区属性、仅每格配置时区，故以目标格时区为准，客户端 D8 预览须与之同源。
+  world.setRegionTimeProvider((cell) => (timeZoneManager.getCellLocalTime(cell.id).isDay ? 0 : 1));
 
   // 初始化昼夜驱动的区域 UCT 数值变化服务（进入白天/夜晚时对配置的区域字段施加增量）
   const dayNightValueChange = new DayNightValueChange(world, dayNightCycle);

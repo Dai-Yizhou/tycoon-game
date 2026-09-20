@@ -52,3 +52,24 @@ describe('day/night dayRatio 权威下发（非硬编码 0.5）', () => {
     expect(vmAtProgress(0.85, 0.75).getLocalDayNight(0).isDay).toBe(false);
   });
 });
+
+describe('D8 region.time 按目标格时区求值（预览与服务端权威结算同源）', () => {
+  // 周期 1min；dayNightStartTime = now-15000 → 无偏移时 progress≈0.25（昼，<0.5）。
+  // 目标格时间偏移 +600min 使本地 progress 加 0.4167 → ≈0.6667（夜）。断言 regionTime 跟随目标格时区，
+  // 而非玩家所在格时区（HUD 时钟可用玩家格时区，但 D8 结算/预览的 region.time 必须按目标格）。
+  function ctxFor(targetTimezone: number) {
+    const store = new GameStore();
+    const now = Date.now();
+    store.updateDayNight({ cycleMinutes: 1, serverTimeOffset: 0, dayNightStartTime: now - 15_000, dayNightRatio: 0.5 });
+    store.setRegions([], [{ id: 'pros', name: 'pros', scope: 'region' }], [], [{ id: 'm', scope: { cellType: 'property', base: 'price' }, calc: { $ref: 'base' } }] as never);
+    return new GameViewModel(store).getCellResolutionCtx({ id: 9, regionId: 'r', timezone: targetTimezone } as never);
+  }
+
+  it('目标格时区 +600（夜）：regionTime=1，即便玩家/权威边界为昼', () => {
+    expect(ctxFor(600)?.regionTime).toBe(1);
+  });
+
+  it('目标格时区 0（昼）：regionTime=0', () => {
+    expect(ctxFor(0)?.regionTime).toBe(0);
+  });
+});

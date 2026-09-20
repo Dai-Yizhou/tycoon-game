@@ -143,8 +143,8 @@ export class GameWorld {
   private runtimeState: WorldRuntimeStateStore | null = null;
   private lastValidation: ValidationResult | null = null;
   private snapshotStateProvider: (() => Pick<WorldSnapshot, 'taxRecords' | 'jailStates'>) | null = null;
-  /** D8：区域环境时刻读取器（白天=0/夜晚=1，缺省恒 0；由 app.ts 从 DayNightCycle 接入） */
-  private regionTimeProvider: (() => number) | null = null;
+  /** D8：区域环境时刻读取器（白天=0/夜晚=1，缺省恒 0；由 app.ts 按目标格时区从 TimeZoneManager 接入） */
+  private regionTimeProvider: ((cell: Cell) => number) | null = null;
   private persistenceQueue: Promise<void> = Promise.resolve();
   private persistenceInitialized = false;
   private persistedRevision: number | undefined;
@@ -182,8 +182,8 @@ export class GameWorld {
     this.snapshotStateProvider = provider;
   }
 
-  /** 设置 D8 区域环境时刻读取器（白天=0/夜晚=1）；未设置时恒返回 0 */
-  setRegionTimeProvider(provider: () => number): void {
+  /** 设置 D8 区域环境时刻读取器（白天=0/夜晚=1，按结算目标格解析）；未设置时恒返回 0 */
+  setRegionTimeProvider(provider: (cell: Cell) => number): void {
     this.regionTimeProvider = provider;
   }
 
@@ -453,9 +453,9 @@ export class GameWorld {
     return this.mapMeta?.valueModifiers?.find((r) => r.scope.cellType === cellType && r.scope.base === base) ?? undefined;
   }
 
-  /** 区域环境时刻（白天=0/夜晚=1） */
-  getRegionTime(): number {
-    return this.regionTimeProvider?.() ?? 0;
+  /** 区域环境时刻（白天=0/夜晚=1），按结算目标格时区解析 */
+  getRegionTime(cell: Cell): number {
+    return this.regionTimeProvider?.(cell) ?? 0;
   }
 
   /** 构建某区域的 region 作用域 UCT（仅取 valueFieldDefinitions 中 scope=region 的字段） */
@@ -550,7 +550,7 @@ export class GameWorld {
       teamMemberCount: team?.memberIds.length ?? 1,
       teamValue: opts.teamValue ?? ((fieldId: string) => this.computeTeamValue(opts.payer.id, fieldId)),
       regionUct: this.getRegionUct(opts.cell.regionId),
-      regionTime: this.getRegionTime(),
+      regionTime: this.getRegionTime(opts.cell),
       curCellLevel: opts.level,
       curCellOwnerCount: opts.ownerCount,
     };
@@ -589,7 +589,7 @@ export class GameWorld {
           teamMemberCount: 1,
           teamValue: undefined,
           regionUct: this.getRegionUct(opts.cell.regionId),
-          regionTime: this.getRegionTime(),
+          regionTime: this.getRegionTime(opts.cell),
           curCellLevel: opts.level,
           curCellOwnerCount: opts.ownerCount,
         };
