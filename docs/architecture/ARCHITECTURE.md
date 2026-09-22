@@ -103,7 +103,7 @@ sequenceDiagram
 
 `SocketEventHandler` 将 `server.gameState`、`server.playerMoved`、`server.valueChanged`、`server.playerStatusChanged`、`server.teamUpdated`、`server.investmentEventTriggered`、昼夜和繁荣度事件转写为 `GameStore` 状态；通过注册时注入的 HUD 刷新回调触发通知、聊天、移动动画或界面刷新，不再使用模块级全局刷新槽。`GameViewModel` 是 `GameHudShell` 的状态桥梁，按切片通知订阅者，不依赖 Socket 或具体 UI。
 
-昼夜属**权威区域时钟域**：全局时间仅作计时基准，`day/night` 相位由「全局进度 + 时区偏移」决定，两端同口径 `localProgress = globalProgress + (offsetMinutes mod cycleMinutes)/cycleMinutes`。服务端下发 `dayRatio`（白天占周期比例，经 `server.dayNightProgress` / `server.dayNightChanged` 下发），客户端 HUD 按玩家所在格时区偏移求 `isDay`。D8 结算/预览的 `region.time`（白天=0/夜晚=1）一律按**目标格时区**取本地昼夜：服务端经 `TimeZoneManager.getLocalTime(cell.timezone)` 结算，客户端 `getCellResolutionCtx` 以目标格时区求值，两端同源（目标格与玩家格时区不一致时不得用玩家格时区）。注意 offset 只叠加到全局时刻、不得同时加进 `cycleStartTime`（否则相位偏移相消退化为全局昼夜）。
+昼夜属**权威区域时钟域**：全局时间仅作计时基准，`day/night` 相位由「全局进度 + 时区偏移」决定，两端同口径 `localProgress = globalProgress + offsetMinutes/1440 (mod 1)`。时区偏移是真实墙钟偏移（60 的倍数），须按「24h 一天」换算相位；**不得对 cycle 取模**——否则短周期（如 map-meta `dayNightCycle=24`）下 480/0/-480 会全部相消、不同时区显示相同时间。cycle 只决定昼夜切换频率（`dayRatio` 为白天占 cycle 比例），服务端经 `server.dayNightProgress`/`server.dayNightChanged` 下发 `dayRatio`。客户端 HUD 按玩家所在格时区偏移求 `isDay`；D8 结算/预览的 `region.time`（白天=0/夜晚=1）一律按**目标格时区**取本地昼夜：服务端经 `TimeZoneManager.getLocalTime(cell.timezone)` 结算，客户端 `getCellResolutionCtx` 以目标格时区求值，两端同源。
 
 ```text
 server.*

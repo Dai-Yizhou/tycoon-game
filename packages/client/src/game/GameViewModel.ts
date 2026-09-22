@@ -402,12 +402,12 @@ export class GameViewModel {
     const dayNight = this.getDayNight();
     const serverNow = Date.now() + dayNight.serverTimeOffset;
     const serverElapsed = serverNow - dayNight.cycleStartTime;
-    // 相位 = 全局进度 + 时区偏移（以 cycle 长度换算取小数相位）。全局时间仅作计时基准，
-    // day/night 由"全局进度 + offset mod cycle"决定，与服务端 TimeZoneManager.getLocalTime 同口径；
-    // 不可用 offset/(24*60)，那仅在 cycle=1440min 时等价，否则 HUD 与权威结算相位错配。
-    const cycleMinutes = dayNight.cycleDuration / 60_000;
-    const offsetAsCycle = (offsetMinutes % cycleMinutes) / cycleMinutes;
-    const localProgress = (((serverElapsed / dayNight.cycleDuration) + offsetAsCycle) % 1 + 1) % 1;
+    // 相位 = 全局进度 + 时区偏移。时区偏移是真实墙钟偏移（60 的倍数），按"24h 一天"换算相位
+    // （offsetMinutes/1440），与服务端 TimeZoneManager.getLocalTime 同口径。cycle 只决定昼夜切换
+    // 频率（dayRatio 为白天占比），不能把偏移对 cycle 取模——那会让短周期下真实时区偏移全部相消，
+    // 不同时区显示相同时间。例如 cycle=24min 时 offset 480/0/-480 mod 24 全为 0。
+    const offsetAsDayFraction = offsetMinutes / 1440;
+    const localProgress = (((serverElapsed / dayNight.cycleDuration) + offsetAsDayFraction) % 1 + 1) % 1;
     const totalMinutes = Math.floor(localProgress * 24 * 60);
     const hour = Math.floor(totalMinutes / 60);
     const minute = totalMinutes % 60;

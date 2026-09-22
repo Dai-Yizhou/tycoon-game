@@ -388,11 +388,12 @@ export class TimeZoneManager {
     const dayRatio = this.dayNightCycle.getConfig().dayRatio;
     const cycleStartTime = snapshot.cycleStartTime;
 
-    // day/night 相位 = 全局相位 + 时区偏移（以 cycle 长度换算取小数相位）。
-    // 注意：offset 只叠加到全局时刻，不能同时加进 cycleStartTime（否则两者相消、偏移归零，
-    // 导致 region.time 退化为全局昼夜，与客户端 HUD 时区偏移显示不一致）。
-    const localElapsedMs = localTime - cycleStartTime;
-    const localProgress = (localElapsedMs % cycleDurationMs) / cycleDurationMs;
+    // day/night 相位 = 全局相位 + 时区偏移（时区偏移是真实墙钟偏移，按"24h 一天"换算：
+    // offsetMinutes/1440）。cycle 只决定昼夜切换频率（dayRatio 为白天占比），不能把偏移对
+    // cycle 取模，否则短周期（如 24min）下真实时区偏移（60 的倍数）会全部相消、退化为全局昼夜。
+    const globalElapsedMs = globalTime - cycleStartTime;
+    const globalProgress = (globalElapsedMs % cycleDurationMs) / cycleDurationMs;
+    const localProgress = ((globalProgress + offsetMinutes / 1440) % 1 + 1) % 1;
 
     const isDay = localProgress < dayRatio;
     const isNight = !isDay;
@@ -427,9 +428,10 @@ export class TimeZoneManager {
 
     const cycleDurationMs = this.dayNightCycle.getConfig().cycleMinutes * 60 * 1000;
     const dayRatio = this.dayNightCycle.getConfig().dayRatio;
-    // 与 getLocalTime 同口径：offset 只叠加到本地墙钟，不叠加到 cycleStartTime，避免相位偏移相消
-    const localElapsedMs = localTimeInfo.localTime - snapshot.cycleStartTime;
-    const localProgress = (localElapsedMs % cycleDurationMs) / cycleDurationMs;
+    // 与 getLocalTime 同口径：偏移按"24h 一天"换算相位（offsetMinutes/1440），不对 cycle 取模
+    const globalElapsedMs = snapshot.globalTime - snapshot.cycleStartTime;
+    const globalProgress = (globalElapsedMs % cycleDurationMs) / cycleDurationMs;
+    const localProgress = ((globalProgress + offsetMinutes / 1440) % 1 + 1) % 1;
     const localPhase: DayNightPhase = localProgress < dayRatio ? DayNightPhase.Day : DayNightPhase.Night;
 
     return {

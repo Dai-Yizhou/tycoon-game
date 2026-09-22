@@ -53,32 +53,31 @@ describe('day/night dayRatio 权威下发（非硬编码 0.5）', () => {
   });
 });
 
-describe('D8 region.time 按目标格时区求值（预览与服务端权威结算同源）', () => {
-  // 周期 60min；dayNightStartTime = now-15000 → 无偏移时 progress=0.25（昼，<0.5）。
-  // 目标格时区偏移 +30min → 相位 +0.5 → 0.75（夜）。断言 regionTime 跟随目标格时区。
+describe('D8 region.time 按目标格时区求值（offset 按 /1440 换算，与服务端同源）', () => {
+  // 周期 60min；dayNightStartTime = now - 0.25*cycle → 无偏移时 progress=0.25（昼，<0.5）。
   function ctxFor(targetTimezone: number) {
     const store = new GameStore();
     const now = Date.now();
-    store.updateDayNight({ cycleMinutes: 60, serverTimeOffset: 0, dayNightStartTime: now - 15_000, dayNightRatio: 0.5 });
+    store.updateDayNight({ cycleMinutes: 60, serverTimeOffset: 0, dayNightStartTime: now - 0.25 * 60 * 60_000, dayNightRatio: 0.5 });
     store.setRegions([], [{ id: 'pros', name: 'pros', scope: 'region' }], [], [{ id: 'm', scope: { cellType: 'property', base: 'price' }, calc: { $ref: 'base' } }] as never);
     return new GameViewModel(store).getCellResolutionCtx({ id: 9, regionId: 'r', timezone: targetTimezone } as never);
   }
 
-  it('目标格时区 +30（相位 +0.5 → 夜）：regionTime=1，即便全局边界为昼', () => {
-    expect(ctxFor(30)?.regionTime).toBe(1);
+  it('目标格时区 +360（6h）：相位 0.25+0.25=0.5 → 夜（regionTime=1）', () => {
+    expect(ctxFor(360)?.regionTime).toBe(1);
   });
 
   it('目标格时区 0（昼）：regionTime=0', () => {
     expect(ctxFor(0)?.regionTime).toBe(0);
   });
 
-  it('时区偏移对相位按 cycle 取模：偏移整倍数 cycle 不改变相位（60min 内 +60 与 0 同相位）', () => {
-    // +60min 恰为一个整 cycle → 相位不变，仍为昼
-    expect(ctxFor(60)?.regionTime).toBe(0);
+  it('回归点（真实 map cycle=24、offset 480）：目标格 +480 与 0 相位不同（不得相消）', () => {
+    // 用 480 与 0 两格验证：短周期下若 offset 对 cycle 取模，两者会相消为同一相位
+    expect(ctxFor(480)?.regionTime).not.toBe(ctxFor(0)?.regionTime);
   });
 });
 
-describe('HUD day/night 相位叠加时区偏移（与服务端 getLocalTime 同口径）', () => {
+describe('HUD day/night 相位叠加时区偏移（offset/1440，与服务端 getLocalTime 同口径）', () => {
   function vmAt(offsetMinutes: number, cycleMinutes: number): GameViewModel {
     const store = new GameStore();
     const now = Date.now();
@@ -86,16 +85,19 @@ describe('HUD day/night 相位叠加时区偏移（与服务端 getLocalTime 同
     return new GameViewModel(store);
   }
 
-  it('cycle=60min、全局 progress=0.25（昼）：offset=+30 → 相位 0.75 → 夜', () => {
-    expect(vmAt(30, 60).getLocalDayNight(30).isDay).toBe(false);
+  it('cycle=60min、全局 progress=0.25（昼）：offset=+360 → 相位 0.5 → 夜', () => {
+    expect(vmAt(360, 60).getLocalDayNight(360).isDay).toBe(false);
   });
 
-  it('cycle=60min、offset=0 → 昼；offset=+60（整 cycle）→ 仍昼', () => {
+  it('cycle=60min、offset=0 → 昼；offset=+720 → 相位 0.75 → 夜', () => {
     expect(vmAt(0, 60).getLocalDayNight(0).isDay).toBe(true);
-    expect(vmAt(60, 60).getLocalDayNight(60).isDay).toBe(true);
+    expect(vmAt(720, 60).getLocalDayNight(720).isDay).toBe(false);
   });
 
-  it('cycle=24h、offset=+6h → 相位 +0.25，边界跟随（与真实时区语义一致）', () => {
-    expect(vmAt(6 * 60, 1440).getLocalDayNight(6 * 60).isDay).toBe(false); // 0.25+0.25=0.5 → 夜边界
+  it('回归点（真实 map cycle=24）：offset 480 与 0 显示不同相位与时间，不得相同', () => {
+    const a = vmAt(480, 24).getLocalDayNight(480);
+    const b = vmAt(0, 24).getLocalDayNight(0);
+    expect(a.isDay).not.toBe(b.isDay);
+    expect(a.timeStr).not.toBe(b.timeStr);
   });
 });
