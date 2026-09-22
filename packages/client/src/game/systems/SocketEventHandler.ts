@@ -213,6 +213,8 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   socket.on('server.playerJoined', (payload: Player) => {
     // 添加新玩家或更新已有玩家（重连场景）
     const currentPlayers = store.getSnapshot().otherPlayers;
+    // 自身守卫：重连时服务端会向全服广播 playerJoined（含自己），跳过自身避免把自己加进 otherPlayers
+    if (payload.id === store.getSnapshot().currentPlayer?.id) return;
     const existingIndex = currentPlayers.findIndex(p => p.id === payload.id);
     if (payload.status === 'frozen') return;
     // primaryValue 仅为 UI 展示投影，非业务数值来源：取该玩家第一个可用 UCT 字段，不写死 `money`/不捏造默认值

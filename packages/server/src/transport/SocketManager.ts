@@ -467,6 +467,9 @@ export class SocketManager {
           // 玩家已在世界中（重连），更新数据并解冻
           this.world.updatePlayer(player);
           this.world.getPlayerManager().connectPlayer(player.id, socket.id);
+          // 重连也广播 playerJoined，让其他客户端重建该玩家（此前仅 addPlayer 路径广播，
+          // 导致 A 重连后 B 侧永远不知道 A 回来）；客户端对自身 id 有守卫不会误加自己。
+          this.broadcast('server.playerJoined', player);
         } else {
           // 添加到游戏世界
           const added = this.world.addPlayer(player, socket.id);

@@ -315,6 +315,40 @@ describe('SocketManager', () => {
       await new Promise<void>((resolve) => env.http.close(() => resolve()));
     });
 
+    it('重连（冻结玩家重新登录）时向其他客户端广播 server.playerJoined', async () => {
+      const env = await createTestEnv();
+      const playerManager = new PlayerManager();
+      playerManager.addPlayer(buildPlayer('p-reconnect', { username: 'reconnect_player' }));
+      // 模拟 A 断线：冻结玩家，保留在世界中（不触发 playerRemoved）
+      playerManager.disconnectPlayer('p-reconnect');
+      const world = new GameWorld({ playerManager });
+      const jwt = new JWTService({ secret: 'test-secret', expiresIn: 3600 });
+      const socketManager = new SocketManager(env.io, {
+        world,
+        autoWireWorldEvents: false,
+        jwtService: jwt,
+      });
+      env.io.on('connection', (socket) => socketManager.registerConnectionHandlers(socket));
+      const observer = await connectClient(env.port, {
+        auth: { token: jwt.generateToken('observer', 'observer', false) },
+      });
+      let joinedCount = 0;
+      observer.on('server.playerJoined', (p) => {
+        if (p.id === 'p-reconnect') joinedCount += 1;
+      });
+      const reconnectSocket = await connectClient(env.port, {
+        auth: { token: jwt.generateToken('p-reconnect', 'reconnect_player', false) },
+      });
+      await new Promise<{ ok: boolean }>((resolve) => {
+        reconnectSocket.emit('client.login', { username: 'reconnect_player', guest: false }, resolve);
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(joinedCount).toBe(1);
+      observer.disconnect();
+      reconnectSocket.disconnect();
+      await new Promise<void>((resolve) => env.http.close(() => resolve()));
+    });
+
     it('rejects a login payload that attempts to impersonate the JWT user', async () => {
       const env = await createTestEnv();
       const world = new GameWorld();
