@@ -23,3 +23,29 @@ describe('GameStore 绝对值覆写语义', () => {
     expect(store.getSnapshot().currentPlayer?.values.money.current).toBe(800);
   });
 });
+
+describe('GameStore 他人购买不得污染我的 ownedProperties/ownedInvestments', () => {
+  function makeSelfStore(): GameStore {
+    const store = new GameStore();
+    store.applyEvent({ sequence: store.nextSequence(), type: 'player', player: { id: 'self', username: '自己', position: { cellId: 0 }, values: {}, status: 'normal', createdAt: 1, lastActiveAt: 1 } as never });
+    return store;
+  }
+
+  test('他人购买 property：不得把该格加入我的 ownedProperties（否则同格未持股显示"升级"）', () => {
+    const store = makeSelfStore();
+    // 他人（p2）购买 cell 5
+    store.applyEvent({ sequence: store.nextSequence(), type: 'property', playerId: 'p2', cellId: 5, level: 0 });
+    expect(store.getSnapshot().ownedProperties.has(5)).toBe(false);
+    // 自己购买 cell 6 才加入
+    store.applyEvent({ sequence: store.nextSequence(), type: 'property', playerId: 'self', cellId: 6, level: 0 });
+    expect(store.getSnapshot().ownedProperties.has(6)).toBe(true);
+  });
+
+  test('他人购买 investment：不得把该格加入我的 ownedInvestments', () => {
+    const store = makeSelfStore();
+    store.applyEvent({ sequence: store.nextSequence(), type: 'investment', playerId: 'p2', cellId: 7, share: 50 });
+    expect(store.getSnapshot().ownedInvestments.has(7)).toBe(false);
+    store.applyEvent({ sequence: store.nextSequence(), type: 'investment', playerId: 'self', cellId: 8, share: 100 });
+    expect(store.getSnapshot().ownedInvestments.has(8)).toBe(true);
+  });
+});

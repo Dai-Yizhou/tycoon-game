@@ -81,6 +81,8 @@ export interface ClientGameSnapshot {
   moveToX: number;
   moveToY: number;
   moveStartTime: number;
+  /** 每格落足停顿截止时间戳（performance.now 基准）；now<该值时不推进，形成"段落感"。0 表示不停顿 */
+  moveDwellUntil: number;
   serverPath: number[];
   serverPathIndex: number;
   isWaitingForChoice: boolean;
@@ -134,7 +136,7 @@ export class GameStore {
   private snapshot: ClientGameSnapshot = {
     sequence: 0, currentPlayer: null, otherPlayers: [], currentPlayerPosition: 0,
     isBankrupt: false,
-    isInJail: false, jailEndTime: 0, jailDurationMs: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, cycleMinutes: 15, dayNightRatio: 0.5, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], regionValues: new Map(),
+    isInJail: false, jailEndTime: 0, jailDurationMs: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, cycleMinutes: 15, dayNightRatio: 0.5, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, moveDwellUntil: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], regionValues: new Map(),
       boughtPrices: new Map(),
       mapRegions: [], mapTimezones: [], valueFieldDefs: [], valueModifiers: [], cellRuntimeStates: new Map(), otherPlayerMoves: new Map(), teamValueTable: {}, leaderboard: { status: 'loading', snapshot: null, error: null }, achievements: { status: 'loading', snapshot: null, error: null },
   };
@@ -362,14 +364,21 @@ export class GameStore {
     } else if (event.type === 'property') {
       const ownedProperties = new Set(this.snapshot.ownedProperties);
       const propertyLevels = new Map(this.snapshot.propertyLevels);
-      ownedProperties.add(event.cellId);
-      propertyLevels.set(event.cellId, event.level);
+      // 仅当购买方是当前玩家时才记录为"我持有的地产"；他人购买仅更新权威格子运行时态（由
+      // server.propertyBought 的 setCellRuntimeState 处理），不得把自己误标为持有者，
+      // 否则同格未持股的其他玩家会把"购买"误显示为"升级"。
+      if (event.playerId === this.snapshot.currentPlayer?.id) {
+        ownedProperties.add(event.cellId);
+        propertyLevels.set(event.cellId, event.level);
+      }
       this.snapshot = { ...this.snapshot, sequence: event.sequence, ownedProperties, propertyLevels, actionUsedThisTurn: event.playerId === this.snapshot.currentPlayer?.id ? true : this.snapshot.actionUsedThisTurn };
     } else if (event.type === 'investment') {
       const ownedInvestments = new Set(this.snapshot.ownedInvestments);
       const investmentShares = new Map(this.snapshot.investmentShares);
-      ownedInvestments.add(event.cellId);
-      investmentShares.set(event.cellId, event.share);
+      if (event.playerId === this.snapshot.currentPlayer?.id) {
+        ownedInvestments.add(event.cellId);
+        investmentShares.set(event.cellId, event.share);
+      }
       this.snapshot = { ...this.snapshot, sequence: event.sequence, ownedInvestments, investmentShares, actionUsedThisTurn: event.playerId === this.snapshot.currentPlayer?.id ? true : this.snapshot.actionUsedThisTurn };
     } else if (event.type === 'value' && this.snapshot.currentPlayer?.id === event.playerId) {
       const player = { ...this.snapshot.currentPlayer, values: { ...this.snapshot.currentPlayer.values, [event.fieldId]: { ...this.snapshot.currentPlayer.values[event.fieldId], current: event.current } } };
@@ -439,6 +448,7 @@ export class GameStore {
       moveToX: 0,
       moveToY: 0,
       moveStartTime: 0,
+      moveDwellUntil: 0,
       serverPath: [],
       serverPathIndex: 0,
       isWaitingForChoice: false,

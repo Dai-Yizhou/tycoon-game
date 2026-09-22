@@ -25,9 +25,11 @@ describe('GameStore server sequence', () => {
 
   it('projects property and investment events into the snapshot', () => {
     const store = new GameStore();
-    store.applyEvent({ sequence: 1, type: 'property', playerId: 'p1', cellId: 4, level: 0 });
-    store.applyEvent({ sequence: 2, type: 'property', playerId: 'p1', cellId: 4, level: 2 });
-    store.applyEvent({ sequence: 3, type: 'investment', playerId: 'p1', cellId: 8, share: 0.5 });
+    // 设定当前玩家为 p1：仅当购买方是当前玩家时，property/investment 才记入自有资产集合
+    store.applyEvent({ sequence: 1, type: 'player', player: { id: 'p1', values: {}, position: { cellId: 0 }, status: 'normal' } as never });
+    store.applyEvent({ sequence: 2, type: 'property', playerId: 'p1', cellId: 4, level: 0 });
+    store.applyEvent({ sequence: 3, type: 'property', playerId: 'p1', cellId: 4, level: 2 });
+    store.applyEvent({ sequence: 4, type: 'investment', playerId: 'p1', cellId: 8, share: 0.5 });
     expect(store.getSnapshot().ownedProperties).toEqual(new Set([4]));
     expect(store.getSnapshot().propertyLevels.get(4)).toBe(2);
     expect(store.getSnapshot().investmentShares.get(8)).toBe(0.5);
