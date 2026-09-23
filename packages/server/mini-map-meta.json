@@ -22,6 +22,7 @@
     { "id": "west", "name": { "zh-CN": "西部区域", "en-US": "West" }, "initial": { "region": { "pros": 2 } } }
   ],
   "dayNightCycle": 24,
+  "dayNightRatio": 0.5,
   "dayNight": {
     "day": { "region": { "pros": 1 } },
     "night": { "region": { "pros": -1 } }

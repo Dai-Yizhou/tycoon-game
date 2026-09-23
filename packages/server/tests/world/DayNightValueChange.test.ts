@@ -74,9 +74,11 @@ describe('DayNightValueChange', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     seedRegions();
-    dayNight = new DayNightCycle(mockIO, { ...DEFAULT_DAY_NIGHT_CONFIG, cycleMinutes: 15, broadcastChanges: false });
-    dayNight.start();
+    dayNight = new DayNightCycle(mockIO, { ...DEFAULT_DAY_NIGHT_CONFIG, cycleMinutes: 24, broadcastChanges: false });
+    dayNight.start(); // progress=0（午夜，夜晚）
     service = new DayNightValueChange(mockWorld, dayNight);
+    // 首个 tick 仅记录基线相位，不施加增量
+    jest.advanceTimersByTime(1000);
   });
 
   afterEach(() => {
@@ -86,22 +88,32 @@ describe('DayNightValueChange', () => {
     jest.clearAllMocks();
   });
 
-  it('进入夜晚时对配置的区域字段施加负增量（所有区域）', () => {
-    dayNight.forceNight();
-    expect(regionStore['region-1'].pros).toBe(60);
-    expect(regionStore['region-2'].pros).toBe(30);
-  });
-
-  it('进入白天时对配置的区域字段施加正增量（所有区域）', () => {
-    dayNight.forceDay();
+  it('时区跨入白天时对配置的区域字段施加正增量（该时区下所有区域）', () => {
+    dayNight.forceDay(); // 游戏时钟对齐正午
+    jest.advanceTimersByTime(1000); // 夜 → 昼
     expect(regionStore['region-1'].pros).toBe(100); // 80+20，受 max=100 截断
     expect(regionStore['region-2'].pros).toBe(70);
   });
 
-  it('变化通过 world.changeRegionValue 应用', () => {
+  it('时区跨入夜晚时对配置的区域字段施加负增量（该时区下所有区域）', () => {
+    dayNight.forceDay();
+    jest.advanceTimersByTime(1000); // 夜 → 昼
     dayNight.forceNight();
-    expect(mockWorld.changeRegionValue).toHaveBeenCalledWith('region-1', 'pros', -20);
-    expect(mockWorld.changeRegionValue).toHaveBeenCalledWith('region-2', 'pros', -20);
+    jest.advanceTimersByTime(1000); // 昼 → 夜
+    expect(regionStore['region-1'].pros).toBe(80); // 100-20
+    expect(regionStore['region-2'].pros).toBe(50); // 70-20
+  });
+
+  it('变化通过 world.changeRegionValue 应用', () => {
+    dayNight.forceDay();
+    jest.advanceTimersByTime(1000);
+    expect(mockWorld.changeRegionValue).toHaveBeenCalledWith('region-1', 'pros', 20);
+    expect(mockWorld.changeRegionValue).toHaveBeenCalledWith('region-2', 'pros', 20);
+  });
+
+  it('相位未变化时不施加增量', () => {
+    jest.advanceTimersByTime(3000); // 保持夜晚，多个 tick 无跨相位
+    expect(mockWorld.changeRegionValue).not.toHaveBeenCalled();
   });
 
   it('未配置 dayNight 时不改变任何区域值', () => {
@@ -109,7 +121,8 @@ describe('DayNightValueChange', () => {
     const world = { ...mockWorld, getMapMeta: jest.fn(() => ({ ...mockMapMeta, dayNight: undefined })) } as unknown as GameWorld;
     const noopService = new DayNightValueChange(world, dayNight);
     noopService.stop();
-    dayNight.forceNight();
+    dayNight.forceDay();
+    jest.advanceTimersByTime(1000);
     expect(regionStore['region-1'].pros).toBe(80);
     expect(regionStore['region-2'].pros).toBe(50);
   });

@@ -2,12 +2,15 @@
  * 昼夜驱动的 UCT 数值变化服务
  *
  * 负责：
- * - 进入白天/夜晚时，对地图配置的区域 UCT 字段施加一次增量
+ * - 当某个时区进入白天/夜晚时，对该时区所属区域的地图配置 UCT 字段施加一次增量
  * - 配置从地图元数据 `dayNight` 段读取（参考税收实现），不硬编码具体字段名
  *
  * 设计原则（UCT）：
- * - 与玩家/区域 UCT 字段统一处理：凡配置声明为 region 的字段，
- *   进入白天/夜晚时对所有区域施加对应增量（正/负）。
+ * - 区域无时区属性、仅每格声明时区；区域的时区由其格子声明推导（同区域格子时区一致）。
+ * - 按「时区去重」触发：每个去重后的时区偏移只判定一次相位，跨相位时对该时区下的
+ *   所有区域各施加一次增量，避免同一时区内的多个区域各自重复判定。
+ * - 相位定义唯一来源为 @game/shared 的 resolveDayNightPhase（与服务端 DayNightCycle
+ *   及客户端同源），不做本地重算。
  * - 数值变化通过 `world.changeRegionValue` 应用，由 GameWorld 统一触发
  *   `regionValueChanged` 事件（保存快照、供排行榜/广播使用）。
  * - 未配置 `dayNight` 段时不做任何调整。
@@ -17,8 +20,8 @@ import { logger } from '../utils/logger.js';
 import type { GameWorld } from './GameWorld.js';
 import type { DayNightCycle } from './DayNightCycle.js';
 import { DayNightEvents } from './DayNightCycle.js';
-import type { Uct } from '@game/shared';
-import type { DayNightValueChangeConfig } from '@game/shared';
+import type { Uct, DayNightValueChangeConfig } from '@game/shared';
+import { resolveDayNightPhase } from '@game/shared';
 
 /**
  * 昼夜 UCT 数值变化服务
@@ -27,13 +30,13 @@ export class DayNightValueChange {
   private readonly world: GameWorld;
   private readonly dayNightCycle: DayNightCycle;
   private readonly config: DayNightValueChangeConfig | undefined;
+  /** 去重时区偏移 → 该时区下的区域 ID 列表 */
+  private readonly offsetRegions: Map<number, string[]> = new Map();
+  /** 各时区上次判定结果（用于检测跨相位）；首次仅记录基线不施加增量 */
+  private readonly lastIsDay: Map<number, boolean> = new Map();
 
-  private readonly onDayStarted = (): void => {
-    this.applyPhase(this.config?.day);
-  };
-
-  private readonly onNightStarted = (): void => {
-    this.applyPhase(this.config?.night);
+  private readonly onTick = (): void => {
+    this.evaluate();
   };
 
   constructor(
@@ -45,8 +48,8 @@ export class DayNightValueChange {
     this.dayNightCycle = dayNightCycle;
     this.config = config;
     if (this.config) {
-      this.dayNightCycle.on(DayNightEvents.DayStarted, this.onDayStarted);
-      this.dayNightCycle.on(DayNightEvents.NightStarted, this.onNightStarted);
+      this.indexRegionOffsets();
+      this.dayNightCycle.on(DayNightEvents.CycleTick, this.onTick);
     }
   }
 
@@ -54,26 +57,66 @@ export class DayNightValueChange {
    * 停止监听昼夜事件
    */
   stop(): void {
-    this.dayNightCycle.off(DayNightEvents.DayStarted, this.onDayStarted);
-    this.dayNightCycle.off(DayNightEvents.NightStarted, this.onNightStarted);
+    this.dayNightCycle.off(DayNightEvents.CycleTick, this.onTick);
   }
 
   /**
-   * 对配置声明的所有区域字段，向所有区域施加一次增量
+   * 建立「时区偏移 → 区域列表」索引（区域时区由其格子声明推导）
    */
-  private applyPhase(delta: Uct | undefined): void {
+  private indexRegionOffsets(): void {
+    const mapData = this.world.getMapData() ?? [];
+    for (const cell of mapData) {
+      const offset = cell.timezone;
+      if (typeof offset !== 'number' || !Number.isFinite(offset)) continue;
+      const regionId = cell.regionId;
+      if (!regionId) continue;
+
+      const regions = this.offsetRegions.get(offset) ?? [];
+      if (!regions.includes(regionId)) regions.push(regionId);
+      this.offsetRegions.set(offset, regions);
+    }
+  }
+
+  /**
+   * 逐时区判定相位，跨相位时对该时区下的所有区域施加对应增量
+   */
+  private evaluate(): void {
+    if (!this.config) return;
+    const snapshot = this.dayNightCycle.getSnapshot();
+    const cycleConfig = this.dayNightCycle.getConfig();
+    const cycleDurationMs = cycleConfig.cycleMinutes * 60 * 1000;
+    const baseline = this.lastIsDay.size === 0;
+
+    for (const [offsetMinutes, regionIds] of this.offsetRegions) {
+      const phase = resolveDayNightPhase({
+        gameElapsedMs: snapshot.globalTime - snapshot.cycleStartTime,
+        cycleDurationMs,
+        dayRatio: cycleConfig.dayRatio,
+        offsetMinutes,
+      });
+      const previous = this.lastIsDay.get(offsetMinutes);
+      this.lastIsDay.set(offsetMinutes, phase.isDay);
+      if (baseline || previous === undefined || previous === phase.isDay) continue;
+
+      this.applyPhase(regionIds, phase.isDay ? this.config.day : this.config.night);
+    }
+  }
+
+  /**
+   * 对指定区域施加一次增量
+   */
+  private applyPhase(regionIds: string[], delta: Uct | undefined): void {
     if (!delta) return;
     const regionDeltas = delta.region ?? {};
     const fieldIds = Object.keys(regionDeltas);
     if (fieldIds.length === 0) return;
 
-    const regions = this.world.getMapMeta()?.regions ?? [];
-    for (const region of regions) {
+    for (const regionId of regionIds) {
       for (const fieldId of fieldIds) {
         const amount = regionDeltas[fieldId];
         if (!Number.isFinite(amount) || amount === 0) continue;
-        this.world.changeRegionValue(region.id, fieldId, amount);
-        logger.debug(`昼夜切换：区域 ${region.id} 字段 ${fieldId} 变化 ${amount}`);
+        this.world.changeRegionValue(regionId, fieldId, amount);
+        logger.debug(`昼夜切换：区域 ${regionId} 字段 ${fieldId} 变化 ${amount}`);
       }
     }
   }

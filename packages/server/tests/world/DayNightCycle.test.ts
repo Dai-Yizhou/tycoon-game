@@ -40,7 +40,8 @@ describe('DayNightCycle', () => {
       dayNight.start();
 
       expect(dayNight.getConfig().cycleMinutes).toBe(1);
-      expect(dayNight.getCurrentPhase()).toBe(DayNightPhase.Day);
+      // 游戏日 00:00 为午夜（夜晚），白昼窗口以 12:00 为中点
+      expect(dayNight.getCurrentPhase()).toBe(DayNightPhase.Night);
     });
 
     it('应该正确计算周期进度', () => {
@@ -51,26 +52,26 @@ describe('DayNightCycle', () => {
       expect(snapshot.progress).toBeLessThanOrEqual(1);
     });
 
-    it('应该正确切换昼夜阶段', () => {
+    it('应该正确切换昼夜阶段（06:00 入昼、18:00 入夜）', () => {
       dayNight = new DayNightCycle(mockIO, {
         ...DEFAULT_DAY_NIGHT_CONFIG,
-        cycleMinutes: 0.01, // 0.6 秒周期
+        cycleMinutes: 0.01, // 0.6 秒周期 → dayStart=150ms、dayEnd=450ms
         dayRatio: 0.5,
         broadcastChanges: false,
       });
 
       dayNight.start();
 
-      // 初始为白天
-      expect(dayNight.isDay()).toBe(true);
-
-      // 前进到夜晚
-      jest.advanceTimersByTime(310);
+      // 初始为午夜（夜晚）
       expect(dayNight.isNight()).toBe(true);
 
-      // 前进到下一个周期
-      jest.advanceTimersByTime(310);
+      // 前进到 06:00（progress=0.25）→ 白昼
+      jest.advanceTimersByTime(160);
       expect(dayNight.isDay()).toBe(true);
+
+      // 前进到 18:00（progress=0.75）→ 夜晚
+      jest.advanceTimersByTime(300);
+      expect(dayNight.isNight()).toBe(true);
     });
   });
 
@@ -78,20 +79,20 @@ describe('DayNightCycle', () => {
     it('应该正确获取当前阶段', () => {
       dayNight.start();
 
-      expect(dayNight.getCurrentPhase()).toBe(DayNightPhase.Day);
-      dayNight.forceNight();
       expect(dayNight.getCurrentPhase()).toBe(DayNightPhase.Night);
+      dayNight.forceDay();
+      expect(dayNight.getCurrentPhase()).toBe(DayNightPhase.Day);
     });
 
     it('应该正确判断白天和夜晚', () => {
       dayNight.start();
 
-      expect(dayNight.isDay()).toBe(true);
-      expect(dayNight.isNight()).toBe(false);
-
-      dayNight.forceNight();
-      expect(dayNight.isDay()).toBe(false);
       expect(dayNight.isNight()).toBe(true);
+      expect(dayNight.isDay()).toBe(false);
+
+      dayNight.forceDay();
+      expect(dayNight.isNight()).toBe(false);
+      expect(dayNight.isDay()).toBe(true);
     });
   });
 
@@ -112,7 +113,7 @@ describe('DayNightCycle', () => {
       expect(dayHandler).toHaveBeenCalled();
     });
 
-    it('应该正确计算周期计数', () => {
+    it('应该正确计算周期计数（进入白昼时 +1）', () => {
       const fast = new DayNightCycle(mockIO, {
         ...DEFAULT_DAY_NIGHT_CONFIG,
         cycleMinutes: 0.01,
@@ -123,14 +124,14 @@ describe('DayNightCycle', () => {
 
       expect(fast.getCycleCount()).toBe(0);
 
-      // 前进到夜晚（Night→Night 不增加计数）
-      jest.advanceTimersByTime(310);
-      expect(fast.isNight()).toBe(true);
-      expect(fast.getCycleCount()).toBe(0);
-
-      // 前进到下一个白天（Night→Day 完整切换，计数 +1）
-      jest.advanceTimersByTime(310);
+      // 前进到 06:00（progress=0.25）→ 入昼，计数 +1
+      jest.advanceTimersByTime(160);
       expect(fast.isDay()).toBe(true);
+      expect(fast.getCycleCount()).toBe(1);
+
+      // 前进到 18:00（progress=0.75）→ 入夜，计数不变
+      jest.advanceTimersByTime(300);
+      expect(fast.isNight()).toBe(true);
       expect(fast.getCycleCount()).toBe(1);
     });
   });

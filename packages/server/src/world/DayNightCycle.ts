@@ -9,7 +9,10 @@
  *
  * 设计原则：
  * - 昼夜周期由地图元数据决定（map-meta.dayNightCycle），不读 ServerConfig
- * - 白天/夜晚时间比例可配置（默认各占 50%）
+ * - 白天/夜晚时间比例由地图元数据决定（map-meta.dayNightRatio，默认 0.5）
+ * - 白昼窗口以 12:00 为中点：`cycleStartTime` 为游戏日 00:00（UTC+0），
+ *   白昼区间为 [dayStart, dayEnd) = [0.5 - dayRatio/2, 0.5 + dayRatio/2)
+ * - 相位定义唯一来源为 @game/shared 的 resolveDayNightPhase（两端同构）
  * - 昼夜变化触发相关系统事件（计税、交通枢纽等）
  * - 服务端权威管理全局时间
  */
@@ -18,6 +21,7 @@ import { EventEmitter } from 'node:events';
 import { logger } from '../utils/logger.js';
 import type { TypedServer } from '../transport/SocketManager.js';
 import type { TransportHandler } from '../handlers/transportHandler.js';
+import { resolveDayNightPhase } from '@game/shared';
 
 /**
  * 昼夜循环事件类型
@@ -115,7 +119,7 @@ export class DayNightCycle extends EventEmitter {
     }
 
     this.cycleStartTime = Date.now();
-    this.currentPhase = DayNightPhase.Day;
+    this.currentPhase = this.phaseAt(this.cycleStartTime);
 
     // 定时广播周期进度
     const tickInterval = 1000; // 每秒更新一次
@@ -127,7 +131,7 @@ export class DayNightCycle extends EventEmitter {
     // 定时检查阶段切换
     this.schedulePhaseChange();
 
-    logger.info(`昼夜循环已启动，周期 ${this.config.cycleMinutes} 分钟`);
+    logger.info(`昼夜循环已启动，周期 ${this.config.cycleMinutes} 分钟，白昼占比 ${this.config.dayRatio}`);
     this.broadcastDayNightChange();
   }
 
@@ -147,20 +151,52 @@ export class DayNightCycle extends EventEmitter {
   }
 
   /**
+   * 白昼窗口边界（周期内比例）：以 12:00（0.5）为中点，跨度 dayRatio
+   */
+  private dayWindow(): { dayStart: number; dayEnd: number } {
+    const ratio = this.config.dayRatio > 0 && this.config.dayRatio < 1 ? this.config.dayRatio : 0.5;
+    const half = ratio / 2;
+    return { dayStart: 0.5 - half, dayEnd: 0.5 + half };
+  }
+
+  /**
+   * 周期内进度（全局相位，0..1）——与 @game/shared 纯函数同口径（offset=0）
+   */
+  private globalProgressAt(time: number): number {
+    const cycleDurationMs = this.config.cycleMinutes * 60 * 1000;
+    if (cycleDurationMs <= 0) return 0;
+    return (((time - this.cycleStartTime) % cycleDurationMs) + cycleDurationMs) % cycleDurationMs / cycleDurationMs;
+  }
+
+  /**
+   * 由时间推导相位（权威口径）
+   */
+  private phaseAt(time: number): DayNightPhase {
+    const phase = resolveDayNightPhase({
+      gameElapsedMs: time - this.cycleStartTime,
+      cycleDurationMs: this.config.cycleMinutes * 60 * 1000,
+      dayRatio: this.config.dayRatio,
+      offsetMinutes: 0,
+    });
+    return phase.isDay ? DayNightPhase.Day : DayNightPhase.Night;
+  }
+
+  /**
    * 获取当前昼夜快照
    */
   getSnapshot(): DayNightSnapshot {
     const now = Date.now();
     const cycleDurationMs = this.config.cycleMinutes * 60 * 1000;
-    const elapsedMs = now - this.cycleStartTime;
-    const progress = (elapsedMs % cycleDurationMs) / cycleDurationMs;
+    const progress = this.globalProgressAt(now);
+    const { dayStart, dayEnd } = this.dayWindow();
 
-    // 计算下次阶段切换时间
-    const dayDurationMs = cycleDurationMs * this.config.dayRatio;
-    const nextPhaseChangeTime =
-      this.currentPhase === DayNightPhase.Day
-        ? this.cycleStartTime + dayDurationMs
-        : this.cycleStartTime + cycleDurationMs;
+    // 计算下次阶段切换时间（游戏日 00:00 起算的固定周期，不重置 cycleStartTime）
+    const elapsedInCycle = progress * cycleDurationMs;
+    const nextBoundaryFraction =
+      elapsedInCycle < dayStart * cycleDurationMs ? dayStart
+        : elapsedInCycle < dayEnd * cycleDurationMs ? dayEnd
+          : 1;
+    const nextPhaseChangeTime = now + (nextBoundaryFraction * cycleDurationMs - elapsedInCycle);
 
     return {
       phase: this.currentPhase,
@@ -213,24 +249,11 @@ export class DayNightCycle extends EventEmitter {
   }
 
   /**
-   * 安排阶段切换
+   * 安排阶段切换（到下一个相位边界：入昼 dayStart 或入夜 dayEnd）
    */
   private schedulePhaseChange(): void {
-    const cycleDurationMs = this.config.cycleMinutes * 60 * 1000;
-    const dayDurationMs = cycleDurationMs * this.config.dayRatio;
-
-    // 计算到下次阶段切换的时间
-    const now = Date.now();
-    const elapsedMs = now - this.cycleStartTime;
-    let nextChangeDelay: number;
-
-    if (this.currentPhase === DayNightPhase.Day) {
-      // 白天阶段，计算到夜晚的时间
-      nextChangeDelay = dayDurationMs - elapsedMs;
-    } else {
-      // 夜晚阶段，计算到下一个周期开始的时间
-      nextChangeDelay = cycleDurationMs - elapsedMs;
-    }
+    const snapshot = this.getSnapshot();
+    let nextChangeDelay = snapshot.nextPhaseChangeTime - Date.now();
 
     // 确保 delay 为正数
     if (nextChangeDelay <= 0) {
@@ -253,24 +276,24 @@ export class DayNightCycle extends EventEmitter {
   }
 
   /**
-   * 阶段切换
+   * 阶段切换（依据权威相位判定，而非假设固定先后顺序）
    */
   private onPhaseChange(): void {
-    // 切换阶段
-    if (this.currentPhase === DayNightPhase.Day) {
-      this.currentPhase = DayNightPhase.Night;
-      this.emit(DayNightEvents.NightStarted, this.getSnapshot());
-      logger.debug('进入夜晚阶段');
-    } else {
-      this.currentPhase = DayNightPhase.Day;
-      this.emit(DayNightEvents.DayStarted, this.getSnapshot());
-      this.cycleCount++;
-      this.cycleStartTime = Date.now(); // 开始新周期
-      logger.debug(`进入白天阶段，第 ${this.cycleCount} 个周期`);
+    const next = this.phaseAt(Date.now());
+    if (next !== this.currentPhase) {
+      this.currentPhase = next;
+      if (next === DayNightPhase.Day) {
+        this.emit(DayNightEvents.DayStarted, this.getSnapshot());
+        this.cycleCount++;
+        logger.debug(`进入白天阶段，第 ${this.cycleCount} 个周期`);
 
-      // 触发周期性事件（交通枢纽变更）
-      if (this.config.enableEvents) {
-        this.triggerCycleEvents();
+        // 触发周期性事件（交通枢纽变更）
+        if (this.config.enableEvents) {
+          this.triggerCycleEvents();
+        }
+      } else {
+        this.emit(DayNightEvents.NightStarted, this.getSnapshot());
+        logger.debug('进入夜晚阶段');
       }
     }
 
@@ -309,11 +332,12 @@ export class DayNightCycle extends EventEmitter {
   }
 
   /**
-   * 手动切换到白天（调试用）
+   * 手动切换到白天（调试用）：将游戏时钟对齐到正午（progress=0.5）
    */
   forceDay(): void {
+    const cycleDurationMs = this.config.cycleMinutes * 60 * 1000;
+    this.cycleStartTime = Date.now() - 0.5 * cycleDurationMs;
     this.currentPhase = DayNightPhase.Day;
-    this.cycleStartTime = Date.now();
     this.broadcastDayNightChange();
     this.emit(DayNightEvents.DayStarted, this.getSnapshot());
     logger.debug('手动切换到白天');
@@ -321,9 +345,10 @@ export class DayNightCycle extends EventEmitter {
   }
 
   /**
-   * 手动切换到夜晚（调试用）
+   * 手动切换到夜晚（调试用）：将游戏时钟对齐到午夜（progress=0）
    */
   forceNight(): void {
+    this.cycleStartTime = Date.now();
     this.currentPhase = DayNightPhase.Night;
     this.broadcastDayNightChange();
     this.emit(DayNightEvents.NightStarted, this.getSnapshot());
@@ -355,9 +380,12 @@ export class DayNightCycle extends EventEmitter {
   /**
    * 更新配置（从地图元数据）
    */
-  updateConfig(cycleMinutes: number): void {
+  updateConfig(cycleMinutes: number, dayRatio?: number): void {
     this.config.cycleMinutes = cycleMinutes;
-    logger.debug(`昼夜周期更新为 ${cycleMinutes} 分钟`);
+    if (typeof dayRatio === 'number') {
+      this.config.dayRatio = dayRatio > 0 && dayRatio < 1 ? dayRatio : 0.5;
+    }
+    logger.debug(`昼夜周期更新为 ${cycleMinutes} 分钟，白昼占比 ${this.config.dayRatio}`);
   }
 }
 

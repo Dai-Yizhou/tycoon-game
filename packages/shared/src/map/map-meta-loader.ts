@@ -59,6 +59,12 @@ function parseDayNight(value: unknown): DayNightValueChangeConfig | undefined {
   };
 }
 
+function parseDayNightRatio(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value >= 1) throw new MapMetaParseError('dayNightRatio 必须是 (0,1) 区间内的数字');
+  return value;
+}
+
 export function parseMapMeta(raw: unknown): MapMeta {
   const input = object(raw, '地图元数据');
   for (const field of ['id', 'version', 'name', 'valueFieldDefinitions', 'uct', 'playerInitial', 'startCellId', 'regions', 'dayNightCycle', 'dice', 'tax']) if (input[field] === undefined) throw new MapMetaParseError(`地图元数据缺少 ${field} 字段`);
@@ -72,7 +78,7 @@ export function parseMapMeta(raw: unknown): MapMeta {
   });
   const uct = object(input.uct, 'uct');
   const regions: Region[] = (input.regions as unknown[]).map((value) => { const region = object(value, 'regions'); const regionName = object(region.name, 'regions.name'); if (typeof region.id !== 'string') throw new MapMetaParseError('region id 无效'); return { id: region.id, name: regionName as Region['name'], initial: region.initial as Region['initial'] }; });
-  return { id: input.id as string, version: input.version as string, name: name as MapMeta['name'], valueFieldDefinitions: fields, uct: { player: Array.isArray(uct.player) ? uct.player as string[] : [], region: Array.isArray(uct.region) ? uct.region as string[] : [] }, playerInitial: input.playerInitial as MapMeta['playerInitial'], startCellId: input.startCellId as number, regions, dayNightCycle: input.dayNightCycle as number, dice: input.dice as MapMeta['dice'], tax: parseTax(input.tax), ranking: parseRanking(input.ranking), dayNight: parseDayNight(input.dayNight), valueModifiers: parseValueModifiers(input.valueModifiers, fields) };
+  return { id: input.id as string, version: input.version as string, name: name as MapMeta['name'], valueFieldDefinitions: fields, uct: { player: Array.isArray(uct.player) ? uct.player as string[] : [], region: Array.isArray(uct.region) ? uct.region as string[] : [] }, playerInitial: input.playerInitial as MapMeta['playerInitial'], startCellId: input.startCellId as number, regions, dayNightCycle: input.dayNightCycle as number, dayNightRatio: parseDayNightRatio(input.dayNightRatio), dice: input.dice as MapMeta['dice'], tax: parseTax(input.tax), ranking: parseRanking(input.ranking), dayNight: parseDayNight(input.dayNight), valueModifiers: parseValueModifiers(input.valueModifiers, fields) };
 }
 
 export function validateMapMeta(meta: MapMeta, map: MapData): ValidationResult {

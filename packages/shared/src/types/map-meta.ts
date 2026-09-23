@@ -67,6 +67,8 @@ export interface MapMeta {
   startCellId: number;
   regions: Region[];
   dayNightCycle: number;
+  /** 白昼占全天比例 (0,1)，12:00 为白昼中点；未配置时默认 0.5（06:00-18:00） */
+  dayNightRatio?: number;
   dice: DiceConfig;
   tax: TaxConfig;
   ranking?: RankingConfig;
@@ -77,6 +79,8 @@ export interface MapMeta {
 }
 
 export const DEFAULT_DAY_NIGHT_CYCLE_MINUTES = 15;
+/** 白昼占全天比例的默认值（0.5 → 白昼 06:00-18:00，12:00 为正午中点） */
+export const DEFAULT_DAY_NIGHT_RATIO = 0.5;
 
 export function buildPlayerValues(meta: MapMeta): Record<string, ValueField> {
   const values: Record<string, ValueField> = {};

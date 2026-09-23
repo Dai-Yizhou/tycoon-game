@@ -390,15 +390,18 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   });
   leaderboardManager.markDirty();
 
-  // 初始化昼夜循环（从服务器启动时开始计时），周期时长以 mapMeta.dayNightCycle 为准
+  // 初始化昼夜循环（从服务器启动时开始计时），周期时长与白昼占比均以 map-meta 为准
   const cycleMinutes = mapMeta.dayNightCycle > 0 ? mapMeta.dayNightCycle : DEFAULT_DAY_NIGHT_CONFIG.cycleMinutes;
+  const dayRatio = typeof mapMeta.dayNightRatio === 'number' && mapMeta.dayNightRatio > 0 && mapMeta.dayNightRatio < 1
+    ? mapMeta.dayNightRatio
+    : DEFAULT_DAY_NIGHT_CONFIG.dayRatio;
   const dayNightCycle = new DayNightCycle(
     io,
-    { ...DEFAULT_DAY_NIGHT_CONFIG, cycleMinutes },
+    { ...DEFAULT_DAY_NIGHT_CONFIG, cycleMinutes, dayRatio },
     handlerRegistry.getTransportHandler(),
   );
   dayNightCycle.start();
-  logger.info(`DayNightCycle started (cycle=${cycleMinutes}min)`);
+  logger.info(`DayNightCycle started (cycle=${cycleMinutes}min, dayRatio=${dayRatio})`);
 
   // 将 DayNightCycle 注入 SocketManager（供 login handler 同步时间）
   if (socketManager) {

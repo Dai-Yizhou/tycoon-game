@@ -45,6 +45,7 @@ import {
 import { createMovementLoop, browserLoopHost, type MovementLoop } from '../game/systems/MovementLoop.js';
 
 import { registerSocketHandlers, unregisterSocketHandlers } from '../game/systems/SocketEventHandler.js';
+import { createDayNightShadowLoop } from '../game/systems/DayNightShadow.js';
 import { DesignAdapter } from '../design/DesignAdapter.js';
 import { getRegionThemeId, getThemeId, getThemeTokens, SAVED_REGION_THEME_KEY } from '../design/ThemeConfig.js';
 import { resolveCellActions } from '../game/cellActionResolver.js';
@@ -57,6 +58,7 @@ let mapIndex: MapIndex | null = null;
 let gameSocket: TypedClientSocket | null = null;
 let gameEffects: EffectController | null = null;
 let gameMovementLoop: MovementLoop | null = null;
+let dayNightShadowLoop: ReturnType<typeof createDayNightShadowLoop> | null = null;
 // 当前已应用的区域 UI 主题 id；null 表示尚未应用（首次加载）。用于区分"主题切换转场"与"首次加载不转场"。
 let appliedRegionThemeId: string | null = null;
 const pageEventCleanups = new WeakMap<HTMLElement, () => void>();
@@ -98,6 +100,21 @@ export function createGamePage(controller: GameController): HTMLElement {
   const effects = new EffectController(new CssTransitionEffectHooks(page));
   gameEffects = effects;
   const movementEffects: MovementEffectHooks = effects;
+
+  // 昼夜阴影分层（§3.9）：独立于移动循环的连续更新，每帧读权威相位写 CSS 变量到页面根节点。
+  // reduced-motion / 动效关闭时退化为静态默认阴影（不扫动）。
+  dayNightShadowLoop = createDayNightShadowLoop({
+    root: page,
+    getPhase: () => {
+      if (!gameViewModel) return null;
+      // 阴影跟随玩家所在格时区的相位（与 HUD 时钟同一来源）
+      const local = gameViewModel.getLocalDayNight(gameViewModel.getPlayerTimezoneOffset());
+      return { isDay: local.isDay, dayPhase: local.dayPhase, nightPhase: local.nightPhase };
+    },
+    effectsEnabled: () => gameEffects?.isEnabled() ?? false,
+    reducedMotion: () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+  });
+  dayNightShadowLoop.start();
 
   // Board
   const boardContainer = document.createElement('div');
@@ -556,6 +573,8 @@ function formatTeamValues(values: Record<string, number>, definitions: Array<{ i
 }
 
 export function cleanupGamePage(page: HTMLElement): void {
+  dayNightShadowLoop?.stop();
+  dayNightShadowLoop = null;
   gameMovementLoop?.stop();
   gameMovementLoop = null;
   pageEventCleanups.get(page)?.();

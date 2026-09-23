@@ -10,6 +10,7 @@
  */
 
 import type { Player, Uct, ValueModifierRule } from '@game/shared';
+import { resolveDayNightPhase } from '@game/shared';
 import type { GameStore, ClientGameSnapshot, RegionInfo, ValueFieldDef, TeamMember, OtherPlayerInfo, ClientChatMessage } from '../state/GameStore.js';
 import { type CellHoverResolutionCtx } from './cellDisplayModel.js';
 import { localizedText } from './i18n.js';
@@ -395,28 +396,33 @@ export class GameViewModel {
 
   /**
    * 基于服务器时间 + 时区偏移计算本地昼夜状态
+   *
+   * 相位定义唯一来源为 @game/shared 的 resolveDayNightPhase（与服务端同源）：
+   * - 游戏时钟以服务端计时器为基准（UTC+0），按时区偏移换算显示与相位；
+   * - 白昼窗口以 12:00 为中点：[0.5 - dayRatio/2, 0.5 + dayRatio/2)；
+   * - 时区偏移按「24h 一天」换算（offsetMinutes/1440），不对 cycle 取模。
    */
   getLocalDayNight(offsetMinutes: number): {
     isDay: boolean; progress: number; hour: number; minute: number; timeStr: string;
+    dayPhase: number; nightPhase: number;
   } {
     const dayNight = this.getDayNight();
     const serverNow = Date.now() + dayNight.serverTimeOffset;
-    const serverElapsed = serverNow - dayNight.cycleStartTime;
-    // 相位 = 全局进度 + 时区偏移。时区偏移是真实墙钟偏移（60 的倍数），按"24h 一天"换算相位
-    // （offsetMinutes/1440），与服务端 TimeZoneManager.getLocalTime 同口径。cycle 只决定昼夜切换
-    // 频率（dayRatio 为白天占比），不能把偏移对 cycle 取模——那会让短周期下真实时区偏移全部相消，
-    // 不同时区显示相同时间。例如 cycle=24min 时 offset 480/0/-480 mod 24 全为 0。
-    const offsetAsDayFraction = offsetMinutes / 1440;
-    const localProgress = (((serverElapsed / dayNight.cycleDuration) + offsetAsDayFraction) % 1 + 1) % 1;
-    const totalMinutes = Math.floor(localProgress * 24 * 60);
-    const hour = Math.floor(totalMinutes / 60);
-    const minute = totalMinutes % 60;
-    const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-    // 白天边界以服务端权威下发的 dayRatio 为准（默认 0.5，白天=周期起始的 [0,dayRatio) 块）。
-    // 服务端在 progress=dayRatio 处切换相位并触发区域 pros 等 applyPhase；客户端须与之对齐，
-    // 否则 HUD 由昼转夜会比服务端相位偏差，导致"HUD 转夜但区域值已提前变化/无同步变化"。
-    const isDay = localProgress < dayNight.dayRatio;
-    return { isDay, progress: localProgress, hour, minute, timeStr };
+    const phase = resolveDayNightPhase({
+      gameElapsedMs: serverNow - dayNight.cycleStartTime,
+      cycleDurationMs: dayNight.cycleDuration,
+      dayRatio: dayNight.dayRatio,
+      offsetMinutes,
+    });
+    return {
+      isDay: phase.isDay,
+      progress: phase.progress,
+      hour: phase.hour,
+      minute: phase.minute,
+      timeStr: phase.timeStr,
+      dayPhase: phase.dayPhase,
+      nightPhase: phase.nightPhase,
+    };
   }
 
   /**

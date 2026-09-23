@@ -207,6 +207,15 @@ export interface ServerToClientEvents {
     members?: TeamMemberView[];
     ownedProperties?: Array<{ cellId: number; level: number }>;
     ownedInvestments?: Array<{ cellId: number; share: number }>;
+    /** 全部格子的运行时态（持股明细/等级/累计值），登录/重连时下发以初始化 hover 展示 */
+    cellRuntimeStates?: Array<{
+      cellId: number;
+      ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>;
+      level: number;
+      accumulatedValue: number;
+      repairedBy?: string;
+      repairedAt?: number;
+    }>;
     /** 当前玩家视野内可见的格子（可选） */
     visibleCells?: Cell[];
     /** 服务端时间 */

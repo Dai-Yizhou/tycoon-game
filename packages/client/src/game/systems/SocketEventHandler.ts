@@ -180,6 +180,19 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     if (payload.teamValues && payload.player?.id === currentSnapshot.currentPlayer?.id) {
       store.setTeamValueTable(payload.teamValues);
     }
+    // 登录/重连即以服务端权威运行时态覆盖全部格子（持股明细/等级/累计值），
+    // 修复仅靠增量事件在重连后丢失导致 hover 持股人数/等级显示为 0 的问题。
+    if (payload.cellRuntimeStates?.length) {
+      for (const runtime of payload.cellRuntimeStates) {
+        store.setCellRuntimeState(runtime.cellId, {
+          ownerships: runtime.ownerships.map((o) => ({ ...o })),
+          level: runtime.level,
+          accumulatedValue: runtime.accumulatedValue,
+          ...(runtime.repairedBy ? { repairedBy: runtime.repairedBy } : {}),
+          ...(typeof runtime.repairedAt === 'number' ? { repairedAt: runtime.repairedAt } : {}),
+        });
+      }
+    }
     store.applySnapshot({ sequence: store.nextSequence(), player: payload.player, teamMembers, ownedProperties: payload.ownedProperties, ownedInvestments: payload.ownedInvestments });
   });
 

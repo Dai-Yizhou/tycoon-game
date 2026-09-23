@@ -532,6 +532,21 @@ export class SocketManager {
             return cell.type === 'investment' && ownership ? [{ cellId: cell.id, share: ownership.share }] : [];
           }),
           team: this.teamManager?.getPlayerTeam(player.id) ?? null,
+          // 全部格子的运行时态（含持股明细/等级/累计值）：客户端据此初始化 hover 展示，
+          // 避免仅靠增量事件（游戏中途重连会丢失）导致持股人数/等级显示为 0。
+          cellRuntimeStates: (this.world.getMapData() ?? [])
+            .filter((cell: Cell) => cell.type === 'property' || cell.type === 'investment')
+            .map((cell: Cell) => {
+              const runtime = this.world.getRuntimeState().getCellState(cell.id);
+              return {
+                cellId: cell.id,
+                ownerships: runtime.ownerships.map((o) => ({ ...o })),
+                level: runtime.level,
+                accumulatedValue: runtime.accumulatedValue,
+                ...(runtime.repairedBy ? { repairedBy: runtime.repairedBy } : {}),
+                ...(typeof runtime.repairedAt === 'number' ? { repairedAt: runtime.repairedAt } : {}),
+              };
+            }),
           members: this.teamManager?.getPlayerTeam(player.id)?.memberIds.map((memberId) => {
             const member = this.world.getPlayer(memberId);
             const values = Object.fromEntries(Object.entries(member?.values ?? {}).map(([fieldId, field]) => [fieldId, field.current]));
