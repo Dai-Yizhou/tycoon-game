@@ -55,10 +55,11 @@ export class EffectController implements GameEffectHooks {
   onIntersectionPrompt(options: number[]): void { this.invoke('onIntersectionPrompt', options); }
   onIntersectionResolved(chosenCellId: number): void { this.invoke('onIntersectionResolved', chosenCellId); }
   onTeleport(toCellId: number, applyMove: () => void): void { this.invoke('onTeleport', toCellId, applyMove); }
-  onThemeChange(moving: boolean, waitingForChoice = false, apply?: () => void): void {
+  /** 进入游戏承接转场：盖满后立即露出（无中间操作） */
+  playIntroTransition(): void {
     if (this.destroyed || !this.enabled) return;
-    const hook = this.hooks as { onThemeChange?: (moving: boolean, waitingForChoice?: boolean, apply?: () => void) => void } | undefined;
-    hook?.onThemeChange?.(moving, waitingForChoice, apply);
+    const hook = this.hooks as { playIntroTransition?: () => void } | undefined;
+    hook?.playIntroTransition?.();
   }
   onMoneyChange(delta: number, newValue: number): void { this.invoke('onMoneyChange', delta, newValue); }
   onCreditChange(delta: number, newValue: number): void { this.invoke('onCreditChange', delta, newValue); }

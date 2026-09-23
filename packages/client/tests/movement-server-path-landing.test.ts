@@ -38,7 +38,9 @@ function drive(surface: InteractiveMapSurface, store: GameStore, mapIndex: { get
       break;
     }
     surface.setPlayerDisplayPosition(s.currentPlayer!.id, s.playerDisplayX ?? 0, s.playerDisplayY ?? 0);
-    store.applySnapshot({ sequence: store.nextSequence(), moveStartTime: performance.now() - 400 } as never);
+    // 本测试验证权威落点，与 3.6 段落停顿/减速正交：置 moveDwellUntil=0 跳过停顿，并把快进时长
+    // 放大到远超末步减速后的步长（约 518ms），保证每步 progress≥1 直接落格。
+    store.applySnapshot({ sequence: store.nextSequence(), moveStartTime: performance.now() - 1500, moveDwellUntil: 0 } as never);
     updateMovement(store, mapIndex, () => {});
   }
 }

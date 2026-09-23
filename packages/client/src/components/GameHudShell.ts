@@ -527,9 +527,22 @@ export class GameHudShell {
 
   /** 动作/岔路按钮簇 */
   private updateActionCluster(): void {
+    const movement = this.vm.getMovement();
+    const actionCluster = this.root.querySelector('[data-ui="action-cluster"]')!;
+    const widgets: HTMLElement[] = [];
+    // 拼图块点数（§3.2）：仅本玩家移动期显示"已走 X/总步数"。数据取权威 serverPath（服务端
+    // 下发），不做本地推算；移动结束 update() 重渲染时自然隐藏。
+    if (movement.isMoving && movement.isServerAnimating && movement.serverPath.length >= 2) {
+      const total = movement.serverPath.length - 1;
+      const moved = Math.min(movement.serverPathIndex, total);
+      const chip = document.createElement('div');
+      chip.className = 'act-btn act-btn--pips';
+      chip.dataset.ui = 'steps-progress';
+      chip.textContent = t('hud.stepsProgress', { moved, total });
+      widgets.push(chip);
+    }
     const pathChoice = this.vm.getPathChoice();
     const cellActions = this.vm.getCellActions();
-    const actionCluster = this.root.querySelector('[data-ui="action-cluster"]')!;
     const actionButtons = pathChoice.active ? pathChoice.options.map((option, index) => {
       const button = document.createElement('button');
       button.className = 'act-btn act-btn--accent';
@@ -557,7 +570,7 @@ export class GameHudShell {
       button.addEventListener('click', () => this.config.onCellAction?.(action.id, action.data));
       return button;
     });
-    actionCluster.replaceChildren(...actionButtons);
+    actionCluster.replaceChildren(...widgets, ...actionButtons);
   }
 
   /** 聊天消息、ticker 与频道筛选 */

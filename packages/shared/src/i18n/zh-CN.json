@@ -183,6 +183,7 @@
     "nightShort": "夜",
     "ready": "就绪",
     "moving": "移动中",
+    "stepsProgress": "已走 {{moved}}/{{total}} 步",
     "cooldown": "冷却中",
     "effectsOn": "动效：开",
     "effectsOff": "动效：关",

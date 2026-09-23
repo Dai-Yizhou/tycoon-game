@@ -12,6 +12,8 @@
   /* 动效时长（交互时序，非视觉主题，固定值） */
   --motion-fast: 0.15s ease;
   --motion-normal: 0.25s ease;
+  /* 数值底色呼吸总时长（§3.7）：CSS 与 JS 共用此单点，避免定时器把动画截断 */
+  --motion-value-breathe: 0.5s;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -266,6 +268,16 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
    ============================================================ */
 .game-page { background: var(--gp-map-bg); overflow: hidden; }
 
+/* 昼夜光照呼吸（§3.11）：在区域基色之上叠加夜晚光照层，强度由 --gp-night-alpha 连续插值
+   （入夜渐深 / 破晓渐退），与区域色正交可叠加；颜色取主题令牌 --gp-cycle-night。
+   z-index 低于 HUD（20）而高于地图，避免遮暗控件；reduced-motion / 动效关闭时该变量为 0。 */
+.game-page::after {
+  content: ""; position: absolute; inset: 0; z-index: 15; pointer-events: none;
+  background: var(--gp-cycle-night);
+  mix-blend-mode: multiply;
+  opacity: var(--gp-night-alpha, 0);
+}
+
 /* 地图严格铺满视野，覆盖整个 body */
 .game-page .board-container {
   position: absolute; inset: 0; z-index: 1;
@@ -284,10 +296,20 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .interactive-map-surface__links, .interactive-map-surface__nodes, .interactive-map-surface__players { width: 100%; height: 100%; }
 
 .map-link {
-  stroke: color-mix(in srgb, var(--region-motion-fg) 55%, transparent);
-  stroke-width: 8; stroke-linecap: round;
+  stroke: color-mix(in srgb, var(--region-motion-fg) 80%, transparent);
+  stroke-width: 10; stroke-linecap: round;
+  filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--region-board-bg) 55%, transparent));
 }
-.map-node { cursor: pointer; }
+.map-link__arrow {
+  fill: var(--region-motion-fg);
+  stroke: color-mix(in srgb, var(--region-board-bg) 60%, transparent);
+  stroke-width: 2; stroke-linejoin: round;
+}
+.map-node {
+  cursor: pointer;
+  /* 躺桌面低阴影（§3.9）：浅、低 alpha，方向由昼夜阴影更新器写入 --gp-shadow-cell-* 变量 */
+  filter: drop-shadow(var(--gp-shadow-cell-dx, 0px) var(--gp-shadow-cell-dy, 1px) 1px color-mix(in srgb, var(--region-border) calc(var(--gp-shadow-cell-alpha, 0.3) * 100%), transparent));
+}
 .map-node__shape {
   fill: var(--region-cell-bg);
   stroke: var(--region-border); stroke-width: 3;
@@ -295,14 +317,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .map-node:hover .map-node__shape { fill: var(--region-box-bg); }
 /* 仅 2 种边框样式：默认（未持股 / 不能持股）与已持股高亮 */
 .map-node--held .map-node__shape { stroke: var(--region-accent); stroke-width: 4; }
-.map-node__type { fill: var(--region-label-fg); font-weight: 700; font-size: 13px; font-family: var(--font-func); letter-spacing: 0.08em; }
-.map-node__name { fill: var(--region-fg); font-weight: 900; font-size: 19px; font-family: var(--font-title); }
-.map-node__price { fill: var(--region-accent); font-weight: 700; font-size: 15px; font-family: var(--font-num); }
+.map-node__type { fill: var(--region-label-fg); font-weight: 700; font-size: 13px; font-family: var(--font-func); letter-spacing: 0.14em; }
+.map-node__name { fill: var(--region-fg); font-weight: 900; font-size: 20px; font-family: var(--font-title); }
 
-/* 玩家棋子：语义色由交互层传入（--gp-player-color），头/描边取主题令牌 */
+/* 玩家棋子：语义色由交互层传入（--gp-player-color），头/描边取主题令牌。
+   阴影方向随昼夜扫动（§3.9）：偏移/强度由 --gp-shadow-piece-* 变量驱动，颜色走 --region-border */
 .map-player {
   pointer-events: none;
-  filter: drop-shadow(0 3px 2px color-mix(in srgb, var(--region-border) 45%, transparent));
+  filter: drop-shadow(var(--gp-shadow-piece-dx, 0px) var(--gp-shadow-piece-dy, 3px) 2px color-mix(in srgb, var(--region-border) calc(var(--gp-shadow-piece-alpha, 0.45) * 100%), transparent));
 }
 .map-player__head {
   fill: var(--tycoon-piece-head);
@@ -343,6 +365,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   clip-path: circle(150% at 50% 50%);
   transition: clip-path var(--motion-transition) ease-in;
 }
+/* 进场瞬时全黑（无过渡），用于承接点击进入后：先全黑定帧，再播露出动画 */
+.transition-overlay.no-anim,
+.transition-overlay.no-anim.is-active { transition: none; }
 
 /* —— HUD 外壳 —— */
 .game-hud-shell {
@@ -400,6 +425,20 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .value-pill__label { font-size: 8px; color: var(--gp-muted); font-family: var(--font-func); letter-spacing: 0.06em; text-transform: uppercase; }
 .value-pill__num { font-family: var(--font-num); font-size: 13px; font-weight: 700; color: var(--gp-fg); }
 .value-pill--accent .value-pill__num { color: var(--gp-accent); }
+
+/* 底色呼吸（§3.7，暂缓数值滚动）：本地数值结算时，对应数值区快速提亮强调色再缓慢回归。
+   玩家数值 → 资源条（.value-pills）；区域繁荣度 → 区域状态条（.region-status）。
+   用 box-shadow 光环而非改底色，避免与 --gp-card 现有底色打架；仅本玩家结算触发。
+   时长走 --motion-value-breathe（单点），JS 按同一令牌移除 class。 */
+@keyframes gp-value-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gp-accent) 0%, transparent); }
+  30% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--gp-accent) 38%, transparent); }
+}
+.fx-value-breathe .value-pills,
+.fx-value-breathe .region-status {
+  border-radius: var(--region-radius);
+  animation: gp-value-breathe var(--motion-value-breathe, 0.5s) ease-out 1;
+}
 
 .topbar-spacer { flex: 1; }
 
@@ -576,8 +615,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .dice-btn {
   position: relative;
   display: inline-flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 13px;
-  padding: 8px 18px;
+  font-weight: 800; font-size: 15px;
+  padding: 11px 24px;
   border: calc(var(--region-border-w) + 1px) solid var(--gp-border);
   border-radius: var(--region-radius);
   background: var(--gp-card); color: var(--gp-muted);
@@ -606,11 +645,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 /* 动效关闭：冷却填充不做任何过渡揭示（禁用态直接切换，无 clip-path 扫光动画） */
 .effects-disabled .dice-btn__fill,
 .effects-disabled .dice-btn:not(:disabled) .dice-btn__fill { transition: none; }
-.dice-status { font-size: 10px; color: var(--gp-muted); font-family: var(--font-num); }
+.dice-status { font-size: 12px; color: var(--gp-muted); font-family: var(--font-num); }
 
 .action-cluster { display: flex; gap: 6px; flex-shrink: 0; }
 .act-btn {
-  font-size: 11px; font-weight: 700; padding: 6px 12px;
+  font-size: 13px; font-weight: 700; padding: 8px 16px;
   border: var(--region-border-w) solid var(--gp-border); border-radius: var(--region-radius);
   background: var(--gp-card); color: var(--gp-fg);
   cursor: pointer; white-space: nowrap;
@@ -620,10 +659,38 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .act-btn--accent { background: var(--gp-accent); color: var(--gp-paper); border-color: var(--gp-accent); }
 .act-btn--accent:hover:not(:disabled) { background: color-mix(in srgb, var(--gp-accent) 85%, #ffffff); }
 .act-btn__price { display: block; font-family: var(--font-num); font-size: 9px; font-weight: 700; }
+.act-btn--pips {
+  cursor: default; user-select: none; font-family: var(--font-num);
+  /* 与按钮簇同源观感：继承 .act-btn 底色/描边/圆角，仅字体换等宽数字；非交互 */
+}
 
 .actionbar-spacer { flex: 1; }
 
 /* ===== 响应式 ===== */
+/* 桌面优先：大屏放大 HUD（顶栏/底栏/聊天 dock/悬浮卡片），增强可读性 */
+@media (min-width: 1280px) {
+  .gp-topbar { height: 84px; padding: 16px 22px; }
+  .gp-actionbar { height: 124px; padding: 0 22px; }
+  .region-status__name { font-size: 13px; }
+  .region-status__value { font-size: 12px; }
+  .player-badge__avatar { width: 26px; height: 26px; font-size: 11px; }
+  .player-badge__name { font-size: 13px; }
+  .player-badge__team { font-size: 10px; }
+  .value-pill { min-width: 64px; padding: 3px 10px; }
+  .value-pill__label { font-size: 9px; }
+  .value-pill__num { font-size: 14px; }
+  .dice-status { font-size: 13px; }
+  .cell-hover-card { width: 220px; padding: 12px; }
+  .cell-hover-card__type { font-size: 9px; }
+  .cell-hover-card__title { font-size: 16px; }
+  .cell-hover-card__rows, .cell-hover-card__rows b { font-size: 10px; }
+  .hud-chat-dock { width: 280px; }
+  .hud-chat-dock__ticker-text,
+  .hud-chat-dock__filter,
+  .hud-chat-msg,
+  .hud-chat-dock__input select,
+  .hud-chat-dock__input input { font-size: 10px; }
+}
 @media (max-width: 900px) {
   .gp-topbar { padding: 0 10px; }
   .gp-actionbar { padding: 0 10px; }
@@ -633,6 +700,12 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   .cell-hover-card { width: 168px; }
   .value-pills { gap: 4px; }
   .value-pill { min-width: 44px; }
+}
+/* 桌面优先：小屏回退略小的控件，避免挤爆（当前不重点打磨移动端） */
+@media (max-width: 700px) {
+  .dice-btn { font-size: 13px; padding: 8px 18px; }
+  .act-btn { font-size: 11px; padding: 6px 12px; }
+  .dice-status { font-size: 10px; }
 }
 @media (max-width: 700px) {
   .gp-topbar { height: 64px; }
@@ -660,4 +733,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   .dice-btn, .dice-btn__fill, .act-btn, .start-button, .confirm-button, .retry-button,
   .username-input, .password-input, .progress-bar::after { transition: none; }
   .fx-step-start, .fx-step-arrive, .fx-move-complete { animation: none; }
+  .fx-value-breathe .value-pills,
+  .fx-value-breathe .region-status { animation: none; }
 }

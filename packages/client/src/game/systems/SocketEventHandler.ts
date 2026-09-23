@@ -14,7 +14,7 @@ import { noopHudRefresh, type HudRefresh } from '../ClientHudBridge.js';
 import type { GameController } from '../GameController.js';
 import { GameStore } from '../../state/GameStore.js';
 import { formatUct, type MapIndex, type Player } from '@game/shared';
-import type { MovementEffectHooks } from '../GameEffects.js';
+import type { MovementEffectHooks, ValueEffectHooks } from '../GameEffects.js';
 
 const registeredSockets = new WeakSet<TypedClientSocket>();
 const eventObservers = new WeakMap<TypedClientSocket, (event: string) => void>();
@@ -32,6 +32,27 @@ export interface SocketHandlerOptions {
   /** 进入监狱时触发：用于启动监狱冷却揭示动画 ticker */
   onJailCooldownStart?: () => void;
   movementEffects?: MovementEffectHooks;
+  /** 数值视效（§3.7 底色呼吸）：仅本玩家数值实际变化时触发 */
+  valueEffects?: ValueEffectHooks;
+}
+
+/**
+ * 数值字段 → 底色呼吸钩子（§3.7）。字段 id 来自地图 valueFields，未识别字段忽略。
+ * 玩家作用域：money / credit / environment；区域作用域：pros（繁荣度）。
+ */
+const VALUE_BREATHE_HOOKS: Record<string, keyof ValueEffectHooks> = {
+  money: 'onMoneyChange',
+  credit: 'onCreditChange',
+  environment: 'onEnvChange',
+  pros: 'onProsperityChange',
+};
+
+/** 派发数值底色呼吸；effects 或字段未识别时静默忽略 */
+function dispatchValueBreathe(effects: ValueEffectHooks | undefined, fieldId: string, delta: number, current: number): void {
+  const hook = VALUE_BREATHE_HOOKS[fieldId];
+  if (!effects || !hook) return;
+  const fn = effects[hook] as (delta: number, newValue: number) => void;
+  fn.call(effects, delta, current);
 }
 
 const SOCKET_EVENTS = [
@@ -311,8 +332,13 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     const isCurrentPlayer = snapshot.currentPlayer?.id === payload.playerId;
     const isOtherPlayer = snapshot.otherPlayers.some(player => player.id === payload.playerId);
     if (!isCurrentPlayer && !isOtherPlayer) return;
+    const prevValue = snapshot.currentPlayer?.values?.[payload.fieldId]?.current;
     store.applyEvent({ sequence: store.nextSequence(), type: 'value', playerId: payload.playerId, fieldId: payload.fieldId, current: payload.current });
     if (isCurrentPlayer) {
+      // 底色呼吸（§3.7）：仅本玩家数值"实际变化"时触发；首次同步（无前值）不触发，避免进页面即呼吸
+      if (typeof prevValue === 'number' && prevValue !== payload.current) {
+        dispatchValueBreathe(options.valueEffects, payload.fieldId, payload.delta, payload.current);
+      }
       refresh();
     }
   });
@@ -449,7 +475,13 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   // 监听服务端区域 UCT 数值变化（昼夜切换、纪念碑修缮等统一广播）
   socket.on('server.regionValueChanged', (payload: { regionId?: string; fieldId?: string; value?: number; delta: number; reason?: string; timestamp?: number }) => {
     if (payload.regionId && payload.fieldId && typeof payload.value === 'number') {
+      const prevValue = store.getSnapshot().regionValues.get(payload.regionId)?.[payload.fieldId];
       store.setRegionValue(payload.regionId, payload.fieldId, payload.value);
+      // 底色呼吸（§3.7）：仅当变化的是"本玩家所在区域"且数值实际变化时触发（HUD 区域状态条随之呼吸）
+      const currentRegionId = store.getCell(store.getSnapshot().currentPlayerPosition)?.regionId;
+      if (typeof prevValue === 'number' && prevValue !== payload.value && currentRegionId === payload.regionId) {
+        dispatchValueBreathe(options.valueEffects, payload.fieldId, payload.delta, payload.value);
+      }
     }
   });
 

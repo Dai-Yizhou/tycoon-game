@@ -270,6 +270,7 @@ export function createGamePage(controller: GameController): HTMLElement {
       onHudRefresh: () => gameHudShell?.update(),
       onJailCooldownStart: () => invokeGameAction((runtime) => ensureCooldownRevealTicker(runtime)),
       movementEffects,
+      valueEffects: effects,
       onEvent: () => {
         gameHudShell?.update();
         syncCellActions(gameStore?.getSnapshot().currentPlayerPosition ?? 0);
@@ -306,6 +307,10 @@ export function createGamePage(controller: GameController): HTMLElement {
   });
 
   container.appendChild(page);
+
+  // 进入游戏承接转场：黑圆盖满后露出（§2.1 收口：黑圆仅进入游戏与传送时触发，主题切换不再播）
+  requestAnimationFrame(() => gameEffects?.playIntroTransition());
+
   return page;
 }
 
@@ -348,13 +353,8 @@ function applyRegionTheme(page: HTMLElement, cellId: number): void {
     // 首次进入不播转场，直接落主题，避免加载时黑屏一闪
     applyGamePageThemeTokens(page, { tokens: getThemeTokens(themeId) });
   } else {
-    // UI 主题切换：由视效层在完全进入黑屏后应用主题令牌（apply），
-    // 再按移动/岔路选择状态决定保持或露出；正等待路径选择（棋子未真正移动）时立即应用、不进黑屏。
-    gameEffects?.onThemeChange(
-      !!snapshot?.isMoving,
-      !!snapshot?.isWaitingForChoice,
-      () => applyGamePageThemeTokens(page, { tokens: getThemeTokens(themeId) }),
-    );
+    // 主题切换不再播黑圆盖屏/露屏转场（§2.1 收口：黑圆仅进入游戏与传送时触发），直接应用令牌
+    applyGamePageThemeTokens(page, { tokens: getThemeTokens(themeId) });
   }
 
   // 记录当前玩家所在格子的区域主题，供欢迎/登录等独立页面在下次启动时沿用

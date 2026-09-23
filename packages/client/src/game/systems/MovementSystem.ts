@@ -10,6 +10,20 @@ import { readCssVarNumber } from '../../design/DesignAdapter.js';
 /** 单步移动插值时长的兜底默认值；运行时以主题令牌 --motion-step 覆盖 */
 const MOVE_STEP_DURATION = 280;
 
+/** 每格落步的停顿时长（段落感）；移动以"停顿→滑步→停顿"逐格推进 */
+const MOVE_DWELL_MS = 150;
+
+/**
+ * 接近终点减速系数：根据剩余步数（含当前步）返回该步时长的放大倍数。
+ * 剩最后 1～2 格时明显放慢，形成"收尾减速 + 落地手感"；步数越多越接近匀速。
+ */
+function stepDecelerationFactor(stepsRemaining: number): number {
+  if (stepsRemaining <= 1) return 1.85;
+  if (stepsRemaining === 2) return 1.45;
+  if (stepsRemaining === 3) return 1.2;
+  return 1.08;
+}
+
 /** 当前生效的单步时长（毫秒）；在每次移动起点刷新，避免 RAF 热路径每帧读取计算样式 */
 let stepDurationMs = MOVE_STEP_DURATION;
 
@@ -30,8 +44,12 @@ export function updateMovement(store: GameStore, map: MapIndex, onPlayerArrived:
   const snapshot = store.getSnapshot();
   if (!snapshot.isMoving) return;
 
+  const now = performance.now();
+  // 每格落足停顿中：保持当前格位不推进，形成"段落感"。isMoving 仍为真，移动循环会持续续排。
+  if (snapshot.moveDwellUntil > now) return;
+
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const progress = reducedMotion ? 1 : Math.min((performance.now() - snapshot.moveStartTime) / stepDurationMs, 1);
+  const progress = reducedMotion ? 1 : Math.min((now - snapshot.moveStartTime) / stepDurationMs, 1);
   const eased = easeInOutQuad(progress);
   const newX = snapshot.moveFromX + (snapshot.moveToX - snapshot.moveFromX) * eased;
   const newY = snapshot.moveFromY + (snapshot.moveToY - snapshot.moveFromY) * eased;
@@ -42,11 +60,15 @@ export function updateMovement(store: GameStore, map: MapIndex, onPlayerArrived:
     effects?.onStepArrive(snapshot.currentPlayerPosition);
     if (snapshot.serverPathIndex >= snapshot.serverPath.length - 1) {
       const finalCell = map.getById(snapshot.currentPlayerPosition);
-      updateSnapshot(store, { isServerAnimating: false, isMoving: false, playerDisplayX: finalCell?.x ?? snapshot.playerDisplayX, playerDisplayY: finalCell?.y ?? snapshot.playerDisplayY });
+      updateSnapshot(store, { isServerAnimating: false, isMoving: false, moveDwellUntil: 0, playerDisplayX: finalCell?.x ?? snapshot.playerDisplayX, playerDisplayY: finalCell?.y ?? snapshot.playerDisplayY });
       onPlayerArrived();
       effects?.onMoveComplete(snapshot.currentPlayerPosition);
       return;
     }
+    // 非末格：落步后停顿再推进下一步（段落感）。reduced-motion 下不停顿，立即衔接下一步。
+    // 停顿截止时间不会在本帧清掉：animateMoveTo 把下一步 moveStartTime 置为同一截止点，
+    // 停顿期间顶层 moveDwellUntil 门禁保持不推进，停顿结束那一刻 progress≈0 开始全新滑步。
+    updateSnapshot(store, { moveDwellUntil: reducedMotion ? 0 : now + MOVE_DWELL_MS });
     advanceServerPathStep(store, map, onPlayerArrived, effects);
     return;
   }
@@ -91,13 +113,23 @@ export function animateMoveTo(store: GameStore, map: MapIndex, targetId: number,
   if (!target) return;
 
   refreshStepDuration();
+  // 接近终点减速：仅对多步路径生效（单步/碎步保持基准步长，避免单格落子被拖慢）。
+  // serverPathIndex 正是当前目标步下标，剩余步数 = 总步数 - 当前下标 + 1；末步最慢，形成落地感。
+  const totalSteps = Math.max(1, snapshot.serverPath.length - 1);
+  if (totalSteps > 1) {
+    const stepsRemaining = Math.max(1, totalSteps - snapshot.serverPathIndex + 1);
+    stepDurationMs = Math.round(stepDurationMs * stepDecelerationFactor(stepsRemaining));
+  }
+  // 上一步落足已写下 moveDwellUntil（停顿截止）：本步动画应始于停顿之后，故 moveStartTime 取其截止点，
+  // 停顿期间顶层门禁保持不推进，停顿结束才从 progress≈0 开始全新滑步；无停顿时立即开始。
+  const stepStartTime = snapshot.moveDwellUntil > performance.now() ? snapshot.moveDwellUntil : performance.now();
   updateSnapshot(store, {
     previousCellId: snapshot.currentPlayerPosition,
     moveFromX: snapshot.playerDisplayX,
     moveFromY: snapshot.playerDisplayY,
     moveToX: target.x,
     moveToY: target.y,
-    moveStartTime: performance.now(),
+    moveStartTime: stepStartTime,
     currentPlayerPosition: targetId,
   });
   effects?.onStepStart(snapshot.currentPlayerPosition, targetId);
@@ -120,7 +152,7 @@ export function startServerPathAnimation(store: GameStore, map: MapIndex, path: 
   const startCell = map.getById(start);
   const endCell = map.getById(end);
   if (!startCell || !endCell) return;
-  updateSnapshot(store, { serverPath: [...path], serverPathIndex: 0, isServerAnimating: true, isMoving: true, currentPlayerPosition: start, playerDisplayX: startCell.x, playerDisplayY: startCell.y, moveFromX: startCell.x, moveFromY: startCell.y, moveToX: endCell.x, moveToY: endCell.y, remainingSteps: 0 });
+  updateSnapshot(store, { serverPath: [...path], serverPathIndex: 0, isServerAnimating: true, isMoving: true, currentPlayerPosition: start, playerDisplayX: startCell.x, playerDisplayY: startCell.y, moveFromX: startCell.x, moveFromY: startCell.y, moveToX: endCell.x, moveToY: endCell.y, remainingSteps: 0, moveDwellUntil: 0 });
   window.dispatchEvent(new CustomEvent('game:cell-leave'));
   (onHudRefresh ?? noopHudRefresh)();
   advanceServerPathStep(store, map, onPlayerArrived, effects);

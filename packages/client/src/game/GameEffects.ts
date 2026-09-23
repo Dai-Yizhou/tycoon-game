@@ -152,8 +152,6 @@ export class CssTransitionEffectHooks extends NoOpEffectHooks {
   private coverOps: Array<() => void> = [];
   /** 是否已请求退出黑屏；盖满前请求则等到盖满后执行，保证动画完整播放 */
   private revealRequested = false;
-  /** 是否正停留在岔路口等待路径选择（选择期间不进入/保持黑屏，避免挡住选项） */
-  private inChoice = false;
 
   constructor(private readonly root: HTMLElement) {
     super();
@@ -207,13 +205,6 @@ export class CssTransitionEffectHooks extends NoOpEffectHooks {
     });
   }
 
-  /** 进入黑屏：盖满后执行 op（已全黑则立即执行）。 */
-  private cover(op?: () => void): void {
-    if (this.phase === 'covered') { op?.(); return; }
-    if (this.phase === 'covering') { if (op) this.coverOps.push(op); return; }
-    this.startCover(op ?? null);
-  }
-
   /** 完整转场：进入黑屏 → 盖满后执行 op → 露出画面（进入的反效果）。 */
   private cycle(op: () => void): void {
     if (this.phase === 'covered') { op(); this.reveal(); return; }
@@ -237,20 +228,26 @@ export class CssTransitionEffectHooks extends NoOpEffectHooks {
     }, { once: true });
   }
 
-  /**
-   * 主题变化时的转场调度（由 GamePage.applyRegionTheme 在真正发生主题切换时调用）。
-   * apply 为主题令牌应用，须在完全进入黑屏后执行（避免切换过程露出）。
-   * - moving：是否处于移动序列中；waitingForChoice：是否正等待路径选择。
-   * - 岔路口选择期间（inChoice 或 waitingForChoice）：不进入黑屏（避免挡住选项，且棋子尚未真正移动），
-   *   立即 apply；
-   * - 移动中：进入黑屏，盖满后 apply 并保持黑屏（连续多个主题变化不反复闪烁），移动结束/出现选择时才退出；
-   * - 空闲：完整转场（进入 → 盖满后 apply → 露出）。
-   */
-  onThemeChange(moving: boolean, waitingForChoice = false, apply?: () => void): void {
-    const run = apply ?? ((): void => {});
-    if (this.inChoice || waitingForChoice) { run(); return; }
-    if (moving) this.cover(run);
-    else this.cycle(run);
+  /** 进入游戏承接转场：点击进入已是全黑，页面出现后只播露出动画，不播进入黑屏扩散。 */
+  playIntroTransition(): void {
+    this.overlay?.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'transition-overlay no-anim';
+    this.overlay = overlay;
+    this.phase = 'covered';
+    this.coverOps = [];
+    this.revealRequested = false;
+    document.body.appendChild(overlay);
+    // 无过渡瞬时全黑（no-anim 关闭 transition）
+    overlay.classList.add('is-active');
+    // 先让浏览器把全黑 paint 出来（双 rAF），再移除 no-anim 播露出动画，避免"黑屏未定帧就消退"
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (this.overlay !== overlay) return;
+        overlay.classList.remove('no-anim');
+        this.reveal();
+      });
+    });
   }
 
   onStepStart(fromCellId: number, toCellId: number): void {
@@ -274,17 +271,29 @@ export class CssTransitionEffectHooks extends NoOpEffectHooks {
     this.removeClassAfter('fx-move-complete', this.motionMs('--motion-move-complete', 320));
   }
 
+  /** 数值结算：资源条快速提亮强调色再缓慢回归（底色呼吸）。仅本玩家本地结算触发 */
+  private breatheValuePills(): void {
+    this.root.classList.remove('fx-value-breathe');
+    void this.root.offsetWidth; // 强制 reflow 以每次重启动画
+    this.root.classList.add('fx-value-breathe');
+    // 时长与 CSS 动画共用 --motion-value-breathe 单点，避免定时器短于动画而把呼吸截断
+    this.removeClassAfter('fx-value-breathe', this.motionMs('--motion-value-breathe', 500));
+  }
+
+  onMoneyChange(_delta: number, _newValue: number): void { this.breatheValuePills(); }
+  onCreditChange(_delta: number, _newValue: number): void { this.breatheValuePills(); }
+  onEnvChange(_delta: number, _newValue: number): void { this.breatheValuePills(); }
+  onProsperityChange(_delta: number, _newValue: number): void { this.breatheValuePills(); }
+
   onIntersectionPrompt(options: number[]): void {
     void options;
     // 出现岔路口选择：退出黑屏，让玩家看清可选项
-    this.inChoice = true;
     this.reveal();
   }
 
   onIntersectionResolved(chosenCellId: number): void {
     void chosenCellId;
-    // 选择完成：解除选择态；若下一个格子变换主题，onThemeChange 会在移动中进入黑屏
-    this.inChoice = false;
+    // 选择完成：无需额外处理（主题切换不再使用盖屏转场）
   }
 
   onTeleport(toCellId: number, applyMove: () => void): void {

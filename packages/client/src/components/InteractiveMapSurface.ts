@@ -83,26 +83,74 @@ export class InteractiveMapSurface {
     svg.classList.add("interactive-map-surface__svg");
 
     const byId = new Map(cells.map(c => [c.id, c]));
+    const destSet = new Map(cells.map(c => [c.id, new Set(c.destinations || [])]));
+
+    // 方向箭头 marker：双向边两端各挂一个，单向边仅目标端挂一个
+    const defs = document.createElementNS(ns, "defs");
+    const arrowMarker = document.createElementNS(ns, "marker");
+    arrowMarker.setAttribute("id", "map-link-arrow");
+    // 更大的箭头（16 单位 viewBox 铺到 32 user-space 单位），相对 10px 线径足够醒目
+    arrowMarker.setAttribute("viewBox", "0 0 16 16");
+    arrowMarker.setAttribute("refX", "14");
+    arrowMarker.setAttribute("refY", "8");
+    arrowMarker.setAttribute("markerWidth", "32");
+    arrowMarker.setAttribute("markerHeight", "32");
+    arrowMarker.setAttribute("markerUnits", "userSpaceOnUse");
+    arrowMarker.setAttribute("orient", "auto");
+    const arrowPath = document.createElementNS(ns, "path");
+    arrowPath.setAttribute("d", "M1,1 L15,8 L1,15 Z");
+    arrowPath.classList.add("map-link__arrow");
+    arrowMarker.appendChild(arrowPath);
+    defs.appendChild(arrowMarker);
+    svg.appendChild(defs);
+
     const links = document.createElementNS(ns, "g");
     links.classList.add("interactive-map-surface__links");
     const drawn = new Set<string>();
     const followedCell = byId.get(this.followedCellId ?? -1);
     if (followedCell) this.applyViewBox(svg, followedCell.x, followedCell.y);
 
+    // 箭头端点内收半径：格子半宽 68 + 箭头后段约 26，使放大后的箭头整体落在格子边缘外可见
+    const ARROW_INSET = 94;
+    const drawDirectedLine = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const len = Math.hypot(dx, dy);
+      const inset = Math.min(ARROW_INSET, len / 2);
+      const ux = dx / len;
+      const uy = dy / len;
+      const ex = to.x - ux * inset;
+      const ey = to.y - uy * inset;
+      const l = document.createElementNS(ns, "line");
+      l.setAttribute("x1", String(from.x));
+      l.setAttribute("y1", String(from.y));
+      l.setAttribute("x2", String(ex));
+      l.setAttribute("y2", String(ey));
+      l.classList.add("map-link");
+      l.setAttribute("marker-end", "url(#map-link-arrow)");
+      links.appendChild(l);
+    };
+
     cells.forEach(c =>
       (c.destinations || []).forEach(id => {
         const d = byId.get(id);
         if (!d) return;
-        const k = [c.id, id].sort().join(":");
+        const a = c.id;
+        const b = id;
+        const k = a === b ? `loop:${a}` : [a, b].sort().join(":");
         if (drawn.has(k)) return;
         drawn.add(k);
-        const l = document.createElementNS(ns, "line");
-        l.setAttribute("x1", String(c.x));
-        l.setAttribute("y1", String(c.y));
-        l.setAttribute("x2", String(d.x));
-        l.setAttribute("y2", String(d.y));
-        l.classList.add("map-link");
-        links.appendChild(l);
+        const ab = destSet.get(a)?.has(b) ?? false;
+        const ba = destSet.get(b)?.has(a) ?? false;
+        if (ab && ba) {
+          drawDirectedLine(c, d);
+          drawDirectedLine(d, c);
+        } else if (ab) {
+          drawDirectedLine(c, d);
+        } else if (ba) {
+          drawDirectedLine(d, c);
+        }
+        // 均无方向关系（异常数据）：不画线，保持一致
       })
     );
     svg.appendChild(links);
@@ -119,22 +167,24 @@ export class InteractiveMapSurface {
       g.setAttribute("transform", `translate(${c.x} ${c.y})`);
 
       const r = document.createElementNS(ns, "rect");
-      r.setAttribute("x", "-56");
-      r.setAttribute("y", "-38");
-      r.setAttribute("width", "112");
-      r.setAttribute("height", "76");
+      r.setAttribute("x", "-68");
+      r.setAttribute("y", "-46");
+      r.setAttribute("width", "136");
+      r.setAttribute("height", "92");
       r.setAttribute("rx", type === "property" ? "2" : "12");
       r.classList.add("map-node__shape");
 
       const t = document.createElementNS(ns, "text");
-      t.setAttribute("x", "-45");
-      t.setAttribute("y", "-18");
+      t.setAttribute("x", "0");
+      t.setAttribute("y", "-12");
+      t.setAttribute("text-anchor", "middle");
       t.classList.add("map-node__type");
       t.textContent = type.toUpperCase();
 
       const n = document.createElementNS(ns, "text");
-      n.setAttribute("x", "-45");
-      n.setAttribute("y", "9");
+      n.setAttribute("x", "0");
+      n.setAttribute("y", "24");
+      n.setAttribute("text-anchor", "middle");
       n.classList.add("map-node__name");
       n.textContent = name;
 

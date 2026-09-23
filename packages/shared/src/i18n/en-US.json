@@ -183,6 +183,7 @@
     "nightShort": "Night",
     "ready": "Ready",
     "moving": "Moving",
+    "stepsProgress": "{{moved}}/{{total}} steps",
     "cooldown": "Cooldown",
     "effectsOn": "Effects: On",
     "effectsOff": "Effects: Off",
