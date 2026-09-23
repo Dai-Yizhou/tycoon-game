@@ -61,10 +61,7 @@ export class EffectController implements GameEffectHooks {
     const hook = this.hooks as { playIntroTransition?: () => void } | undefined;
     hook?.playIntroTransition?.();
   }
-  onMoneyChange(delta: number, newValue: number): void { this.invoke('onMoneyChange', delta, newValue); }
-  onCreditChange(delta: number, newValue: number): void { this.invoke('onCreditChange', delta, newValue); }
-  onEnvChange(delta: number, newValue: number): void { this.invoke('onEnvChange', delta, newValue); }
-  onProsperityChange(delta: number, newValue: number): void { this.invoke('onProsperityChange', delta, newValue); }
+  onValueChange(fieldId: string, delta: number, newValue: number): void { this.invoke('onValueChange', fieldId, delta, newValue); }
   onPropertyPurchased(cellId: number): void { this.invoke('onPropertyPurchased', cellId); }
   onPropertyUpgraded(cellId: number, newLevel: number): void { this.invoke('onPropertyUpgraded', cellId, newLevel); }
   onInvestmentPurchased(cellId: number): void { this.invoke('onInvestmentPurchased', cellId); }

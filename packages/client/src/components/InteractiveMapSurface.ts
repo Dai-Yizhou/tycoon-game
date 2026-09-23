@@ -1,5 +1,6 @@
 import { type MapData, type Player, type ValueFieldDefinition } from "@game/shared";
 import { localizedText } from "../game/i18n.js";
+import { readCssVarNumber } from "../design/DesignAdapter.js";
 
 export class InteractiveMapSurface {
   private root = document.createElement("div");
@@ -85,18 +86,22 @@ export class InteractiveMapSurface {
     const byId = new Map(cells.map(c => [c.id, c]));
     const destSet = new Map(cells.map(c => [c.id, new Set(c.destinations || [])]));
 
-    // 方向箭头 marker：双向边两端各挂一个，单向边仅目标端挂一个
+    // 连线几何令牌（布局常量）：线宽由 CSS --map-link-width 控制；箭头尺寸与端点留白在此读取
+    const arrowSize = readCssVarNumber(this.root, "--map-arrow-size", 22);
+    const linkGap = readCssVarNumber(this.root, "--map-link-gap", 4);
+
+    // 方向箭头 marker：双向边两端各挂一个（auto-start-reverse 使起点箭头朝外），单向边仅目标端挂一个
     const defs = document.createElementNS(ns, "defs");
     const arrowMarker = document.createElementNS(ns, "marker");
     arrowMarker.setAttribute("id", "map-link-arrow");
-    // 更大的箭头（16 单位 viewBox 铺到 32 user-space 单位），相对 10px 线径足够醒目
+    // viewBox 16 单位映射到 --map-arrow-size 个 user-space 单位；refX 取箭头尖端(15)使尖端恰好落在端点
     arrowMarker.setAttribute("viewBox", "0 0 16 16");
-    arrowMarker.setAttribute("refX", "14");
+    arrowMarker.setAttribute("refX", "15");
     arrowMarker.setAttribute("refY", "8");
-    arrowMarker.setAttribute("markerWidth", "32");
-    arrowMarker.setAttribute("markerHeight", "32");
+    arrowMarker.setAttribute("markerWidth", String(arrowSize));
+    arrowMarker.setAttribute("markerHeight", String(arrowSize));
     arrowMarker.setAttribute("markerUnits", "userSpaceOnUse");
-    arrowMarker.setAttribute("orient", "auto");
+    arrowMarker.setAttribute("orient", "auto-start-reverse");
     const arrowPath = document.createElementNS(ns, "path");
     arrowPath.setAttribute("d", "M1,1 L15,8 L1,15 Z");
     arrowPath.classList.add("map-link__arrow");
@@ -110,23 +115,40 @@ export class InteractiveMapSurface {
     const followedCell = byId.get(this.followedCellId ?? -1);
     if (followedCell) this.applyViewBox(svg, followedCell.x, followedCell.y);
 
-    // 箭头端点内收半径：格子半宽 68 + 箭头后段约 26，使放大后的箭头整体落在格子边缘外可见
-    const ARROW_INSET = 94;
-    const drawDirectedLine = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+    // 格子矩形半宽/半高（与节点 rect 的 -68/-46 保持一致）
+    const HALF_W = 68;
+    const HALF_H = 46;
+    /** 从格子中心沿单位方向 u 到矩形边界的距离（射线-矩形求交） */
+    const edgeDistance = (ux: number, uy: number): number =>
+      1 / (Math.abs(ux) / HALF_W + Math.abs(uy) / HALF_H);
+
+    /**
+     * 绘制一条连线。端点按格子矩形边界计算并各留出 linkGap，使线/箭头与格子衔接自然。
+     * @param both 双向边：两端各挂一个箭头，且只画一条线（避免两条反向线重叠发脏）
+     */
+    const drawLink = (
+      from: { x: number; y: number },
+      to: { x: number; y: number },
+      both: boolean,
+    ) => {
       const dx = to.x - from.x;
       const dy = to.y - from.y;
       const len = Math.hypot(dx, dy);
-      const inset = Math.min(ARROW_INSET, len / 2);
+      // 自环 / 极短边：不绘制，避免除零与坐标 NaN
+      if (!Number.isFinite(len) || len < 1) return;
       const ux = dx / len;
       const uy = dy / len;
-      const ex = to.x - ux * inset;
-      const ey = to.y - uy * inset;
+      // 两格矩形等尺寸，故两端内收相同
+      const inset = edgeDistance(ux, uy) + linkGap;
+      // 两格过近时留白会互相越过：退化为不画线
+      if (len <= inset * 2) return;
       const l = document.createElementNS(ns, "line");
-      l.setAttribute("x1", String(from.x));
-      l.setAttribute("y1", String(from.y));
-      l.setAttribute("x2", String(ex));
-      l.setAttribute("y2", String(ey));
+      l.setAttribute("x1", String(from.x + ux * inset));
+      l.setAttribute("y1", String(from.y + uy * inset));
+      l.setAttribute("x2", String(to.x - ux * inset));
+      l.setAttribute("y2", String(to.y - uy * inset));
       l.classList.add("map-link");
+      if (both) l.setAttribute("marker-start", "url(#map-link-arrow)");
       l.setAttribute("marker-end", "url(#map-link-arrow)");
       links.appendChild(l);
     };
@@ -137,18 +159,19 @@ export class InteractiveMapSurface {
         if (!d) return;
         const a = c.id;
         const b = id;
-        const k = a === b ? `loop:${a}` : [a, b].sort().join(":");
+        if (a === b) return; // 自环：不绘制
+        const k = [a, b].sort().join(":");
         if (drawn.has(k)) return;
         drawn.add(k);
         const ab = destSet.get(a)?.has(b) ?? false;
         const ba = destSet.get(b)?.has(a) ?? false;
         if (ab && ba) {
-          drawDirectedLine(c, d);
-          drawDirectedLine(d, c);
+          // 双向：单条线 + 两端箭头
+          drawLink(c, d, true);
         } else if (ab) {
-          drawDirectedLine(c, d);
+          drawLink(c, d, false);
         } else if (ba) {
-          drawDirectedLine(d, c);
+          drawLink(d, c, false);
         }
         // 均无方向关系（异常数据）：不画线，保持一致
       })

@@ -21,17 +21,22 @@ describe('day/night shadow phase mapping', () => {
     expect(noon.pieceAlpha).toBeGreaterThan(computeDayNightShadow(day(0.1)).pieceAlpha);
   });
 
-  it('白天边缘（日出/日落）offsetX 扫轴两侧，与正午相反', () => {
-    const start = computeDayNightShadow(day(0.0));     // 入昼 → dx=+7
-    const end = computeDayNightShadow(day(0.96));      // 近入夜 → dx≈-6.4
-    expect(start.pieceDx).toBeGreaterThan(0);
-    expect(end.pieceDx).toBeLessThan(0);
-    expect(Math.abs(start.pieceDx)).toBeGreaterThan(5);
+  it('清晨(太阳在东/右)阴影偏左，傍晚(太阳在西/左)阴影偏右，与正午相反', () => {
+    const morning = computeDayNightShadow(day(0.0));   // 入昼 → dx=-7（向左）
+    const evening = computeDayNightShadow(day(0.96));  // 近入夜 → dx≈+6.4（向右）
+    expect(morning.pieceDx).toBeLessThan(0);
+    expect(evening.pieceDx).toBeGreaterThan(0);
+    expect(Math.abs(morning.pieceDx)).toBeGreaterThan(5);
+  });
+
+  it('昼 7:00 附近（白昼早段）阴影向左', () => {
+    // dayRatio=0.5 时 07:00 → dayPhase≈0.083
+    expect(computeDayNightShadow(day(0.083)).pieceDx).toBeLessThan(0);
   });
 
   it('夜晚仍在扫动（弱月光），强度小、跨度窄于白天早段且不为 0', () => {
     const n = computeDayNightShadow(night(0.2));
-    const earlyDay = computeDayNightShadow(day(0.1)); // dx=+5.6（白天跨度大）
+    const earlyDay = computeDayNightShadow(day(0.1)); // |dx|=5.6（白天跨度大）
     expect(Math.abs(n.pieceDx)).toBeGreaterThan(0);
     expect(n.pieceAlpha).toBeLessThan(earlyDay.pieceAlpha);
     expect(Math.abs(n.pieceDx)).toBeLessThan(Math.abs(earlyDay.pieceDx));

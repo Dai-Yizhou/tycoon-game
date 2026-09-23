@@ -356,20 +356,38 @@ export class GameHudShell {
     const strip = this.root.querySelector("[data-ui=resource-strip]")!;
     const playerValues = player.currentPlayer?.values ?? {};
     const slots: ValueFieldDef[] = defs.filter((def) => def.scope === "player");
-    strip.replaceChildren(...slots.map((def, index) => {
-      const pill = document.createElement("div");
-      pill.className = `value-pill${index === 0 ? " value-pill--accent" : ""}`;
-      const label = document.createElement("span");
-      label.className = "value-pill__label";
-      label.textContent = localizedText(def.name, t("hud." + def.id));
-      const num = document.createElement("span");
-      num.className = "value-pill__num";
+    // 按 data-field 复用已有数值框：元素身份必须稳定，否则每次刷新重建会把
+    // 底色呼吸（§3.7）刚加上的 fx-value-breathe 类随旧节点一起丢掉，动画永远看不到
+    const existing = new Map<string, HTMLElement>();
+    strip.querySelectorAll<HTMLElement>(".value-pill").forEach((el) => {
+      if (el.dataset.field) existing.set(el.dataset.field, el);
+    });
+    const next = slots.map((def, index) => {
+      let pill = existing.get(def.id);
+      if (!pill) {
+        pill = document.createElement("div");
+        pill.className = "value-pill";
+        // 底色呼吸（§3.7）目标锚点：仅该字段变化时提亮这一个数值框的填充底色
+        pill.dataset.field = def.id;
+        const label = document.createElement("span");
+        label.className = "value-pill__label";
+        const num = document.createElement("span");
+        num.className = "value-pill__num";
+        pill.append(label, num);
+      }
+      // 只切换修饰类，不能用 className 整体赋值，否则会一并清掉 fx-value-breathe
+      pill.classList.toggle("value-pill--accent", index === 0);
+      pill.querySelector(".value-pill__label")!.textContent = localizedText(def.name, t("hud." + def.id));
       const raw = playerValues[def.id]?.current ?? 0;
       const value = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
-      num.textContent = String(Math.round(value));
-      pill.append(label, num);
+      pill.querySelector(".value-pill__num")!.textContent = String(Math.round(value));
       return pill;
-    }));
+    });
+    // 集合与顺序都没变时不动 DOM，避免无谓的 detach/attach 打断进行中的动画
+    const needsReorder =
+      strip.children.length !== next.length ||
+      next.some((el, i) => strip.children[i] !== el);
+    if (needsReorder) strip.replaceChildren(...next);
   }
 
   private showSettings(): void {
@@ -472,10 +490,13 @@ export class GameHudShell {
     const region = this.vm.getRegions().mapRegions.find((item) => item.id === cell?.regionId);
     const name = this.root.querySelector('[data-ui="zone-tag"]');
     const value = this.root.querySelector('[data-ui="prosperity-tag"]');
+    const statusCard = this.root.querySelector<HTMLElement>('[data-ui="region-status"]');
     if (name) name.textContent = localizedText(region?.name, t('game.unknownRegion'));
+    const definitions = this.vm.getRegions().valueFieldDefs.filter((definition) => definition.scope === 'region');
+    // 底色呼吸（§3.7）目标锚点：区域作用域字段变化时提亮区域状态条（~= 支持多字段并列）
+    if (statusCard) statusCard.dataset.field = definitions.map((definition) => definition.id).join(' ');
     if (value) {
       const regionValues = this.vm.getRegions().regionValues.get(cell?.regionId ?? '') ?? {};
-      const definitions = this.vm.getRegions().valueFieldDefs.filter((definition) => definition.scope === 'region');
       value.textContent = definitions.map((definition) => `${localizedText(definition.name, definition.id)} ${regionValues[definition.id] ?? 0}`).join(' · ');
     }
   }

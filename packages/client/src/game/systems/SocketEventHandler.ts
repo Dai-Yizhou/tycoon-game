@@ -36,25 +36,6 @@ export interface SocketHandlerOptions {
   valueEffects?: ValueEffectHooks;
 }
 
-/**
- * 数值字段 → 底色呼吸钩子（§3.7）。字段 id 来自地图 valueFields，未识别字段忽略。
- * 玩家作用域：money / credit / environment；区域作用域：pros（繁荣度）。
- */
-const VALUE_BREATHE_HOOKS: Record<string, keyof ValueEffectHooks> = {
-  money: 'onMoneyChange',
-  credit: 'onCreditChange',
-  environment: 'onEnvChange',
-  pros: 'onProsperityChange',
-};
-
-/** 派发数值底色呼吸；effects 或字段未识别时静默忽略 */
-function dispatchValueBreathe(effects: ValueEffectHooks | undefined, fieldId: string, delta: number, current: number): void {
-  const hook = VALUE_BREATHE_HOOKS[fieldId];
-  if (!effects || !hook) return;
-  const fn = effects[hook] as (delta: number, newValue: number) => void;
-  fn.call(effects, delta, current);
-}
-
 const SOCKET_EVENTS = [
   'server.dayNightProgress', 'server.dayNightChanged', 'server.pong',
   'server.chat', 'server.leaderboardUpdated', 'connect', 'disconnect',
@@ -350,7 +331,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     if (isCurrentPlayer) {
       // 底色呼吸（§3.7）：仅本玩家数值"实际变化"时触发；首次同步（无前值）不触发，避免进页面即呼吸
       if (typeof prevValue === 'number' && prevValue !== payload.current) {
-        dispatchValueBreathe(options.valueEffects, payload.fieldId, payload.delta, payload.current);
+        options.valueEffects?.onValueChange(payload.fieldId, payload.delta, payload.current);
       }
       refresh();
     }
@@ -493,7 +474,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       // 底色呼吸（§3.7）：仅当变化的是"本玩家所在区域"且数值实际变化时触发（HUD 区域状态条随之呼吸）
       const currentRegionId = store.getCell(store.getSnapshot().currentPlayerPosition)?.regionId;
       if (typeof prevValue === 'number' && prevValue !== payload.value && currentRegionId === payload.regionId) {
-        dispatchValueBreathe(options.valueEffects, payload.fieldId, payload.delta, payload.value);
+        options.valueEffects?.onValueChange(payload.fieldId, payload.delta, payload.value);
       }
     }
   });

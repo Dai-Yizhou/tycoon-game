@@ -44,14 +44,8 @@ export interface MovementEffectHooks {
 
 /** 数值变化视效 */
 export interface ValueEffectHooks {
-  /** 金钱变化（正数为获得，负数为支出） */
-  onMoneyChange(delta: number, newValue: number): void;
-  /** 信用值变化 */
-  onCreditChange(delta: number, newValue: number): void;
-  /** 环保值变化 */
-  onEnvChange(delta: number, newValue: number): void;
-  /** 繁荣度变化 */
-  onProsperityChange(delta: number, newValue: number): void;
+  /** 某个数值字段发生变化（fieldId 为字段 id，如 money / credit / environment / pros） */
+  onValueChange(fieldId: string, delta: number, newValue: number): void;
 }
 
 /** 格子交互视效 */
@@ -118,10 +112,7 @@ export class NoOpEffectHooks implements GameEffectHooks {
   onIntersectionPrompt(_options: number[]): void {}
   onIntersectionResolved(_chosenCellId: number): void {}
   onTeleport(_toCellId: number, _applyMove: () => void): void {}
-  onMoneyChange(_delta: number, _newValue: number): void {}
-  onCreditChange(_delta: number, _newValue: number): void {}
-  onEnvChange(_delta: number, _newValue: number): void {}
-  onProsperityChange(_delta: number, _newValue: number): void {}
+  onValueChange(_fieldId: string, _delta: number, _newValue: number): void {}
   onPropertyPurchased(_cellId: number): void {}
   onPropertyUpgraded(_cellId: number, _newLevel: number): void {}
   onInvestmentPurchased(_cellId: number): void {}
@@ -166,8 +157,13 @@ export class CssTransitionEffectHooks extends NoOpEffectHooks {
   }
 
   private removeClassAfter(className: string, durationMs: number): void {
+    this.removeClassFromAfter(this.root, className, durationMs);
+  }
+
+  /** 从指定元素上延时移除 class（用于只作用于单个数值框的底色呼吸） */
+  private removeClassFromAfter(element: HTMLElement, className: string, durationMs: number): void {
     const timer = setTimeout(() => {
-      this.root.classList.remove(className);
+      element.classList.remove(className);
       this.timers.delete(timer);
     }, durationMs);
     this.timers.add(timer);
@@ -271,19 +267,17 @@ export class CssTransitionEffectHooks extends NoOpEffectHooks {
     this.removeClassAfter('fx-move-complete', this.motionMs('--motion-move-complete', 320));
   }
 
-  /** 数值结算：资源条快速提亮强调色再缓慢回归（底色呼吸）。仅本玩家本地结算触发 */
-  private breatheValuePills(): void {
-    this.root.classList.remove('fx-value-breathe');
-    void this.root.offsetWidth; // 强制 reflow 以每次重启动画
-    this.root.classList.add('fx-value-breathe');
+  /** 数值结算（§3.7 底色呼吸）：仅"发生变化的那一个数值显示框"填充底色快速提亮再归位。
+   *  目标元素由 HUD 写入 data-field=<fieldId>（玩家字段 → 数值框；区域字段 → 区域状态条）。 */
+  onValueChange(fieldId: string, _delta: number, _newValue: number): void {
+    const target = this.root.querySelector<HTMLElement>(`[data-field~="${fieldId}"]`);
+    if (!target) return;
+    target.classList.remove('fx-value-breathe');
+    void target.offsetWidth; // 强制 reflow 以每次重启动画
+    target.classList.add('fx-value-breathe');
     // 时长与 CSS 动画共用 --motion-value-breathe 单点，避免定时器短于动画而把呼吸截断
-    this.removeClassAfter('fx-value-breathe', this.motionMs('--motion-value-breathe', 500));
+    this.removeClassFromAfter(target, 'fx-value-breathe', this.motionMs('--motion-value-breathe', 500));
   }
-
-  onMoneyChange(_delta: number, _newValue: number): void { this.breatheValuePills(); }
-  onCreditChange(_delta: number, _newValue: number): void { this.breatheValuePills(); }
-  onEnvChange(_delta: number, _newValue: number): void { this.breatheValuePills(); }
-  onProsperityChange(_delta: number, _newValue: number): void { this.breatheValuePills(); }
 
   onIntersectionPrompt(options: number[]): void {
     void options;

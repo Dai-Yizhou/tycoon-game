@@ -14,6 +14,10 @@
   --motion-normal: 0.25s ease;
   /* 数值底色呼吸总时长（§3.7）：CSS 与 JS 共用此单点，避免定时器把动画截断 */
   --motion-value-breathe: 0.5s;
+  /* SVG 地图连线几何（布局常量，非主题身份）：线宽 / 箭头尺寸 / 端点与格子边缘的留白 */
+  --map-link-width: 10;
+  --map-arrow-size: 22;
+  --map-link-gap: 4;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -55,7 +59,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   position: absolute; inset: 0;
   animation: fadeIn var(--motion-normal) ease-out;
 }
-.game-page { display: block; padding: 0; }
+/* 游戏页：派生令牌在此元素上解析，才能取到"本地区域主题"的 --gp-card（:root 上是默认主题） */
+.game-page {
+  display: block; padding: 0;
+  /* HUD 浮层底色：由主题 --gp-card 派生的"少量透明"面，供数值框/状态条/悬浮卡/浮层共用 */
+  --gp-surface: color-mix(in srgb, var(--gp-card) 90%, transparent);
+  /* 数值底色呼吸的提亮色（§3.7）：强调色混入浮层底色 */
+  --gp-breathe-tint: color-mix(in srgb, var(--gp-accent) 30%, var(--gp-surface));
+}
 .hud-panel-actions {
   position: absolute;
   right: 16px;
@@ -83,7 +94,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   padding: 10px;
   border: var(--region-border-w) solid var(--gp-border);
   border-radius: var(--region-radius);
-  background: var(--gp-card);
+  background: var(--gp-surface);
   color: var(--gp-fg);
   box-shadow: 0 6px 20px color-mix(in srgb, var(--gp-border) 28%, transparent);
 }
@@ -297,7 +308,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 
 .map-link {
   stroke: color-mix(in srgb, var(--region-motion-fg) 80%, transparent);
-  stroke-width: 10; stroke-linecap: round;
+  stroke-width: var(--map-link-width);
+  stroke-linecap: round;
   filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--region-board-bg) 55%, transparent));
 }
 .map-link__arrow {
@@ -386,7 +398,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .region-status {
   display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; max-width: 52%;
   padding: 4px 8px; border: var(--region-border-w) solid var(--gp-border);
-  border-radius: var(--region-radius); background: var(--gp-card);
+  border-radius: var(--region-radius); background: var(--gp-surface);
 }
 .region-status__row { display: flex; align-items: center; gap: 8px; max-width: 100%; }
 .region-status__name,
@@ -420,22 +432,20 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   display: flex; flex-direction: column; align-items: center;
   padding: 2px 8px; min-width: 56px;
   border: var(--region-border-w) solid var(--gp-border);
-  border-radius: var(--region-radius); background: var(--gp-card);
+  border-radius: var(--region-radius); background: var(--gp-surface);
 }
 .value-pill__label { font-size: 8px; color: var(--gp-muted); font-family: var(--font-func); letter-spacing: 0.06em; text-transform: uppercase; }
 .value-pill__num { font-family: var(--font-num); font-size: 13px; font-weight: 700; color: var(--gp-fg); }
 .value-pill--accent .value-pill__num { color: var(--gp-accent); }
 
-/* 底色呼吸（§3.7，暂缓数值滚动）：本地数值结算时，对应数值区快速提亮强调色再缓慢回归。
-   玩家数值 → 资源条（.value-pills）；区域繁荣度 → 区域状态条（.region-status）。
-   用 box-shadow 光环而非改底色，避免与 --gp-card 现有底色打架；仅本玩家结算触发。
-   时长走 --motion-value-breathe（单点），JS 按同一令牌移除 class。 */
+/* 底色呼吸（§3.7）：数值结算时，仅"发生变化的那个数值显示框"填充底色快速提亮再归位。
+   玩家数值 → 该字段的 .value-pill；区域繁荣度 → .region-status（由 HUD 写入 data-field 锚点）。
+   用填充底色而非光环；仅本玩家结算触发。时长走 --motion-value-breathe（单点），JS 按同一令牌移除 class。 */
 @keyframes gp-value-breathe {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gp-accent) 0%, transparent); }
-  30% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--gp-accent) 38%, transparent); }
+  0%, 100% { background-color: var(--gp-surface); }
+  30% { background-color: var(--gp-breathe-tint); }
 }
-.fx-value-breathe .value-pills,
-.fx-value-breathe .region-status {
+.fx-value-breathe {
   border-radius: var(--region-radius);
   animation: gp-value-breathe var(--motion-value-breathe, 0.5s) ease-out 1;
 }
@@ -460,7 +470,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .event-toast {
   top: 10%; left: 50%; transform: translateX(-50%);
   z-index: 12; min-width: 260px; text-align: center;
-  padding: 8px 16px; background: var(--gp-card);
+  padding: 8px 16px; background: var(--gp-surface);
   border: var(--region-border-w) solid var(--gp-accent); border-radius: var(--region-radius);
   font-size: 11px; color: var(--gp-fg);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--gp-border) 40%, transparent);
@@ -475,7 +485,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   z-index: 40; width: 200px;
   opacity: 0;
   transition: opacity var(--motion-hover) ease-out;
-  background: var(--gp-card);
+  background: var(--gp-surface);
   border: var(--region-border-w) solid var(--gp-accent);
   border-radius: var(--region-radius);
   box-shadow: 0 8px 24px color-mix(in srgb, var(--gp-border) 42%, transparent);
@@ -733,6 +743,5 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   .dice-btn, .dice-btn__fill, .act-btn, .start-button, .confirm-button, .retry-button,
   .username-input, .password-input, .progress-bar::after { transition: none; }
   .fx-step-start, .fx-step-arrive, .fx-move-complete { animation: none; }
-  .fx-value-breathe .value-pills,
-  .fx-value-breathe .region-status { animation: none; }
+  .fx-value-breathe { animation: none; }
 }

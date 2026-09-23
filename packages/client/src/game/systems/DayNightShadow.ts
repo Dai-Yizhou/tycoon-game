@@ -6,7 +6,8 @@
  *
  * 口径（已对齐）：
  * - 仅白天扫半周；以视野中心为参照（offsetX 在屏幕上左右扫）；
- * - 午 12:00（dayP=0.5）offsetX=0，阴影叠在物件正下方（仅 offsetY 向下深度）；
+ * - 光源自东向西：地图阅读为上北下南、左西右东，故清晨(东)阴影偏左、傍晚(西)阴影偏右，
+ *   午 12:00（dayP=0.5）offsetX=0，阴影叠在物件正下方（仅 offsetY 向下深度）；
  * - 夜晚保留弱月光仍扫动（不消失），强度/跨度缩小；
  * - 夜晚叠加层强度按 sin(π·nightP) 连续升降（入夜渐深、破晓渐退），与区域色正交可叠加；
  * - 颜色由 --region-border / --gp-cycle-night 主题令牌驱动；
@@ -65,10 +66,10 @@ export function computeDayNightShadow(phase: DayNightShadowPhase): DayNightShado
     const dayP = clamp01(phase.dayPhase);
     const grade = solarGrade(dayP);
     return {
-      pieceDx: (0.5 - dayP) * PIECE_SPAN,
+      pieceDx: (dayP - 0.5) * PIECE_SPAN,
       pieceDy: PIECE_DY,
       pieceAlpha: PIECE_ALPHA_DAY * (0.55 + 0.45 * grade),
-      cellDx: (0.5 - dayP) * CELL_SPAN,
+      cellDx: (dayP - 0.5) * CELL_SPAN,
       cellDy: CELL_DY,
       cellAlpha: CELL_ALPHA_DAY * (0.55 + 0.45 * grade),
       nightAlpha: 0,
@@ -76,10 +77,10 @@ export function computeDayNightShadow(phase: DayNightShadowPhase): DayNightShado
   }
   const nightP = clamp01(phase.nightPhase);
   return {
-    pieceDx: (0.5 - nightP) * PIECE_SPAN * 0.7, // 月光下扫动跨度更小，仍保留变化
+    pieceDx: (nightP - 0.5) * PIECE_SPAN * 0.7, // 月光下扫动跨度更小，仍保留变化
     pieceDy: PIECE_DY,
     pieceAlpha: PIECE_ALPHA_NIGHT,
-    cellDx: (0.5 - nightP) * CELL_SPAN * 0.7,
+    cellDx: (nightP - 0.5) * CELL_SPAN * 0.7,
     cellDy: CELL_DY,
     cellAlpha: CELL_ALPHA_NIGHT,
     // 入夜渐深、破晓渐退：sin 曲线在夜/昼边界均为 0，保证与白天无缝衔接
