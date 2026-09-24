@@ -40,7 +40,7 @@
 
 ## 技术栈与命令
 
-Node.js >=18、TypeScript、Vite、Express、Socket.IO、可选 MongoDB、Jest、pnpm workspace。
+Node.js >=18、TypeScript、Vite、Express、Socket.IO、MongoDB（开发环境必需）、Jest、pnpm workspace。
 
 ```bash
 pnpm install
@@ -53,7 +53,7 @@ pnpm lint
 pnpm test
 ```
 
-根 `pnpm dev` 通过 `scripts/dev-services.mjs` 并行启动 server/client。服务端默认 3000，客户端 Vite 默认 5173。
+根 `pnpm dev` 通过 `scripts/dev-services.mjs` 并行启动 server/client，并在启动前确保 MongoDB 可用：已运行则直接复用，未运行则自动拉起本地 `mongod`（数据落在 `.mongo-data/`），并向 server 注入 `MONGO_URI`（默认 `mongodb://127.0.0.1:27017/monopoly_io`）。若显式设置了 `MONGO_URI` 却连不上，脚本会失败退出而不降级到文件存储。服务端默认 3000，客户端 Vite 默认 5173。
 
 ## 目录
 
