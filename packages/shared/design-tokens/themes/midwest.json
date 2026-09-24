@@ -3,7 +3,7 @@
   "color": {
     "palette": {
       "surface": {
-        "$value": "#C4AB86",
+        "$value": "#E0D0B8",
         "$type": "color"
       },
       "border": {
@@ -85,19 +85,19 @@
     },
     "hud": {
       "barBg": {
-        "$value": "#A89878",
+        "$value": "#CEC2AC",
         "$type": "color"
       },
       "sidebarBg": {
-        "$value": "#A89878",
+        "$value": "#CEC2AC",
         "$type": "color"
       },
       "mapBg": {
-        "$value": "#C4AB86",
+        "$value": "#E0D0B8",
         "$type": "color"
       },
       "card": {
-        "$value": "#B8B2A8",
+        "$value": "#E3DFD9",
         "$type": "color"
       },
       "fg": {
@@ -113,11 +113,11 @@
         "$type": "color"
       },
       "cellA": {
-        "$value": "#CCB38E",
+        "$value": "#E4D5BE",
         "$type": "color"
       },
       "cellB": {
-        "$value": "#BCA37E",
+        "$value": "#D6C4A9",
         "$type": "color"
       },
       "cellBorder": {
@@ -127,7 +127,7 @@
     },
     "region": {
       "board": {
-        "$value": "#C4AB86",
+        "$value": "#E0D0B8",
         "$type": "color"
       },
       "fg": {
@@ -171,11 +171,11 @@
         "$type": "color"
       },
       "cellBg": {
-        "$value": "#CCB38E",
+        "$value": "#E4D5BE",
         "$type": "color"
       },
       "cellBgAlt": {
-        "$value": "#BCA37E",
+        "$value": "#D6C4A9",
         "$type": "color"
       },
       "cellBorder": {
@@ -183,7 +183,7 @@
         "$type": "color"
       },
       "boxBg": {
-        "$value": "#B8B2A8",
+        "$value": "#E3DFD9",
         "$type": "color"
       },
       "btnFg": {
@@ -248,11 +248,11 @@
   },
   "font": {
     "body": {
-      "$value": "PingFang SC, Microsoft YaHei, Noto Sans SC, sans-serif",
+      "$value": "Noto Sans SC, PingFang SC, sans-serif",
       "$type": "fontFamily"
     },
     "title": {
-      "$value": "'Franklin Gothic Medium', 'Arial Black', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif",
+      "$value": "'Arial Black', 'Helvetica Neue', Impact, 'Heiti SC', sans-serif",
       "$type": "fontFamily"
     },
     "func": {
@@ -260,7 +260,7 @@
       "$type": "fontFamily"
     },
     "number": {
-      "$value": "'SF Mono', Menlo, Consolas, monospace",
+      "$value": "IBM Plex Mono, Menlo, monospace",
       "$type": "fontFamily"
     },
     "titleWeight": {
@@ -268,15 +268,15 @@
       "$type": "number"
     },
     "titleSpacing": {
-      "$value": "0.02em",
+      "$value": "0.06em",
       "$type": "string"
     },
     "bodySpacing": {
-      "$value": "0.03em",
+      "$value": "normal",
       "$type": "string"
     },
     "titleLineHeight": {
-      "$value": 1.25,
+      "$value": 1.2,
       "$type": "number"
     }
   },

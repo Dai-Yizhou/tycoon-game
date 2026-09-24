@@ -15,9 +15,10 @@
   /* 数值底色呼吸总时长（§3.7）：CSS 与 JS 共用此单点，避免定时器把动画截断 */
   --motion-value-breathe: 0.5s;
   /* 纸纹噪点（全局材质效果，不属于地域身份）：棋盘底纸与半透明浮层共用。
-     浮层本身是 55% 半透明的，若背后只有一片纯色，任何 alpha 都读作实心；
-     底纸带上噪点后，浮层后面的纹理确实可见，这才是"浮层被看穿"的视觉依据。 */
-  --gp-paper-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
+     浮层本身是半透明的，若背后只有一片纯色，任何 alpha 都读作实心；
+     底纸带上噪点后，浮层后面的纹理确实可见，这才是"浮层被看穿"的视觉依据。
+     强度取 0.26：既保证隔层可辨的纸感，又不至于让底色发脏。 */
+  --gp-paper-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.26'/%3E%3C/svg%3E");
   /* SVG 地图连线几何（箭头尺寸 / 端点与格子边缘的留白，布局常量）
      线宽由主题令牌 dimension.line.map 驱动（--map-link-width） */
   --map-arrow-size: 22;
@@ -75,11 +76,12 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .game-page {
   display: block; padding: 0;
   /* HUD 浮层底色：由主题 --gp-card 派生的半透明面，供数值框/状态条/悬浮卡/浮层/聊天框共用。
-     不透明度固定 55%，不再下调（下调会牺牲文字可读性）。浮层"看起来不是实心"改由三层协作：
+     不透明度取 75%：兼顾文字可读性（正文直接压在浮层上）与隔层透出，不再下调。
+     浮层"看起来不是实心"另由三层协作：
      ① 令牌层：主题里 card 与 mapBg 取不同的色相/明度档，浮层与底纸本身就有差；
      ② 材质层：底纸的纸纹噪点透过半透明浮层可见（--gp-paper-noise）；
      ③ 边界层：--gp-border 墨线与 --gp-shadow-paper 硬投影定义浮层轮廓。 */
-  --gp-surface: color-mix(in srgb, var(--gp-card) 55%, transparent);
+  --gp-surface: color-mix(in srgb, var(--gp-card) 75%, transparent);
   /* 数值底色呼吸的提亮色（§3.7）：强调色混入浮层底色 */
   --gp-breathe-tint: color-mix(in srgb, var(--gp-accent) 30%, var(--gp-surface));
   /* 硬投影：纸张叠放的偏移墨影（非模糊光晕），用于浮层/悬浮卡/面板 */
@@ -542,7 +544,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   left: 18px; right: auto; bottom: 128px;
   width: 260px; z-index: 32;
   border-radius: var(--region-radius);
-  /* 与 hover 卡 / 右下 hud-panel 一致：走 HUD 半透明浮层底色（55% 卡色，不下调）。
+  /* 与 hover 卡 / 右下 hud-panel 一致：走 HUD 半透明浮层底色（75% 卡色，兼顾可读性）。
      blur 取 4px：8px 会把底纸的纸纹与纹理一并抹平，浮层后面变成纯色，读作实心；
      4px 只软化边缘不抹掉纹理，折叠/展开两态共用此容器，一处生效 */
   background: var(--gp-surface);

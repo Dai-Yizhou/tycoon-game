@@ -8,7 +8,7 @@ describe('世界主题基础设施', () => {
   it('从单一主题令牌文件读取默认昼间表面', () => {
     const adapter = new DesignAdapter(northeastTheme);
 
-    expect(adapter.getColor('color.surface.board')).toBe('#A8ACB0');
+    expect(adapter.getColor('color.surface.board')).toBe('#D4D6D8');
   });
 
   it('导出同一份 Canvas 与 DOM 主题快照', () => {
@@ -22,10 +22,10 @@ describe('世界主题基础设施', () => {
   });
 
   it.each([
-    [northeastTheme, '#A8ACB0'],
-    [southTheme, '#D0C7B0'],
-    [midwestTheme, '#C4AB86'],
-    [westTheme, '#C4C8C6'],
+    [northeastTheme, '#D4D6D8'],
+    [southTheme, '#E6DCC3'],
+    [midwestTheme, '#E0D0B8'],
+    [westTheme, '#DADDDB'],
   ])('可从单个地域令牌文件加载主题', (tokens, surface) => {
     expect(new DesignAdapter(tokens).createSnapshot().canvas.board.background).toBe(surface);
   });

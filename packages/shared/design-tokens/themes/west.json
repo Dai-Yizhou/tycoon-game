@@ -3,7 +3,7 @@
   "color": {
     "palette": {
       "surface": {
-        "$value": "#C4C8C6",
+        "$value": "#DADDDB",
         "$type": "color"
       },
       "border": {
@@ -85,19 +85,19 @@
     },
     "hud": {
       "barBg": {
-        "$value": "#A09088",
+        "$value": "#CDC5C1",
         "$type": "color"
       },
       "sidebarBg": {
-        "$value": "#A09088",
+        "$value": "#CDC5C1",
         "$type": "color"
       },
       "mapBg": {
-        "$value": "#C4C8C6",
+        "$value": "#DADDDB",
         "$type": "color"
       },
       "card": {
-        "$value": "#B0A098",
+        "$value": "#E9E4E2",
         "$type": "color"
       },
       "fg": {
@@ -113,11 +113,11 @@
         "$type": "color"
       },
       "cellA": {
-        "$value": "#CCCEC9",
+        "$value": "#E1E2DF",
         "$type": "color"
       },
       "cellB": {
-        "$value": "#BCBEB9",
+        "$value": "#CFD0CD",
         "$type": "color"
       },
       "cellBorder": {
@@ -127,7 +127,7 @@
     },
     "region": {
       "board": {
-        "$value": "#C4C8C6",
+        "$value": "#DADDDB",
         "$type": "color"
       },
       "fg": {
@@ -171,11 +171,11 @@
         "$type": "color"
       },
       "cellBg": {
-        "$value": "#CCCEC9",
+        "$value": "#E1E2DF",
         "$type": "color"
       },
       "cellBgAlt": {
-        "$value": "#BCBEB9",
+        "$value": "#CFD0CD",
         "$type": "color"
       },
       "cellBorder": {
@@ -183,7 +183,7 @@
         "$type": "color"
       },
       "boxBg": {
-        "$value": "#B0A098",
+        "$value": "#E9E4E2",
         "$type": "color"
       },
       "btnFg": {
@@ -248,11 +248,11 @@
   },
   "font": {
     "body": {
-      "$value": "'Songti SC', SimSun, 'Noto Serif SC', serif",
+      "$value": "Noto Sans SC, PingFang SC, sans-serif",
       "$type": "fontFamily"
     },
     "title": {
-      "$value": "'Courier New', 'Songti SC', SimSun, 'Noto Serif SC', serif",
+      "$value": "'Times New Roman', Georgia, serif",
       "$type": "fontFamily"
     },
     "func": {
@@ -260,7 +260,7 @@
       "$type": "fontFamily"
     },
     "number": {
-      "$value": "'Courier New', monospace",
+      "$value": "IBM Plex Mono, Menlo, monospace",
       "$type": "fontFamily"
     },
     "titleWeight": {
@@ -268,15 +268,15 @@
       "$type": "number"
     },
     "titleSpacing": {
-      "$value": "0.01em",
+      "$value": "0.06em",
       "$type": "string"
     },
     "bodySpacing": {
-      "$value": "0.02em",
+      "$value": "normal",
       "$type": "string"
     },
     "titleLineHeight": {
-      "$value": 1.3,
+      "$value": 1.2,
       "$type": "number"
     }
   },
