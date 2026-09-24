@@ -34,13 +34,8 @@ export function getCurrentLocaleData(): Record<string, unknown> {
   return locales[currentLocale];
 }
 
-/**
- * 获取国际化文本
- * @param key 点号分隔的 key，如 'common.loading'
- * @param params 可选参数，用于替换 {{key}} 占位符
- * @returns 翻译后的文本，如果 key 不存在则返回 key 本身
- */
-export function t(key: string, params?: Record<string, string | number>): string {
+/** 按点号分隔的 key 在当前语言包中查找节点；未命中返回 undefined */
+function resolveKey(key: string): unknown {
   const parts = key.split('.');
   let value: unknown = locales[currentLocale];
 
@@ -48,9 +43,21 @@ export function t(key: string, params?: Record<string, string | number>): string
     if (typeof value === 'object' && value !== null && part in value) {
       value = (value as Record<string, unknown>)[part];
     } else {
-      return key;
+      return undefined;
     }
   }
+
+  return value;
+}
+
+/**
+ * 获取国际化文本
+ * @param key 点号分隔的 key，如 'common.loading'
+ * @param params 可选参数，用于替换 {{key}} 占位符
+ * @returns 翻译后的文本，如果 key 不存在则返回 key 本身
+ */
+export function t(key: string, params?: Record<string, string | number>): string {
+  const value = resolveKey(key);
 
   if (typeof value !== 'string') {
     return key;
@@ -65,6 +72,17 @@ export function t(key: string, params?: Record<string, string | number>): string
   }
 
   return value;
+}
+
+/**
+ * 获取国际化字符串列表（语言包中配置为字符串数组的 key，如 'loading.tips'）
+ * @param key 点号分隔的 key
+ * @returns 字符串数组；key 未命中或不是数组时返回空数组
+ */
+export function tList(key: string): string[] {
+  const value = resolveKey(key);
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string');
 }
 
 export function getSupportedLocales(): LocaleCode[] {

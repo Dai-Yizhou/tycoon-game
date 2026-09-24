@@ -1,5 +1,4 @@
 export type TokenTree = Record<string, unknown>;
-export type DayPhase = 'day' | 'dusk' | 'night';
 
 export interface ThemeSnapshot {
   canvas: {
@@ -20,14 +19,15 @@ type DomTokenSource =
   | { kind: 'color'; path: string }
   | { kind: 'string'; path: string }
   | { kind: 'px'; path: string }
-  | { kind: 'ms'; path: string };
+  | { kind: 'ms'; path: string }
+  | { kind: 'number'; path: string };
 
 /** DOM 令牌映射：令牌路径 → CSS 变量名。单一数据源，由 createSnapshot 统一消费。 */
 const DOM_TOKEN_MAP: ReadonlyArray<readonly [cssVar: string, source: DomTokenSource]> = [
-  ['--tycoon-board-background', { kind: 'color', path: 'color.surface.board' }],
-  ['--tycoon-cell-property-fill', { kind: 'color', path: 'color.cell.property.fill' }],
   ['--tycoon-piece-head', { kind: 'color', path: 'color.piece.head' }],
   ['--tycoon-piece-outline', { kind: 'color', path: 'color.piece.outline' }],
+  // 地图连线线宽：由主题 dimension.line.map 驱动
+  ['--map-link-width', { kind: 'number', path: 'dimension.line.map' }],
   ['--gp-player-self', { kind: 'color', path: 'color.player.self' }],
   ['--gp-player-teammate', { kind: 'color', path: 'color.player.teammate' }],
   ['--gp-player-other', { kind: 'color', path: 'color.player.other' }],
@@ -92,6 +92,16 @@ const DOM_TOKEN_MAP: ReadonlyArray<readonly [cssVar: string, source: DomTokenSou
   ['--motion-slideup-title', { kind: 'string', path: 'motion.slideUpTitle' }],
   ['--motion-slideup', { kind: 'string', path: 'motion.slideUp' }],
   ['--motion-spin', { kind: 'string', path: 'motion.spin' }],
+  // 昼夜光照参数（light 段）：跨度/深度/强度/夜晚叠加峰值，运行时由 DayNightShadow 读取
+  ['--gp-light-piece-span', { kind: 'number', path: 'light.pieceSpan' }],
+  ['--gp-light-piece-dy', { kind: 'number', path: 'light.pieceDy' }],
+  ['--gp-light-piece-alpha-day', { kind: 'number', path: 'light.pieceAlphaDay' }],
+  ['--gp-light-piece-alpha-night', { kind: 'number', path: 'light.pieceAlphaNight' }],
+  ['--gp-light-cell-span', { kind: 'number', path: 'light.cellSpan' }],
+  ['--gp-light-cell-dy', { kind: 'number', path: 'light.cellDy' }],
+  ['--gp-light-cell-alpha-day', { kind: 'number', path: 'light.cellAlphaDay' }],
+  ['--gp-light-cell-alpha-night', { kind: 'number', path: 'light.cellAlphaNight' }],
+  ['--gp-light-night-overlay-max', { kind: 'number', path: 'light.nightOverlayMax' }],
 ];
 
 /**
@@ -105,21 +115,19 @@ export function readCssVarNumber(root: HTMLElement, property: string, fallback: 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function isToken(value: unknown): value is { $value: unknown } {
-  return typeof value === 'object' && value !== null && '$value' in value;
+/**
+ * 从根元素读取带 `--` 前缀的 CSS 浮点变量（如光照 alpha/跨度）。
+ * 解析失败或非正时回退 fallback。
+ */
+export function readCssVarFloat(root: HTMLElement, property: string, fallback: number): number {
+  if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return fallback;
+  const raw = window.getComputedStyle(root).getPropertyValue(property);
+  const parsed = parseFloat(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function mergeTrees(base: TokenTree, override: TokenTree): TokenTree {
-  const result: TokenTree = { ...base };
-  Object.entries(override).forEach(([key, value]) => {
-    const current = result[key];
-    result[key] =
-      typeof current === 'object' && current !== null && !isToken(current) &&
-      typeof value === 'object' && value !== null && !isToken(value)
-        ? mergeTrees(current as TokenTree, value as TokenTree)
-        : value;
-  });
-  return result;
+function isToken(value: unknown): value is { $value: unknown } {
+  return typeof value === 'object' && value !== null && '$value' in value;
 }
 
 /** 令牌读取、引用解析和 Canvas/DOM 投影；不存放主题样式值或游戏逻辑。 */
@@ -162,13 +170,12 @@ export class DesignAdapter {
       case 'string': return [cssVar, this.getString(source.path, tokens)];
       case 'px': return [cssVar, `${this.readNumber(source.path, tokens)}px`];
       case 'ms': return [cssVar, `${this.readNumber(source.path, tokens)}ms`];
+      case 'number': return [cssVar, String(this.readNumber(source.path, tokens))];
     }
   }
 
-  createSnapshot(phase: DayPhase = 'day'): ThemeSnapshot {
-    const tokens = phase === 'day'
-      ? this.baseTokens
-      : mergeTrees(this.baseTokens, ((this.baseTokens.modes as TokenTree | undefined)?.[phase] as TokenTree | undefined) ?? {});
+  createSnapshot(): ThemeSnapshot {
+    const tokens = this.baseTokens;
 
     const property = this.getColor('color.cell.property.fill', tokens);
     const event = this.getColor('color.cell.event.fill', tokens);

@@ -4,7 +4,7 @@
  * 从 @game/shared 导出 i18n 功能，并提供语言切换的本地持久化。
  */
 
-import { t as sharedT, setLocale, getLocale, getSupportedLocales, type LocaleCode } from '@game/shared';
+import { t as sharedT, tList as sharedTList, setLocale, getLocale, getSupportedLocales, type LocaleCode } from '@game/shared';
 
 export type { LocaleCode };
 
@@ -15,6 +15,13 @@ const STORAGE_KEY = 'game-language';
  */
 export function t(key: string, params?: Record<string, string | number>): string {
   return sharedT(key, params);
+}
+
+/**
+ * 获取国际化字符串列表（语言包中配置为字符串数组的 key，如 'loading.tips'）
+ */
+export function tList(key: string): string[] {
+  return sharedTList(key);
 }
 
 /**

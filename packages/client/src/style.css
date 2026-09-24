@@ -14,10 +14,18 @@
   --motion-normal: 0.25s ease;
   /* 数值底色呼吸总时长（§3.7）：CSS 与 JS 共用此单点，避免定时器把动画截断 */
   --motion-value-breathe: 0.5s;
-  /* SVG 地图连线几何（布局常量，非主题身份）：线宽 / 箭头尺寸 / 端点与格子边缘的留白 */
-  --map-link-width: 10;
+  /* SVG 地图连线几何（箭头尺寸 / 端点与格子边缘的留白，布局常量）
+     线宽由主题令牌 dimension.line.map 驱动（--map-link-width） */
   --map-arrow-size: 22;
   --map-link-gap: 4;
+  /* 加载页几何与节奏（布局/行为常量，非主题身份） */
+  --loading-progress-height: 7px;
+  /* 进度填充过渡时长：CSS 过渡与 JS 最短停留共用，保证离场前填充动画已播完 */
+  --loading-progress-duration: 450ms;
+  --loading-spinner-size: 46px;
+  --loading-spinner-border: 3px;
+  /* 加载页最短停留（ms）：保证玩家能读完一条 tips 再跳转 */
+  --loading-min-dwell: 2500;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -62,8 +70,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 /* 游戏页：派生令牌在此元素上解析，才能取到"本地区域主题"的 --gp-card（:root 上是默认主题） */
 .game-page {
   display: block; padding: 0;
-  /* HUD 浮层底色：由主题 --gp-card 派生的"少量透明"面，供数值框/状态条/悬浮卡/浮层共用 */
-  --gp-surface: color-mix(in srgb, var(--gp-card) 90%, transparent);
+  /* HUD 浮层底色：由主题 --gp-card 派生的半透明面，供数值框/状态条/悬浮卡/浮层/聊天框共用。
+     55% 卡色 + backdrop blur：过低会看不清内容，过高（如 75%）在深色区域与地图底色接近，
+     视觉上等同不透明，故取 55% 让底层地图纹理确实透出 */
+  --gp-surface: color-mix(in srgb, var(--gp-card) 55%, transparent);
   /* 数值底色呼吸的提亮色（§3.7）：强调色混入浮层底色 */
   --gp-breathe-tint: color-mix(in srgb, var(--gp-accent) 30%, var(--gp-surface));
 }
@@ -199,6 +209,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .login-card { display: flex; flex-direction: column; gap: 9px; }
 .loading-card { display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center; }
 .loading-card .loading-title { font-size: 26px; }
+/* 加载小贴士：方框下方的一行提示，内容由语言包 loading.tips 配置，每次进入随机取一条 */
+.loading-tip {
+  max-width: min(420px, calc(100vw - 48px));
+  margin: 0;
+  color: var(--auth-muted);
+  font-family: var(--font-body);
+  font-size: 12px; line-height: 1.6; letter-spacing: 0.03em;
+  text-align: center;
+}
 
 .auth-label, .auth-helper { color: var(--auth-muted); }
 .auth-label {
@@ -251,8 +270,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 }
 
 .spinner {
-  width: 46px; height: 46px;
-  border: 3px solid var(--auth-border);
+  width: var(--loading-spinner-size); height: var(--loading-spinner-size);
+  border: var(--loading-spinner-border) solid var(--auth-border);
   border-top-color: var(--auth-accent);
   border-radius: 50%;
   animation: spin var(--motion-spin) linear infinite;
@@ -262,15 +281,18 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   grid-template-columns: 1fr auto; gap: 10px; align-items: center;
 }
 .progress-bar {
-  grid-column: 1 / -1; width: 100%; height: 7px;
+  grid-column: 1 / -1; width: 100%; height: var(--loading-progress-height);
   background: var(--auth-track);
   border: 1px solid var(--auth-border); border-radius: var(--auth-radius);
   overflow: hidden;
+  /* 填充进度由 LoadingPage 写入的 --progress 驱动（此前 JS 误写 style.width，填充层恒为 0%） */
+  --progress: 0%;
 }
 .progress-bar::after {
   content: ""; display: block;
   width: var(--progress, 0%); height: 100%;
-  background: var(--auth-accent); transition: width var(--motion-normal);
+  background: var(--auth-accent);
+  transition: width var(--loading-progress-duration) ease-out;
 }
 .progress-text { color: var(--auth-accent); font-family: var(--font-num); font-weight: 700; font-size: 12px; justify-self: end; }
 
@@ -331,6 +353,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .map-node--held .map-node__shape { stroke: var(--region-accent); stroke-width: 4; }
 .map-node__type { fill: var(--region-label-fg); font-weight: 700; font-size: 13px; font-family: var(--font-func); letter-spacing: 0.14em; }
 .map-node__name { fill: var(--region-fg); font-weight: 900; font-size: 20px; font-family: var(--font-title); }
+/* 8 种格子类型图标（独立 SVG 资源，解包为 <g>）：单色，随类型标签同色 */
+.map-node__icon { fill: var(--region-label-fg); }
 
 /* 玩家棋子：语义色由交互层传入（--gp-player-color），头/描边取主题令牌。
    阴影方向随昼夜扫动（§3.9）：偏移/强度由 --gp-shadow-piece-* 变量驱动，颜色走 --region-border */
@@ -461,11 +485,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .cycle-dot--night { background: var(--gp-cycle-night); }
 .cycle-text { font-size: 10px; color: var(--gp-muted); font-family: var(--font-num); }
 
-/* 地图角落标签 */
-.map-overlay { position: absolute; z-index: 5; font-size: 9px; }
-.map-overlay--zone,
-.map-overlay--prosperity { top: 88px; right: 18px; color: var(--gp-fg); }
-
 /* 事件提示 */
 .event-toast {
   top: 10%; left: 50%; transform: translateX(-50%);
@@ -508,7 +527,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   left: 18px; right: auto; bottom: 128px;
   width: 260px; z-index: 32;
   border-radius: var(--region-radius);
-  background: var(--gp-sidebar-bg);
+  /* 与 hover 卡 / 右下 hud-panel 一致：走 HUD 半透明浮层底色（原为实色 sidebar-bg，透明度被误删） */
+  background: var(--gp-surface);
   border: var(--region-border-w) solid var(--gp-border);
   box-shadow: 0 6px 20px color-mix(in srgb, var(--gp-border) 22%, transparent);
   overflow: hidden;
@@ -534,12 +554,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .hud-chat-dock__ticker-text .ch {
   color: var(--gp-accent); font-weight: 700; font-size: 8px; margin-right: 3px;
 }
-.hud-chat-dock__ticker-badge {
-  font-size: 7px; font-weight: 800; color: var(--gp-paper);
-  background: var(--gp-accent); border-radius: 99px;
-  padding: 1px 5px; min-width: 12px; text-align: center; flex-shrink: 0;
-}
-
 /* ===== 展开态内容（默认隐藏，hover/focus/JS 展开） ===== */
 .hud-chat-dock__expanded {
   display: none; flex-direction: column;
@@ -595,7 +609,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .hud-chat-msg span { color: var(--gp-fg); }
 .hud-chat-msg .sys { color: var(--gp-muted); font-style: italic; }
 .hud-chat-msg .time { color: var(--gp-muted); font-size: 7px; float: right; }
-.hud-chat-msg--hidden { display: none; }
 
 /* ===== 输入栏 ===== */
 .hud-chat-dock__input {
@@ -704,8 +717,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 @media (max-width: 900px) {
   .gp-topbar { padding: 0 10px; }
   .gp-actionbar { padding: 0 10px; }
-  .map-overlay--zone { right: 8px; }
-  .map-overlay--prosperity { right: 8px; }
   .hud-chat-dock { left: 8px; width: 224px; }
   .cell-hover-card { width: 168px; }
   .value-pills { gap: 4px; }

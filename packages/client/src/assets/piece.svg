@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="60" height="66" viewBox="-30 -26 60 66">
+  <!-- 玩家棋子：头 + 身体。填充与描边由应用样式表按类名驱动 -->
+  <!-- 头取主题令牌（tycoon pieceHead/outline），身体取关系色 gp player color -->
+  <!-- 接入时按 <g> 解包使用（仅取图形子节点），外层视口不参与渲染 -->
+  <circle class="map-player__head" cx="0" cy="-4" r="12" />
+  <path class="map-player__body" d="M-18 34 L-11 2 L11 2 L18 34 Z" />
+</svg>

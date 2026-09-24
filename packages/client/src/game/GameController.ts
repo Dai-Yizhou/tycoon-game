@@ -188,7 +188,9 @@ export class GameController {
   }
 
   /**
-   * 设置登录后的玩家信息和时间同步数据
+   * 设置登录后的玩家信息和时间同步数据。
+   * 注意：此处只落地数据、不切换页面状态——加载页需要先补足最短停留（让玩家读完 tips）
+   * 再显式调用 setState。若在此直接切到 game/bankruptcy，加载页会瞬间被替换，停留逻辑失效。
    */
   setLoginResult(player: Player, cycleStartTime: number, cycleMinutes: number, existingPlayers: Player[] = [], leaderboard: LeaderboardSnapshot | null = null): void {
     this.context.player = player;
@@ -196,7 +198,6 @@ export class GameController {
     this.context.cycleMinutes = cycleMinutes;
     this.context.existingPlayers = existingPlayers;
     this.context.leaderboard = leaderboard;
-    this.context.state = player.status === 'bankrupt' ? 'bankruptcy' : 'game';
     this.notifyListeners();
   }
 

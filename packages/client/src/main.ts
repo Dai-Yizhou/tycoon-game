@@ -71,7 +71,7 @@ function bootstrap(): void {
   // 统一从 :root 继承；游戏页再在自身元素上按地区覆盖。
   // 默认取 northeast 主题；若已有存档则沿用玩家所在格子的区域主题，保证欢迎页调性与存档一致。
   const savedTheme = localStorage.getItem(SAVED_REGION_THEME_KEY) ?? undefined;
-  const rootSnapshot = new DesignAdapter(getThemeTokens(savedTheme)).createSnapshot('day');
+  const rootSnapshot = new DesignAdapter(getThemeTokens(savedTheme)).createSnapshot();
   for (const [name, value] of Object.entries(rootSnapshot.dom)) {
     document.documentElement.style.setProperty(name, value);
   }

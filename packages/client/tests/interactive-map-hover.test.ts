@@ -85,4 +85,42 @@ describe('InteractiveMapSurface hover/selfCellId 耦合', () => {
     node(4).dispatchEvent(new MouseEvent('mouseenter'));
     expect(hovered).toEqual([4]);
   });
+
+  it('棋子由 piece.svg 模板渲染出 head/body（模板解析失败会静默丢失棋子）', () => {
+    const { mapData } = loadFixture();
+    const surface = new InteractiveMapSurface();
+    surface.render(mapData, [playerAt(0)], []);
+
+    const icon = surface.getElement().querySelector('.map-player .map-player__icon');
+    expect(icon).toBeTruthy();
+    expect(icon?.querySelector('.map-player__head')).toBeTruthy();
+    expect(icon?.querySelector('.map-player__body')).toBeTruthy();
+  });
+
+  it('8 种格子类型图标：每种类型节点渲染出独立 svg 解包后的图标', () => {
+    const { mapData } = loadFixture();
+    const surface = new InteractiveMapSurface();
+    surface.render(mapData, [playerAt(0)], []);
+    const root = surface.getElement();
+
+    const knownTypes = new Set(['empty', 'event', 'supply', 'property', 'transport', 'investment', 'jail', 'monument']);
+    const nodes = Array.from(root.querySelectorAll<SVGGElement>('.map-node'));
+    expect(nodes.length).toBeGreaterThan(0);
+
+    let iconCount = 0;
+    for (const node of nodes) {
+      const type = Array.from(node.classList)
+        .map((cls) => (cls.startsWith('map-node--') ? cls.slice('map-node--'.length) : ''))
+        .find((candidate) => knownTypes.has(candidate));
+      if (!type) continue;
+      const icon = node.querySelector('.map-node__icon');
+      expect(icon).toBeTruthy();
+      // 解包为 <g>：图标内是图形子节点（而非嵌套 <svg> 视口）
+      expect(icon!.children.length).toBeGreaterThan(0);
+      expect(icon!.querySelector('svg')).toBeNull();
+      expect(icon!.getAttribute('transform')).toBe('translate(-50 0)');
+      iconCount++;
+    }
+    expect(iconCount).toBeGreaterThan(0);
+  });
 });

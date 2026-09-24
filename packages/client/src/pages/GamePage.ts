@@ -45,7 +45,7 @@ import {
 import { createMovementLoop, browserLoopHost, type MovementLoop } from '../game/systems/MovementLoop.js';
 
 import { registerSocketHandlers, unregisterSocketHandlers } from '../game/systems/SocketEventHandler.js';
-import { createDayNightShadowLoop } from '../game/systems/DayNightShadow.js';
+import { createDayNightShadowLoop, readLightParams, DEFAULT_LIGHT_PARAMS, type LightParams } from '../game/systems/DayNightShadow.js';
 import { DesignAdapter } from '../design/DesignAdapter.js';
 import { getRegionThemeId, getThemeId, getThemeTokens, SAVED_REGION_THEME_KEY } from '../design/ThemeConfig.js';
 import { resolveCellActions } from '../game/cellActionResolver.js';
@@ -59,6 +59,8 @@ let gameSocket: TypedClientSocket | null = null;
 let gameEffects: EffectController | null = null;
 let gameMovementLoop: MovementLoop | null = null;
 let dayNightShadowLoop: ReturnType<typeof createDayNightShadowLoop> | null = null;
+// 当前光照参数缓存：由主题令牌投影后的页面 CSS 变量读出，主题切换时刷新，避免每帧读样式
+let dayNightLightParams: LightParams | null = null;
 // 当前已应用的区域 UI 主题 id；null 表示尚未应用（首次加载）。用于区分"主题切换转场"与"首次加载不转场"。
 let appliedRegionThemeId: string | null = null;
 const pageEventCleanups = new WeakMap<HTMLElement, () => void>();
@@ -92,8 +94,10 @@ export function createGamePage(controller: GameController): HTMLElement {
   const context = controller.getContext();
   const page = document.createElement('div');
   page.className = 'page game-page';
-  const designSnapshot = new DesignAdapter(getThemeTokens()).createSnapshot('day');
+  const designSnapshot = new DesignAdapter(getThemeTokens()).createSnapshot();
   applyGamePageThemeSnapshot(page, designSnapshot);
+  // 首次读取光照参数（页面令牌已就位），供昼夜阴影循环使用
+  dayNightLightParams = readLightParams(page);
   gameStore = new GameStore();
   setChatStore(gameStore);
   gameViewModel = new GameViewModel(gameStore, context.playerName || t('game.defaultPlayerName'));
@@ -105,6 +109,7 @@ export function createGamePage(controller: GameController): HTMLElement {
   // reduced-motion / 动效关闭时退化为静态默认阴影（不扫动）。
   dayNightShadowLoop = createDayNightShadowLoop({
     root: page,
+    getParams: () => dayNightLightParams ?? DEFAULT_LIGHT_PARAMS,
     getPhase: () => {
       if (!gameViewModel) return null;
       // 阴影跟随玩家所在格时区的相位（与 HUD 时钟同一来源）
@@ -342,7 +347,7 @@ export interface GamePageThemeConfig {
 }
 
 export function applyGamePageThemeTokens(page: HTMLElement, config: GamePageThemeConfig = {}): void {
-  const snapshot = new DesignAdapter(config.tokens ?? getThemeTokens()).createSnapshot('day');
+  const snapshot = new DesignAdapter(config.tokens ?? getThemeTokens()).createSnapshot();
   applyGamePageThemeSnapshot(page, snapshot);
 }
 
@@ -351,6 +356,8 @@ function applyGamePageThemeSnapshot(page: HTMLElement, snapshot: ReturnType<Desi
   for (const [name, value] of Object.entries(snapshot.dom)) {
     page.style.setProperty(name, value);
   }
+  // 主题（含 light 段）变化后刷新光照参数缓存，供昼夜阴影循环即时采用
+  if (dayNightLightParams) dayNightLightParams = readLightParams(page);
 }
 
 function applyRegionTheme(page: HTMLElement, cellId: number): void {
@@ -580,6 +587,7 @@ function formatTeamValues(values: Record<string, number>, definitions: Array<{ i
 export function cleanupGamePage(page: HTMLElement): void {
   dayNightShadowLoop?.stop();
   dayNightShadowLoop = null;
+  dayNightLightParams = null;
   gameMovementLoop?.stop();
   gameMovementLoop = null;
   pageEventCleanups.get(page)?.();

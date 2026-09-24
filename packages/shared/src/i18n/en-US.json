@@ -547,7 +547,17 @@
     "loginFailed": "Login failed",
     "loginFailedWithMsg": "Login failed: {{msg}}",
     "guestPrefix": "Guest_",
-    "networkEyebrow": "MONOPOLY.IO / NETWORK LINK"
+    "networkEyebrow": "MONOPOLY.IO / NETWORK LINK",
+    "tips": [
+      "Roll the dice to start your turn.",
+      "Own property and rivals pay rent when they land on it.",
+      "Holding more cells in one region raises rent income.",
+      "Prosperity affects rent and prices within a region.",
+      "Transport hubs can teleport you for a fee.",
+      "After forming a team, members can share rewards.",
+      "Investment payouts are split by shareholding ratio.",
+      "After being jailed, you must wait out the cooldown."
+    ]
   },
   "panel": {
     "details": "Details",

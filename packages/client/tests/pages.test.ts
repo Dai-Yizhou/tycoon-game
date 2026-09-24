@@ -33,7 +33,8 @@ describe('Pages', () => {
   test('游戏控件使用主题变量且返回按钮位于顶部中央', () => {
     expect(styleSource).toContain('.cell-hover-card');
     expect(styleSource).toContain('background: var(--gp-card)');
-    expect(styleSource).toContain('background: var(--gp-sidebar-bg)');
+    // 聊天框与 hover 卡 / hud-panel 一致，走 HUD 半透明浮层底色（不再用实色 sidebar-bg）
+    expect(styleSource).toContain('background: var(--gp-surface)');
     expect(styleSource).toContain('font-family: var(--font-body)');
     expect(styleSource).toContain('left: 50%;');
     expect(styleSource).toContain('transform: translateX(-50%);');

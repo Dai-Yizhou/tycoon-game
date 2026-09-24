@@ -17,6 +17,8 @@
  * 其中 dayPhase ∈ [0,1)（正午=0.5）、nightPhase ∈ [0,1)（午夜=0.5）。
  */
 
+import { readCssVarFloat } from '../../design/DesignAdapter.js';
+
 /** 单帧写出的光照相关 CSS 变量值（px / alpha 0..1） */
 export interface DayNightShadowStyles {
   pieceDx: number;
@@ -38,18 +40,56 @@ export interface DayNightShadowPhase {
   nightPhase: number;
 }
 
-const PIECE_SPAN = 14;        // 棋子阴影水平扫动半跨（px）
-const PIECE_DY = 3;           // 棋子阴影向下深度（px）
-const PIECE_ALPHA_DAY = 0.5;  // 白天棋子阴影强度
-const PIECE_ALPHA_NIGHT = 0.22; // 夜晚（月光）棋子阴影强度
+/**
+ * 光照参数（跨度/深度/强度/夜晚叠加峰值）：由主题 JSON 的 light 段令牌化，
+ * 经 DesignAdapter 投影为 --gp-light-* CSS 变量，运行时由 readLightParams 读取。
+ */
+export interface LightParams {
+  pieceSpan: number;
+  pieceDy: number;
+  pieceAlphaDay: number;
+  pieceAlphaNight: number;
+  cellSpan: number;
+  cellDy: number;
+  cellAlphaDay: number;
+  cellAlphaNight: number;
+  nightOverlayMax: number;
+}
 
-const CELL_SPAN = 6;         // 格子阴影水平扫动半跨（px）
-const CELL_DY = 1;            // 格子阴影向下深度（px）
-const CELL_ALPHA_DAY = 0.3;   // 白天格子（躺桌面）阴影强度
-const CELL_ALPHA_NIGHT = 0.14; // 夜晚格子阴影强度
+/** 回退默认值：与主题 JSON light 段一致；仅当 CSS 变量缺失（如无 DOM 的单测环境）时使用 */
+export const DEFAULT_LIGHT_PARAMS: LightParams = {
+  pieceSpan: 14,
+  pieceDy: 3,
+  pieceAlphaDay: 0.5,
+  pieceAlphaNight: 0.22,
+  cellSpan: 6,
+  cellDy: 1,
+  cellAlphaDay: 0.3,
+  cellAlphaNight: 0.14,
+  nightOverlayMax: 0.42,
+};
 
-/** 夜晚光照叠加层峰值强度（深夜最深；0 为完全不叠加） */
-const NIGHT_OVERLAY_MAX = 0.42;
+/** 光照参数 → CSS 变量名与回退值（供 readLightParams 统一读取） */
+const LIGHT_CSS_VARS: Record<keyof LightParams, string> = {
+  pieceSpan: '--gp-light-piece-span',
+  pieceDy: '--gp-light-piece-dy',
+  pieceAlphaDay: '--gp-light-piece-alpha-day',
+  pieceAlphaNight: '--gp-light-piece-alpha-night',
+  cellSpan: '--gp-light-cell-span',
+  cellDy: '--gp-light-cell-dy',
+  cellAlphaDay: '--gp-light-cell-alpha-day',
+  cellAlphaNight: '--gp-light-cell-alpha-night',
+  nightOverlayMax: '--gp-light-night-overlay-max',
+};
+
+/** 从落有主题令牌的元素读取光照参数（主题切换后重新调用即可刷新） */
+export function readLightParams(root: HTMLElement): LightParams {
+  const result = { ...DEFAULT_LIGHT_PARAMS };
+  for (const key of Object.keys(LIGHT_CSS_VARS) as (keyof LightParams)[]) {
+    result[key] = readCssVarFloat(root, LIGHT_CSS_VARS[key], DEFAULT_LIGHT_PARAMS[key]);
+  }
+  return result;
+}
 
 /** 白天相位（0..1）→ 中午 0.5 偏移为正下方的补偿系数，日出日落最弱 */
 function solarGrade(dayP: number): number {
@@ -60,31 +100,31 @@ function solarGrade(dayP: number): number {
  * 纯函数：由相位计算阴影变量。相位来自共享纯函数（两端同构），不做本地重算。
  * 不做任何副作用，便于单测。
  */
-export function computeDayNightShadow(phase: DayNightShadowPhase): DayNightShadowStyles {
+export function computeDayNightShadow(phase: DayNightShadowPhase, params: LightParams = DEFAULT_LIGHT_PARAMS): DayNightShadowStyles {
   const clamp01 = (v: number): number => Math.min(Math.max(v, 0), 1);
   if (phase.isDay) {
     const dayP = clamp01(phase.dayPhase);
     const grade = solarGrade(dayP);
     return {
-      pieceDx: (dayP - 0.5) * PIECE_SPAN,
-      pieceDy: PIECE_DY,
-      pieceAlpha: PIECE_ALPHA_DAY * (0.55 + 0.45 * grade),
-      cellDx: (dayP - 0.5) * CELL_SPAN,
-      cellDy: CELL_DY,
-      cellAlpha: CELL_ALPHA_DAY * (0.55 + 0.45 * grade),
+      pieceDx: (dayP - 0.5) * params.pieceSpan,
+      pieceDy: params.pieceDy,
+      pieceAlpha: params.pieceAlphaDay * (0.55 + 0.45 * grade),
+      cellDx: (dayP - 0.5) * params.cellSpan,
+      cellDy: params.cellDy,
+      cellAlpha: params.cellAlphaDay * (0.55 + 0.45 * grade),
       nightAlpha: 0,
     };
   }
   const nightP = clamp01(phase.nightPhase);
   return {
-    pieceDx: (nightP - 0.5) * PIECE_SPAN * 0.7, // 月光下扫动跨度更小，仍保留变化
-    pieceDy: PIECE_DY,
-    pieceAlpha: PIECE_ALPHA_NIGHT,
-    cellDx: (nightP - 0.5) * CELL_SPAN * 0.7,
-    cellDy: CELL_DY,
-    cellAlpha: CELL_ALPHA_NIGHT,
+    pieceDx: (nightP - 0.5) * params.pieceSpan * 0.7, // 月光下扫动跨度更小，仍保留变化
+    pieceDy: params.pieceDy,
+    pieceAlpha: params.pieceAlphaNight,
+    cellDx: (nightP - 0.5) * params.cellSpan * 0.7,
+    cellDy: params.cellDy,
+    cellAlpha: params.cellAlphaNight,
     // 入夜渐深、破晓渐退：sin 曲线在夜/昼边界均为 0，保证与白天无缝衔接
-    nightAlpha: NIGHT_OVERLAY_MAX * Math.sin(Math.PI * nightP),
+    nightAlpha: params.nightOverlayMax * Math.sin(Math.PI * nightP),
   };
 }
 
@@ -101,8 +141,8 @@ export const SHADOW_CSS_VARS: Record<keyof DayNightShadowStyles, string> = {
 
 /** 退化为默认（reduced-motion / 动效关闭时写入，抵消历史扫动与叠加值） */
 const DEFAULT_STYLES: DayNightShadowStyles = {
-  pieceDx: 0, pieceDy: PIECE_DY, pieceAlpha: 0.45,
-  cellDx: 0, cellDy: CELL_DY, cellAlpha: 0.3,
+  pieceDx: 0, pieceDy: DEFAULT_LIGHT_PARAMS.pieceDy, pieceAlpha: 0.45,
+  cellDx: 0, cellDy: DEFAULT_LIGHT_PARAMS.cellDy, cellAlpha: 0.3,
   nightAlpha: 0,
 };
 
@@ -122,6 +162,8 @@ export interface DayNightShadowLoopOptions {
   root: HTMLElement;
   /** 返回当前权威昼夜相位（玩家所在格时区）；无数据时回退默认（不扫动） */
   getPhase: () => DayNightShadowPhase | null;
+  /** 返回当前光照参数（令牌驱动）；主题切换后由调用方刷新其缓存 */
+  getParams: () => LightParams;
   /** 是否允许动效（EffectController.isEnabled）；false 时退化为静态阴影并停更 */
   effectsEnabled: () => boolean;
   /** 是否命中 prefers-reduced-motion；true 时静态阴影 */
@@ -149,7 +191,7 @@ export function createDayNightShadowLoop(options: DayNightShadowLoopOptions): {
       if ('' !== lastKey) { writeStyles(options.root, DEFAULT_STYLES); lastKey = ''; }
       return;
     }
-    const styles = computeDayNightShadow(phase);
+    const styles = computeDayNightShadow(phase, options.getParams());
     // 仅当变化明显才写，避免每帧无谓刷 style（未变化帧保持原值）
     const key = `${styles.pieceDx.toFixed(1)}:${styles.pieceDy}:${styles.pieceAlpha.toFixed(2)}:${styles.cellDx.toFixed(1)}:${styles.cellDy}:${styles.cellAlpha.toFixed(2)}:${styles.nightAlpha.toFixed(3)}`;
     if (key !== lastKey) { writeStyles(options.root, styles); lastKey = key; }

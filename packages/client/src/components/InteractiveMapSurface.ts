@@ -1,6 +1,65 @@
 import { type MapData, type Player, type ValueFieldDefinition } from "@game/shared";
 import { localizedText } from "../game/i18n.js";
 import { readCssVarNumber } from "../design/DesignAdapter.js";
+// 图形资源（矢量）：以 Vite ?raw 内联，颜色由应用样式表按类名/CSS 变量驱动
+import pieceSvgRaw from "../assets/piece.svg?raw";
+import emptyCellSvgRaw from "../assets/cells/empty.svg?raw";
+import eventCellSvgRaw from "../assets/cells/event.svg?raw";
+import supplyCellSvgRaw from "../assets/cells/supply.svg?raw";
+import propertyCellSvgRaw from "../assets/cells/property.svg?raw";
+import transportCellSvgRaw from "../assets/cells/transport.svg?raw";
+import investmentCellSvgRaw from "../assets/cells/investment.svg?raw";
+import jailCellSvgRaw from "../assets/cells/jail.svg?raw";
+import monumentCellSvgRaw from "../assets/cells/monument.svg?raw";
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/**
+ * 解析独立 SVG 资源并"解包"为 <g>：只取其图形子节点，不保留外层 <svg> 视口。
+ * 嵌套 <svg> 视口在祖先翻转变换（缩放/滤镜）下会被反复重栅格化，导致棋子频闪；
+ * 解包后与直接写在文档里的图形一致，且模板共用（克隆后使用）。
+ * 解析失败返回 null（该图形不渲染），不抛错。
+ */
+function parseSvgGroup(raw: string, className?: string): SVGElement | null {
+  if (typeof DOMParser === "undefined") return null;
+  const doc = new DOMParser().parseFromString(raw, "image/svg+xml");
+  const root = doc.documentElement as unknown as SVGElement;
+  if (!root || root.nodeName.toLowerCase() === "parsererror") return null;
+  const g = document.createElementNS(SVG_NS, "g");
+  if (className) g.classList.add(className);
+  for (const child of Array.from(root.childNodes)) g.appendChild(document.importNode(child, true));
+  return g;
+}
+
+/** 棋子图形模板：解析一次后按玩家克隆；解析失败时返回 null（棋子将不渲染） */
+let pieceTemplate: SVGElement | null = null;
+function getPieceTemplate(): SVGElement | null {
+  if (!pieceTemplate) pieceTemplate = parseSvgGroup(pieceSvgRaw, "map-player__icon");
+  return pieceTemplate;
+}
+
+/** 8 种格子类型图标（独立 SVG 资源）：按类型缓存解包后的模板 */
+const CELL_ICON_RAW: Record<string, string> = {
+  empty: emptyCellSvgRaw,
+  event: eventCellSvgRaw,
+  supply: supplyCellSvgRaw,
+  property: propertyCellSvgRaw,
+  transport: transportCellSvgRaw,
+  investment: investmentCellSvgRaw,
+  jail: jailCellSvgRaw,
+  monument: monumentCellSvgRaw,
+};
+const cellIconTemplates = new Map<string, SVGElement>();
+function getCellIconTemplate(type: string): SVGElement | null {
+  const cached = cellIconTemplates.get(type);
+  if (cached) return cached;
+  const raw = CELL_ICON_RAW[type];
+  if (!raw) return null;
+  const g = parseSvgGroup(raw);
+  if (!g) return null;
+  cellIconTemplates.set(type, g);
+  return g;
+}
 
 export class InteractiveMapSurface {
   private root = document.createElement("div");
@@ -66,7 +125,7 @@ export class InteractiveMapSurface {
     // selfCellId 由 setSelfCell 以 currentPlayerPosition（权威移动字段）维护；
     // 这里仅在尚未初始化时回填一次，避免 render 用滞后的 position.cellId 覆盖权威值
     if (this.selfCellId === null) this.selfCellId = players[0]?.position.cellId ?? null;
-    const ns = "http://www.w3.org/2000/svg";
+    const ns = SVG_NS;
     const cells = [...map];
     if (!cells.length) return;
 
@@ -211,7 +270,18 @@ export class InteractiveMapSurface {
       n.classList.add("map-node__name");
       n.textContent = name;
 
-      g.append(r, t, n);
+      g.append(r);
+
+      // 8 种格子类型图标：独立 SVG 资源解包为 <g> 后克隆，靠左居中对齐（不动既有文字排版）
+      const iconTemplate = getCellIconTemplate(type);
+      if (iconTemplate) {
+        const icon = iconTemplate.cloneNode(true) as SVGElement;
+        icon.classList.add("map-node__icon");
+        icon.setAttribute("transform", "translate(-50 0)");
+        g.appendChild(icon);
+      }
+
+      g.append(t, n);
 
       // 客户端宽松防护：仅当悬停格是本玩家当前所在格时才上报 hover，其余格子不显示
       g.addEventListener("mouseenter", () => {
@@ -252,16 +322,8 @@ export class InteractiveMapSurface {
         g.setAttribute("transform", `translate(${x} ${y})`);
         g.dataset.playerId = player.id;
         
-        const body = document.createElementNS(ns, "path");
-        body.setAttribute("d", "M-18 34 L-11 2 L11 2 L18 34 Z");
-        body.classList.add("map-player__body");
-        
-        const head = document.createElementNS(ns, "circle");
-        head.setAttribute("r", "12");
-        head.setAttribute("cy", "-4");
-        head.classList.add("map-player__head");
-        
-        /* 玩家色：按关系区分（本玩家/队友/其他玩家），颜色由主题令牌注入 */
+        /* 玩家色：按关系区分（本玩家/队友/其他玩家），颜色由主题令牌注入；
+           棋子 SVG 内 body 以 var(--gp-player-color) 取色 */
         const roleVar = player.id === selfId
           ? "--gp-player-self"
           : player.teamId !== null && player.teamId === selfTeamId
@@ -270,10 +332,12 @@ export class InteractiveMapSurface {
         const color = getComputedStyle(this.root).getPropertyValue(roleVar).trim();
         if (color) g.style.setProperty("--gp-player-color", color);
 
-        // 待机跳动包裹层：对外层 g 的 translate 定位无干扰，动画仅作用于内层 transform
+        // 待机跳动包裹层：对外层 g 的 translate 定位无干扰，动画仅作用于内层 transform。
+        // 棋子图形来自内联的 piece.svg（克隆模板），保留矢量清晰度并由样式表着色。
         const bounce = document.createElementNS(ns, "g");
         bounce.classList.add("map-player__bounce");
-        bounce.append(head, body);
+        const icon = getPieceTemplate();
+        if (icon) bounce.appendChild(icon.cloneNode(true));
         g.append(bounce);
         pieces.appendChild(g);
       });

@@ -35,7 +35,6 @@ export interface GameHudShellConfig {
  * - hud-chat-dock：左下角可收起聊天/通知
  * - gp-actionbar：底部渐变透明行动栏（掷骰 + 动作）
  * - event-toast：顶部居中事件提示（默认隐藏）
- * - map-overlay：地图角落区域标签
  *
  * 低耦合：仅消费 GameViewModel 和回调，不直接访问 Store / Socket / Canvas。
  * 主题令牌通过页面根节点 CSS 变量（--gp-*）注入，组件不读取主题 JSON。
