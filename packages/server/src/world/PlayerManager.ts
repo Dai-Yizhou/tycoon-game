@@ -312,6 +312,23 @@ export class PlayerManager {
   }
 
   /**
+   * 经济资格判定所用的领域状态
+   *
+   * 冻结只是一层「离线连接态」，不应掩盖 jail/bankrupt 等领域状态：
+   * - 未冻结：直接返回 player.status。
+   * - 已冻结：返回冻结前记录的领域状态（缺失时保守取 Normal，离线仍参与经济）。
+   *
+   * 这样 Normal 玩家离线后仍以 Normal 参与计税/收租，而离线前在押或破产的玩家
+   * 不会被 `Frozen` 洗成「可用」，保证 jail/bankrupt 的排除在离线时依旧生效。
+   */
+  getEffectiveStatus(playerId: string): Player['status'] {
+    const player = this.players.get(playerId);
+    if (!player) return PlayerStatus.Normal;
+    if (player.status !== PlayerStatus.Frozen) return player.status;
+    return this.statusBeforeFreeze.get(playerId) ?? PlayerStatus.Normal;
+  }
+
+  /**
    * 获取全部冻结玩家 ID
    */
   getFrozenPlayerIds(): string[] {

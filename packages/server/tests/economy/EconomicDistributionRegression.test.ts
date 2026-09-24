@@ -3,6 +3,7 @@ import type { Cell, MapMeta, Player } from '@game/shared';
 import { PropertyHandler } from '../../src/handlers/propertyHandler.js';
 import { InvestmentHandler } from '../../src/handlers/investmentHandler.js';
 import { addOwnership, releaseOwnership } from '../../src/economy/Ownership.js';
+import { HandlerRegistry } from '../../src/transport/handlers.js';
 import { GameWorld } from '../../src/world/GameWorld.js';
 import type { TypedServer } from '../../src/transport/SocketManager.js';
 
@@ -150,5 +151,50 @@ describe('经济分配一致性回归', () => {
     for (const amount of received) expect(Number.isInteger(amount)).toBe(true);
     // 丢弃尾数：每人 floor(100 * 1/3) = 33，Σ=99，不足 100 的尾数 1 直接丢弃（不守恒回补）
     expect(received).toEqual([33, 33, 33]);
+  });
+});
+
+describe('收租主链路（HandlerRegistry：付款方资格 + 离线股东的领域状态）', () => {
+  const socketFor = (io: TypedServer) => ({ data: { playerId: 'payer' }, emit: io.emit, on: io.on } as never);
+
+  function setup(): { world: GameWorld; io: TypedServer } {
+    const world = new GameWorld();
+    world.loadMap([property], meta);
+    world.addPlayer(player('payer', 500));
+    world.addPlayer(player('owner-a', 0));
+    world.getRuntimeState().replaceOwnerships(1, [{ playerId: 'owner-a', share: 1, purchasePrice: 100 }]);
+    return { world, io: server() };
+  }
+
+  it('payer/owner 均正常：正常扣款与到账', () => {
+    const { world, io } = setup();
+    new HandlerRegistry(io, world).handleRentPayment('payer', 1, socketFor(io));
+    expect(world.getPlayer('payer')?.values.money.current).toBe(400);
+    expect(world.getPlayer('owner-a')?.values.money.current).toBe(100);
+  });
+
+  it('owner 离线（Normal→Frozen）：仍可收租', () => {
+    const { world, io } = setup();
+    world.getPlayerManager().freezePlayer('owner-a', 'disconnect');
+    new HandlerRegistry(io, world).handleRentPayment('payer', 1, socketFor(io));
+    expect(world.getPlayer('owner-a')?.values.money.current).toBe(100);
+  });
+
+  it('owner 在押后离线：不收租，payer 也不支付其份额', () => {
+    const { world, io } = setup();
+    const pm = world.getPlayerManager();
+    pm.updateStatus('owner-a', 'jail');
+    pm.freezePlayer('owner-a', 'disconnect');
+    new HandlerRegistry(io, world).handleRentPayment('payer', 1, socketFor(io));
+    expect(world.getPlayer('payer')?.values.money.current).toBe(500);
+    expect(world.getPlayer('owner-a')?.values.money.current).toBe(0);
+  });
+
+  it('payer 破产：不支付租金（付款方资格判定，不再被 jail-only 守卫漏放）', () => {
+    const { world, io } = setup();
+    world.getPlayerManager().updateStatus('payer', 'bankrupt');
+    new HandlerRegistry(io, world).handleRentPayment('payer', 1, socketFor(io));
+    expect(world.getPlayer('payer')?.values.money.current).toBe(500);
+    expect(world.getPlayer('owner-a')?.values.money.current).toBe(0);
   });
 });

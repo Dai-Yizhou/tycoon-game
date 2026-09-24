@@ -204,6 +204,53 @@ describe('PlayerManager', () => {
     });
   });
 
+  describe('getEffectiveStatus（经济资格用领域状态）', () => {
+    it('未冻结时返回真实状态', () => {
+      const pm = new PlayerManager();
+      pm.addPlayer(buildPlayer('p1'));
+      pm.updateStatus('p1', PlayerStatus.Jail);
+      expect(pm.getEffectiveStatus('p1')).toBe(PlayerStatus.Jail);
+    });
+
+    it('离线冻结不掩盖 Jail：冻结前后都视为在押', () => {
+      const pm = new PlayerManager();
+      pm.addPlayer(buildPlayer('p1'));
+      pm.updateStatus('p1', PlayerStatus.Jail);
+      pm.freezePlayer('p1', 'disconnect');
+      expect(pm.getPlayer('p1')?.status).toBe(PlayerStatus.Frozen);
+      expect(pm.getEffectiveStatus('p1')).toBe(PlayerStatus.Jail);
+    });
+
+    it('离线冻结不掩盖 Bankrupt', () => {
+      const pm = new PlayerManager();
+      pm.addPlayer(buildPlayer('p1'));
+      pm.updateStatus('p1', PlayerStatus.Bankrupt);
+      pm.freezePlayer('p1', 'disconnect');
+      expect(pm.getEffectiveStatus('p1')).toBe(PlayerStatus.Bankrupt);
+    });
+
+    it('Normal 玩家离线后仍以 Normal 参与经济', () => {
+      const pm = new PlayerManager();
+      pm.addPlayer(buildPlayer('p1'));
+      pm.freezePlayer('p1', 'disconnect');
+      expect(pm.getEffectiveStatus('p1')).toBe(PlayerStatus.Normal);
+    });
+
+    it('解冻后恢复领域状态', () => {
+      const pm = new PlayerManager();
+      pm.addPlayer(buildPlayer('p1'));
+      pm.updateStatus('p1', PlayerStatus.Jail);
+      pm.freezePlayer('p1', 'disconnect');
+      pm.unfreezePlayer('p1');
+      expect(pm.getEffectiveStatus('p1')).toBe(PlayerStatus.Jail);
+    });
+
+    it('玩家不存在时保守取 Normal', () => {
+      const pm = new PlayerManager();
+      expect(pm.getEffectiveStatus('ghost')).toBe(PlayerStatus.Normal);
+    });
+  });
+
   describe('Events', () => {
     it('emits Added on add', () => {
       const pm = new PlayerManager();

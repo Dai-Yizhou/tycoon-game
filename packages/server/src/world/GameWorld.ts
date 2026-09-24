@@ -256,6 +256,13 @@ export class GameWorld {
   }
 
   /**
+   * 获取玩家用于经济资格判定的领域状态（离线冻结不掩盖 jail/bankrupt）
+   */
+  getEffectiveStatus(playerId: string): Player['status'] {
+    return this.playerManager.getEffectiveStatus(playerId);
+  }
+
+  /**
    * 获取全部玩家
    */
   getAllPlayers(): Player[] {

@@ -387,7 +387,7 @@ export class InvestmentHandler {
       const allocated = distributeByShareFloor(existing, payoutMagnitude);
       for (const [ownerId, units] of allocated) {
         const owner = this.world.getPlayer(ownerId);
-        if (!owner || owner.status === PlayerStatus.Bankrupt) continue;
+        if (!owner || this.world.getEffectiveStatus(ownerId) === PlayerStatus.Bankrupt) continue;
         this.applyUct(owner, { player: { [fieldId]: units } }, 'investment_buy_in_payout');
       }
     }
@@ -478,9 +478,10 @@ export class InvestmentHandler {
     }
 
     // 仅有效股东（可接收影响）参与整数分配；不可接收者的份额不转给其他股东。
+    // 用领域状态判定：离线（Frozen）不掩盖在押/破产，保证 jail 排除在离线时依旧生效
     const effective = ownerships.filter((ownership) => {
       const player = this.world.getPlayer(ownership.playerId);
-      return player !== undefined && canReceiveInvestmentImpact(player.status);
+      return player !== undefined && canReceiveInvestmentImpact(this.world.getEffectiveStatus(ownership.playerId));
     });
     const effectiveShareSum = effective.reduce((sum, ownership) => sum + ownership.share, 0);
     if (effectiveShareSum > 0) {

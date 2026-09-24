@@ -514,7 +514,8 @@ export class PropertyHandler {
 
       const receivableOwnerIds = ownerships.filter((ownership) => {
         const owner = this.world.getPlayer(ownership.playerId);
-        return owner && canCollectRent(owner.status);
+        // 用领域状态判定：离线（Frozen）不掩盖在押/破产，保证 jail 排除在离线时依旧生效
+        return owner !== undefined && canCollectRent(this.world.getEffectiveStatus(ownership.playerId));
       }).map((ownership) => ownership.playerId);
       if (receivableOwnerIds.length === 0) {
         return null;
@@ -542,7 +543,7 @@ export class PropertyHandler {
       // 可收款股东（仅向可收款股东收租，其不可收的份额不凭空转移给其他股东）
       const collectableOwnerships = ownerships.filter((ownership) => {
         const owner = this.world.getPlayer(ownership.playerId);
-        return owner !== undefined && canCollectRent(owner.status);
+        return owner !== undefined && canCollectRent(this.world.getEffectiveStatus(ownership.playerId));
       });
       if (collectableOwnerships.length === 0) return null;
       const receivableShare = collectableOwnerships.reduce((total, ownership) => total + ownership.share, 0);
@@ -634,7 +635,7 @@ export class PropertyHandler {
       const allocated = distributeByShareFloor(existing, payoutMagnitude);
       for (const [ownerId, units] of allocated) {
         const owner = this.world.getPlayer(ownerId);
-        if (!owner || owner.status === PlayerStatus.Bankrupt) continue;
+        if (!owner || this.world.getEffectiveStatus(ownerId) === PlayerStatus.Bankrupt) continue;
         this.applyUct(owner, { player: { [fieldId]: units } }, 'property_buy_in_payout');
       }
     }
@@ -684,7 +685,7 @@ export class PropertyHandler {
       const allocated = distributeByShareFloor(collectableOwnerships, payableMagnitude);
       for (const [ownerId, units] of allocated) {
         const owner = this.world.getPlayer(ownerId);
-        if (!owner || !canCollectRent(owner.status)) continue;
+        if (!owner || !canCollectRent(this.world.getEffectiveStatus(ownerId))) continue;
         this.applyUct(owner, { player: { [fieldId]: units } }, 'rent_income');
       }
     }

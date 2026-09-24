@@ -14,7 +14,7 @@
  * ```
  */
 
-import { ChatChannels, DomainEvents, type ChatChannel, type ChatMessage, parseChatCommand, type CommandResult } from '@game/shared';
+import { ChatChannels, DomainEvents, participatesInEconomy, type ChatChannel, type ChatMessage, parseChatCommand, type CommandResult } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from './SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -340,9 +340,10 @@ export class HandlerRegistry {
    * 处理租金支付（由 MovementHandler 在到达格子后调用）
    */
   handleRentPayment(playerId: string, cellId: number, socket: TypedSocket): void {
-    // 检查玩家是否在监狱中（监狱中无法收取租金）
-    if (!this.jailHandler.canCollectRent(playerId)) {
-      logger.debug(`玩家 ${playerId} 在监狱中，无法收取租金`);
+    // 付款方需具备经济资格（在押/破产不参与支付）。此处判定的是「付款方」能否支付，
+    // 与股东能否收租无关；用领域状态判定，避免离线 Frozen 掩盖在押/破产状态。
+    if (!participatesInEconomy(this.world.getEffectiveStatus(playerId))) {
+      logger.debug(`玩家 ${playerId} 当前状态不可支付租金`);
       return;
     }
 

@@ -2,7 +2,7 @@
  * 计税系统
  *
  * 负责：
- * - 昼夜计税（每过一个昼夜计税一次）
+ * - 定时计税（间隔由 map-meta 的 `tax.*.taxInterval` 决定，与昼夜循环无关）
  * - 税率由棋盘配置定义
  * - 基础税与股份税均按 UCT 逐字段征收
  *
@@ -108,7 +108,8 @@ export class Taxation {
   /**
    * 启动计税定时器
    *
-   * 每过一个昼夜（baseTax.taxInterval）计税一次
+   * 间隔取 `map-meta.tax.baseTax.taxInterval`（固定墙钟定时，与昼夜循环无关）。
+   * 一次计税周期内同时结算基础税与股份税。
    */
   startTaxTimer(): void {
     if (this.taxTimer) {
@@ -138,7 +139,8 @@ export class Taxation {
   /**
    * 执行一次计税周期
    *
-   * 对所有活跃玩家进行计税
+   * 对所有参与经济的玩家计税（离线玩家仍在名单中，照常计税）；
+   * 在押/破产玩家即便离线也不计税（按领域状态判定）。
    */
   private executeTaxCycle(): void {
     this.lastTaxTime = Date.now();
@@ -147,7 +149,9 @@ export class Taxation {
     logger.debug(`开始计税周期，共 ${players.length} 名玩家`);
 
     for (const player of players) {
-      if (!participatesInEconomy(player.status)) {
+      // 用领域状态判定：离线（Frozen）仍参与经济（离线照常计税），
+      // 但离线前在押/破产的玩家不会被 Frozen 洗成可用
+      if (!participatesInEconomy(this.world.getEffectiveStatus(player.id))) {
         continue;
       }
 
@@ -171,7 +175,7 @@ export class Taxation {
     if (!player) {
       return { success: false, error: '玩家不存在' };
     }
-    if (!participatesInEconomy(player.status)) {
+    if (!participatesInEconomy(this.world.getEffectiveStatus(playerId))) {
       return { success: false, error: '当前状态玩家不计税' };
     }
 
