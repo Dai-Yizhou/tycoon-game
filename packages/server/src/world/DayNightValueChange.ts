@@ -22,6 +22,7 @@ import type { DayNightCycle } from './DayNightCycle.js';
 import { DayNightEvents } from './DayNightCycle.js';
 import type { Uct, DayNightValueChangeConfig } from '@game/shared';
 import { resolveDayNightPhase } from '@game/shared';
+import { broadcastSystemMessage, formatFieldAmounts, type SystemChatIO } from '../net/systemChat.js';
 
 /**
  * 昼夜 UCT 数值变化服务
@@ -30,6 +31,8 @@ export class DayNightValueChange {
   private readonly world: GameWorld;
   private readonly dayNightCycle: DayNightCycle;
   private readonly config: DayNightValueChangeConfig | undefined;
+  /** 系统聊天广播目标（可选：未注入时只改数值不发消息） */
+  private readonly io: SystemChatIO | undefined;
   /** 去重时区偏移 → 该时区下的区域 ID 列表 */
   private readonly offsetRegions: Map<number, string[]> = new Map();
   /** 各时区上次判定结果（用于检测跨相位）；首次仅记录基线不施加增量 */
@@ -43,10 +46,12 @@ export class DayNightValueChange {
     world: GameWorld,
     dayNightCycle: DayNightCycle,
     config: DayNightValueChangeConfig | undefined = world.getMapMeta()?.dayNight,
+    io?: SystemChatIO,
   ) {
     this.world = world;
     this.dayNightCycle = dayNightCycle;
     this.config = config;
+    this.io = io;
     if (this.config) {
       this.indexRegionOffsets();
       this.dayNightCycle.on(DayNightEvents.CycleTick, this.onTick);
@@ -98,26 +103,37 @@ export class DayNightValueChange {
       this.lastIsDay.set(offsetMinutes, phase.isDay);
       if (baseline || previous === undefined || previous === phase.isDay) continue;
 
-      this.applyPhase(regionIds, phase.isDay ? this.config.day : this.config.night);
+      this.applyPhase(regionIds, phase.isDay ? this.config.day : this.config.night, phase.isDay);
     }
   }
 
   /**
    * 对指定区域施加一次增量
    */
-  private applyPhase(regionIds: string[], delta: Uct | undefined): void {
+  private applyPhase(regionIds: string[], delta: Uct | undefined, isDay: boolean): void {
     if (!delta) return;
     const regionDeltas = delta.region ?? {};
     const fieldIds = Object.keys(regionDeltas);
     if (fieldIds.length === 0) return;
 
+    const meta = this.world.getMapMeta();
+    const fieldDefinitions = meta?.valueFieldDefinitions ?? [];
+    const phaseLabel = isDay ? '白昼' : '夜晚';
+
     for (const regionId of regionIds) {
+      const applied: Record<string, number> = {};
       for (const fieldId of fieldIds) {
         const amount = regionDeltas[fieldId];
         if (!Number.isFinite(amount) || amount === 0) continue;
         this.world.changeRegionValue(regionId, fieldId, amount);
+        applied[fieldId] = amount;
         logger.debug(`昼夜切换：区域 ${regionId} 字段 ${fieldId} 变化 ${amount}`);
       }
+      // 聊天框系统消息：昼夜更替引起的区域数值变化
+      const detail = formatFieldAmounts(applied, fieldDefinitions, 'region');
+      if (!detail) continue;
+      const regionName = meta?.regions.find((region) => region.id === regionId)?.name['zh-CN'] ?? regionId;
+      if (this.io) broadcastSystemMessage(this.io, `进入${phaseLabel}：${regionName} ${detail}`);
     }
   }
 }
@@ -129,6 +145,7 @@ export function createDayNightValueChange(
   world: GameWorld,
   dayNightCycle: DayNightCycle,
   config?: DayNightValueChangeConfig,
+  io?: SystemChatIO,
 ): DayNightValueChange {
-  return new DayNightValueChange(world, dayNightCycle, config);
+  return new DayNightValueChange(world, dayNightCycle, config, io);
 }

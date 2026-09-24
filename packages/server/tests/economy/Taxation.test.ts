@@ -121,6 +121,23 @@ describe('Taxation UCT', () => {
     expect(world.getPlayer('p1')!.values.credit.current).toBe(40);
   });
 
+  it('broadcasts a system chat message after a successful tax collection so the result is visible in-game', () => {
+    const world = new GameWorld();
+    world.loadMap([baseCell], meta);
+    world.addPlayer(makePlayer('p1', 2000, 50));
+    const emit = jest.fn();
+    const taxation = new Taxation({ emit } as never, world, makeConfig({ money: 0.1, credit: 0.2 }, {}, {}));
+
+    taxation.triggerManualTax('p1');
+
+    const systemChat = emit.mock.calls.filter(([event]) => event === 'server.chat');
+    expect(systemChat).toHaveLength(1);
+    const [payload] = systemChat[0].slice(1) as Array<{ message: { channel: string; senderId: string | null; content: string } }>;
+    expect(payload.message.channel).toBe('system');
+    expect(payload.message.senderId).toBeNull();
+    expect(payload.message.content).toBe('p1 缴纳税款 210（基础税 210，股份税 0）');
+  });
+
   it('does not broadcast server.valueChanged when the whole tax debit rolls back', () => {
     const world = new GameWorld();
     world.loadMap([baseCell], meta);

@@ -417,7 +417,7 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   world.setRegionTimeProvider((cell) => (timeZoneManager.getCellLocalTime(cell.id).isDay ? 0 : 1));
 
   // 初始化昼夜驱动的区域 UCT 数值变化服务（进入白天/夜晚时对配置的区域字段施加增量）
-  const dayNightValueChange = new DayNightValueChange(world, dayNightCycle);
+  const dayNightValueChange = new DayNightValueChange(world, dayNightCycle, undefined, io);
   if (world.getMapMeta()?.dayNight) {
     logger.info('DayNightValueChange initialized (region UCT changes on day/night)');
   }

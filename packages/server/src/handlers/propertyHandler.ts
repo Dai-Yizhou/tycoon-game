@@ -31,6 +31,7 @@ import {
 import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
 import { EconomyService } from '../economy/EconomyService.js';
 import { publishValueChanged } from '../net/valuePublisher.js';
+import { broadcastSystemMessage, formatFieldAmounts } from '../net/systemChat.js';
 
 /**
  * 地产所有权信息
@@ -134,6 +135,11 @@ export class PropertyHandler {
 
   private visitKey(playerId: string, cellId: number): string {
     return `${playerId}:${cellId}`;
+  }
+
+  /** 格子可读名称（优先中文名，缺失时回退 ID），用于系统消息 */
+  private cellLabel(cell: Cell): string {
+    return cell.name?.['zh-CN'] ?? cell.name?.['en-US'] ?? String(cell.id);
   }
 
   private hasActedThisVisit(playerId: string, cellId: number): boolean {
@@ -509,6 +515,8 @@ export class PropertyHandler {
       // 自己的地产不收租
       const isOwner = ownerships.some(o => o.playerId === payerId);
       if (isOwner) {
+        // 说明性系统消息：玩家常因「他人持股也画了持股描边」而误判该格为他人地产
+        broadcastSystemMessage(this.io, `${payer.username} 停靠「${this.cellLabel(cell)}」，因其本人持股，本次不收租`);
         return null;
       }
 
@@ -518,13 +526,17 @@ export class PropertyHandler {
         return owner !== undefined && canCollectRent(this.world.getEffectiveStatus(ownership.playerId));
       }).map((ownership) => ownership.playerId);
       if (receivableOwnerIds.length === 0) {
+        broadcastSystemMessage(this.io, `「${this.cellLabel(cell)}」的股东均不可收租（在押/破产），本次不收租`);
         return null;
       }
 
       // 6. 获取租金（结算时刻按 D8 规则求一次并固定）
       const level = this.world.getRuntimeState().getCellState(cell.id).level;
       const baseRentUct = cell.rent?.[level];
-      if (!baseRentUct) return null;
+      if (!baseRentUct) {
+        broadcastSystemMessage(this.io, `「${this.cellLabel(cell)}」缺少等级 ${level} 的租金配置，本次不收租`);
+        return null;
+      }
       const rentUct = this.world.resolveValueModifier({
         cellType: 'property',
         baseField: 'rent',
@@ -537,6 +549,7 @@ export class PropertyHandler {
       const rent = this.getUctCost(rentUct);
 
       if (rent <= 0) {
+        broadcastSystemMessage(this.io, `「${this.cellLabel(cell)}」当前租金为 0，本次不收租`);
         return null;
       }
 
@@ -554,16 +567,26 @@ export class PropertyHandler {
       for (const [fieldId, delta] of Object.entries(rentUct.player ?? {})) {
         const payableMagnitude = Math.floor(Math.abs(delta) * receivableShare);
         const field = payer.values[fieldId];
-        if (!field) return null;
+        if (!field) {
+          broadcastSystemMessage(this.io, `${payer.username} 缺少字段「${fieldId}」，本次不收租`);
+          return null;
+        }
         const next = field.current - payableMagnitude;
-        if (next < (field.min ?? Number.NEGATIVE_INFINITY) || next > (field.max ?? Number.POSITIVE_INFINITY)) return null;
+        if (next < (field.min ?? Number.NEGATIVE_INFINITY) || next > (field.max ?? Number.POSITIVE_INFINITY)) {
+          // 余额不足（字段有 min 下限）时不结算：此前静默返回，导致「收租未触发」难以定位
+          broadcastSystemMessage(this.io, `${payer.username} 余额不足，应付「${this.cellLabel(cell)}」租金 ${payableMagnitude} 未结算`);
+          return null;
+        }
         payerDeltas[fieldId] = -payableMagnitude;
       }
       const payerChanges = this.applyUct(payer, { player: payerDeltas }, 'rent_payment');
-      if (payerChanges.length === 0) return null;
+      if (payerChanges.length === 0) {
+        broadcastSystemMessage(this.io, `${payer.username} 租金扣款未生效，本次不收租`);
+        return null;
+      }
 
-      // 增加所有者财产（按股权整数分配）
-      this.distributeRentToOwners(rentUct, collectableOwnerships, receivableShare);
+      // 增加所有者财产（按股权整数分配），并记录各股东实收金额用于系统消息
+      const received = this.distributeRentToOwners(rentUct, collectableOwnerships, receivableShare);
       for (const [fieldId, delta] of Object.entries(rentUct?.region ?? {})) {
         const applied = this.world.changeRegionValue(cell.regionId, fieldId, delta);
         this.io.emit('server.notification', {
@@ -579,6 +602,16 @@ export class PropertyHandler {
       const mainOwner = receivableOwnerIds[0];
 
       logger.debug(`玩家 ${payerId} 向格子 ${cellId} 的所有者支付 UCT 租金`);
+
+      // 聊天框系统消息：交租方与各股东实收金额（收/交租双向可见）
+      const fieldDefinitions = this.world.getMapMeta()?.valueFieldDefinitions ?? [];
+      const ownerDetail = [...received.entries()]
+        .map(([ownerId, amounts]) => `${this.world.getPlayer(ownerId)?.username ?? ownerId} 收 ${formatFieldAmounts(amounts, fieldDefinitions)}`)
+        .join('；');
+      broadcastSystemMessage(
+        this.io,
+        `${payer.username} 向「${this.cellLabel(cell)}」股东交租 ${formatFieldAmounts(payerDeltas, fieldDefinitions)}${ownerDetail ? `（${ownerDetail}）` : ''}`,
+      );
 
       return {
         rent: rentUct,
@@ -677,7 +710,9 @@ export class PropertyHandler {
    *
    * 只对可收款股东分配，且不把不可收方份额转给他人；每个股东取整数下限，尾数丢弃。
    */
-  private distributeRentToOwners(rent: Uct, collectableOwnerships: Array<{ playerId: string; share: number }>, receivableShare: number): void {
+  private distributeRentToOwners(rent: Uct, collectableOwnerships: Array<{ playerId: string; share: number }>, receivableShare: number): Map<string, Record<string, number>> {
+    /** 股东 → 本次实际收到的逐字段金额（用于系统消息展示） */
+    const received: Map<string, Record<string, number>> = new Map();
     for (const [fieldId, delta] of Object.entries(rent.player ?? {})) {
       const payableMagnitude = Math.floor(Math.abs(delta) * receivableShare);
       if (payableMagnitude <= 0) continue;
@@ -687,8 +722,12 @@ export class PropertyHandler {
         const owner = this.world.getPlayer(ownerId);
         if (!owner || !canCollectRent(this.world.getEffectiveStatus(ownerId))) continue;
         this.applyUct(owner, { player: { [fieldId]: units } }, 'rent_income');
+        const bucket = received.get(ownerId) ?? {};
+        bucket[fieldId] = (bucket[fieldId] ?? 0) + units;
+        received.set(ownerId, bucket);
       }
     }
+    return received;
   }
 
   /**

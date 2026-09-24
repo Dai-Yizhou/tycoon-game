@@ -22,6 +22,7 @@ import type { GameWorld } from '../world/GameWorld.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
 import { addOwnership, getOwnerships, distributeByShareFloor } from '../economy/index.js';
 import { publishValueChanged } from '../net/valuePublisher.js';
+import { broadcastSystemMessage, formatFieldAmounts } from '../net/systemChat.js';
 import type { PropertyOwnership } from './propertyHandler.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
 import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
@@ -319,6 +320,23 @@ export class InvestmentHandler {
 
       // 7. 广播事件触发结果
       this.io.emit('server.investmentEventTriggered', result);
+
+      // 聊天框系统消息：投资项目钩子触发（股东收益/损失 + 区域数值变化）
+      const fieldDefinitions = this.world.getMapMeta()?.valueFieldDefinitions ?? [];
+      const cellLabel = cell.name?.['zh-CN'] ?? cell.name?.['en-US'] ?? String(cell.id);
+      const parts: string[] = [];
+      for (const affected of result.affectedPlayers) {
+        const detail = formatFieldAmounts(affected.amount.player ?? {}, fieldDefinitions);
+        if (!detail) continue;
+        parts.push(`${this.world.getPlayer(affected.playerId)?.username ?? affected.playerId} ${detail}`);
+      }
+      const regionDetail = formatFieldAmounts(eventImpact.region ?? {}, fieldDefinitions, 'region');
+      if (parts.length > 0 || regionDetail) {
+        broadcastSystemMessage(
+          this.io,
+          `投资项目「${cellLabel}」响应事件 ${eventName}：${[...parts, regionDetail].filter(Boolean).join('；')}`,
+        );
+      }
 
       logger.debug(`投资项目 ${investmentId} 被域事件 ${eventName} 触发：${this.formatUct(eventImpact)}`);
       return result;

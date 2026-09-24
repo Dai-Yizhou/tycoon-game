@@ -24,6 +24,7 @@ import { logger } from '../utils/logger.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { TypedServer } from '../transport/SocketManager.js';
 import { EconomyService } from './EconomyService.js';
+import { broadcastSystemMessage } from '../net/systemChat.js';
 
 /**
  * 计税配置（与地图元数据 tax 段同构）
@@ -243,6 +244,11 @@ export class Taxation {
     });
 
     logger.debug(`玩家 ${playerId} 缴税 ${totalTax}（基础税 ${sumPlayerUct(baseTax)}，股份税 ${sumPlayerUct(shareTax)}）`);
+    // 聊天框系统消息：让缴税结果在游戏内可见
+    broadcastSystemMessage(
+      this.io,
+      `${player.username} 缴纳税款 ${totalTax}（基础税 ${sumPlayerUct(baseTax)}，股份税 ${sumPlayerUct(shareTax)}）`,
+    );
 
     return { success: true, taxRecord };
   }

@@ -157,6 +157,12 @@ describe('经济分配一致性回归', () => {
 describe('收租主链路（HandlerRegistry：付款方资格 + 离线股东的领域状态）', () => {
   const socketFor = (io: TypedServer) => ({ data: { playerId: 'payer' }, emit: io.emit, on: io.on } as never);
 
+  /** 取本 io 上广播过的聊天系统消息内容 */
+  const chatMessages = (io: TypedServer): string[] =>
+    (io.emit as unknown as jest.Mock).mock.calls
+      .filter(([event]) => event === 'server.chat')
+      .map(([, payload]) => (payload as { message: { content: string } }).message.content);
+
   function setup(): { world: GameWorld; io: TypedServer } {
     const world = new GameWorld();
     world.loadMap([property], meta);
@@ -196,5 +202,18 @@ describe('收租主链路（HandlerRegistry：付款方资格 + 离线股东的�
     new HandlerRegistry(io, world).handleRentPayment('payer', 1, socketFor(io));
     expect(world.getPlayer('payer')?.values.money.current).toBe(500);
     expect(world.getPlayer('owner-a')?.values.money.current).toBe(0);
+  });
+
+  it('收租成功时在聊天框广播系统消息（交租 + 各股东实收）', () => {
+    const { world, io } = setup();
+    new HandlerRegistry(io, world).handleRentPayment('payer', 1, socketFor(io));
+    expect(chatMessages(io)).toEqual(['payer 向「地产」股东交租 财产 -100（owner-a 收 财产 +100）']);
+  });
+
+  it('本人持股时不收租，并说明原因（避免被误判为收租未触发）', () => {
+    const { world, io } = setup();
+    world.getRuntimeState().replaceOwnerships(1, [{ playerId: 'payer', share: 1, purchasePrice: 100 }]);
+    new HandlerRegistry(io, world).handleRentPayment('payer', 1, socketFor(io));
+    expect(chatMessages(io)).toEqual(['payer 停靠「地产」，因其本人持股，本次不收租']);
   });
 });
