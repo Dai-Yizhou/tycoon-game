@@ -14,6 +14,10 @@
   --motion-normal: 0.25s ease;
   /* 数值底色呼吸总时长（§3.7）：CSS 与 JS 共用此单点，避免定时器把动画截断 */
   --motion-value-breathe: 0.5s;
+  /* 纸纹噪点（全局材质效果，不属于地域身份）：棋盘底纸与半透明浮层共用。
+     浮层本身是 55% 半透明的，若背后只有一片纯色，任何 alpha 都读作实心；
+     底纸带上噪点后，浮层后面的纹理确实可见，这才是"浮层被看穿"的视觉依据。 */
+  --gp-paper-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
   /* SVG 地图连线几何（箭头尺寸 / 端点与格子边缘的留白，布局常量）
      线宽由主题令牌 dimension.line.map 驱动（--map-link-width） */
   --map-arrow-size: 22;
@@ -71,11 +75,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .game-page {
   display: block; padding: 0;
   /* HUD 浮层底色：由主题 --gp-card 派生的半透明面，供数值框/状态条/悬浮卡/浮层/聊天框共用。
-     55% 卡色 + backdrop blur：过低会看不清内容，过高（如 75%）在深色区域与地图底色接近，
-     视觉上等同不透明，故取 55% 让底层地图纹理确实透出 */
+     不透明度固定 55%，不再下调（下调会牺牲文字可读性）。浮层"看起来不是实心"改由三层协作：
+     ① 令牌层：主题里 card 与 mapBg 取不同的色相/明度档，浮层与底纸本身就有差；
+     ② 材质层：底纸的纸纹噪点透过半透明浮层可见（--gp-paper-noise）；
+     ③ 边界层：--gp-border 墨线与 --gp-shadow-paper 硬投影定义浮层轮廓。 */
   --gp-surface: color-mix(in srgb, var(--gp-card) 55%, transparent);
   /* 数值底色呼吸的提亮色（§3.7）：强调色混入浮层底色 */
   --gp-breathe-tint: color-mix(in srgb, var(--gp-accent) 30%, var(--gp-surface));
+  /* 硬投影：纸张叠放的偏移墨影（非模糊光晕），用于浮层/悬浮卡/面板 */
+  --gp-shadow-paper: 2px 2px 0 color-mix(in srgb, var(--gp-border) 40%, transparent);
 }
 .hud-panel-actions {
   position: absolute;
@@ -106,7 +114,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   border-radius: var(--region-radius);
   background: var(--gp-surface);
   color: var(--gp-fg);
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--gp-border) 28%, transparent);
+  box-shadow: var(--gp-shadow-paper, 2px 2px 0 color-mix(in srgb, var(--gp-border) 40%, transparent));
 }
 .hud-panel h2 { margin: 0 0 8px; font-size: 12px; }
 .achievement-panel { max-height: min(52vh, 420px); overflow-y: auto; }
@@ -136,6 +144,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   padding: clamp(28px, 6vh, 72px) clamp(16px, 5vw, 64px);
   background: var(--auth-bg);
   color: var(--auth-fg);
+  /* 正文字距的地域气质（主题 font.bodySpacing）：只在文档型页面生效，避免挤压 HUD 窄容器 */
+  letter-spacing: var(--font-body-spacing, normal);
 }
 
 /* 1900 特征：内框线 + 地域纹理叠加 */
@@ -155,8 +165,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .title-container { text-align: center; z-index: 10; animation: slideUp var(--motion-slideup-title) ease-out; }
 .game-title {
   font-family: var(--font-title);
-  font-size: clamp(3rem, 8vw, 6rem); font-weight: 900;
-  color: var(--auth-fg); letter-spacing: 0.06em; margin-bottom: 0.5rem;
+  font-size: clamp(3rem, 8vw, 6rem); font-weight: var(--font-title-weight, 900);
+  color: var(--auth-fg); letter-spacing: var(--font-title-spacing, 0.06em); margin-bottom: 0.5rem;
   text-shadow: none;
 }
 .subtitle { color: var(--auth-muted); font-family: var(--font-func); font-size: clamp(1rem, 2vw, 1.4rem); font-weight: 500; letter-spacing: 0.08em; }
@@ -186,8 +196,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 }
 .login-title, .loading-title {
   font-family: var(--font-title);
-  font-weight: 900; font-size: clamp(30px, 4vw, 54px);
-  color: var(--auth-fg); letter-spacing: 0.06em;
+  font-weight: var(--font-title-weight, 900); font-size: clamp(30px, 4vw, 54px);
+  line-height: var(--font-title-line, 1.2);
+  color: var(--auth-fg); letter-spacing: var(--font-title-spacing, 0.06em);
   text-align: center; margin: 0;
 }
 .login-title::after, .loading-title::after {
@@ -322,8 +333,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 /* 交互式 SVG 地图（真正渲染棋子的层） */
 .interactive-map-surface {
   position: absolute; inset: 0; z-index: 2; pointer-events: auto;
-  background: var(--gp-map-bg);
-  background-image: var(--region-texture);
+  background-color: var(--gp-map-bg);
+  /* 底纸 = 地域纹理 + 纸纹噪点；噪点是浮层半透明可见性的基础 */
+  background-image: var(--gp-paper-noise), var(--region-texture);
+  background-blend-mode: multiply, normal;
 }
 .interactive-map-surface__svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .interactive-map-surface__links, .interactive-map-surface__nodes, .interactive-map-surface__players { width: 100%; height: 100%; }
@@ -348,11 +361,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   fill: var(--region-cell-bg);
   stroke: var(--region-border); stroke-width: 3;
 }
+/* 棋盘格双色：相邻格子交替取 cellBg / cellBgAlt（令牌层拆分的两档同族色） */
+.interactive-map-surface__nodes .map-node:nth-child(even) .map-node__shape { fill: var(--region-cell-bg-alt); }
 .map-node:hover .map-node__shape { fill: var(--region-box-bg); }
 /* 仅 2 种边框样式：默认（未持股 / 不能持股）与已持股高亮 */
 .map-node--held .map-node__shape { stroke: var(--region-accent); stroke-width: 4; }
 .map-node__type { fill: var(--region-label-fg); font-weight: 700; font-size: 13px; font-family: var(--font-func); letter-spacing: 0.14em; }
-.map-node__name { fill: var(--region-fg); font-weight: 900; font-size: 20px; font-family: var(--font-title); }
+.map-node__name { fill: var(--region-fg); font-weight: var(--font-title-weight, 900); font-size: 20px; font-family: var(--font-title); }
 /* 8 种格子类型图标（独立 SVG 资源，解包为 <g>）：单色，随类型标签同色 */
 .map-node__icon { fill: var(--region-label-fg); }
 
@@ -507,12 +522,12 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   background: var(--gp-surface);
   border: var(--region-border-w) solid var(--gp-accent);
   border-radius: var(--region-radius);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--gp-border) 42%, transparent);
+  box-shadow: var(--gp-shadow-paper, 2px 2px 0 color-mix(in srgb, var(--gp-border) 40%, transparent));
   padding: 10px; color: var(--gp-fg); pointer-events: none;
 }
 .cell-hover-card.is-visible { opacity: 1; }
 .cell-hover-card__type { font-family:var(--font-func); font-size: 8px; letter-spacing: 0.08em; color: var(--gp-accent); text-transform: uppercase; }
-.cell-hover-card__title { font-family: var(--font-title); font-weight: 900; font-size: 15px; margin: 3px 0 3px; }
+.cell-hover-card__title { font-family: var(--font-title); font-weight: var(--font-title-weight, 900); font-size: 15px; margin: 3px 0 3px; }
 .cell-hover-card__description { font-family: var(--font-func); margin: 2px 0px 5px; }
 .cell-hover-card__rows { font-family:var(--font-func); display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 9px; }
 .cell-hover-card__rows span { color: var(--gp-muted); }
@@ -527,13 +542,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   left: 18px; right: auto; bottom: 128px;
   width: 260px; z-index: 32;
   border-radius: var(--region-radius);
-  /* 与 hover 卡 / 右下 hud-panel 一致：走 HUD 半透明浮层底色（原为实色 sidebar-bg，透明度被误删） */
+  /* 与 hover 卡 / 右下 hud-panel 一致：走 HUD 半透明浮层底色（55% 卡色，不下调）。
+     blur 取 4px：8px 会把底纸的纸纹与纹理一并抹平，浮层后面变成纯色，读作实心；
+     4px 只软化边缘不抹掉纹理，折叠/展开两态共用此容器，一处生效 */
   background: var(--gp-surface);
   border: var(--region-border-w) solid var(--gp-border);
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--gp-border) 22%, transparent);
+  box-shadow: var(--gp-shadow-paper, 2px 2px 0 color-mix(in srgb, var(--gp-border) 40%, transparent));
   overflow: hidden;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 /* ===== 折叠态 Ticker（方案 B） ===== */
@@ -678,7 +695,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   cursor: pointer; white-space: nowrap;
   transition: background var(--motion-fast), color var(--motion-fast);
 }
-.act-btn:hover:not(:disabled) { background: var(--gp-cell-bg); }
+.act-btn:hover:not(:disabled) { background: var(--gp-cell-a); }
 .act-btn--accent { background: var(--gp-accent); color: var(--gp-paper); border-color: var(--gp-accent); }
 .act-btn--accent:hover:not(:disabled) { background: color-mix(in srgb, var(--gp-accent) 85%, #ffffff); }
 .act-btn__price { display: block; font-family: var(--font-num); font-size: 9px; font-weight: 700; }

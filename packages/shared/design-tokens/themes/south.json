@@ -3,15 +3,15 @@
   "color": {
     "palette": {
       "surface": {
-        "$value": "#E6DCC3",
+        "$value": "#D0C7B0",
         "$type": "color"
       },
       "border": {
-        "$value": "#5C6B7A",
+        "$value": "#6A6A58",
         "$type": "color"
       },
       "accent": {
-        "$value": "#8C4E3A",
+        "$value": "#A65B3E",
         "$type": "color"
       },
       "property": {
@@ -85,89 +85,105 @@
     },
     "hud": {
       "barBg": {
-        "$value": "#D4C9B0",
+        "$value": "#A8B098",
         "$type": "color"
       },
       "sidebarBg": {
-        "$value": "#DDE4D8",
+        "$value": "#A8B098",
         "$type": "color"
       },
       "mapBg": {
-        "$value": "#E6DCC3",
+        "$value": "#D0C7B0",
         "$type": "color"
       },
       "card": {
-        "$value": "#F0E7D0",
+        "$value": "#B8BEA8",
         "$type": "color"
       },
       "fg": {
-        "$value": "#3C3326",
+        "$value": "#3C4030",
         "$type": "color"
       },
       "muted": {
-        "$value": "#6B6450",
+        "$value": "#676C5A",
         "$type": "color"
       },
-      "cellBg": {
-        "$value": "#E6DCC3",
+      "aux": {
+        "$value": "#5C6B7A",
+        "$type": "color"
+      },
+      "cellA": {
+        "$value": "#D8CFB8",
+        "$type": "color"
+      },
+      "cellB": {
+        "$value": "#C8BFA8",
         "$type": "color"
       },
       "cellBorder": {
-        "$value": "#7B8D7A",
+        "$value": "#6A6A58",
         "$type": "color"
       }
     },
     "region": {
       "board": {
-        "$value": "#E6DCC3",
+        "$value": "#D0C7B0",
         "$type": "color"
       },
       "fg": {
-        "$value": "#3C3326",
+        "$value": "#3C4030",
         "$type": "color"
       },
       "border": {
-        "$value": "#7B8D7A",
+        "$value": "#6A6A58",
         "$type": "color"
       },
       "borderWidth": {
-        "$value": 1,
+        "$value": 1.5,
         "$type": "number"
       },
       "radius": {
-        "$value": 16,
+        "$value": 12,
         "$type": "number"
       },
       "accent": {
-        "$value": "#8C4E3A",
+        "$value": "#A65B3E",
         "$type": "color"
       },
       "accentHover": {
-        "$value": "#A45C46",
+        "$value": "#BC6E4E",
+        "$type": "color"
+      },
+      "aux": {
+        "$value": "#5C6B7A",
         "$type": "color"
       },
       "labelFg": {
-        "$value": "#6B6450",
+        "$value": "#676C5A",
         "$type": "color"
       },
       "motionFg": {
-        "$value": "#7B8D7A",
+        "$value": "#6A6A58",
         "$type": "color"
       },
       "ruleColor": {
-        "$value": "rgba(60,51,38,0.20)",
+        "$value": "rgba(60,64,48,0.20)",
         "$type": "color"
       },
       "cellBg": {
-        "$value": "#F0E7D0",
+        "$value": "#D8CFB8",
+        "$type": "color"
+      },
+      "cellBgAlt": {
+        "$value": "#C8BFA8",
         "$type": "color"
       },
       "cellBorder": {
-        "$value": "#7B8D7A",
+        "$value": "#6A6A58",
         "$type": "color"
       },
       "boxBg": {
-        "$value": "#F0E7D0",
+        "$value": "#B8BEA8",
         "$type": "color"
       },
       "btnFg": {
@@ -232,11 +248,11 @@
   },
   "font": {
     "body": {
-      "$value": "Noto Sans SC, PingFang SC, sans-serif",
+      "$value": "'Kaiti SC', 'STKaiti', KaiTi, 'Noto Serif SC', serif",
       "$type": "fontFamily"
     },
     "title": {
-      "$value": "'Snell Roundhand', 'Apple Chancery', Georgia, serif",
+      "$value": "'Kaiti SC', 'STKaiti', KaiTi, 'Noto Serif SC', Georgia, serif",
       "$type": "fontFamily"
     },
     "func": {
@@ -244,8 +260,24 @@
       "$type": "fontFamily"
     },
     "number": {
-      "$value": "IBM Plex Mono, Menlo, monospace",
+      "$value": "Georgia, 'Times New Roman', serif",
       "$type": "fontFamily"
+    },
+    "titleWeight": {
+      "$value": 700,
+      "$type": "number"
+    },
+    "titleSpacing": {
+      "$value": "0.04em",
+      "$type": "string"
+    },
+    "bodySpacing": {
+      "$value": "0.05em",
+      "$type": "string"
+    },
+    "titleLineHeight": {
+      "$value": 1.45,
+      "$type": "number"
     }
   },
   "light": {

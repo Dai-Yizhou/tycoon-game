@@ -40,12 +40,21 @@ const DOM_TOKEN_MAP: ReadonlyArray<readonly [cssVar: string, source: DomTokenSou
   ['--gp-border', { kind: 'color', path: 'color.hud.cellBorder' }],
   ['--gp-muted', { kind: 'color', path: 'color.hud.muted' }],
   ['--gp-accent', { kind: 'color', path: 'color.palette.accent' }],
-  ['--gp-cell-bg', { kind: 'color', path: 'color.hud.cellBg' }],
+  // 辅助色：地域第二语义色（与 accent 主强调色区分）
+  ['--gp-aux', { kind: 'color', path: 'color.hud.aux' }],
+  // 棋盘格双色：由原单一 cellBg 拆分，相邻格子交替取色
+  ['--gp-cell-a', { kind: 'color', path: 'color.hud.cellA' }],
+  ['--gp-cell-b', { kind: 'color', path: 'color.hud.cellB' }],
   // 字体（功能/数字 + 通用正文/标题）
   ['--font-body', { kind: 'color', path: 'font.body' }],
   ['--font-title', { kind: 'color', path: 'font.title' }],
   ['--font-func', { kind: 'color', path: 'font.func' }],
   ['--font-num', { kind: 'color', path: 'font.number' }],
+  // 排版令牌：字重 / 字距 / 行高，标题与正文的地域排版气质
+  ['--font-title-weight', { kind: 'number', path: 'font.titleWeight' }],
+  ['--font-title-spacing', { kind: 'string', path: 'font.titleSpacing' }],
+  ['--font-body-spacing', { kind: 'string', path: 'font.bodySpacing' }],
+  ['--font-title-line', { kind: 'number', path: 'font.titleLineHeight' }],
   // 地域语法（棋盘与 SVG 地图语义令牌）
   ['--region-board-bg', { kind: 'color', path: 'color.region.board' }],
   ['--region-fg', { kind: 'color', path: 'color.region.fg' }],
@@ -53,10 +62,12 @@ const DOM_TOKEN_MAP: ReadonlyArray<readonly [cssVar: string, source: DomTokenSou
   ['--region-border-w', { kind: 'px', path: 'color.region.borderWidth' }],
   ['--region-radius', { kind: 'px', path: 'color.region.radius' }],
   ['--region-accent', { kind: 'color', path: 'color.region.accent' }],
+  ['--region-aux', { kind: 'color', path: 'color.region.aux' }],
   ['--region-label-fg', { kind: 'color', path: 'color.region.labelFg' }],
   ['--region-motion-fg', { kind: 'color', path: 'color.region.motionFg' }],
   ['--region-rule', { kind: 'color', path: 'color.region.ruleColor' }],
   ['--region-cell-bg', { kind: 'color', path: 'color.region.cellBg' }],
+  ['--region-cell-bg-alt', { kind: 'color', path: 'color.region.cellBgAlt' }],
   ['--region-box-bg', { kind: 'color', path: 'color.region.boxBg' }],
   ['--region-texture', { kind: 'color', path: 'texture.region.background' }],
   // 登录/加载/欢迎：语义令牌映射到同一套地域变量（standalone 时由 :root 兜底）

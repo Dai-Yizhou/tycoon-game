@@ -3,15 +3,15 @@
   "color": {
     "palette": {
       "surface": {
-        "$value": "#DDE0DF",
+        "$value": "#C4C8C6",
         "$type": "color"
       },
       "border": {
-        "$value": "#6D3F3F",
+        "$value": "#5A403C",
         "$type": "color"
       },
       "accent": {
-        "$value": "#B52B1D",
+        "$value": "#C24030",
         "$type": "color"
       },
       "property": {
@@ -85,49 +85,57 @@
     },
     "hud": {
       "barBg": {
-        "$value": "#C8CCCB",
+        "$value": "#A09088",
         "$type": "color"
       },
       "sidebarBg": {
-        "$value": "#D0D4D3",
+        "$value": "#A09088",
         "$type": "color"
       },
       "mapBg": {
-        "$value": "#DDE0DF",
+        "$value": "#C4C8C6",
         "$type": "color"
       },
       "card": {
-        "$value": "#ECEDEC",
+        "$value": "#B0A098",
         "$type": "color"
       },
       "fg": {
-        "$value": "#3A2E2C",
+        "$value": "#4A302C",
         "$type": "color"
       },
       "muted": {
-        "$value": "#7A6A66",
+        "$value": "#6E5752",
         "$type": "color"
       },
-      "cellBg": {
-        "$value": "#DDE0DF",
+      "aux": {
+        "$value": "#A1B85A",
+        "$type": "color"
+      },
+      "cellA": {
+        "$value": "#CCCEC9",
+        "$type": "color"
+      },
+      "cellB": {
+        "$value": "#BCBEB9",
         "$type": "color"
       },
       "cellBorder": {
-        "$value": "#6D3F3F",
+        "$value": "#5A403C",
         "$type": "color"
       }
     },
     "region": {
       "board": {
-        "$value": "#DDE0DF",
+        "$value": "#C4C8C6",
         "$type": "color"
       },
       "fg": {
-        "$value": "#3A2E2C",
+        "$value": "#4A302C",
         "$type": "color"
       },
       "border": {
-        "$value": "#6D3F3F",
+        "$value": "#5A403C",
         "$type": "color"
       },
       "borderWidth": {
@@ -139,35 +147,43 @@
         "$type": "number"
       },
       "accent": {
-        "$value": "#B52B1D",
+        "$value": "#C24030",
         "$type": "color"
       },
       "accentHover": {
-        "$value": "#CF3A2A",
+        "$value": "#D55545",
+        "$type": "color"
+      },
+      "aux": {
+        "$value": "#A1B85A",
         "$type": "color"
       },
       "labelFg": {
-        "$value": "#7A6A66",
+        "$value": "#6E5752",
         "$type": "color"
       },
       "motionFg": {
-        "$value": "#6D3F3F",
+        "$value": "#5A403C",
         "$type": "color"
       },
       "ruleColor": {
-        "$value": "rgba(61,46,44,0.22)",
+        "$value": "rgba(74,48,44,0.22)",
         "$type": "color"
       },
       "cellBg": {
-        "$value": "#ECEDEC",
+        "$value": "#CCCEC9",
+        "$type": "color"
+      },
+      "cellBgAlt": {
+        "$value": "#BCBEB9",
         "$type": "color"
       },
       "cellBorder": {
-        "$value": "#6D3F3F",
+        "$value": "#5A403C",
         "$type": "color"
       },
       "boxBg": {
-        "$value": "#ECEDEC",
+        "$value": "#B0A098",
         "$type": "color"
       },
       "btnFg": {
@@ -232,11 +248,11 @@
   },
   "font": {
     "body": {
-      "$value": "Noto Sans SC, PingFang SC, sans-serif",
+      "$value": "'Songti SC', SimSun, 'Noto Serif SC', serif",
       "$type": "fontFamily"
     },
     "title": {
-      "$value": "'Times New Roman', Georgia, serif",
+      "$value": "'Courier New', 'Songti SC', SimSun, 'Noto Serif SC', serif",
       "$type": "fontFamily"
     },
     "func": {
@@ -244,8 +260,24 @@
       "$type": "fontFamily"
     },
     "number": {
-      "$value": "IBM Plex Mono, Menlo, monospace",
+      "$value": "'Courier New', monospace",
       "$type": "fontFamily"
+    },
+    "titleWeight": {
+      "$value": 900,
+      "$type": "number"
+    },
+    "titleSpacing": {
+      "$value": "0.01em",
+      "$type": "string"
+    },
+    "bodySpacing": {
+      "$value": "0.02em",
+      "$type": "string"
+    },
+    "titleLineHeight": {
+      "$value": 1.3,
+      "$type": "number"
     }
   },
   "light": {
