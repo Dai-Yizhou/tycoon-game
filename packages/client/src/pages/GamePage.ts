@@ -139,10 +139,15 @@ export function createGamePage(controller: GameController): HTMLElement {
     interactiveMap.updatePlayers(players);
     // hover 用权威移动字段定位本玩家所在格（players[0].position 在 serverPath 移动中可能滞后）
     interactiveMap.setSelfCell(snapshot.currentPlayerPosition);
-    // 已持股（有股东）格子边框高亮；未持股/不能持股共用默认边框
-    const heldCellIds = new Set<number>();
-    for (const [cellId, state] of snapshot.cellRuntimeStates) {
-      if (state.ownerships.length > 0) heldCellIds.add(cellId);
+    // 持股描边仅代表「我持有」：运行时态里只看当前玩家自己的持股，
+    // 并并入 gameState 下发的 ownedProperties（重连后 cellRuntimeStates 可能为空）。
+    // 他人持股不描边（未持股/不能持股共用默认边框）。
+    const heldCellIds = new Set<number>(snapshot.ownedProperties);
+    const heldPlayerId = snapshot.currentPlayer?.id;
+    if (heldPlayerId) {
+      for (const [cellId, state] of snapshot.cellRuntimeStates) {
+        if (state.ownerships.some((ownership) => ownership.playerId === heldPlayerId && ownership.share > 0)) heldCellIds.add(cellId);
+      }
     }
     interactiveMap.setHeldCells(heldCellIds);
     if (!snapshot.isMoving) interactiveMap.followPlayer(snapshot.currentPlayerPosition);
