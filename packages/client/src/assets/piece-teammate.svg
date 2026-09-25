@@ -1,5 +1,13 @@
 <svg width="60" height="66" viewBox="-30 -26 60 66" xmlns="http://www.w3.org/2000/svg">
-  <!-- 队友棋子：方头 + 宽肩方身（与本玩家区分轮廓，颜色仍由样式表按令牌驱动） -->
-  <rect class="map-player__head" x="-11" y="-15" width="22" height="22" rx="5"/>
-  <path class="map-player__body" d="M-20 34 L-14 5 L14 5 L20 34 Z"/>
+  <!-- 外轮廓 -->
+  <circle class="map-player__head" cx="0" cy="-4" r="12"/>
+  <path class="map-player__body" d="M-18 34 L-11 2 L11 2 L18 34 Z"/>
+
+  <!-- 内部细节：头发/兜帽 + 背带裤结构 -->
+  <path class="map-player__detail" d="M -10 -8 A 11 11 0 0 1 10 -8 L 10 -2" /> <!-- 头发/兜帽 -->
+  <path class="map-player__detail" d="M -7 2 L 7 2" /> <!-- 胸前横线 -->
+  <path class="map-player__detail" d="M -4 2 L -3 18" /> <!-- 左背带 -->
+  <path class="map-player__detail" d="M 4 2 L 3 18" /> <!-- 右背带 -->
+  <path class="map-player__detail" d="M -11 18 L 11 18" /> <!-- 腰部横线 -->
+  <path class="map-player__detail" d="M 0 18 L 0 34" /> <!-- 裤腿线 2 -->
 </svg>

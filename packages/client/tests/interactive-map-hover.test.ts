@@ -86,7 +86,7 @@ describe('InteractiveMapSurface hover/selfCellId 耦合', () => {
     expect(hovered).toEqual([4]);
   });
 
-  it('棋子按角色语义取不同图像源：本玩家 / 队友 / 其他玩家轮廓不同', () => {
+  it('棋子按角色语义取不同图像源：本玩家 / 队友 / 其他玩家图像可区分', () => {
     const { mapData } = loadFixture();
     const surface = new InteractiveMapSurface();
     const self = { ...playerAt(0), teamId: 't1' } as Player;
@@ -98,11 +98,16 @@ describe('InteractiveMapSurface hover/selfCellId 耦合', () => {
     const roles = Array.from(root.querySelectorAll<SVGGElement>('.map-player')).map((g) => g.dataset.playerRole);
     expect(roles).toEqual(['self', 'teammate', 'other']);
 
-    // 三种角色都由解包后的 <g> 模板渲染出 head/body，且图像源不同（head 标签各不相同）
+    // 三种角色都由解包后的 <g> 模板渲染出 head/body。
+    // 本玩家与队友同为圆头轮廓，队友靠 map-player__detail 内部细节（头发/背带裤）区分；
+    // 其他玩家用菱形头轮廓。
     const icons = Array.from(root.querySelectorAll('.map-player .map-player__icon'));
     expect(icons).toHaveLength(3);
     expect(icons.map((icon) => icon.querySelector('.map-player__head')?.tagName.toLowerCase()))
-      .toEqual(['circle', 'rect', 'path']);
+      .toEqual(['circle', 'circle', 'path']);
+    // 仅队友带内部细节元素，保证三种角色图像源互不相同
+    expect(icons.map((icon) => icon.querySelectorAll('.map-player__detail').length))
+      .toEqual([0, 6, 0]);
     for (const icon of icons) {
       expect(icon.querySelector('.map-player__body')).toBeTruthy();
       // 解包为 <g>：图标内不得出现嵌套 <svg> 视口

@@ -371,6 +371,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   fill: var(--gp-player-color, var(--region-accent));
   stroke: var(--tycoon-piece-outline); stroke-width: 4; stroke-linejoin: round;
 }
+.map-player__detail {
+  fill: none;
+  stroke: var(--tycoon-piece-outline);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 /* 待机跳动：仅作用于内层包裹 g，不影响外层 translate 定位；移动时暂停。
    transform-box: fill-box + transform-origin 底部中心，使缩放表现为落地压扁/上升拉伸 */
