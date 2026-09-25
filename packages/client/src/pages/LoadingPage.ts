@@ -2,8 +2,7 @@
  * 加载界面
  *
  * 功能：
- * - 连接服务器进度显示
- * - 加载动画
+ * - 连接服务器（旋转指示 + 最短停留，保证 tips 可读）
  * - 错误处理
  */
 
@@ -35,8 +34,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
   page.className = 'page loading-page';
   page.dataset.ui = 'loading-page';
 
-  // 节奏令牌：填充过渡时长与最短停留共用，保证离场前填充动画播完、tips 有足够阅读时间
-  const progressDurationMs = readCssVarNumber(document.documentElement, '--loading-progress-duration', 450);
+  // 节奏令牌：最短停留时长，保证 tips 有足够阅读时间
   const minDwellMs = readCssVarNumber(document.documentElement, '--loading-min-dwell', 2500);
 
   const eyebrow = document.createElement('div');
@@ -54,31 +52,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
   title.textContent = t('loading.connecting');
   loadingCard.appendChild(title);
 
-  // 进度条容器
-  const progressContainer = document.createElement('div');
-  progressContainer.className = 'progress-container';
-
-  const progressBar = document.createElement('div');
-  progressBar.className = 'progress-bar';
-  progressContainer.appendChild(progressBar);
-
-  const progressText = document.createElement('div');
-  progressText.className = 'progress-text';
-  progressText.textContent = '0%';
-  progressContainer.appendChild(progressText);
-
-  /**
-   * 写入填充进度：只更新 .progress-bar 上的 --progress，宽度过渡由 CSS 负责平滑。
-   * 注意不能写 style.width——那会改变 track 自身宽度而非填充层，且绕过过渡。
-   */
-  const setProgress = (percent: number): void => {
-    progressBar.style.setProperty('--progress', `${percent}%`);
-    progressText.textContent = `${percent}%`;
-  };
-
-  loadingCard.appendChild(progressContainer);
-
-  // 加载动画（旋转圆圈）
+  // 加载动画（旋转圆圈）：进度条已移除——百分比与填充条长期对不齐，改为纯指示 + 最短停留
   const spinner = document.createElement('div');
   spinner.className = 'spinner';
   loadingCard.appendChild(spinner);
@@ -130,14 +104,12 @@ export function createLoadingPage(controller: GameController): HTMLElement {
     const startedAt = performance.now();
     socket?.disconnect();
     if (controller.getSocket() === socket) controller.setSocket(null);
-    setProgress(20);
 
     socket = createSocket({
       url: window.location.origin,
       token: controller.getAuthSession().getToken() || undefined,
       onConnect: (socketId) => {
         if (!active || attempt !== connectionAttempt || controller.getSocket() !== socket) return;
-        setProgress(70);
         controller.setConnected(socketId);
       },
       onStatus: (status) => {
@@ -160,8 +132,6 @@ export function createLoadingPage(controller: GameController): HTMLElement {
     // 保存 socket 到 controller，供 GamePage 使用
     controller.setSocket(socket);
 
-    setProgress(45);
-
     try {
       await waitForConnection(socket, 5000);
       if (!active || attempt !== connectionAttempt) return;
@@ -175,20 +145,10 @@ export function createLoadingPage(controller: GameController): HTMLElement {
           controller.setLoginResult(result.data.player, result.data.cycleStartTime, result.data.cycleMinutes, result.data.existingPlayers || [], result.data.leaderboard || null);
 
           const targetState = result.data.player.status === 'bankrupt' ? 'bankruptcy' : 'game';
-          // 停留期内让进度条缓慢爬到 99%（不冻结、也不提前停到 100%）：停顿在 100% 会被
-          // 误认为卡顿；停留结束后才补满 100%，再用一个极短的填充收尾延迟立即切页。
+          // 停留期保持加载动画，读满一条 tips 后再切页（进度条已移除，不再有填充进度）
           const dwellRemainMs = Math.max(minDwellMs - (performance.now() - startedAt), 0);
-          if (dwellRemainMs > 0) {
-            progressBar.style.setProperty('--loading-progress-duration', `${dwellRemainMs}ms`);
-            setProgress(99);
-          }
           setTimeout(() => {
-            if (!active || attempt !== connectionAttempt) return;
-            progressBar.style.setProperty('--loading-progress-duration', `${progressDurationMs}ms`);
-            setProgress(100);
-            setTimeout(() => {
-              if (active && attempt === connectionAttempt) controller.setState(targetState);
-            }, progressDurationMs);
+            if (active && attempt === connectionAttempt) controller.setState(targetState);
           }, dwellRemainMs);
         } else {
           const errorMsg = result.error || t('loading.loginFailed');
@@ -215,9 +175,6 @@ export function createLoadingPage(controller: GameController): HTMLElement {
     errorContainer.style.display = 'none';
     retryButton.style.display = 'none';
     spinner.style.display = 'block';
-    // 复位停留期可能被拉长的填充时长，避免进度回退被拖成慢动画
-    progressBar.style.setProperty('--loading-progress-duration', `${progressDurationMs}ms`);
-    setProgress(0);
     controller.clearError();
     startConnection();
   });

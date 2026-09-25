@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="-9 -9 18 18">
-  <!-- 纪念碑：塔尖 + 塔身 + 基座。填充色由应用样式表按 .map-node__icon 驱动 -->
-  <path d="M0 -9 L3.6 -3 H-3.6 Z" />
-  <path d="M-2.6 -3 H2.6 V5 H-2.6 Z" />
-  <path d="M-8 5 H8 V8.6 H-8 Z" />
-</svg>

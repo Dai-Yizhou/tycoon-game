@@ -1,4 +1,4 @@
-import type { AchievementSnapshot, Cell, LeaderboardSnapshot, LeaderboardState, Player, ChatMessage as ServerChatMessage, ValueModifierRule } from '@game/shared';
+import type { AchievementSnapshot, Cell, LeaderboardSnapshot, LeaderboardState, LocalizedText, Player, ChatMessage as ServerChatMessage, ValueModifierRule } from '@game/shared';
 
 // ===== 类型定义 =====
 
@@ -21,11 +21,14 @@ export interface OtherPlayerMoveState {
   pathIndex: number;
 }
 
-export interface RegionInfo { id: string; name: string; cellIds: number[]; initialValues: Record<string, number>; themeId?: 'northeast' | 'south' | 'midwest' | 'west'; }
+export interface RegionInfo { id: string; /** 多语言名称：HUD 区域名经 localizedText 按当前语言取文本（不得在加载期压成单一语言） */ name: LocalizedText; cellIds: number[]; initialValues: Record<string, number>; themeId?: 'northeast' | 'south' | 'midwest' | 'west'; }
 export interface TimeZoneInfo { id: string; name?: string; offsetMinutes: number; }
 
 export interface ValueFieldDef {
-  id: string; name: string; scope: 'player' | 'region';
+  id: string;
+  /** 多语言名称：数值框标签经 localizedText 按当前语言取文本（不得在加载期压成单一语言） */
+  name: LocalizedText;
+  scope: 'player' | 'region';
   min?: number; max?: number;
 }
 

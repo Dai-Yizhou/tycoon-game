@@ -1,0 +1,5 @@
+<svg width="60" height="66" viewBox="-30 -26 60 66" xmlns="http://www.w3.org/2000/svg">
+  <!-- 队友棋子：方头 + 宽肩方身（与本玩家区分轮廓，颜色仍由样式表按令牌驱动） -->
+  <rect class="map-player__head" x="-11" y="-15" width="22" height="22" rx="5"/>
+  <path class="map-player__body" d="M-20 34 L-14 5 L14 5 L20 34 Z"/>
+</svg>

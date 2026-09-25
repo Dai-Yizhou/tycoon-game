@@ -49,6 +49,7 @@ import { createDayNightShadowLoop, readLightParams, DEFAULT_LIGHT_PARAMS, type L
 import { DesignAdapter } from '../design/DesignAdapter.js';
 import { getRegionThemeId, getThemeId, getThemeTokens, SAVED_REGION_THEME_KEY } from '../design/ThemeConfig.js';
 import { resolveCellActions } from '../game/cellActionResolver.js';
+import { localizedText } from '../game/i18n.js';
 
 let gameViewModel: GameViewModel | null = null;
 let gameStore: GameStore | null = null;
@@ -248,7 +249,8 @@ export function createGamePage(controller: GameController): HTMLElement {
       if (snapshot.currentPlayer) {
         interactiveMap.render(mapData, toInteractivePlayers(snapshot), mapResult.valueFields.map((field) => ({
           id: field.id,
-          name: { 'zh-CN': field.name, 'en-US': field.name },
+          // name 已是多语言对象，直接透传（此前压成 zh-CN 会丢失 i18n）
+          name: field.name,
           scope: field.scope,
           min: field.min,
           max: field.max,
@@ -580,8 +582,9 @@ function syncCellActions(cellId: number): void {
   if (!unchanged) gameStore.setCellActions(actions);
 }
 
-function formatTeamValues(values: Record<string, number>, definitions: Array<{ id: string; name: string }>): string {
-  return Object.entries(values).map(([fieldId, value]) => `${definitions.find((definition) => definition.id === fieldId)?.name ?? fieldId} ${value}`).join(' · ');
+function formatTeamValues(values: Record<string, number>, definitions: Array<{ id: string; name: unknown }>): string {
+  // 数值名是多语言的（LocalizedText），必须经 localizedText 按当前语言取文本，否则会渲染成 [object Object]
+  return Object.entries(values).map(([fieldId, value]) => `${localizedText(definitions.find((definition) => definition.id === fieldId)?.name, fieldId)} ${value}`).join(' · ');
 }
 
 export function cleanupGamePage(page: HTMLElement): void {

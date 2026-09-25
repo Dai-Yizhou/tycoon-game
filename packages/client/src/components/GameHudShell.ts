@@ -2,6 +2,7 @@ import type { GameEffectHooks } from "../game/GameEffects.js";
 import type { GameViewModel, ValueFieldDef } from "../game/GameViewModel.js";
 import { t, localizedText } from "../game/i18n.js";
 import { parseChatCommand } from "@game/shared";
+import type { LeaderboardEntry } from "@game/shared";
 import { resolveCellHoverModel } from "../game/cellDisplayModel.js";
 import { readCssVarNumber } from "../design/DesignAdapter.js";
 
@@ -84,10 +85,11 @@ export class GameHudShell {
           </div>
           <div class="value-pills" data-ui="resource-strip"></div>
           <div class="topbar-spacer"></div>
+          <!-- 区域作用域数值（区域 UCT）：与玩家数值同一套 value-pill 样式，置于区域信息块左侧 -->
+          <div class="value-pills value-pills--region" data-ui="region-uct-strip"></div>
           <section class="region-status" data-ui="region-status" aria-live="polite" role="status">
             <div class="region-status__row">
               <div class="region-status__name" data-ui="zone-tag">--</div>
-              <div class="region-status__value" data-ui="prosperity-tag">--</div>
               <div class="cycle-indicator" data-ui="day-night">
                 <div class="cycle-dot" data-ui="cycle-dot"></div>
                 <span class="cycle-text" data-ui="day-time">--:--</span>
@@ -348,15 +350,33 @@ export class GameHudShell {
   }
 
   /** 顶部数值条：由地图 valueFieldDefinitions 驱动，仅渲染玩家作用域字段。
-   *  区域作用域字段（如繁荣度）由右上 updateRegionStatus 单独渲染，避免区域字段泄漏进玩家字段区。 */
+   *  区域作用域字段（如区域 UCT）由 updateRegionStatus 渲染到右上区域信息块左侧的独立数值条。 */
   private updateValuePills(): void {
     const player = this.vm.getPlayer();
     const defs = this.vm.getRegions().valueFieldDefs;
-    const strip = this.root.querySelector("[data-ui=resource-strip]")!;
+    const strip = this.root.querySelector("[data-ui=resource-strip]") as HTMLElement;
     const playerValues = player.currentPlayer?.values ?? {};
-    const slots: ValueFieldDef[] = defs.filter((def) => def.scope === "player");
-    // 按 data-field 复用已有数值框：元素身份必须稳定，否则每次刷新重建会把
-    // 底色呼吸（§3.7）刚加上的 fx-value-breathe 类随旧节点一起丢掉，动画永远看不到
+    this.renderValuePills(
+      strip,
+      defs.filter((def) => def.scope === "player"),
+      (def) => playerValues[def.id]?.current ?? 0,
+      (def) => t("hud." + def.id),
+      true,
+    );
+  }
+
+  /**
+   * 渲染一组数值框（玩家数值条与区域数值条共用同一套外观与呼吸锚点）。
+   * 按 data-field 复用已有元素：元素身份必须稳定，否则每次刷新重建会把
+   * 底色呼吸（§3.7）刚加上的 fx-value-breathe 类随旧节点一起丢掉，动画永远看不到。
+   */
+  private renderValuePills(
+    strip: HTMLElement,
+    slots: ValueFieldDef[],
+    readValue: (def: ValueFieldDef) => number,
+    readLabel: (def: ValueFieldDef) => string,
+    accentFirst: boolean,
+  ): void {
     const existing = new Map<string, HTMLElement>();
     strip.querySelectorAll<HTMLElement>(".value-pill").forEach((el) => {
       if (el.dataset.field) existing.set(el.dataset.field, el);
@@ -375,9 +395,9 @@ export class GameHudShell {
         pill.append(label, num);
       }
       // 只切换修饰类，不能用 className 整体赋值，否则会一并清掉 fx-value-breathe
-      pill.classList.toggle("value-pill--accent", index === 0);
-      pill.querySelector(".value-pill__label")!.textContent = localizedText(def.name, t("hud." + def.id));
-      const raw = playerValues[def.id]?.current ?? 0;
+      pill.classList.toggle("value-pill--accent", accentFirst && index === 0);
+      pill.querySelector(".value-pill__label")!.textContent = localizedText(def.name, readLabel(def));
+      const raw = readValue(def);
       const value = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
       pill.querySelector(".value-pill__num")!.textContent = String(Math.round(value));
       return pill;
@@ -476,11 +496,30 @@ export class GameHudShell {
       panel.textContent = t('leaderboard.empty');
       return;
     }
-    const rows = leaderboard.top.map((entry) => `${entry.rank}. ${entry.username} ${entry.score}`);
-    if (leaderboard.currentPlayer && !leaderboard.top.some((entry) => entry.playerId === leaderboard.currentPlayer?.playerId)) {
-      rows.push(`${leaderboard.currentPlayer.rank}. ${leaderboard.currentPlayer.username} ${leaderboard.currentPlayer.score}`);
-    }
-    panel.textContent = rows.join(' | ');
+    // 纵向列表：每行一个玩家（名次 / 玩家名 / 分数），本玩家行单独标记。
+    // 原实现把整张榜单压成一行 "1. a 100 | 2. b 90"，名字一多就横着跑出面板。
+    const current = leaderboard.currentPlayer;
+    const entries = [...leaderboard.top];
+    if (current && !entries.some((entry) => entry.playerId === current.playerId)) entries.push(current);
+    panel.replaceChildren(...entries.map((entry) => this.buildLeaderboardRow(entry, entry.playerId === current?.playerId)));
+  }
+
+  /** 榜单单行：名次、玩家名、分数三段（分数右对齐，玩家名过长时省略） */
+  private buildLeaderboardRow(entry: LeaderboardEntry, isSelf: boolean): HTMLElement {
+    const row = document.createElement('div');
+    row.className = `leaderboard-row${isSelf ? ' leaderboard-row--self' : ''}`;
+    row.dataset.ui = 'leaderboard-row';
+    const rank = document.createElement('span');
+    rank.className = 'leaderboard-row__rank';
+    rank.textContent = String(entry.rank);
+    const name = document.createElement('span');
+    name.className = 'leaderboard-row__name';
+    name.textContent = entry.username;
+    const score = document.createElement('span');
+    score.className = 'leaderboard-row__score';
+    score.textContent = String(entry.score);
+    row.append(rank, name, score);
+    return row;
   }
 
   private updateRegionStatus(): void {
@@ -488,15 +527,20 @@ export class GameHudShell {
     const cell = this.vm.getCell(position);
     const region = this.vm.getRegions().mapRegions.find((item) => item.id === cell?.regionId);
     const name = this.root.querySelector('[data-ui="zone-tag"]');
-    const value = this.root.querySelector('[data-ui="prosperity-tag"]');
-    const statusCard = this.root.querySelector<HTMLElement>('[data-ui="region-status"]');
     if (name) name.textContent = localizedText(region?.name, t('game.unknownRegion'));
+    // 区域作用域数值（区域 UCT）与玩家数值同一套样式，独立渲染在区域信息块左侧；
+    // data-field 锚点落在各自数值框上，底色呼吸（§3.7）只提亮发生变化的那个字段
     const definitions = this.vm.getRegions().valueFieldDefs.filter((definition) => definition.scope === 'region');
-    // 底色呼吸（§3.7）目标锚点：区域作用域字段变化时提亮区域状态条（~= 支持多字段并列）
-    if (statusCard) statusCard.dataset.field = definitions.map((definition) => definition.id).join(' ');
-    if (value) {
+    const strip = this.root.querySelector<HTMLElement>('[data-ui="region-uct-strip"]');
+    if (strip) {
       const regionValues = this.vm.getRegions().regionValues.get(cell?.regionId ?? '') ?? {};
-      value.textContent = definitions.map((definition) => `${localizedText(definition.name, definition.id)} ${regionValues[definition.id] ?? 0}`).join(' · ');
+      this.renderValuePills(
+        strip,
+        definitions,
+        (def) => regionValues[def.id] ?? 0,
+        (def) => def.id,
+        false,
+      );
     }
   }
 
@@ -550,7 +594,7 @@ export class GameHudShell {
     const movement = this.vm.getMovement();
     const actionCluster = this.root.querySelector('[data-ui="action-cluster"]')!;
     const widgets: HTMLElement[] = [];
-    // 拼图块点数（§3.2）：仅本玩家移动期显示"已走 X/总步数"。数据取权威 serverPath（服务端
+    // 移动步数提示（§3.2）：仅本玩家移动期显示"已走 X/总步数"。数据取权威 serverPath（服务端
     // 下发），不做本地推算；移动结束 update() 重渲染时自然隐藏。
     if (movement.isMoving && movement.isServerAnimating && movement.serverPath.length >= 2) {
       const total = movement.serverPath.length - 1;

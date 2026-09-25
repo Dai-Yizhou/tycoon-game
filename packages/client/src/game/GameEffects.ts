@@ -268,7 +268,7 @@ export class CssTransitionEffectHooks extends NoOpEffectHooks {
   }
 
   /** 数值结算（§3.7 底色呼吸）：仅"发生变化的那一个数值显示框"填充底色快速提亮再归位。
-   *  目标元素由 HUD 写入 data-field=<fieldId>（玩家字段 → 数值框；区域字段 → 区域状态条）。 */
+   *  目标元素由 HUD 写入 data-field=<fieldId>（玩家字段与区域字段都落在各自的数值框上）。 */
   onValueChange(fieldId: string, _delta: number, _newValue: number): void {
     const target = this.root.querySelector<HTMLElement>(`[data-field~="${fieldId}"]`);
     if (!target) return;

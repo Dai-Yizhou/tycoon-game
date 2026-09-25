@@ -1,0 +1,5 @@
+<svg width="60" height="66" viewBox="-30 -26 60 66" xmlns="http://www.w3.org/2000/svg">
+  <!-- 其他玩家棋子：菱形头 + 锥形身（与本玩家/队友区分轮廓，颜色仍由样式表按令牌驱动） -->
+  <path class="map-player__head" d="M0 -17 L13 -4 L0 9 L-13 -4 Z"/>
+  <path class="map-player__body" d="M-17 34 L0 6 L17 34 Z"/>
+</svg>

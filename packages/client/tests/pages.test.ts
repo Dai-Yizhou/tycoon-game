@@ -165,9 +165,9 @@ describe('Pages', () => {
       expect(title).toBeTruthy();
       expect(title?.textContent).toBe('正在连接服务器...');
 
-      // 检查进度条
-      const progressContainer = page.querySelector('.progress-container');
-      expect(progressContainer).toBeTruthy();
+      // 进度条已移除（百分比与填充条对不齐），仅保留旋转指示
+      expect(page.querySelector('.progress-container')).toBeNull();
+      expect(page.querySelector('.progress-bar')).toBeNull();
 
       // 检查 spinner
       const spinner = page.querySelector('.spinner');

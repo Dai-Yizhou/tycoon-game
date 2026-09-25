@@ -2,7 +2,9 @@ import { type MapData, type Player, type ValueFieldDefinition } from "@game/shar
 import { localizedText } from "../game/i18n.js";
 import { readCssVarNumber } from "../design/DesignAdapter.js";
 // 图形资源（矢量）：以 Vite ?raw 内联，颜色由应用样式表按类名/CSS 变量驱动
-import pieceSvgRaw from "../assets/piece.svg?raw";
+import pieceSelfSvgRaw from "../assets/piece-self.svg?raw";
+import pieceTeammateSvgRaw from "../assets/piece-teammate.svg?raw";
+import pieceOtherSvgRaw from "../assets/piece-other.svg?raw";
 import emptyCellSvgRaw from "../assets/cells/empty.svg?raw";
 import eventCellSvgRaw from "../assets/cells/event.svg?raw";
 import supplyCellSvgRaw from "../assets/cells/supply.svg?raw";
@@ -14,6 +16,48 @@ import monumentCellSvgRaw from "../assets/cells/monument.svg?raw";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
+/** 棋子角色语义：由交互层按玩家关系判定，决定棋子图像源 */
+type PlayerRole = "self" | "teammate" | "other";
+
+/** 同格多玩家的错位图案：在格内水平铺开，满 3 人后换上一排继续错位（不再竖直堆叠），索引超出后循环 */
+const PLAYER_SLOT_OFFSETS: ReadonlyArray<{ x: number; y: number }> = [
+  { x: -34, y:  10 },
+  { x:  30, y: -14 },
+  { x:   6, y:  30 },
+  { x: -24, y: -30 },
+  { x:  46, y:  18 },
+];
+
+/** 同格内第 index 个玩家的落点偏移（index 0 = 本玩家，不偏移） */
+function playerSlotOffset(index: number): { x: number; y: number } {
+  if (index <= 0) return { x: 0, y: 0 };
+  return PLAYER_SLOT_OFFSETS[(index - 1) % PLAYER_SLOT_OFFSETS.length];
+}
+
+/** 格子矩形几何（矩形相对格子中心对称，故用半宽/半高）：名称变长只横向扩展，不截断 */
+const BASE_RECT_HALF_W = 68;
+const RECT_HALF_H = 46;
+/** 名称/类型文字距矩形左右边缘的内边距 */
+const RECT_TEXT_PAD_X = 10;
+/** 名称字号（与 .map-node__name 的 font-size 对应，用于估算所需宽度） */
+const NODE_NAME_FONT_SIZE = 16;
+/** 右侧图标预留宽度（该类型有图标资源时才计入矩形宽度） */
+const RECT_ICON_RESERVE = 32;
+/** 图标中心距矩形右边缘的距离（矩形变宽时图标随之右移） */
+const RECT_ICON_INSET = 16;
+
+/**
+ * 按字号估算文本宽度：全角按字号、半角按 0.55 字号（保守估算，仅用于给矩形定宽）。
+ * 格子名称过长时不再截断，而是据此把矩形拉长；估算需贴紧真实字宽，
+ * 否则矩形会明显宽于文字（此前按整字宽估算 + 大内边距导致矩形过宽）。
+ */
+function estimateTextWidth(text: string, fontSize: number): number {
+  const halfWidth = fontSize * 0.55;
+  let total = 0;
+  for (const ch of text) total += /[^\x00-\xff]/.test(ch) ? fontSize : halfWidth;
+  return total;
+}
+
 /**
  * 解析独立 SVG 资源并"解包"为 <g>：只取其图形子节点，不保留外层 <svg> 视口。
  * 嵌套 <svg> 视口在祖先翻转变换（缩放/滤镜）下会被反复重栅格化，导致棋子频闪；
@@ -21,6 +65,8 @@ const SVG_NS = "http://www.w3.org/2000/svg";
  * 解析失败返回 null（该图形不渲染），不抛错。
  */
 function parseSvgGroup(raw: string, className?: string): SVGElement | null {
+  // 空资源（占位期留空的 svg 文件）直接视为"无图形"，不进入解析
+  if (!raw.trim()) return null;
   if (typeof DOMParser === "undefined") return null;
   const doc = new DOMParser().parseFromString(raw, "image/svg+xml");
   const root = doc.documentElement as unknown as SVGElement;
@@ -31,11 +77,23 @@ function parseSvgGroup(raw: string, className?: string): SVGElement | null {
   return g;
 }
 
-/** 棋子图形模板：解析一次后按玩家克隆；解析失败时返回 null（棋子将不渲染） */
-let pieceTemplate: SVGElement | null = null;
-function getPieceTemplate(): SVGElement | null {
-  if (!pieceTemplate) pieceTemplate = parseSvgGroup(pieceSvgRaw, "map-player__icon");
-  return pieceTemplate;
+/**
+ * 棋子图形模板：按角色语义（本玩家 / 队友 / 其他玩家）取不同图像源，解析一次后克隆复用。
+ * 颜色规则不变（仍由 --gp-player-color 驱动身体填充），这里只区分轮廓。
+ */
+const PIECE_RAW: Record<PlayerRole, string> = {
+  self: pieceSelfSvgRaw,
+  teammate: pieceTeammateSvgRaw,
+  other: pieceOtherSvgRaw,
+};
+const pieceTemplates = new Map<PlayerRole, SVGElement>();
+function getPieceTemplate(role: PlayerRole): SVGElement | null {
+  const cached = pieceTemplates.get(role);
+  if (cached) return cached;
+  const g = parseSvgGroup(PIECE_RAW[role], "map-player__icon");
+  if (!g) return null;
+  pieceTemplates.set(role, g);
+  return g;
 }
 
 /** 8 种格子类型图标（独立 SVG 资源）：按类型缓存解包后的模板 */
@@ -129,11 +187,28 @@ export class InteractiveMapSurface {
     const cells = [...map];
     if (!cells.length) return;
 
+    // 每格排版：类型 / 名称 / 矩形半宽 / 图标模板，供连线端点与节点绘制共用。
+    // 名称过长时不截断文字，而是把矩形横向拉长（右侧有图标资源时再预留图标位）。
+    const layout = new Map<number, { type: string; name: string; halfW: number; icon: SVGElement | null }>();
+    cells.forEach((c) => {
+      const type = String(c.type ?? c.extra?.type ?? "property");
+      const icon = getCellIconTemplate(type);
+      const name = localizedText(c.name ?? c.extra?.name, `格子 ${c.id}`);
+      const halfW = Math.max(
+        BASE_RECT_HALF_W,
+        RECT_TEXT_PAD_X * 2 + estimateTextWidth(name, NODE_NAME_FONT_SIZE) + (icon ? RECT_ICON_RESERVE : 0),
+      );
+      layout.set(c.id, { type, name, halfW, icon });
+    });
+    // 视口留白需覆盖最宽格子的半个矩形，否则边缘格子的矩形会紧贴/越出可视范围
+    const maxHalfW = Math.max(BASE_RECT_HALF_W, ...cells.map((c) => layout.get(c.id)!.halfW));
+
     const xs = cells.map(c => c.x),
       ys = cells.map(c => c.y);
-    const minX = Math.min(...xs) - 90,
+    const padX = Math.max(90, maxHalfW + 24);
+    const minX = Math.min(...xs) - padX,
       minY = Math.min(...ys) - 90,
-      maxX = Math.max(...xs) + 90,
+      maxX = Math.max(...xs) + padX,
       maxY = Math.max(...ys) + 90;
     this.bounds = { minX, minY, maxX, maxY };
 
@@ -174,20 +249,22 @@ export class InteractiveMapSurface {
     const followedCell = byId.get(this.followedCellId ?? -1);
     if (followedCell) this.applyViewBox(svg, followedCell.x, followedCell.y);
 
-    // 格子矩形半宽/半高（与节点 rect 的 -68/-46 保持一致）
-    const HALF_W = 68;
-    const HALF_H = 46;
-    /** 从格子中心沿单位方向 u 到矩形边界的距离（射线-矩形求交） */
-    const edgeDistance = (ux: number, uy: number): number =>
-      1 / (Math.abs(ux) / HALF_W + Math.abs(uy) / HALF_H);
+    /** 从格子中心沿单位方向 u 到矩形边界的距离（射线-矩形求交）：
+     *  取两个轴的约束距离中较小的一个；固定距离会让斜向连线的端点落进矩形内（被格子盖住），
+     *  或离矩形太远，故必须按方向与各自的矩形尺寸实时求交。零分量轴视为无约束。 */
+    const edgeDistance = (ux: number, uy: number, halfW: number): number => {
+      const tx = ux === 0 ? Infinity : halfW / Math.abs(ux);
+      const ty = uy === 0 ? Infinity : RECT_HALF_H / Math.abs(uy);
+      return Math.min(tx, ty);
+    };
 
     /**
-     * 绘制一条连线。端点按格子矩形边界计算并各留出 linkGap，使线/箭头与格子衔接自然。
+     * 绘制一条连线。两端按各自格子矩形边界计算并各留出 linkGap，使线/箭头与格子衔接自然。
      * @param both 双向边：两端各挂一个箭头，且只画一条线（避免两条反向线重叠发脏）
      */
     const drawLink = (
-      from: { x: number; y: number },
-      to: { x: number; y: number },
+      from: { x: number; y: number; id: number },
+      to: { x: number; y: number; id: number },
       both: boolean,
     ) => {
       const dx = to.x - from.x;
@@ -197,15 +274,16 @@ export class InteractiveMapSurface {
       if (!Number.isFinite(len) || len < 1) return;
       const ux = dx / len;
       const uy = dy / len;
-      // 两格矩形等尺寸，故两端内收相同
-      const inset = edgeDistance(ux, uy) + linkGap;
+      // 矩形宽度随名称长度变化，故两端分别按自身半宽求交
+      const insetFrom = edgeDistance(ux, uy, layout.get(from.id)!.halfW) + linkGap;
+      const insetTo = edgeDistance(ux, uy, layout.get(to.id)!.halfW) + linkGap;
       // 两格过近时留白会互相越过：退化为不画线
-      if (len <= inset * 2) return;
+      if (len <= insetFrom + insetTo) return;
       const l = document.createElementNS(ns, "line");
-      l.setAttribute("x1", String(from.x + ux * inset));
-      l.setAttribute("y1", String(from.y + uy * inset));
-      l.setAttribute("x2", String(to.x - ux * inset));
-      l.setAttribute("y2", String(to.y - uy * inset));
+      l.setAttribute("x1", String(from.x + ux * insetFrom));
+      l.setAttribute("y1", String(from.y + uy * insetFrom));
+      l.setAttribute("x2", String(to.x - ux * insetTo));
+      l.setAttribute("y2", String(to.y - uy * insetTo));
       l.classList.add("map-link");
       if (both) l.setAttribute("marker-start", "url(#map-link-arrow)");
       l.setAttribute("marker-end", "url(#map-link-arrow)");
@@ -241,43 +319,42 @@ export class InteractiveMapSurface {
     nodes.classList.add("interactive-map-surface__nodes");
     cells.forEach(c => {
       const g = document.createElementNS(ns, "g");
-      const type = String(c.type ?? c.extra?.type ?? "property");
-      const name = localizedText(c.name ?? c.extra?.name, `格子 ${c.id}`);
+      const { type, name, halfW, icon: iconTemplate } = layout.get(c.id)!;
       g.classList.add("map-node", `map-node--${type}`);
       if (this.heldCellIds.has(c.id)) g.classList.add("map-node--held");
       g.dataset.cellId = String(c.id);
       g.setAttribute("transform", `translate(${c.x} ${c.y})`);
 
+      // 矩形宽度由名称长度决定（长名称拉长矩形而非截断文字），仍以格子中心对称
       const r = document.createElementNS(ns, "rect");
-      r.setAttribute("x", "-68");
-      r.setAttribute("y", "-46");
-      r.setAttribute("width", "136");
-      r.setAttribute("height", "92");
+      r.setAttribute("x", String(-halfW));
+      r.setAttribute("y", String(-RECT_HALF_H));
+      r.setAttribute("width", String(halfW * 2));
+      r.setAttribute("height", String(RECT_HALF_H * 2));
       r.setAttribute("rx", type === "property" ? "2" : "12");
       r.classList.add("map-node__shape");
 
+      // 文字左对齐（矩形内按阅读起点排布）；矩形已按名称宽度扩展，故不再截断
+      const textLeft = -halfW + RECT_TEXT_PAD_X;
       const t = document.createElementNS(ns, "text");
-      t.setAttribute("x", "0");
+      t.setAttribute("x", String(textLeft));
       t.setAttribute("y", "-12");
-      t.setAttribute("text-anchor", "middle");
       t.classList.add("map-node__type");
       t.textContent = type.toUpperCase();
 
       const n = document.createElementNS(ns, "text");
-      n.setAttribute("x", "0");
+      n.setAttribute("x", String(textLeft));
       n.setAttribute("y", "24");
-      n.setAttribute("text-anchor", "middle");
       n.classList.add("map-node__name");
       n.textContent = name;
 
       g.append(r);
 
-      // 8 种格子类型图标：独立 SVG 资源解包为 <g> 后克隆，靠左居中对齐（不动既有文字排版）
-      const iconTemplate = getCellIconTemplate(type);
+      // 8 种格子类型图标：独立 SVG 资源解包为 <g> 后克隆，贴矩形右缘（左侧留给左对齐文字）
       if (iconTemplate) {
         const icon = iconTemplate.cloneNode(true) as SVGElement;
         icon.classList.add("map-node__icon");
-        icon.setAttribute("transform", "translate(-50 0)");
+        icon.setAttribute("transform", `translate(${halfW - RECT_ICON_INSET} 0)`);
         g.appendChild(icon);
       }
 
@@ -314,29 +391,32 @@ export class InteractiveMapSurface {
         if (!cell) return;
         const g = document.createElementNS(ns, "g");
         g.classList.add("map-player");
-        const defaultX = i === 0 ? cell.x : cell.x + (i % 3 - 1) * 18;
-        const defaultY = i === 0 ? cell.y : cell.y - 42 - Math.floor(i / 3) * 8;
+        const slot = playerSlotOffset(i);
+        const defaultX = cell.x + slot.x;
+        const defaultY = cell.y + slot.y;
         const displayed = this.displayedPlayerPositions.get(player.id);
         const x = displayed?.x ?? defaultX;
         const y = displayed?.y ?? defaultY;
         g.setAttribute("transform", `translate(${x} ${y})`);
         g.dataset.playerId = player.id;
         
-        /* 玩家色：按关系区分（本玩家/队友/其他玩家），颜色由主题令牌注入；
-           棋子 SVG 内 body 以 var(--gp-player-color) 取色 */
-        const roleVar = player.id === selfId
-          ? "--gp-player-self"
+        /* 角色语义：本玩家 / 队友 / 其他玩家。决定棋子图像源（各自独立 SVG）与颜色令牌，
+           颜色规则不再变化（--gp-player-self|teammate|other，棋子 SVG 内 body 取 --gp-player-color） */
+        const role: PlayerRole = player.id === selfId
+          ? "self"
           : player.teamId !== null && player.teamId === selfTeamId
-            ? "--gp-player-teammate"
-            : "--gp-player-other";
-        const color = getComputedStyle(this.root).getPropertyValue(roleVar).trim();
+            ? "teammate"
+            : "other";
+        g.dataset.playerRole = role;
+        const color = getComputedStyle(this.root).getPropertyValue(`--gp-player-${role}`).trim();
         if (color) g.style.setProperty("--gp-player-color", color);
 
         // 待机跳动包裹层：对外层 g 的 translate 定位无干扰，动画仅作用于内层 transform。
-        // 棋子图形来自内联的 piece.svg（克隆模板），保留矢量清晰度并由样式表着色。
+        // 同格多玩家随机错开动画相位，避免整格棋子同频同起同落。
         const bounce = document.createElementNS(ns, "g");
         bounce.classList.add("map-player__bounce");
-        const icon = getPieceTemplate();
+        if (i > 0) bounce.style.animationDelay = `${-((i % PLAYER_SLOT_OFFSETS.length) * 0.16 + Math.random() * 0.04).toFixed(2)}s`;
+        const icon = getPieceTemplate(role);
         if (icon) bounce.appendChild(icon.cloneNode(true));
         g.append(bounce);
         pieces.appendChild(g);
@@ -361,7 +441,8 @@ export class InteractiveMapSurface {
       const cell = this.map.find((item) => item.id === player.position.cellId);
       const element = this.root.querySelector(`[data-player-id="${player.id}"]`);
       if (cell && element) {
-        element.setAttribute('transform', `translate(${cell.x + ((index + 1) % 3 - 1) * 18} ${cell.y - 42 - Math.floor((index + 1) / 3) * 8})`);
+        const slot = playerSlotOffset(index + 1);
+        element.setAttribute('transform', `translate(${cell.x + slot.x} ${cell.y + slot.y})`);
       }
     });
     // 本玩家：无论 position.cellId 是否滞后，都回落到权威 selfCellId 对应格。
@@ -377,11 +458,12 @@ export class InteractiveMapSurface {
 
   setPlayerDisplayPosition(playerId: string, x: number, y: number): void {
     this.displayedPlayerPositions.set(playerId, { x, y });
-    // 其他玩家带错位偏移（与 render/updatePlayers 的默认落格一致），self 精确落格，
+    // 其他玩家带同格错位偏移（与 render/updatePlayers 的默认落点一致），self 精确落格，
     // 使插值轨迹与静止时的错位位置一致，避免动画起始/结束的微小跳动。
     const idx = this.players.findIndex((player) => player?.id === playerId);
-    const tx = idx > 0 ? x + ((idx % 3) - 1) * 18 : x;
-    const ty = idx > 0 ? y - 42 - Math.floor(idx / 3) * 8 : y;
+    const slot = playerSlotOffset(idx);
+    const tx = x + slot.x;
+    const ty = y + slot.y;
     const player = Array.from(this.root.querySelectorAll('[data-player-id]'))
       .find((element) => element.getAttribute('data-player-id') === playerId);
     if (player) player.setAttribute('transform', `translate(${tx} ${ty})`);
@@ -415,13 +497,36 @@ export class InteractiveMapSurface {
       this.bounds.maxX - width / 2,
       Math.max(this.bounds.minX + width / 2, x)
     );
-    const centerY = Math.min(
+    // 先按地图边界夹紧（视图不越出地图），再把跟随目标拉回上下 HUD 栏的渐变覆盖带之内。
+    // 单靠边界夹紧时，位于地图上下边缘的玩家会被夹到画面边缘，连同所在格一起没入栏的渐变里。
+    let centerY = Math.min(
       this.bounds.maxY - height / 2,
       Math.max(this.bounds.minY + height / 2, y)
     );
+    const devY = this.safeVerticalDeviation(width, height);
+    centerY = Math.min(y + devY, Math.max(y - devY, centerY));
     svg.setAttribute(
       "viewBox",
       `${centerX - width / 2} ${centerY - height / 2} ${width} ${height}`
     );
+  }
+
+  /**
+   * 跟随目标允许偏离画面中心的纵向距离（viewBox 单位）。
+   *
+   * 顶栏/底栏是压在地图上的渐变带（高度取 CSS 令牌 --gp-topbar-h / --gp-actionbar-h），
+   * 目标贴到画面边缘时其所在格会落进渐变里，故把可用区域收掉两条栏的高度、
+   * 再扣除格子自身半高。容器未布局（jsdom / 隐藏）时无法换算像素，退回半屏，等同旧行为。
+   */
+  private safeVerticalDeviation(width: number, height: number): number {
+    const rect = this.root.getBoundingClientRect();
+    const scale = rect.width > 0 && rect.height > 0
+      ? Math.min(rect.width / width, rect.height / height)
+      : 0;
+    if (!(scale > 0)) return height / 2;
+    const topInset = readCssVarNumber(this.root, "--gp-topbar-h", 0);
+    const bottomInset = readCssVarNumber(this.root, "--gp-actionbar-h", 0);
+    const usableHalf = Math.min(rect.height / 2 - topInset, rect.height / 2 - bottomInset);
+    return Math.max(0, usableHalf / scale - RECT_HALF_H);
   }
 }

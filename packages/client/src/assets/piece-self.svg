@@ -1,0 +1,6 @@
+<svg width="60" height="66" viewBox="-30 -26 60 66" xmlns="http://www.w3.org/2000/svg">
+  <!-- 本玩家棋子：圆头 + 梯形身（三种角色语义各自独立的图像源，颜色仍由样式表按令牌驱动）
+       接入时按 <g> 解包使用（仅取图形子节点），避免嵌套 <svg> 视口在祖先变换下重栅格化 -->
+  <circle class="map-player__head" cx="0" cy="-4" r="12"/>
+  <path class="map-player__body" d="M-18 34 L-11 2 L11 2 L18 34 Z"/>
+</svg>

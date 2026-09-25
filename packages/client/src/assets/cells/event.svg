@@ -1,4 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="-9 -9 18 18">
-  <!-- 事件：四角星（随机事件/机会）。填充色由应用样式表按 .map-node__icon 驱动 -->
-  <path d="M0 -9 L2.2 -2.2 L9 0 L2.2 2.2 L0 9 L-2.2 2.2 L-9 0 L-2.2 -2.2 Z" />
-</svg>

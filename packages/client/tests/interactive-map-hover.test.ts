@@ -86,41 +86,37 @@ describe('InteractiveMapSurface hover/selfCellId 耦合', () => {
     expect(hovered).toEqual([4]);
   });
 
-  it('棋子由 piece.svg 模板渲染出 head/body（模板解析失败会静默丢失棋子）', () => {
+  it('棋子按角色语义取不同图像源：本玩家 / 队友 / 其他玩家轮廓不同', () => {
     const { mapData } = loadFixture();
     const surface = new InteractiveMapSurface();
-    surface.render(mapData, [playerAt(0)], []);
+    const self = { ...playerAt(0), teamId: 't1' } as Player;
+    const teammate = { ...playerAt(0), id: 'p2', username: 'p2', teamId: 't1' } as Player;
+    const other = { ...playerAt(0), id: 'p3', username: 'p3', teamId: null } as Player;
+    surface.render(mapData, [self, teammate, other], []);
+    const root = surface.getElement();
 
-    const icon = surface.getElement().querySelector('.map-player .map-player__icon');
-    expect(icon).toBeTruthy();
-    expect(icon?.querySelector('.map-player__head')).toBeTruthy();
-    expect(icon?.querySelector('.map-player__body')).toBeTruthy();
+    const roles = Array.from(root.querySelectorAll<SVGGElement>('.map-player')).map((g) => g.dataset.playerRole);
+    expect(roles).toEqual(['self', 'teammate', 'other']);
+
+    // 三种角色都由解包后的 <g> 模板渲染出 head/body，且图像源不同（head 标签各不相同）
+    const icons = Array.from(root.querySelectorAll('.map-player .map-player__icon'));
+    expect(icons).toHaveLength(3);
+    expect(icons.map((icon) => icon.querySelector('.map-player__head')?.tagName.toLowerCase()))
+      .toEqual(['circle', 'rect', 'path']);
+    for (const icon of icons) {
+      expect(icon.querySelector('.map-player__body')).toBeTruthy();
+      // 解包为 <g>：图标内不得出现嵌套 <svg> 视口
+      expect(icon.querySelector('svg')).toBeNull();
+    }
   });
 
-  it('8 种格子类型图标：每种类型节点渲染出独立 svg 解包后的图标', () => {
+  it('格子类型图标资源暂时留空：不渲染图标，也不抛错', () => {
     const { mapData } = loadFixture();
     const surface = new InteractiveMapSurface();
     surface.render(mapData, [playerAt(0)], []);
     const root = surface.getElement();
 
-    const knownTypes = new Set(['empty', 'event', 'supply', 'property', 'transport', 'investment', 'jail', 'monument']);
-    const nodes = Array.from(root.querySelectorAll<SVGGElement>('.map-node'));
-    expect(nodes.length).toBeGreaterThan(0);
-
-    let iconCount = 0;
-    for (const node of nodes) {
-      const type = Array.from(node.classList)
-        .map((cls) => (cls.startsWith('map-node--') ? cls.slice('map-node--'.length) : ''))
-        .find((candidate) => knownTypes.has(candidate));
-      if (!type) continue;
-      const icon = node.querySelector('.map-node__icon');
-      expect(icon).toBeTruthy();
-      // 解包为 <g>：图标内是图形子节点（而非嵌套 <svg> 视口）
-      expect(icon!.children.length).toBeGreaterThan(0);
-      expect(icon!.querySelector('svg')).toBeNull();
-      expect(icon!.getAttribute('transform')).toBe('translate(-50 0)');
-      iconCount++;
-    }
-    expect(iconCount).toBeGreaterThan(0);
+    expect(root.querySelectorAll('.map-node').length).toBeGreaterThan(0);
+    expect(root.querySelectorAll('.map-node__icon')).toHaveLength(0);
   });
 });

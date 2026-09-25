@@ -23,10 +23,13 @@
      线宽由主题令牌 dimension.line.map 驱动（--map-link-width） */
   --map-arrow-size: 22;
   --map-link-gap: 4;
-  /* 加载页几何与节奏（布局/行为常量，非主题身份） */
-  --loading-progress-height: 7px;
-  /* 进度填充过渡时长：CSS 过渡与 JS 最短停留共用，保证离场前填充动画已播完 */
-  --loading-progress-duration: 450ms;
+  /* HUD 上下栏高度（布局常量）：既是两条栏自身的几何，也是相机安全区的依据。
+     相机据此把跟随目标限制在两栏渐变覆盖带之内，避免玩家与所在格贴到画面边缘被渐变盖住，
+     故两处必须同源（改栏高只需改这里）。 */
+  --gp-topbar-h: 76px;
+  --gp-actionbar-h: 112px;
+  /* 加载页几何与节奏（布局/行为常量，非主题身份）。
+     进度条已移除：进度显示与填充条无法对齐，改为纯旋转指示 + 最短停留。 */
   --loading-spinner-size: 46px;
   --loading-spinner-border: 3px;
   /* 加载页最短停留（ms）：保证玩家能读完一条 tips 再跳转 */
@@ -289,25 +292,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   border-radius: 50%;
   animation: spin var(--motion-spin) linear infinite;
 }
-.progress-container {
-  width: 100%; display: grid;
-  grid-template-columns: 1fr auto; gap: 10px; align-items: center;
-}
-.progress-bar {
-  grid-column: 1 / -1; width: 100%; height: var(--loading-progress-height);
-  background: var(--auth-track);
-  border: 1px solid var(--auth-border); border-radius: var(--auth-radius);
-  overflow: hidden;
-  /* 填充进度由 LoadingPage 写入的 --progress 驱动（此前 JS 误写 style.width，填充层恒为 0%） */
-  --progress: 0%;
-}
-.progress-bar::after {
-  content: ""; display: block;
-  width: var(--progress, 0%); height: 100%;
-  background: var(--auth-accent);
-  transition: width var(--loading-progress-duration) ease-out;
-}
-.progress-text { color: var(--auth-accent); font-family: var(--font-num); font-weight: 700; font-size: 12px; justify-self: end; }
 
 /* ============================================================
    游戏页：全屏地图 + HUD 覆盖层
@@ -369,7 +353,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 /* 仅 2 种边框样式：默认（未持股 / 不能持股）与已持股高亮 */
 .map-node--held .map-node__shape { stroke: var(--region-accent); stroke-width: 4; }
 .map-node__type { fill: var(--region-label-fg); font-weight: 700; font-size: 13px; font-family: var(--font-func); letter-spacing: 0.14em; }
-.map-node__name { fill: var(--region-fg); font-weight: var(--font-title-weight, 900); font-size: 20px; font-family: var(--font-title); }
+.map-node__name { fill: var(--region-fg); font-weight: var(--font-title-weight, 900); font-size: 16px; font-family: var(--font-title); }
 /* 8 种格子类型图标（独立 SVG 资源，解包为 <g>）：单色，随类型标签同色 */
 .map-node__icon { fill: var(--region-label-fg); }
 
@@ -430,11 +414,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .game-hud-shell .gp-layout { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .game-hud-shell .gp-layout > * { pointer-events: auto; position: absolute; }
 
-/* 顶栏 / 底栏：半透明渐变贴在整屏地图上（全视野） */
+/* 顶栏 / 底栏：半透明渐变贴在整屏地图上（全视野）。
+   加强渐变以免和地图混在一层。 */
 .gp-topbar {
-  top: 0; left: 0; right: 0; height: 76px; z-index: 20;
+  top: 0; left: 0; right: 0; height: var(--gp-topbar-h); z-index: 20;
   display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 14px 18px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--gp-bar-bg) 25%, transparent) 0%, transparent 100%);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--gp-bar-bg) 60%, transparent) 0%,
+    color-mix(in srgb, var(--gp-bar-bg) 25%, transparent) 65%,
+    transparent 100%);
 }
 .region-status {
   display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; max-width: 52%;
@@ -442,19 +430,31 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   border-radius: var(--region-radius); background: var(--gp-surface);
 }
 .region-status__row { display: flex; align-items: center; gap: 8px; max-width: 100%; }
-.region-status__name,
-.region-status__value { white-space: nowrap; }
-.region-status__name { font-weight: 800; font-size: 12px; color: var(--gp-fg); }
-.region-status__value { color: var(--gp-muted); font-family: var(--font-num); }
+.region-status__name { white-space: nowrap; font-weight: 800; font-size: 12px; color: var(--gp-fg); }
 .region-status .cycle-indicator { padding-left: 7px; border-left: 1px solid var(--gp-border); }
+/* 榜单：纵向列表，每行一个玩家（名次 / 玩家名 / 分数），行数多时自身滚动。
+   顶部横线把榜单与上方区域名/时间分隔开（同一面板内的两段信息）。 */
 .region-status .leaderboard-panel {
-  display: block; max-width: 100%; color: var(--gp-muted); font-family: var(--font-num);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%; margin-top: 4px; padding-top: 4px;
+  border-top: 1px solid var(--gp-border);
+  max-height: 30vh; overflow-y: auto;
+  color: var(--gp-muted); font-family: var(--font-num); font-size: 11px;
 }
+.leaderboard-row { display: flex; align-items: baseline; gap: 6px; justify-content: flex-end; }
+.leaderboard-row__rank { min-width: 14px; text-align: right; color: var(--gp-accent); font-weight: 700; }
+.leaderboard-row__name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboard-row__score { color: var(--gp-fg); font-weight: 700; }
+/* 本玩家行：名次与名字一并高亮，便于在榜中定位自己 */
+.leaderboard-row--self .leaderboard-row__name,
+.leaderboard-row--self .leaderboard-row__score { color: var(--gp-accent); }
 .gp-actionbar {
-  bottom: 0; left: 0; right: auto; width: min(640px, calc(100vw - 32px)); height: 112px; z-index: 20;
+  bottom: 0; left: 0; right: 0;  height: var(--gp-actionbar-h); z-index: 20;
   display: flex; align-items: center; gap: 12px; padding: 0 18px;
-  background: linear-gradient(0deg, color-mix(in srgb, var(--gp-bar-bg) 25%, transparent) 0%, transparent 100%);
+  background: linear-gradient(0deg,
+    color-mix(in srgb, var(--gp-bar-bg) 70%, transparent) 0%,
+    color-mix(in srgb, var(--gp-bar-bg) 40%, transparent) 55%,
+    transparent 100%);
 }
 .gp-topbar .player-badge { margin-right: auto; }
 .gp-topbar .region-status { margin-left: auto; }
@@ -480,7 +480,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .value-pill--accent .value-pill__num { color: var(--gp-accent); }
 
 /* 底色呼吸（§3.7）：数值结算时，仅"发生变化的那个数值显示框"填充底色快速提亮再归位。
-   玩家数值 → 该字段的 .value-pill；区域繁荣度 → .region-status（由 HUD 写入 data-field 锚点）。
+   玩家数值与区域数值都落在各自字段的 .value-pill 上（由 HUD 写入 data-field 锚点）。
    用填充底色而非光环；仅本玩家结算触发。时长走 --motion-value-breathe（单点），JS 按同一令牌移除 class。 */
 @keyframes gp-value-breathe {
   0%, 100% { background-color: var(--gp-surface); }
@@ -659,14 +659,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   display: inline-flex; align-items: center; justify-content: center;
   font-weight: 800; font-size: 15px;
   padding: 11px 24px;
-  border: calc(var(--region-border-w) + 1px) solid var(--gp-border);
+  border: var(--region-border-w) solid var(--gp-border);
   border-radius: var(--region-radius);
-  background: var(--gp-card); color: var(--gp-muted);
+  background: var(--gp-card); color: var(--gp-fg);
   cursor: pointer; box-shadow: 2px 2px 0 var(--gp-border);
   overflow: hidden;
   transition: transform var(--motion-fast), box-shadow var(--motion-fast);
 }
-/* 底层：禁用/冷却观感（灰底灰字），正常流撑开按钮尺寸 */
+/* 底层：冷却/禁用观感，配色与 .act-btn 同源（card 底 + fg 字 + 同宽描边），
+   可用时由顶层强调色填充覆盖，避免与旁边行动按钮像是两套色板 */
 .dice-btn__face { position: relative; display: flex; align-items: center; gap: 6px; }
 /* 顶层：可用态观感，按 --cooldown 用 clip-path 从左向右揭示（无 blend、文字不反色） */
 .dice-btn__fill {
@@ -714,7 +715,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   .gp-topbar { height: 84px; padding: 16px 22px; }
   .gp-actionbar { height: 124px; padding: 0 22px; }
   .region-status__name { font-size: 13px; }
-  .region-status__value { font-size: 12px; }
   .player-badge__avatar { width: 26px; height: 26px; font-size: 11px; }
   .player-badge__name { font-size: 13px; }
   .player-badge__team { font-size: 10px; }
@@ -771,7 +771,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 /* 减少动效偏好 */
 @media (prefers-reduced-motion: reduce) {
   .dice-btn, .dice-btn__fill, .act-btn, .start-button, .confirm-button, .retry-button,
-  .username-input, .password-input, .progress-bar::after { transition: none; }
+  .username-input, .password-input { transition: none; }
   .fx-step-start, .fx-step-arrive, .fx-move-complete { animation: none; }
   .fx-value-breathe { animation: none; }
 }
