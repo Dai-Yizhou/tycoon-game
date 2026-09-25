@@ -50,12 +50,13 @@ const RECT_ICON_INSET = 16;
  * 按字号估算文本宽度：全角按字号、半角按 0.55 字号（保守估算，仅用于给矩形定宽）。
  * 格子名称过长时不再截断，而是据此把矩形拉长；估算需贴紧真实字宽，
  * 否则矩形会明显宽于文字（此前按整字宽估算 + 大内边距导致矩形过宽）。
+ * 用 charCodeAt 判全角而非 /[^\x00-\xff]/，避免控制字符正则触发 no-control-regex。
  */
 function estimateTextWidth(text: string, fontSize: number): number {
   const halfWidth = fontSize * 0.55;
   let total = 0;
-  for (const ch of text) total += /[^\x00-\xff]/.test(ch) ? fontSize : halfWidth;
-  return total;
+  for (const ch of text) total += ch.charCodeAt(0) > 0xff ? fontSize : halfWidth;
+  return total * 0.45;
 }
 
 /**
