@@ -50,7 +50,15 @@
     "dayNightChanged": "进入{{phase}}：{{region}} {{detail}}",
     "dayNightPhaseDay": "白昼",
     "dayNightPhaseNight": "夜晚",
-    "investmentEventTriggered": "投资项目「{{cell}}」响应事件 {{event}}：{{detail}}"
+    "investmentEventTriggered": "投资项目「{{cell}}」响应事件 {{event}}：{{detail}}",
+    "bankruptTriggered": "{{player}} 破产（{{reason}}）",
+    "bankruptTriggeredDetail": "{{player}} 破产（{{reason}}）：{{detail}}",
+    "bankruptFieldDetail": "{{field}} {{previous}} → {{current}}（下限 {{min}}）",
+    "bankruptReason": {
+      "negative_net_worth": "数值触底",
+      "debt_overdue": "债务逾期",
+      "manual": "手动触发"
+    }
   },
   "game": {
     "title": "rentfree.io",
@@ -170,6 +178,8 @@
   "bankruptcy": {
     "title": "破产",
     "bankrupt": "你已破产。资产已清零，请使用地图初始值重新开始。",
+    "causeTitle": "触发原因",
+    "causeField": "{{field}}：{{previous}} → {{current}}（下限 {{min}}）",
     "restart": "使用地图初始值重新开始",
     "playerNotFound": "破产玩家不存在"
   },

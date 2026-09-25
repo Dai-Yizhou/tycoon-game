@@ -1,6 +1,7 @@
-import { DomainEvents, PlayerStatus, isBankruptcyCheckable, type DomainEvent } from '@game/shared';
+import { DomainEvents, PlayerStatus, getLocale, isBankruptcyCheckable, t, type BankruptFieldTrigger, type DomainEvent } from '@game/shared';
 import type { GameWorld } from '../world/GameWorld.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
+import { broadcastSystemMessage } from '../net/systemChat.js';
 import type { Taxation } from './Taxation.js';
 
 export interface BankruptcyRecord {
@@ -9,6 +10,8 @@ export interface BankruptcyRecord {
   bankruptcyTime: number;
   reason: 'negative_net_worth' | 'debt_overdue' | 'manual';
   netWorthAtBankruptcy: number;
+  /** 触发破产的数值字段明细，便于事后追溯 */
+  triggeredFields: BankruptFieldTrigger[];
 }
 
 export type BankruptcyConfig = Record<string, never>;
@@ -43,15 +46,33 @@ export class Bankruptcy {
 
   private readonly onPlayerUpdated = ({ player }: { player: import('@game/shared').Player }): void => {
     const previous = this.previousValues.get(player.id) ?? this.snapshotValues(player);
-    const reachedFloor = Object.values(player.values).some((field) => {
+    const triggers: BankruptFieldTrigger[] = [];
+    for (const field of Object.values(player.values)) {
       const minimum = field.min ?? Number.NEGATIVE_INFINITY;
-      return (previous[field.id] ?? field.current) > minimum && field.current <= minimum;
-    });
+      const before = previous[field.id] ?? field.current;
+      // 内测口径：经济操作一律把数值钳在 min 之上，玩家无法负债，
+      // 因此「跨过 min 触底」即破产。起始值本就等于 min 时不触发（before > min 不成立）。
+      if (before > minimum && field.current <= minimum) {
+        triggers.push({ fieldId: field.id, fieldName: this.resolveFieldName(player, field.id), previous: before, current: field.current, min: minimum });
+      }
+    }
     this.previousValues.set(player.id, Object.fromEntries(Object.values(player.values).map((field) => [field.id, field.current])));
-    if (isBankruptcyCheckable(player.status) && reachedFloor) {
-      this.triggerBankruptcy(player.id, 'negative_net_worth');
+    if (isBankruptcyCheckable(player.status) && triggers.length > 0) {
+      this.triggerBankruptcy(player.id, 'negative_net_worth', triggers);
     }
   };
+
+  /** 字段显示名：优先取地图数值字段定义，其次取玩家身上已有的名称，最后回退字段 ID */
+  private resolveFieldName(player: import('@game/shared').Player, fieldId: string): string {
+    const locale = getLocale();
+    const definition = this.world.getMapMeta()?.valueFieldDefinitions.find((item) => item.id === fieldId);
+    const localized = definition?.name as Record<string, string> | undefined;
+    if (localized) {
+      return localized[locale] ?? localized['zh-CN'] ?? localized['en-US'] ?? fieldId;
+    }
+    const own = player.values[fieldId]?.name;
+    return typeof own === 'string' && own.length > 0 ? own : fieldId;
+  }
 
   constructor(io: TypedServer, world: GameWorld, taxation: Taxation, _config: BankruptcyConfig = DEFAULT_BANKRUPTCY_CONFIG) {
     this.io = io;
@@ -62,7 +83,7 @@ export class Bankruptcy {
     for (const player of this.world.getAllPlayers()) this.onPlayerAdded({ player });
   }
 
-  triggerBankruptcy(playerId: string, reason: 'negative_net_worth' | 'debt_overdue' | 'manual'): BankruptcyResult {
+  triggerBankruptcy(playerId: string, reason: 'negative_net_worth' | 'debt_overdue' | 'manual', triggeredFields: BankruptFieldTrigger[] = []): BankruptcyResult {
     const player = this.world.getPlayer(playerId);
     if (!player) return { success: false, error: '玩家不存在' };
     if (player.status === PlayerStatus.Bankrupt) return { success: false, error: '玩家已破产' };
@@ -75,6 +96,7 @@ export class Bankruptcy {
       bankruptcyTime,
       reason,
       netWorthAtBankruptcy: Object.values(player.values).reduce((total, field) => total + Math.max(0, field.current), 0),
+      triggeredFields,
     };
 
     this.taxation.clearTaxRecords(playerId);
@@ -85,9 +107,31 @@ export class Bankruptcy {
     this.world.saveSnapshot(this.taxation.getAllTaxRecords(), {});
     this.bankruptcyRecords.set(playerId, record);
 
-    this.io.emit('server.playerBankrupt', { playerId, bankruptcyId, bankruptcyTime, reason, netWorthAtBankruptcy: record.netWorthAtBankruptcy });
+    this.io.emit('server.playerBankrupt', { playerId, bankruptcyId, bankruptcyTime, reason, netWorthAtBankruptcy: record.netWorthAtBankruptcy, triggeredFields });
+    this.broadcastBankruptcyMessage(player.username, reason, triggeredFields);
     this.domainEventDispatcher?.(DomainEvents.ShareholderBankrupt);
     return { success: true, bankruptcyId };
+  }
+
+  /**
+   * 破产可观测性：向聊天框广播系统消息，说明触发原因与触底字段
+   *
+   * 内测口径下经济操作无法把数值扣到 min 以下，玩家负债不可能发生，
+   * 因此破产只由「数值触底」引起；把具体字段与前后值播出来，用户实测时
+   * 可直接从聊天框读出是哪一步操作把人打到破产。
+   */
+  private broadcastBankruptcyMessage(username: string, reason: BankruptcyRecord['reason'], triggeredFields: BankruptFieldTrigger[]): void {
+    const reasonLabel = t(`server.bankruptReason.${reason}`);
+    const separator = t('server.amountSeparator');
+    const detail = triggeredFields
+      .map((field) => t('server.bankruptFieldDetail', { field: field.fieldName, previous: field.previous, current: field.current, min: field.min }))
+      .join(separator);
+    broadcastSystemMessage(
+      this.io,
+      detail
+        ? t('server.bankruptTriggeredDetail', { player: username, reason: reasonLabel, detail })
+        : t('server.bankruptTriggered', { player: username, reason: reasonLabel }),
+    );
   }
 
   setOwnershipChangedHandler(handler: (playerId: string, guest: boolean) => void): void {

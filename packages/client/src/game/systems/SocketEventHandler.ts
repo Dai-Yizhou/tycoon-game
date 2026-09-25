@@ -138,7 +138,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   socket.on('server.playerBankrupt', (payload) => {
     if (payload.playerId === store.getSnapshot().currentPlayer?.id) {
       store.applyEvent({ sequence: store.nextSequence(), type: 'status', playerId: payload.playerId, status: 'bankrupt' });
-      options.controller?.setBankrupt();
+      options.controller?.setBankrupt(payload.triggeredFields ?? []);
     }
     refresh();
   });

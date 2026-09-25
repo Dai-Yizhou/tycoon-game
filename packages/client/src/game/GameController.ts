@@ -9,7 +9,7 @@
  */
 
 import type { TypedClientSocket } from '../hooks/useSocket.js';
-import type { LeaderboardSnapshot, LoginResponse, Player } from '@game/shared';
+import type { LeaderboardSnapshot, LoginResponse, Player, BankruptFieldTrigger } from '@game/shared';
 import { AuthSession } from '../auth/AuthSession.js';
 
 export type GameState = 'start' | 'login' | 'loading' | 'game' | 'bankruptcy';
@@ -54,6 +54,8 @@ export class GameController {
   private container: HTMLElement;
   private socket: TypedClientSocket | null = null;
   private readonly authSession: AuthSession;
+  /** 破产触发字段明细（server.playerBankrupt 载荷），破产页据此展示专属提示 */
+  private bankruptcyTriggers: BankruptFieldTrigger[] = [];
 
   constructor(container: HTMLElement, authSession: AuthSession = new AuthSession()) {
     this.container = container;
@@ -214,9 +216,17 @@ export class GameController {
     this.notifyListeners();
   }
 
-  setBankrupt(): void {
+  setBankrupt(triggers: BankruptFieldTrigger[] = []): void {
+    this.bankruptcyTriggers = triggers;
     if (this.context.player) this.context.player.status = 'bankrupt';
     this.setState('bankruptcy');
+  }
+
+  /**
+   * 破产触发字段明细（来自 server.playerBankrupt），供破产页展示专属提示
+   */
+  getBankruptcyTriggers(): BankruptFieldTrigger[] {
+    return this.bankruptcyTriggers;
   }
 
   setRestarted(player: Player): void {

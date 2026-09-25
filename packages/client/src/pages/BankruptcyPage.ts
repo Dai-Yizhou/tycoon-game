@@ -8,6 +8,26 @@ export function createBankruptcyPage(controller: GameController): HTMLElement {
   title.textContent = t('bankruptcy.title');
   const message = document.createElement('p');
   message.textContent = t('bankruptcy.bankrupt');
+  const triggers = controller.getBankruptcyTriggers();
+  const cause = document.createElement('div');
+  cause.className = 'bankruptcy-cause';
+  cause.style.display = triggers.length > 0 ? 'block' : 'none';
+  if (triggers.length > 0) {
+    const causeTitle = document.createElement('h2');
+    causeTitle.textContent = t('bankruptcy.causeTitle');
+    const causeList = document.createElement('ul');
+    for (const trigger of triggers) {
+      const item = document.createElement('li');
+      item.textContent = t('bankruptcy.causeField', {
+        field: trigger.fieldName,
+        previous: trigger.previous,
+        current: trigger.current,
+        min: trigger.min,
+      });
+      causeList.appendChild(item);
+    }
+    cause.append(causeTitle, causeList);
+  }
   const user = controller.getAuthSession().getUser();
   const usernameInput = document.createElement('input');
   usernameInput.type = 'text';
@@ -46,7 +66,7 @@ export function createBankruptcyPage(controller: GameController): HTMLElement {
       message.textContent = error instanceof Error ? error.message : t('bankruptcy.playerNotFound');
     }
   };
-  page.append(title, message, usernameInput, button);
+  page.append(title, message, cause, usernameInput, button);
   controller.getContainer().appendChild(page);
   return page;
 }

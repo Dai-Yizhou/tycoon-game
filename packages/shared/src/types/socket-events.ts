@@ -41,6 +41,26 @@ import type { Team, TeamInvite, TeamMemberView } from './team.js';
 import type { LeaderboardSnapshot } from './leaderboard.js';
 import type { AchievementSnapshot } from './achievement.js';
 
+/**
+ * 触发破产的单个数值字段明细
+ *
+ * 内测口径：任何经济操作都把数值钳在 `min` 之上，玩家不可能负债，
+ * 因此「数值 ≤ min」即视为破产。该结构用于向客户端与聊天框说明
+ * 究竟是哪个字段触底，提供可观测性。
+ */
+export interface BankruptFieldTrigger {
+  /** 字段 ID（如 money） */
+  fieldId: string;
+  /** 字段显示名（按服务端当前语言回退后的文本） */
+  fieldName: string;
+  /** 触发前值 */
+  previous: number;
+  /** 触发后值（已达到或低于下限） */
+  current: number;
+  /** 该字段的下限 */
+  min: number;
+}
+
 // ---------------------------------------------------------------------------
 // 共用负载（Payloads）
 // ---------------------------------------------------------------------------
@@ -285,6 +305,8 @@ export interface ServerToClientEvents {
     bankruptcyTime?: number;
     reason?: string;
     netWorthAtBankruptcy?: number;
+    /** 触发破产的数值字段明细（达到下限），供客户端展示专属提示 */
+    triggeredFields?: BankruptFieldTrigger[];
   }) => void;
 
   'server.playerRestarted': (payload: {

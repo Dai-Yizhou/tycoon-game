@@ -72,6 +72,42 @@ describe('bankruptcy socket authority', () => {
     bankruptcy.cleanup();
   });
 
+  test('数值触底时广播破产系统消息并携带触发字段', () => {
+    const world = new GameWorld();
+    const map = [{ id: 0, x: 0, y: 0, type: 'property', name: { 'zh-CN': '地产', 'en-US': 'Property' }, description: { 'zh-CN': '', 'en-US': '' }, destinations: [], teleportDestinations: [], theme: 'northeast', regionId: 'r1', timezone: 0, extra: {} }] as any;
+    world.loadMap(map, {
+      id: 'test',
+      version: '1',
+      name: { 'zh-CN': '测试', 'en-US': 'Test' },
+      valueFieldDefinitions: [{ id: 'money', name: { 'zh-CN': '财产', 'en-US': 'Money' }, scope: 'player', min: 0 }],
+      uct: { player: ['money'], region: [] },
+      playerInitial: { player: { money: 200 } },
+      startCellId: 0,
+      regions: [{ id: 'r1', name: { 'zh-CN': '区域', 'en-US': 'Region' }, initial: { region: {} } }],
+      dayNightCycle: 15,
+      dice: { cooldownMs: 1000, min: 1, max: 6 },
+      tax: { baseTax: { rates: { player: {} }, taxInterval: 1000 }, shareTax: { rates: { player: {} }, taxInterval: 1000 } },
+    } as any);
+    const player = buildPlayer();
+    player.values = { money: { id: 'money', name: '财产', current: 200, min: 0 } };
+    world.addPlayer(player);
+    const emit = jest.fn();
+    const bankruptcy = new Bankruptcy({ emit } as unknown as TypedServer, world, { clearTaxRecords: jest.fn(), getAllTaxRecords: jest.fn(() => new Map()) } as any);
+
+    player.values.money.current = 0;
+    world.updatePlayer(player);
+
+    const chat = emit.mock.calls.find(([event]) => event === 'server.chat');
+    expect(chat?.[1].message.channel).toBe('system');
+    expect(chat?.[1].message.content).toBe('player-1 破产（数值触底）：财产 200 → 0（下限 0）');
+    const bankruptEvent = emit.mock.calls.find(([event]) => event === 'server.playerBankrupt');
+    expect(bankruptEvent?.[1].triggeredFields).toEqual([
+      { fieldId: 'money', fieldName: '财产', previous: 200, current: 0, min: 0 },
+    ]);
+    expect(world.getPlayer('player-1')?.status).toBe(PlayerStatus.Bankrupt);
+    bankruptcy.cleanup();
+  });
+
   test('delegates bankruptRestart to the injected Bankruptcy instance', () => {
     const world = new GameWorld(); world.addPlayer(buildPlayer());
     const bankruptcy = { restartBankruptPlayer: jest.fn(() => ({ success: true })) };

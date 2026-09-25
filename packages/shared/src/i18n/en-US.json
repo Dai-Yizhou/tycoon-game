@@ -50,7 +50,15 @@
     "dayNightChanged": "{{phase}} begins: {{region}} {{detail}}",
     "dayNightPhaseDay": "Daytime",
     "dayNightPhaseNight": "Night",
-    "investmentEventTriggered": "Investment \"{{cell}}\" reacted to event {{event}}: {{detail}}"
+    "investmentEventTriggered": "Investment \"{{cell}}\" reacted to event {{event}}: {{detail}}",
+    "bankruptTriggered": "{{player}} went bankrupt ({{reason}})",
+    "bankruptTriggeredDetail": "{{player}} went bankrupt ({{reason}}): {{detail}}",
+    "bankruptFieldDetail": "{{field}} {{previous}} → {{current}} (floor {{min}})",
+    "bankruptReason": {
+      "negative_net_worth": "value hit the floor",
+      "debt_overdue": "debt overdue",
+      "manual": "manual trigger"
+    }
   },
   "game": {
     "title": "rentfree.io",
@@ -170,6 +178,8 @@
   "bankruptcy": {
     "title": "Bankruptcy",
     "bankrupt": "You are bankrupt. Assets were cleared; restart with the map's initial values.",
+    "causeTitle": "Trigger",
+    "causeField": "{{field}}: {{previous}} → {{current}} (floor {{min}})",
     "restart": "Restart with map initial values",
     "playerNotFound": "Bankrupt player not found"
   },

@@ -221,6 +221,14 @@ describe('Pages', () => {
       expect(mockContainer.contains(page)).toBe(true);
       expect(page.querySelector('h1')?.textContent).toBe('破产');
     });
+
+    test('破产页面展示触发字段明细（专属提示）', () => {
+      controller.setBankrupt([{ fieldId: 'money', fieldName: '财产', previous: 200, current: 0, min: 0 }]);
+      const page = createBankruptcyPage(controller);
+
+      expect(page.querySelector('.bankruptcy-cause h2')?.textContent).toBe('触发原因');
+      expect(page.querySelector('.bankruptcy-cause li')?.textContent).toBe('财产：200 → 0（下限 0）');
+    });
   });
 
   describe('GamePage', () => {
