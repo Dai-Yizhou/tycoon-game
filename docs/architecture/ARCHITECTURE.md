@@ -1,6 +1,6 @@
 # 当前运行时架构
 
-> 本文以 2026-08-14 工作目录中的源码和 package scripts 为准。只描述 `packages/shared`、`packages/server`、`packages/client` 三个运行时包。历史/规格文档保留原有历史语义，但不作为运行时事实。
+> 本文以 2026-09-25 工作目录中的源码和 package scripts 为准。只描述 `packages/shared`、`packages/server`、`packages/client` 三个运行时包。历史/规格文档保留原有历史语义，但不作为运行时事实。
 
 ## 一页概览
 
@@ -72,7 +72,6 @@ io.on('connection', socket)
      -> JailHandler / InvestmentHandler
      -> TransportHandler / MonumentHandler / TeamHandler
      -> chat / bankruptcy restart
-     -> debugHandler（仅调试开关满足时）
   -> admin-only settlement entrypoints remain outside the player protocol
 ```
 
@@ -144,6 +143,17 @@ InteractiveMapSurface：每个格子 <g> 的 mouseenter / tap
 - `packages/shared/src/types/economy-rules.ts` 提供跨包状态判定：Normal 与 Frozen 参与经济，Jail 与 Bankrupt 不参与；客户端只消费状态，不自行结算经济。
 - 队伍只维护成员关系与只读成员视图，不设队长经济、共同钱包或团队产权。合租持股仍按玩家身份结算。
 
+## 数值调节系统（value modifiers）
+
+地图可通过 `map-meta.json` 的全局 `valueModifiers` 规则表，让经济字段随世界/玩家/区域/目标格状态联动，不引入通用表达式引擎。
+
+- 解释器纯函数落在 `packages/shared/src/value-modifiers/`（`types` / `refs` / `eval` / `context` / `parse`），两端同构、确定性。AST 为统一前缀 node：字面量数字、`{ "$ref": "<path>" }`、`{ "$op": "<op>", "args": [node…] }`；运算符为闭合集合（算术 + 小型条件）。
+- 取值一律走 refs：自指保留字 `base`（目标字段写入前的静态值）、`player.uct.<field>`、`team.uct.<field>`（成员该字段算术均值）、`team.memberCount`、`region.uct.<field>`、`region.time`、`curCell.level`、`curCell.ownerCount`。UCT 读取必须钻子字段得 number。
+- **覆盖语义**：`calc` 结果为覆盖而非增量；UCT 字段按子字段合并，`calc` 显式列出的子字段替换、未列出的子字段保持 base 原值（不归零）。要增量须在表达式内显式 `add(base, …)`。
+- `scope` 仅 `cellType` + `base`（base 为静态配置字段名）；同一 base 多条规则由加载期 lint 拒绝。lint 在 `map-meta-loader` 接入 `validateMapMeta`，失败即阻断地图加载。
+- 变更类数值（购买实付、租金、升级费、传送费、保释金、修复费、投资 delta）在结算/购买时刻 resolve **一次并固定**，随 ack 返回实付额；展示类按当前上下文 resolve。客户端以同一解释器做乐观预览，服务端 ack 校正。
+- behavior 仅存在于 `supply` / `event` 两类**无 base** 的格子，与 value modifiers 不共享字段、不叠加，无生效顺序冲突。
+
 ## 删除边界
 
 - item、talent 未实现；achievement 已作为现行系统实现（见下）。
@@ -158,7 +168,6 @@ InteractiveMapSurface：每个格子 <g> 的 mouseenter / tap
 
 - `GameStore` 是客户端**唯一**业务快照源，全客户端仅一份实例，属硬约束：`SocketEventHandler.registerSocketHandlers` 的 `store` 为必填参数、禁止内部实例化默认实例；`GameViewModel`/`cellDisplayModel` 仅为只读投影，不再作为经济业务状态写入口。
 - 客户端经济数值投影遵循服务端绝对值覆写契约：`server.valueChanged` 广播 `current`（当前值）+ `delta:0`，客户端对该字段直接覆写、不累加，不做本地结算写入口。
-- 客户端 `SocketEventHandler.ts` 残留 `console.warn('[DBG-*]')` 调试日志，Beta 上线前应移除。
 - `server.notification` 无集中通知管理器：由各 handler 就地 `emit`（见事件/地产/交通/监狱/纪念碑 handler），认证/持久化能力以 `app.ts` 注册为准；通知载荷一致性与限频为已知收敛点。
 - `REDIS_URL` 在配置类型和文档中存在，当前 app 未建立 Redis 适配器；不能描述为已实现多实例同步。
 - 客户端缺低频一致性兜底（`client.heartbeat` 摘要 / `server.resyncDomain` 定向域重拉）**尚未实现**；当前重连靠重复 `login` 拉权威快照对账。已明确**不采用版本号/gap-resync** 方案，后续若引入心跳对账，仅在摘要不一致时补发对应域。

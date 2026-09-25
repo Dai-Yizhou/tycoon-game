@@ -31,6 +31,7 @@
 - 昼夜循环（DayNightCycle）、时区（TimeZoneManager）、昼夜驱动的区域 UCT 数值变化（DayNightValueChange）。
 - 行为事件引擎（BehaviorEngine，供供给格/事件格落地行为）。
 - 区域繁荣度：由 `regionValues` / 数值字段定义动态驱动，无硬编码字段。
+- 数值调节系统：`map-meta.json` 的全局 `valueModifiers` 规则表，经 `@game/shared` 的纯解释器两端同构求值，在结算/购买时刻 resolve 一次并固定；数值变更统一经 `src/net/valuePublisher.ts` 按域广播绝对值。
 - 成就系统（六类触发：visitCells / completeEvents / uctThreshold / ownedCells / purchasedCells / ranking；Mongo / 文件存储；owner 级并发串行化；解锁通知经 Socket 下发）。
 - 实时榜单（LeaderboardManager，区域数值与玩家更新标记脏、正式刷新后广播）。
 - 反馈 `/report`（清洗、限长、限频、结构化日志）。
@@ -70,4 +71,4 @@ docs/player/      玩家操作指南
 
 离线与经济状态规则：Frozen 仅为连接状态；离线不能主动操作，队伍不解散，地产和投资继续参与收租、计税、投资收益和破产检查。Bankrupt 清算全部经济资产并保留 teamId；只有显式 `bankruptRestart` 才按地图初始值重开。
 
-地图经济参数入口为 `packages/server/map-meta.json` 的 `config.taxConfig`；税率使用小数比例，必须同时填写三个税率、两个免税阈值和 `taxInterval`。编辑器入口及字段约束见 `config_editors/map_editor_v01.01/instruction.txt`。
+地图经济参数入口为 `packages/server/map-meta.json` 的 `config.taxConfig`；税率使用小数比例，必须同时填写三个税率、两个免税阈值和 `taxInterval`。地图级数值调节规则（`valueModifiers`）同在该文件声明，字段约束见 [架构文档](docs/architecture/ARCHITECTURE.md) 的“数值调节系统”。

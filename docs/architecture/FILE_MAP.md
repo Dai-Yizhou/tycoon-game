@@ -1,6 +1,6 @@
 # 当前文件地图
 
-> 基于 2026-08-14 工作目录实际文件。路径均相对仓库根目录；只列运行时三包和相关文档。历史/规格文档中的文件名和功能描述不代表当前运行时。
+> 基于 2026-09-25 工作目录实际文件。路径均相对仓库根目录；只列运行时三包和相关文档。历史/规格文档中的文件名和功能描述不代表当前运行时。
 
 ## 顶层
 
@@ -31,6 +31,9 @@
 | `packages/shared/src/map/path-finder.ts` | 沿 destinations 查路径/邻居 | 服务端移动 |
 | `packages/shared/src/map/map-loader.ts` / `map-meta-loader.ts` | 地图与元数据加载/解析 | parser 外层 |
 | `packages/shared/src/debug/index.ts` | DEBUG_FLAGS 和功能开关 | server/client 调试门控 |
+| `packages/shared/src/daynight/index.ts`、`phase.ts` | 昼夜相位与 `dayRatio` 纯函数（全局进度 + 时区偏移 → 本地相位） | 两端同口径；server `TimeZoneManager`、client HUD 与 cell 求值 |
+| `packages/shared/src/value-modifiers/`（`types`/`refs`/`eval`/`context`/`parse`/`index`） | 数值调节 AST 类型、refs 表、解释器与 `resolveField`、ref 读取器、加载期 lint | server handler 结算与 client 乐观预览同构；map-meta 校验接入 |
+| `packages/shared/src/chat/commandParser.ts` | 斜杠指令解析 | server ChatManager、client 聊天输入 |
 | `packages/shared/src/i18n/index.ts`、`zh-CN.json`、`en-US.json` | 翻译与语言资源 | 客户端界面 |
 | `packages/shared/package.json` | CJS/ESM 构建出口与 build/lint/test scripts | 独立构建包 |
 
@@ -48,6 +51,9 @@
 | `packages/server/src/utils/logger.ts` | 分级日志 | 全服务端 |
 | `packages/server/src/transport/SocketManager.ts` | Socket 类型、连接、login/ping、限流、玩家绑定、房间广播和世界事件转发 | app 创建；持有 world/io |
 | `packages/server/src/transport/handlers.ts` | HandlerRegistry，按 socket 注册业务 handlers、统一错误处理 | app 创建；连接时调用 |
+| `packages/server/src/net/valuePublisher.ts` | 数值变更唯一发射点：按域广播**绝对值**（`current` + `delta:0`） | 各 handler 与 EconomyService 消费 |
+| `packages/server/src/net/systemChat.ts` | 系统聊天消息发送辅助 | 计税/收租/昼夜/投资钩子等 |
+| `packages/server/src/auth/AuthService.ts`、`JWTService.ts`、`authRoutes.ts` | 游客/正式账号、JWT、游客转正（不改用户 ID）、REST 鉴权路由 | app 注册路由；SocketManager 登录 |
 
 ### 世界、周期与存储
 
@@ -83,7 +89,6 @@
 | `src/team/TeamManager.ts`、`src/handlers/teamHandler.ts` | 队伍纯数据与 Socket 协议 |
 | `src/chat/ChatManager.ts`、`FeedbackManager.ts` | 聊天消息、频道状态与反馈 `/report`（清洗/限长/限频/结构化日志） |
 | `server.notification`（由各 handler 直发） | 通知类事件由事件/地产/交通/监狱/纪念碑等 handler 就地 `emit`，无集中通知管理器 |
-| `src/handlers/debugHandler.ts` | debug flags 开启时的调试请求 |
 
 ### 数据文件
 
@@ -103,7 +108,8 @@
 | `src/game/GameController.ts` | start/login/loading/game 状态机和 socket 引用 |
 | `src/pages/LoadingPage.ts` | 创建唯一 Socket、连接、login、把结果交给 controller |
 | `src/pages/GamePage.ts` | 游戏页组合根；初始化地图、Store、HUD、渲染器和事件订阅 |
-| `src/pages/StartPage.ts`、`LoginPage.ts`、`LoadingPage.ts`、`GamePage.ts` | 页面工厂与清理 |
+| `src/pages/StartPage.ts`、`LoginPage.ts`、`LoadingPage.ts`、`GamePage.ts`、`BankruptcyPage.ts` | 页面工厂与清理 |
+| `src/auth/AuthSession.ts`、`authApi.ts` | 会话身份水合与 REST 鉴权请求 |
 | `src/hooks/useSocket.ts` | typed socket 创建、连接等待和心跳 |
 
 ### 状态、事件与渲染
@@ -120,9 +126,13 @@
 | `src/game/systems/MovementSystem.ts` | 服务端移动路径/单步插值，供 GamePage 的 RAF 循环驱动棋子移动动画与岔路选择界面 |
 | `src/game/systems/ChatSystem.ts`、`TeamSystem.ts`、`TutorialSystem.ts`、`GameLogic.ts` | 对应请求/投影/引导逻辑 |
 | `src/game/cellDisplayModel.ts` | 纯展示模型：UCT 按 Player/Region 分组格式化与 cell-hover 字段边界 |
-| `src/game/cellActionResolver.ts` | 纯动作解析器：act-bar 动作 ID/可见性/可负担性投影（静态 `cell.price`，无倍率） |
+| `src/game/cellActionResolver.ts` | 纯动作解析器：act-bar 动作 ID/可见性/可负担性投影（服务端权威价 + value modifier 预览） |
+| `src/game/timezone.ts` | 解析格子 `timezone` 偏移（分钟）；兼容时区 ID 字符串与旧配置 |
+| `src/game/i18n.ts` | 客户端文案绑定与本地化辅助 |
+| `src/game/EffectController.ts`、`GameEffects.ts` | 视效开关（localStorage 持久化）与视效钩子接口（默认 NoOp） |
+| `src/design/DesignAdapter.ts`、`ThemeConfig.ts`、`ThemeTokensLoader.ts` | 主题令牌注入 CSS 变量、主题配置与令牌加载 |
 
-`packages/client/public/config/behaviors/` 是客户端可读行为副本。旧 HUD、部分 hooks 和历史文档引用的文件若不在上述当前树中，不得补写为现行文件。`ai-bot` 与 `ai_bot_try` 不在本次运行时文件地图和清理边界内。
+旧 HUD、部分 hooks 和历史文档引用的文件若不在上述当前树中，不得补写为现行文件。`ai-bot` 与 `ai_bot_try` 不在本次运行时文件地图和清理边界内。
 
 ## 验证入口
 

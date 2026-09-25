@@ -6,15 +6,19 @@ Node.js + Express + Socket.IO 服务端。`src/index.ts:bootstrap()` 调用 `src
 
 | 路径 | 职责 |
 |---|---|
-| `src/world/` | GameWorld、PlayerManager、昼夜、时区、繁荣度 |
-| `src/handlers/` | 掷骰、移动、地产、起点、监狱、投资、交通、纪念碑、组队和调试处理器 |
-| `src/events/` | 事件注册、模板与效果 |
-| `src/behavior/` | 从 `config/behaviors/*.json` 执行格子行为 |
+| `src/world/` | GameWorld、PlayerManager、昼夜（DayNightCycle / DayNightValueChange）、时区（TimeZoneManager） |
+| `src/handlers/` | 掷骰、移动、地产、监狱、投资、交通、纪念碑、组队处理器 |
+| `src/economy/` | 计税、破产清算、持股/合租模型与经济操作守卫、EconomyService 数值中枢 |
+| `src/events/`、`src/behavior/` | 事件格分发；从地图同级 `behaviors/*.json` 执行格子行为 |
 | `src/transport/` | SocketManager 与 HandlerRegistry |
-| `src/storage/` | PlayerStore、EraStore 及内存/Mongo 实现 |
+| `src/net/` | `valuePublisher`（数值变更唯一发射点，按域广播绝对值）与 `systemChat` |
+| `src/auth/` | 游客/正式账号、JWT、游客转正与鉴权路由 |
+| `src/state/` | 世界运行时状态聚合与存储 |
+| `src/storage/` | WorldStore / UserStore 及 Mongo / 文件 / 内存实现（玩家状态统一经世界快照持久化） |
 | `src/team/`、`src/chat/` | 队伍、聊天模块 |
-| `src/achievement/` | 成就配置加载、管理器与存储（Mongo/内存） |
-| `map.json`、`map-meta.json` | 棋盘和地图元数据 |
+| `src/achievement/` | 成就配置加载、管理器与存储（Mongo/文件/内存） |
+| `src/ranking/` | LeaderboardManager 榜单脏标记与正式刷新广播 |
+| `map.json`、`map-meta.json`、`behaviors/` | 棋盘、地图元数据与行为配置 |
 
 Socket 注册点是 `app.ts` 的 `io.on('connection')`：先注册 SocketManager 核心连接处理，再调用 HandlerRegistry 注册业务 handler。协议定义在 `@game/shared`。
 

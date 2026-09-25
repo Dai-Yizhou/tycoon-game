@@ -6,6 +6,9 @@
 
 - `src/types/`：玩家、格子、地图元数据、队伍、聊天、交通、事件、时代、认证、服务端配置和 Socket.IO typed events。
 - `src/map/`：地图 JSON/元数据解析、MapIndex 和路径查找。
+- `src/value-modifiers/`：数值调节 AST 类型、refs 表、解释器与 `resolveField`、ref 读取器与加载期 lint（两端同构）。
+- `src/daynight/`：昼夜相位与 `dayRatio` 纯函数（全局进度 + 时区偏移 → 本地相位）。
+- `src/chat/`：斜杠指令解析。
 - `src/i18n/`：中英文语言包和 `setLocale`、`getLocale`、`t`。
 - `src/debug/`：`DEBUG_FLAGS`、功能开关和通配符匹配。
 

@@ -1,6 +1,6 @@
 # @game/client
 
-Vite + TypeScript + SVG 客户端。入口是 `src/main.ts`，页面状态链为 `StartPage → LoginPage → LoadingPage → GamePage`。
+Vite + TypeScript + SVG 客户端。入口是 `src/main.ts`，页面状态链为 `StartPage → LoginPage → LoadingPage → GamePage`（破产时进入 `BankruptcyPage`）。
 
 ## 当前链路
 
@@ -17,12 +17,15 @@ Vite + TypeScript + SVG 客户端。入口是 `src/main.ts`，页面状态链为
 |---|---|
 | `src/main.ts` | 客户端组合根和页面切换 |
 | `src/game/GameController.ts` | 页面状态机和连接引用 |
-| `src/state/GameStore.ts` | 模块级游戏状态 |
+| `src/state/GameStore.ts` | 唯一业务快照源（全客户端仅一份实例） |
 | `src/game/GameViewModel.ts` | HUD 状态投影桥梁 |
 | `src/game/systems/SocketEventHandler.ts` | 服务端事件集中处理 |
 | `src/components/InteractiveMapSurface.ts` | SVG 棋盘/棋子唯一渲染器 |
 | `src/components/GameHudShell.ts` | HUD 组合入口 |
 | `src/game/systems/MovementSystem.ts` | 移动动画插值与路径推进 |
+| `src/game/cellDisplayModel.ts`、`cellActionResolver.ts` | cell-hover 展示模型与 act-bar 动作解析（含数值调节预览） |
+| `src/game/timezone.ts` | 格子时区偏移解析（分钟） |
+| `src/game/EffectController.ts`、`GameEffects.ts` | 视效开关与视效钩子接口 |
 | `src/design/DesignAdapter.ts` | 主题令牌注入 CSS 变量、`readCssVarNumber` |
 | `src/game/systems/MapLoader.ts` | `/api/map` 加载与标准化 |
 
