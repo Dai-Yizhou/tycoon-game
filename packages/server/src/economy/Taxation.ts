@@ -18,7 +18,7 @@
  */
 
 import type { Player, Uct } from '@game/shared';
-import { CellTypes, normalizeCellType, getValueCurrent, participatesInEconomy } from '@game/shared';
+import { CellTypes, normalizeCellType, getValueCurrent, participatesInEconomy, t } from '@game/shared';
 import { getOwnerships } from './Ownership.js';
 import { logger } from '../utils/logger.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -247,7 +247,12 @@ export class Taxation {
     // 聊天框系统消息：让缴税结果在游戏内可见
     broadcastSystemMessage(
       this.io,
-      `${player.username} 缴纳税款 ${totalTax}（基础税 ${sumPlayerUct(baseTax)}，股份税 ${sumPlayerUct(shareTax)}）`,
+      t('server.taxCollected', {
+        player: player.username,
+        total: totalTax,
+        base: sumPlayerUct(baseTax),
+        share: sumPlayerUct(shareTax),
+      }),
     );
 
     return { success: true, taxRecord };

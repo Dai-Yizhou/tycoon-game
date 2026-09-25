@@ -2,57 +2,12 @@
   "common": {
     "loading": "Loading...",
     "confirm": "Confirm",
-    "cancel": "Cancel",
     "close": "Close",
-    "submit": "Submit",
-    "save": "Save",
-    "reset": "Reset",
-    "start": "Start",
     "back": "Back",
-    "next": "Next",
-    "prev": "Previous",
-    "skip": "Skip",
-    "success": "Success",
-    "error": "Error",
-    "warning": "Warning",
-    "info": "Info",
-    "yes": "Yes",
-    "no": "No",
     "unknown": "Unknown",
-    "none": "None",
-    "all": "All",
-    "select": "Select",
-    "switch": "Switch",
-    "enable": "Enable",
-    "disable": "Disable",
-    "open": "Open",
-    "delete": "Delete",
-    "edit": "Edit",
-    "create": "Create",
-    "search": "Search",
-    "filter": "Filter",
-    "sort": "Sort",
-    "refresh": "Refresh",
-    "retry": "Retry",
-    "finish": "Finish",
-    "continue": "Continue",
-    "pause": "Pause",
-    "resume": "Resume",
-    "status": "Status",
-    "version": "Version",
-    "server": "Server",
-    "debug": "Debug Mode",
-    "on": "On",
-    "off": "Off",
     "language": "Language",
-    "loadingMap": "Loading map...",
-    "mapLoadFailed": "Failed to load the board. Return and try again.",
     "unknownError": "Unknown error",
-    "settingsLabel": "Settings",
-    "featureInProgress": "📋 {{page}} page under development...",
-    "backToStart": "Back to start page",
-    "goTo": "Go to {{name}}",
-    "canvasContextError": "Cannot acquire Canvas 2D context"
+    "backToStart": "Back to start page"
   },
   "server": {
     "authInvalidCredentials": "Invalid username or password format",
@@ -64,65 +19,47 @@
     "guestOnly": "Guest accounts must use guest login",
     "passwordRequired": "Please enter a password",
     "userNotFound": "User not found",
-    "guestMigrationRequired": "Non-guest accounts cannot be migrated"
-    ,"passedStartTitle": "Passed Start"
-    ,"passedStartContent": "Player {{name}} passed Start and received {{amount}} funds"
-    ,"monumentRepairSuccess": "Monument repaired"
-    ,"monumentRepairContent": "Player {{player}}... repaired monument {{id}} with value changes {{values}}"
-    ,"monumentTitle": "Monument"
-    ,"monumentPrompt": "You can repair this monument for {{cost}}. Current regional prosperity: {{prosperity}}"
-    ,"jailEnteredTitle": "Entered Jail"
-    ,"jailEnteredContent": "Player {{name}} entered jail and must wait {{duration}}ms before release"
-    ,"jailReleasedTitle": "Released from Jail"
-    ,"jailReleasedContent": "Player {{name}} was released and returned to normal status"
-    ,"transportSuccessTitle": "Transport complete"
-    ,"transportSuccessContent": "Player {{player}}... transported to cell {{cell}}"
-    ,"transportTitle": "Transport hub"
-    ,"transportPrompt": "You can pay to transport to another cell. Cost: {{cost}}"
-    ,"eventTitle": "Event triggered"
-    ,"teamInviteTitle": "Team invitation"
-    ,"teamInviteContent": "{{inviterName}} invited you to join the team"
-    ,"accept": "Accept"
-    ,"reject": "Reject"
-    ,"pathSelectTitle": "Path selection"
-    ,"pathSelectContent": "There are multiple paths ahead. Choose one."
-    ,"pathA": "Path A"
-    ,"pathB": "Path B"
-    ,"systemMessageTitle": "System message"
-    ,"gameEventTitle": "Game event"
-    ,"errorTitle": "Error"
-    ,"playerRestartedTitle": "Player restarted"
-    ,"playerRestartedContent": "{{playerName}} has restarted"
-    ,"eventEffect": "Effect: {{effect}}"
-    ,"regionEffect": "(affects all players in the region)"
-    ,"eraSettlementTitle": "Era settlement complete"
-    ,"eraSettlementContent": "{{players}} players participated in this era settlement, and {{monuments}} monument records were created."
-    ,"monumentRecordTitle": "Monument record"
-    ,"monumentRecordContent": "Category {{category}}: player {{player}} was recorded with {{value}}."
+    "guestMigrationRequired": "Non-guest accounts cannot be migrated",
+    "monumentRepairSuccess": "Monument repaired",
+    "monumentRepairContent": "Player {{player}}... repaired monument {{id}} with value changes {{values}}",
+    "monumentTitle": "Monument",
+    "monumentPrompt": "You can repair this monument for {{cost}}. Current regional prosperity: {{prosperity}}",
+    "jailEnteredTitle": "Entered Jail",
+    "jailEnteredContent": "Player {{name}} entered jail and must wait {{duration}}ms before release",
+    "jailReleasedTitle": "Released from Jail",
+    "jailReleasedContent": "Player {{name}} was released and returned to normal status",
+    "transportSuccessTitle": "Transport complete",
+    "transportSuccessContent": "Player {{player}}... transported to cell {{cell}}",
+    "transportTitle": "Transport hub",
+    "transportPrompt": "You can pay to transport to another cell. Cost: {{cost}}",
+    "eventTitle": "Event triggered",
+    "eventEffect": "Effect: {{effect}}",
+    "regionEffect": "(affects all players in the region)",
+    "amountSeparator": ", ",
+    "fieldAmount": "{{field}} {{amount}}",
+    "taxCollected": "{{player}} paid tax {{total}} (base {{base}}, share {{share}})",
+    "rentPaid": "{{payer}} paid rent to the owners of \"{{cell}}\": {{amount}}{{owners}}",
+    "rentOwnerShare": "{{owner}} received {{amount}}",
+    "rentSelfOwned": "{{payer}} landed on \"{{cell}}\" but owns it, so no rent is charged",
+    "rentNoCollectableOwner": "No owner of \"{{cell}}\" can collect rent (jailed/bankrupt), so no rent is charged",
+    "rentLevelConfigMissing": "\"{{cell}}\" has no rent configured for level {{level}}, so no rent is charged",
+    "rentZero": "Current rent of \"{{cell}}\" is 0, so no rent is charged",
+    "rentFieldMissing": "{{payer}} has no field \"{{field}}\", so no rent is charged",
+    "rentInsufficient": "{{payer}} has insufficient balance; rent of {{amount}} for \"{{cell}}\" was not settled",
+    "rentDebitFailed": "Rent debit for {{payer}} did not take effect, so no rent is charged",
+    "dayNightChanged": "{{phase}} begins: {{region}} {{detail}}",
+    "dayNightPhaseDay": "Daytime",
+    "dayNightPhaseNight": "Night",
+    "investmentEventTriggered": "Investment \"{{cell}}\" reacted to event {{event}}: {{detail}}"
   },
   "game": {
     "title": "rentfree.io",
     "subtitle": "(???)",
     "startButton": "Start Game",
-    "loginButton": "Login",
     "guestButton": "Guest Mode",
-    "registerButton": "Register",
     "welcome": "Welcome to Monopoly.io! Click \"Roll Dice\" to start",
-    "loadingMap": "Loading map...",
     "version": "Version: v1.0.0",
-    "server": "Server: Local Development",
-    "debugMode": "Debug Mode: {{mode}}",
-    "playerPlaceholder": "Player",
     "unknownRegion": "Unknown Region",
-    "currentRegion": "Current Region",
-    "regionProsperity": "Region Prosperity",
-    "prosperity": "Prosperity",
-    "envValue": "Environment",
-    "regionEnvValue": "Region Environment",
-    "money": "{{amount}}",
-    "yuan": "",
-    "percent": "%",
-    "boardAriaLabel": "Game Board",
     "defaultPlayerName": "Player",
     "welcomeMessage": "Welcome to Monopoly.io! Click \"Roll Dice\" to start"
   },
@@ -132,11 +69,7 @@
     "password": "Password",
     "usernamePlaceholder": "Enter username",
     "passwordPlaceholder": "Enter password",
-    "loginSuccess": "Login successful",
     "loginFailed": "Login failed",
-    "usernameRequired": "Username required",
-    "passwordRequired": "Password required",
-    "invalidCredentials": "Invalid username or password",
     "usernameTooShort": "Username must be at least 2 characters",
     "usernameTooLong": "Username cannot exceed 20 characters",
     "usernameInvalidChars": "Username can only contain Chinese characters, letters, numbers, and underscores",
@@ -144,39 +77,14 @@
     "helper": "Enter your city map and asset panel after login"
   },
   "register": {
-    "title": "Register",
-    "username": "Username",
     "password": "Password",
-    "confirmPassword": "Confirm Password",
-    "usernamePlaceholder": "Username (3-20 letters, numbers, underscores)",
-    "passwordPlaceholder": "Password (at least 6 characters)",
-    "confirmPasswordPlaceholder": "Confirm password",
-    "registerSuccess": "Registration successful",
-    "registerFailed": "Registration failed",
-    "usernameExists": "Username already exists",
-    "usernameInvalid": "Invalid username format",
-    "passwordTooShort": "Password too short",
-    "passwordMismatch": "Passwords do not match"
+    "passwordTooShort": "Password too short"
   },
   "hud": {
-    "money": "Money",
-    "credit": "Credit",
-    "env": "Environment",
-    "alternateField": "Alternate Value",
-    "players": "Players",
-    "online": "Online",
-    "offline": "Offline",
     "inJail": "In Jail",
     "bankrupt": "Bankrupt",
-    "frozen": "Frozen",
     "normal": "Normal",
     "team": "Team",
-    "noTeam": "No Team",
-    "teamMembers": "Team Members",
-    "teamTotalAssets": "Team Total Assets",
-    "pointsAvailable": "{{count}} points available",
-    "you": "You",
-    "self": " (You)",
     "lone": "Alone",
     "teamCount": "Team {{count}}",
     "dayShort": "Day",
@@ -189,22 +97,11 @@
     "effectsOff": "Effects: Off",
     "noMessage": "No messages yet",
     "choosePath": "Choose path",
-    "currentTag": "Current",
     "price": "Price",
     "level": "Level",
     "rent": "Rent",
-    "upgrade": "Upgrade Cost",
-    "timezone": "Timezone",
-    "holder": "Holder",
-    "noOwners": "Unowned",
-    "holderCount": "{{count}} holders",
     "hoverSyncing": "Syncing",
     "hoverFetching": "Fetching cell state",
-    "chatNotify": "Chat / Notifications",
-    "chatTabs": "Team Region",
-    "actionArea": "Actions",
-    "regionStatus": "Region Status",
-    "sysUnread": "System {{count}}",
     "settings": "Settings",
     "achievements": "Achievements",
     "achievementLoading": "Loading achievements",
@@ -226,17 +123,10 @@
   },
   "dice": {
     "roll": "Roll Dice",
-    "rolling": "Rolling...",
     "cooldown": "Cooldown",
-    "cooldownBar": "…",
-    "seconds": "s",
-    "result": "Dice Result",
     "moveSteps": "Move {{count}} steps",
-    "rolled": "Rolled {{value}}!",
     "rollFailed": "Roll failed: {{error}}",
-    "unknownError": "Unknown error",
-    "points": "Dice Points",
-    "rollMove": "Roll Dice to Move"
+    "unknownError": "Unknown error"
   },
   "cell": {
     "start": "Start",
@@ -247,17 +137,7 @@
     "transport": "Transport Hub",
     "monument": "Monument",
     "jail": "Jail",
-    "empty": "Empty",
-    "arrived": "Arrived: {{name}}"
-  },
-  "rarity": {
-    "common": "Common",
-    "uncommon": "Uncommon",
-    "rare": "Rare",
-    "epic": "Epic",
-    "legendary": "Legendary",
-    "ultimate": "Ultimate",
-    "unique": "Unique"
+    "empty": "Empty"
   },
   "property": {
     "buyTitle": "Buy Property",
@@ -268,151 +148,32 @@
     "level": "Level",
     "levelFormat": "Level {{level}}/4",
     "upgradeCost": "Upgrade Cost",
-    "owner": "Owner",
-    "coOwners": "Co-owners",
-    "buyConfirm": "Confirm Purchase",
-    "upgradeConfirm": "Confirm Upgrade",
-    "buySuccess": "Purchased {{name}}!",
-    "upgradeSuccess": "{{name}} upgraded to level {{level}}!",
-    "insufficientMoney": "Insufficient funds to buy",
-    "insufficientMoneyUpgrade": "Insufficient funds to upgrade",
-    "maxLevel": "Max level reached",
-    "alreadyOwned": "You already own {{name}}",
-    "passingPayToll": "Passing {{name}}, please pay toll",
-    "availableForPurchase": "{{name}} available for purchase",
-    "rentPaid": "Paid rent {{amount}}",
-    "rentReceived": "Received rent {{amount}}",
-    "buyAction": "Buy ({{price}})",
-    "buyActionTitle": "Buy this property for {{price}}",
-    "upgradeAction": "Upgrade ({{cost}})",
-    "upgradeActionTitle": "Upgrade to level {{level}} for {{cost}}"
-  },
-  "event": {
-    "triggered": "Event Triggered",
-    "arrived": "Event arrives",
-    "effect": "Effect",
-    "good": "Good",
-    "bad": "Bad",
-    "neutral": "Neutral",
-    "winLottery": "Won lottery! Received {{amount}}",
-    "unexpectedExpense": "Unexpected expense, lost {{amount}}",
-    "charity": "Charity work, credit +{{value}}",
-    "envActivity": "Environmental activity, env +{{value}}",
-    "receiveGift": "Received gift, got {{amount}}",
-    "investmentLoss": "Investment loss, lost {{amount}}",
-    "creditBoost": "Credit +{{value}}",
-    "envBoost": "Environment +{{value}}"
+    "rentPaid": "Paid rent {{amount}}"
   },
   "investment": {
     "title": "Investment",
     "invest": "Invest",
-    "fullInvest": "Full Investment {{name}}",
-    "coInvest": "Co-invest {{name}}",
-    "price": "Price: {{price}}",
-    "return": "Per visit return: {{return}}",
-    "balance": "Balance: {{money}}",
-    "totalPrice": "Total price: {{price}}",
-    "shareLabel": "Share (1% - {{max}}%)",
-    "costAndReturn": "Pay {{cost}}, earn {{income}} per visit",
-    "confirmBuy": "Confirm Purchase ({{price}})",
-    "confirmCoInvest": "Confirm Co-invest",
-    "fullInvestSuccess": "Successfully invested in {{name}}!",
-    "coInvestSuccess": "Co-invested in {{name}}! Holding {{share}}%",
-    "insufficientMoney": "Insufficient funds to invest",
-    "insufficientMoneyShort": "Insufficient funds",
-    "shareOutOfRange": "Share must be between 1% - {{max}}%",
-    "arrivedSettlement": "{{name}} investment settling...",
-    "available": "Investment: {{name}}, available for purchase or co-invest",
-    "fullInvestAction": "Full Invest ({{price}})",
-    "coInvestAction": "Co-invest ({{price}})",
-    "fullInvestTitle": "Full investment in this project for {{price}}",
-    "coInvestTitle": "Co-invest in this project for {{price}}"
+    "price": "Price: {{price}}"
   },
   "transport": {
-    "title": "Transport Hub",
-    "selectDestination": "{{name}} - Select Destination",
     "cost": "Transport Cost",
     "costValue": "{{cost}}",
-    "discount": "(30% transport discount)",
     "teleport": "Teleport",
     "loading": "Fetching destinations...",
-    "teleportSuccess": "Teleported to {{name}}! {{discount}}",
     "teleportFailed": "Teleport failed",
-    "noDestinations": "No other transport hubs available",
-    "insufficientMoney": "Insufficient funds to teleport",
-    "distance": "{{distance}} cells away",
-    "arrived": "Transport Hub: {{name}}, pay to teleport",
-    "action": "Teleport ({{cost}})",
-    "actionTitle": "Teleport to another hub for {{cost}}"
+    "noDestinations": "No other transport hubs available"
   },
   "monument": {
-    "title": "Monument",
     "repair": "Repair",
-    "repairCost": "Repair cost: {{cost}}",
-    "creditIncrease": "Credit Increase",
-    "prosperityIncrease": "Prosperity Increase",
-    "currentProsperity": "Current Prosperity",
-    "repairSuccess": "Monument repaired! Credit +{{gain}}",
-    "repairFailed": "Repair failed",
-    "insufficientMoney": "Insufficient funds to repair",
-    "arrived": "Monument: Repair to increase credit",
-    "action": "Repair ({{cost}})",
-    "actionTitle": "Repair monument to increase credit for {{cost}}",
-    "records": "Monument Records"
-  },
-  "jail": {
-    "title": "Jail",
-    "inJail": "In jail! Cannot roll until released",
-    "enteredDetailed": "Player {{playerId}} entered jail, cooldown {{duration}}ms",
-    "stillInJail": "Still in jail! {{seconds}}s remaining",
-    "released": "Released from jail, can roll again",
-    "releasedStatus": "Released! Back to normal",
-    "arrived": "Landed on jail",
-    "releaseTime": "Release Time",
-    "cooldownExtended": "Roll cooldown extended",
-    "creditPenalty": "Credit penalty",
-    "noRent": "Cannot collect rent in jail"
+    "repairCost": "Repair cost: {{cost}}"
   },
   "bankruptcy": {
     "title": "Bankruptcy",
     "bankrupt": "You are bankrupt. Assets were cleared; restart with the map's initial values.",
     "restart": "Restart with map initial values",
-    "restartTitle": "Return to start with values defined by the map",
-    "restarted": "Restarted with the map's initial values",
     "playerNotFound": "Bankrupt player not found"
   },
-  "tutorial": {
-    "welcome": "Welcome to Monopoly.io",
-    "welcomeContent": "A multiplayer board game combining classic Monopoly with io games. Roll dice, buy properties, invest to build wealth!",
-    "step1": "Roll Dice",
-    "step1Content": "Click the \"Roll Dice\" button to start moving. The dice will roll 1-6 points, and your piece will move along the path.",
-    "step2": "Buy Property",
-    "step2Content": "When you land on unowned property, you can buy it. Others pay rent when passing your properties.",
-    "step3": "Credit System",
-    "step3Content": "Credit affects event probabilities. Repair monuments to increase credit.",
-    "step4": "Investment",
-    "step4Content": "Investments provide steady returns. You can fully invest or co-invest with other players.",
-    "step5": "Team System",
-    "step5Content": "Team up with other players to share wealth and credit. Teaming is key to reaching high goals!",
-    "step6": "Day/Night Cycle",
-    "step6Content": "The game world has a 3-minute day/night cycle. Prosperity recovers during day and decreases at night.",
-    "step7": "Start Playing!",
-    "step7Content": "You now know the basics. Start your Monopoly adventure! Good luck!",
-    "skip": "Skip Tutorial",
-    "restart": "Restart Tutorial",
-    "complete": "Tutorial complete! You can now explore freely",
-    "reset": "Tutorial reset, will show on next game start",
-    "stepRollDice": "Roll Dice Move",
-    "stepRollDiceContent": "Click the \"Roll Dice\" button to roll 1-6 and move that many steps along the path.",
-    "stepUpgrade": "Upgrade Property",
-    "stepUpgradeContent": "Upgrade owned properties to increase rent income. Max level is 4.",
-    "stepTransport": "Transport Hub",
-    "stepTransportContent": "Transport hubs let you teleport to other hubs for a fee, quickly traversing the board.",
-    "stepMonument": "Repair Monument",
-    "stepMonumentContent": "Repairing monuments grants credit bonuses."
-  },
   "team": {
-    "panel": "Team",
     "invite": "Invite",
     "manage": "Manage",
     "inviteTitle": "Team Invite",
@@ -422,52 +183,37 @@
     "inviteReject": "Reject",
     "inviteRejected": "You rejected {{name}}'s team invite",
     "inviteAccepted": "Joined {{name}}'s team!",
-    "inviteFailed": "Invite failed",
     "inviteError": "Invite failed: {{error}}",
     "joinFailed": "Join team failed: {{error}}",
     "rejectFailed": "Reject invite failed: {{error}}",
     "memberJoined": "{{name}} joined the team!",
     "memberLeft": "Member {{name}} left the team",
-    "memberKicked": "Member {{name}} was removed",
-    "youWereKicked": "You were removed from the team",
-    "teamUpdated": "Team state updated",
     "teamDisbanded": "Team disbanded",
     "leaveTeam": "Leave Team",
     "leaveFailed": "Leave team failed: {{error}}",
-    "removeMember": "Remove",
-    "removeFailed": "Remove member failed: {{error}}",
     "noConnection": "Not connected to server, cannot send invite",
     "noConnectionLeave": "Cannot leave team: not connected",
-    "noConnectionRemove": "Cannot remove member: not connected",
     "noTeammates": "You have no teammates",
     "invitePlayers": "Invite Players",
-    "teamManagement": "Team Management",
-    "statusNormal": "Normal",
-    "statusJail": "Jail",
-    "statusBankrupt": "Bankrupt",
     "inviteDescription": "{{name}} invites you to join their team!",
     "leftTeam": "Left the team",
     "noOtherPlayers": "No other online players",
     "waitingForPlayers": "Waiting for other players to join",
     "invitePlayersTitle": "Invite Players",
-    "managementTitle": "Team Management",
-    "noTeamMembers": "No Team"
+    "managementTitle": "Team Management"
   },
-  "leaderboard": { "loading": "Leaderboard loading", "empty": "No leaderboard data", "disabled": "Leaderboard disabled", "error": "Leaderboard service error", "offline": "Leaderboard disconnected" },
+  "leaderboard": {
+    "loading": "Leaderboard loading",
+    "empty": "No leaderboard data",
+    "disabled": "Leaderboard disabled",
+    "error": "Leaderboard service error",
+    "offline": "Leaderboard disconnected"
+  },
   "chat": {
     "noConnection": "Chat is unavailable while disconnected",
-    "title": "Chat",
     "inputPlaceholder": "Type a message...",
     "send": "Send",
     "sendFailed": "Message send failed: {{error}}",
-    "toggleChannel": "Toggle {{channel}} channel visibility",
-    "channelSystem": "System",
-    "channelTeam": "Team",
-    "channelRegion": "Region",
-    "channelWorld": "World",
-    "you": "You: ",
-    "anonymous": "Anonymous",
-    "systemPrefix": "[{{channel}}] ",
     "channel": {
       "system": "System",
       "world": "World",
@@ -476,69 +222,16 @@
       "region": "Region"
     }
   },
-  "settings": {
-    "title": "Settings",
-    "restartTutorial": "Restart Tutorial",
-    "clearGameData": "Clear Game Data",
-    "enableTutorial": "Enable Tutorial",
-    "disableTutorial": "Disable Tutorial",
-    "dataCleared": "Game data cleared",
-    "tutorialEnabled": "Tutorial enabled",
-    "tutorialDisabled": "Tutorial disabled",
-    "version": "📱 Game Version: {{version}}",
-    "server": "Server: {{server}}",
-    "localDev": "Local Development",
-    "debugMode": "Debug Mode: {{status}}"
-  },
   "dayNight": {
     "day": "Day",
-    "night": "Night",
-    "dayArrived": "Day has arrived! Region prosperity recovering",
-    "nightArrived": "Night falls, region prosperity decreasing",
-    "dayChanged": "{{phase}}",
-    "timezoneChanged": "Entered {{tz}}, local time {{time}} ({{dayNight}})",
-    "timeUpdate": "{{time}}",
-    "dayTime": "Day",
-    "nightTime": "Night",
-    "format": "{{icon}} {{time}} ({{tz}})"
+    "night": "Night"
   },
   "player": {
     "joined": "{{name}} joined the game",
-    "left": "{{name}} left the game",
-    "passedStart": "Passed Start!",
-    "startBonus": "Start bonus +{{amount}}"
-  },
-  "hoverCard": {
-    "regionStats": "Region Stats",
-    "env": "Environment: {{value}}",
-    "prosperity": "Prosperity: {{value}}%",
-    "price": "{{price}}",
-    "rent": "Rent: {{rent}}",
-    "level": "Level {{level}}/4",
-    "return": "Return: {{return}}/visit",
-    "shares": "Holding {{shares}}%",
-    "transportCost": "Transport cost: {{cost}}",
-    "monumentCost": "Repair cost: {{cost}}",
-    "effects": "{{effects}}",
-    "timezone": "{{tz}}"
-  },
-  "intersection": {
-    "title": "Intersection! Choose direction",
-    "chooseDirection": "Choose direction: {{options}}",
-    "select": "Select"
+    "left": "{{name}} left the game"
   },
   "path": {
     "selectFailed": "Path selection failed: {{error}}"
-  },
-  "error": {
-    "network": "Network connection failed",
-    "server": "Server error",
-    "notFound": "Resource not found",
-    "unauthorized": "Unauthorized",
-    "forbidden": "Forbidden",
-    "invalidData": "Invalid data format",
-    "parseFailed": "Failed to parse player progress data",
-    "loadFailed": "Failed to load data"
   },
   "loading": {
     "connecting": "Connecting to server...",
@@ -546,7 +239,6 @@
     "connectFailed": "Connection failed: {{error}}",
     "loginFailed": "Login failed",
     "loginFailedWithMsg": "Login failed: {{msg}}",
-    "guestPrefix": "Guest_",
     "networkEyebrow": "MONOPOLY.IO / NETWORK LINK",
     "tips": [
       "Roll the dice to start your turn.",
@@ -558,16 +250,6 @@
       "Investment payouts are split by shareholding ratio.",
       "After being jailed, you must wait out the cooldown."
     ]
-  },
-  "panel": {
-    "details": "Details",
-    "region": "Region",
-    "other": "Other",
-    "currentLocation": "Current Location",
-    "regionProsperity": "Region Prosperity",
-    "dayNightStatus": "Day/Night Status",
-    "teamMembers": "Team Members",
-    "teamTotalAssets": "Team Total Assets"
   },
   "board": {
     "loading": "Loading board..."

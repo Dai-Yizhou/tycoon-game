@@ -21,7 +21,7 @@ import type { GameWorld } from './GameWorld.js';
 import type { DayNightCycle } from './DayNightCycle.js';
 import { DayNightEvents } from './DayNightCycle.js';
 import type { Uct, DayNightValueChangeConfig } from '@game/shared';
-import { resolveDayNightPhase } from '@game/shared';
+import { getLocale, resolveDayNightPhase, t } from '@game/shared';
 import { broadcastSystemMessage, formatFieldAmounts, type SystemChatIO } from '../net/systemChat.js';
 
 /**
@@ -118,7 +118,8 @@ export class DayNightValueChange {
 
     const meta = this.world.getMapMeta();
     const fieldDefinitions = meta?.valueFieldDefinitions ?? [];
-    const phaseLabel = isDay ? '白昼' : '夜晚';
+    const phaseLabel = t(isDay ? 'server.dayNightPhaseDay' : 'server.dayNightPhaseNight');
+    const locale = getLocale();
 
     for (const regionId of regionIds) {
       const applied: Record<string, number> = {};
@@ -132,8 +133,8 @@ export class DayNightValueChange {
       // 聊天框系统消息：昼夜更替引起的区域数值变化
       const detail = formatFieldAmounts(applied, fieldDefinitions, 'region');
       if (!detail) continue;
-      const regionName = meta?.regions.find((region) => region.id === regionId)?.name['zh-CN'] ?? regionId;
-      if (this.io) broadcastSystemMessage(this.io, `进入${phaseLabel}：${regionName} ${detail}`);
+      const regionName = meta?.regions.find((region) => region.id === regionId)?.name[locale] ?? regionId;
+      if (this.io) broadcastSystemMessage(this.io, t('server.dayNightChanged', { phase: phaseLabel, region: regionName, detail }));
     }
   }
 }

@@ -8,8 +8,8 @@
  * 本模块面向运行时可观测性，只发不收，不进入频道历史，便于这些结算路径「看得见」。
  */
 
-import type { ChatMessage, ValueFieldDefinition } from '@game/shared';
-import { ChatChannels } from '@game/shared';
+import type { ChatMessage, LocaleCode, ValueFieldDefinition } from '@game/shared';
+import { ChatChannels, getLocale, t } from '@game/shared';
 
 /** 广播所需的最小 io 结构（handler 传入的 TypedServer 满足此结构） */
 export interface SystemChatIO {
@@ -40,19 +40,23 @@ export function broadcastSystemMessage(io: SystemChatIO, content: string): void 
 /**
  * 把逐字段数值变化格式化为可读文本（如「财产 +5，繁荣 -20」）
  *
- * 字段名优先取地图元数据的中文名，未声明时回退字段 ID。
+ * 字段名取地图元数据的当前语言名，未声明时回退中文名／英文名／字段 ID；
+ * 条目模板与分隔符走 i18n（server.fieldAmount / server.amountSeparator）。
  */
 export function formatFieldAmounts(
   amounts: Record<string, number>,
   definitions: ValueFieldDefinition[] = [],
   scope: 'player' | 'region' = 'player',
+  locale: LocaleCode = getLocale(),
 ): string {
+  const separator = t('server.amountSeparator');
   return Object.entries(amounts)
     .filter(([, value]) => Number.isFinite(value) && value !== 0)
     .map(([fieldId, value]) => {
       const definition = definitions.find((item) => item.id === fieldId && item.scope === scope);
-      const name = definition?.name['zh-CN'] ?? definition?.name['en-US'] ?? fieldId;
-      return `${name} ${value >= 0 ? '+' : ''}${value}`;
+      const name = definition?.name[locale] ?? definition?.name['zh-CN'] ?? definition?.name['en-US'] ?? fieldId;
+      const amount = `${value >= 0 ? '+' : ''}${value}`;
+      return t('server.fieldAmount', { field: name, amount });
     })
-    .join('，');
+    .join(separator);
 }

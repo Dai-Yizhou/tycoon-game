@@ -207,7 +207,7 @@ describe('收租主链路（HandlerRegistry：付款方资格 + 离线股东的�
   it('收租成功时在聊天框广播系统消息（交租 + 各股东实收）', () => {
     const { world, io } = setup();
     new HandlerRegistry(io, world).handleRentPayment('payer', 1, socketFor(io));
-    expect(chatMessages(io)).toEqual(['payer 向「地产」股东交租 财产 -100（owner-a 收 财产 +100）']);
+    expect(chatMessages(io)).toEqual(['payer 向「地产」股东交租 财产 -100，owner-a 收 财产 +100']);
   });
 
   it('本人持股时不收租，并说明原因（避免被误判为收租未触发）', () => {

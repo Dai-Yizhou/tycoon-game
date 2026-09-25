@@ -15,7 +15,7 @@
  */
 
 import type { AckResult, Cell, DomainEvent, Player, Uct } from '@game/shared';
-import { normalizeCellType, CellTypes, PlayerStatus, canReceiveInvestmentImpact, participatesInEconomy, formatUct } from '@game/shared';
+import { normalizeCellType, CellTypes, PlayerStatus, canReceiveInvestmentImpact, participatesInEconomy, formatUct, getLocale, t } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
@@ -323,7 +323,9 @@ export class InvestmentHandler {
 
       // 聊天框系统消息：投资项目钩子触发（股东收益/损失 + 区域数值变化）
       const fieldDefinitions = this.world.getMapMeta()?.valueFieldDefinitions ?? [];
-      const cellLabel = cell.name?.['zh-CN'] ?? cell.name?.['en-US'] ?? String(cell.id);
+      const locale = getLocale();
+      const cellLabel = cell.name?.[locale] ?? cell.name?.['zh-CN'] ?? cell.name?.['en-US'] ?? String(cell.id);
+      const separator = t('server.amountSeparator');
       const parts: string[] = [];
       for (const affected of result.affectedPlayers) {
         const detail = formatFieldAmounts(affected.amount.player ?? {}, fieldDefinitions);
@@ -331,10 +333,11 @@ export class InvestmentHandler {
         parts.push(`${this.world.getPlayer(affected.playerId)?.username ?? affected.playerId} ${detail}`);
       }
       const regionDetail = formatFieldAmounts(eventImpact.region ?? {}, fieldDefinitions, 'region');
-      if (parts.length > 0 || regionDetail) {
+      const detail = [...parts, regionDetail].filter(Boolean).join(separator);
+      if (detail) {
         broadcastSystemMessage(
           this.io,
-          `投资项目「${cellLabel}」响应事件 ${eventName}：${[...parts, regionDetail].filter(Boolean).join('；')}`,
+          t('server.investmentEventTriggered', { cell: cellLabel, event: eventName, detail }),
         );
       }
 
