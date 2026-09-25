@@ -3,6 +3,7 @@ import {
   authenticateAccount,
   authenticateGuest,
   clearAuthToken,
+  decodeTokenUser,
   getAuthToken,
   migrateGuestAccount,
   registerAccount,
@@ -10,7 +11,11 @@ import {
 
 export class AuthSession {
   private token: string | null = getAuthToken();
-  private user: LoginResponse['user'] | null = null;
+  /**
+   * 刷新或跨进程重启后 localStorage 只剩 token，故构造时从载荷水合身份，
+   * 保证 isGuest/username 在未重新登录的会话中也可用（详见 decodeTokenUser）。
+   */
+  private user: LoginResponse['user'] | null = decodeTokenUser(this.token);
 
   getToken(): string | null {
     return this.token;
