@@ -162,7 +162,10 @@ export class GameHudShell {
     const setExpanded = (expanded: boolean): void => {
       this.isExpanded = expanded;
       this.root.querySelector('[data-ui="chat-panel"]')?.classList.toggle("is-expanded", expanded);
+      if (expanded) this.scrollChatToBottom();
     };
+    // hover / focus-within 由 CSS 直接展开（不经过 setExpanded），故在容器上补一次滚底
+    this.root.querySelector('[data-ui="chat-panel"]')?.addEventListener("mouseenter", () => this.scrollChatToBottom());
     toggle?.addEventListener("click", () => setExpanded(!this.isExpanded));
     this.root.addEventListener("keydown", (event) => {
       const keyboardEvent = event as KeyboardEvent;
@@ -660,6 +663,14 @@ export class GameHudShell {
       ticker.textContent = t("hud.noMessage");
     }
     this.renderFilters();
+    // 列表每次都是整体重建（scrollTop 归零），展开态下需重新贴底，否则新消息要手动滚才可见
+    if (this.isExpanded) this.scrollChatToBottom();
+  }
+
+  /** 把聊天消息列表滚到底部（最新一条）；折叠时列表不可见，读取高度为 0，等价空操作 */
+  private scrollChatToBottom(): void {
+    const list = this.root.querySelector<HTMLElement>('[data-ui="chat-messages"]');
+    if (list) list.scrollTop = list.scrollHeight;
   }
 
   private renderFilters(): void {
