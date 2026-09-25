@@ -11,7 +11,7 @@
         "$type": "color"
       },
       "accent": {
-        "$value": "#3A5C90",
+        "$value": "#A8542C",
         "$type": "color"
       },
       "property": {
@@ -147,11 +147,11 @@
         "$type": "number"
       },
       "accent": {
-        "$value": "#3A5C90",
+        "$value": "#A8542C",
         "$type": "color"
       },
       "accentHover": {
-        "$value": "#4A6EA6",
+        "$value": "#BE6A3C",
         "$type": "color"
       },
       "aux": {

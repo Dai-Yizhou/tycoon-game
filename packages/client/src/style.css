@@ -18,22 +18,23 @@
      浮层本身是半透明的，若背后只有一片纯色，任何 alpha 都读作实心；
      底纸带上噪点后，浮层后面的纹理确实可见，这才是"浮层被看穿"的视觉依据。
      强度取 0.26：既保证隔层可辨的纸感，又不至于让底色发脏。 */
-  --gp-paper-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.26'/%3E%3C/svg%3E");
+  --gp-paper-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='10' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.2'/%3E%3C/svg%3E");
   /* SVG 地图连线几何（箭头尺寸 / 端点与格子边缘的留白，布局常量）
      线宽由主题令牌 dimension.line.map 驱动（--map-link-width） */
   --map-arrow-size: 22;
   --map-link-gap: 4;
   /* HUD 上下栏高度（布局常量）：既是两条栏自身的几何，也是相机安全区的依据。
      相机据此把跟随目标限制在两栏渐变覆盖带之内，避免玩家与所在格贴到画面边缘被渐变盖住，
-     故两处必须同源（改栏高只需改这里）。 */
+     故两处必须同源（改栏高只需改这里）。
+     底栏取 88px：内部控件（掷骰/行动按钮）同步收紧后不再需要 112px 的容纳高度。 */
   --gp-topbar-h: 76px;
-  --gp-actionbar-h: 112px;
+  --gp-actionbar-h: 88px;
   /* 加载页几何与节奏（布局/行为常量，非主题身份）。
      进度条已移除：进度显示与填充条无法对齐，改为纯旋转指示 + 最短停留。 */
   --loading-spinner-size: 46px;
   --loading-spinner-border: 3px;
   /* 加载页最短停留（ms）：保证玩家能读完一条 tips 再跳转 */
-  --loading-min-dwell: 2500;
+  --loading-min-dwell: 2000;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -84,7 +85,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
      ① 令牌层：主题里 card 与 mapBg 取不同的色相/明度档，浮层与底纸本身就有差；
      ② 材质层：底纸的纸纹噪点透过半透明浮层可见（--gp-paper-noise）；
      ③ 边界层：--gp-border 墨线与 --gp-shadow-paper 硬投影定义浮层轮廓。 */
-  --gp-surface: color-mix(in srgb, var(--gp-card) 75%, transparent);
+  --gp-surface: color-mix(in srgb, var(--gp-card) 85%, transparent);
   /* 数值底色呼吸的提亮色（§3.7）：强调色混入浮层底色 */
   --gp-breathe-tint: color-mix(in srgb, var(--gp-accent) 30%, var(--gp-surface));
   /* 硬投影：纸张叠放的偏移墨影（非模糊光晕），用于浮层/悬浮卡/面板 */
@@ -421,15 +422,19 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .game-hud-shell .gp-layout { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .game-hud-shell .gp-layout > * { pointer-events: auto; position: absolute; }
 
-/* 顶栏 / 底栏：半透明渐变贴在整屏地图上（全视野）。
-   加强渐变以免和地图混在一层。 */
+/* 顶栏 / 底栏：压在地图上的墨色遮罩带（全视野），自屏幕边缘向内渐隐。
+   遮罩取 --gp-border（墨色）而非 --gp-bar-bg（纸色）：纸色混透明在夜晚是一层发亮的白纱，
+   与夜色里的地图格格不入；墨色只会压暗，白昼在浅色格子上形成明确色阶，夜里也不会突然变亮。
+   解决白昼纸色与格底色过于接近导致的分层不清。 */
 .gp-topbar {
   top: 0; left: 0; right: 0; height: var(--gp-topbar-h); z-index: 20;
   display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 14px 18px;
   background: linear-gradient(180deg,
-    color-mix(in srgb, var(--gp-bar-bg) 60%, transparent) 0%,
-    color-mix(in srgb, var(--gp-bar-bg) 25%, transparent) 65%,
-    transparent 100%);
+    color-mix(in srgb, var(--gp-border) 30%, transparent) 0%,
+    color-mix(in srgb, var(--gp-border) 14%, transparent) 55%,
+    color-mix(in srgb, var(--gp-border) 5%, transparent) 85%,
+    color-mix(in srgb, var(--gp-border) 1%, transparent) 100%);
+  
 }
 .region-status {
   display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; max-width: 52%;
@@ -455,13 +460,16 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 /* 本玩家行：名次与名字一并高亮，便于在榜中定位自己 */
 .leaderboard-row--self .leaderboard-row__name,
 .leaderboard-row--self .leaderboard-row__score { color: var(--gp-accent); }
+/* 底栏遮罩略重于顶栏：容器内控件密集，需要更实的底才读得清（同用墨色，理由见顶栏注释） */
 .gp-actionbar {
   bottom: 0; left: 0; right: 0;  height: var(--gp-actionbar-h); z-index: 20;
   display: flex; align-items: center; gap: 12px; padding: 0 18px;
   background: linear-gradient(0deg,
-    color-mix(in srgb, var(--gp-bar-bg) 70%, transparent) 0%,
-    color-mix(in srgb, var(--gp-bar-bg) 40%, transparent) 55%,
-    transparent 100%);
+    color-mix(in srgb, var(--gp-border) 34%, transparent) 0%,
+    color-mix(in srgb, var(--gp-border) 16%, transparent) 55%,
+    color-mix(in srgb, var(--gp-border) 6%, transparent) 85%,
+    color-mix(in srgb, var(--gp-border) 1%, transparent) 100%);
+  /*border-top: 1px solid color-mix(in srgb, var(--gp-border) 32%, transparent);*/
 }
 .gp-topbar .player-badge { margin-right: auto; }
 .gp-topbar .region-status { margin-left: auto; }
@@ -548,7 +556,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
    展开触发：hover、focus-within、is-expanded 类（由 JS 控制）
 */
 .hud-chat-dock {
-  left: 18px; right: auto; bottom: 128px;
+  left: 18px; right: auto; bottom: 104px;
   width: 260px; z-index: 32;
   border-radius: var(--region-radius);
   /* 与 hover 卡 / 右下 hud-panel 一致：走 HUD 半透明浮层底色（75% 卡色，兼顾可读性）。
@@ -659,13 +667,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   border: none; border-radius: var(--region-radius); cursor: pointer;
 }
 
-/* 掷骰与行动按钮 */
-.dice-zone { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
+/* 掷骰与行动按钮（与底栏高度同源收紧：两者同处一排，尺寸需彼此接近，不单独放大某一种） */
+.dice-zone { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; }
 .dice-btn {
   position: relative;
   display: inline-flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 15px;
-  padding: 11px 24px;
+  font-weight: 1000; font-size: 14px;
+  padding: 12px 20px;
   border: var(--region-border-w) solid var(--gp-border);
   border-radius: var(--region-radius);
   background: var(--gp-card); color: var(--gp-fg);
@@ -695,20 +703,20 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 /* 动效关闭：冷却填充不做任何过渡揭示（禁用态直接切换，无 clip-path 扫光动画） */
 .effects-disabled .dice-btn__fill,
 .effects-disabled .dice-btn:not(:disabled) .dice-btn__fill { transition: none; }
-.dice-status { font-size: 12px; color: var(--gp-muted); font-family: var(--font-num); }
+.dice-status { font-size: 11px; color: var(--gp-muted); font-family: var(--font-num); }
 
-.action-cluster { display: flex; gap: 6px; flex-shrink: 0; }
+.action-cluster { display: flex; gap: 5px; flex-shrink: 0; }
 .act-btn {
-  font-size: 13px; font-weight: 700; padding: 8px 16px;
+  font-size: 12px; font-weight: 700; padding: 6px 12px;
   border: var(--region-border-w) solid var(--gp-border); border-radius: var(--region-radius);
   background: var(--gp-card); color: var(--gp-fg);
-  cursor: pointer; white-space: nowrap;
+  cursor: pointer; white-space: pre-wrap;
   transition: background var(--motion-fast), color var(--motion-fast);
 }
 .act-btn:hover:not(:disabled) { background: var(--gp-cell-a); }
 .act-btn--accent { background: var(--gp-accent); color: var(--gp-paper); border-color: var(--gp-accent); }
 .act-btn--accent:hover:not(:disabled) { background: color-mix(in srgb, var(--gp-accent) 85%, #ffffff); }
-.act-btn__price { display: block; font-family: var(--font-num); font-size: 9px; font-weight: 700; }
+.act-btn__price { display: block; font-family: var(--font-num); font-size: 9px; font-weight: 600; }
 .act-btn--pips {
   cursor: default; user-select: none; font-family: var(--font-num);
   /* 与按钮簇同源观感：继承 .act-btn 底色/描边/圆角，仅字体换等宽数字；非交互 */
@@ -720,7 +728,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 /* 桌面优先：大屏放大 HUD（顶栏/底栏/聊天 dock/悬浮卡片），增强可读性 */
 @media (min-width: 1280px) {
   .gp-topbar { height: 84px; padding: 16px 22px; }
-  .gp-actionbar { height: 124px; padding: 0 22px; }
+  .gp-actionbar { height: 96px; padding: 0 22px; }
   .region-status__name { font-size: 13px; }
   .player-badge__avatar { width: 26px; height: 26px; font-size: 11px; }
   .player-badge__name { font-size: 13px; }
@@ -728,7 +736,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   .value-pill { min-width: 64px; padding: 3px 10px; }
   .value-pill__label { font-size: 9px; }
   .value-pill__num { font-size: 14px; }
-  .dice-status { font-size: 13px; }
+  .dice-status { font-size: 12px; }
   .cell-hover-card { width: 220px; padding: 12px; }
   .cell-hover-card__type { font-size: 9px; }
   .cell-hover-card__title { font-size: 16px; }
@@ -750,14 +758,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 }
 /* 桌面优先：小屏回退略小的控件，避免挤爆（当前不重点打磨移动端） */
 @media (max-width: 700px) {
-  .dice-btn { font-size: 13px; padding: 8px 18px; }
-  .act-btn { font-size: 11px; padding: 6px 12px; }
+  .dice-btn { font-size: 12px; padding: 6px 14px; }
+  .act-btn { font-size: 11px; padding: 5px 10px; }
   .dice-status { font-size: 10px; }
 }
 @media (max-width: 700px) {
   .gp-topbar { height: 64px; }
-  .gp-actionbar { height: 94px; }
-  .hud-chat-dock { bottom: 106px; left: 10px; width: 240px; }
+  .gp-actionbar { height: 76px; }
+  .hud-chat-dock { bottom: 88px; left: 10px; width: 240px; }
   .cell-hover-card { width: 190px; }
 }
 @media (max-width: 600px) {
