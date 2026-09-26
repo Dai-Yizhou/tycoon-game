@@ -129,6 +129,7 @@ export class HandlerRegistry {
       this.propertyHandler.handlePlayerArrive(player.id, player.position.cellId);
       this.investmentHandler.handlePlayerArrive(player.id, player.position.cellId);
       this.transportHandler.handlePlayerArrive(player.id, player.position.cellId);
+      this.monumentHandler.handlePlayerArrive(player.id, player.position.cellId);
     });
   }
 

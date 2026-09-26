@@ -386,6 +386,16 @@ export class MonumentHandler {
   }
 
   /**
+   * 玩家到达某格时重置本次停靠修缮标记（停一次只允许修缮一次）。
+   *
+   * 由 HandlerRegistry 统一挂到「玩家位置真实变化」事件上调用，因此经传送、行为位移
+   * 等非掷骰路径落到同一纪念碑时同样会复位，不会把上一次停靠的修缮记录误算到本次停靠。
+   */
+  handlePlayerArrive(playerId: string, cellId: number): void {
+    this.repairedThisVisit.set(this.repairVisitKey(playerId, cellId), false);
+  }
+
+  /**
    * 处理纪念碑格子事件（玩家到达时调用）
    *
    * 由 MovementHandler 或 HandlerRegistry 调用
@@ -397,9 +407,7 @@ export class MonumentHandler {
     const monumentCell = mapIndex.getById(monumentId);
     if (!monumentCell) return;
 
-    // 玩家本次停靠（到达）时重置修缮标记，实现"停一次只能修缮一次"：
-    // 每次到达可修缮一次，修缮后置位，直到再次离开后重新到达才能再次修缮。
-    this.repairedThisVisit.set(this.repairVisitKey(playerId, monumentId), false);
+    this.handlePlayerArrive(playerId, monumentId);
 
     const monumentState = this.monumentStates.get(monumentId);
     if (!monumentState) {

@@ -43,6 +43,7 @@ function createTestMapData(): MapData {
     createBaseCell(2, 'investment', [3]),
     createBaseCell(3, 'transport', [4]),
     createBaseCell(4, 'empty'),
+    createBaseCell(5, 'monument'),
   ];
 }
 
@@ -140,5 +141,18 @@ describe('本次停靠操作标记复位', () => {
     movePlayerTo(2);
 
     expect(investmentHandler.actedThisVisit.get('p1:2')).toBe(false);
+  });
+
+  it('传送落到纪念碑时复位修缮标记，不再误报 already_repaired', () => {
+    const monumentHandler = (registry as unknown as { monumentHandler: { repairedThisVisit: Map<string, boolean> } }).monumentHandler;
+    const repairKey = 'p1:5';
+
+    // 上一次停靠在同一纪念碑修缮过
+    monumentHandler.repairedThisVisit.set(repairKey, true);
+
+    // 经传送（非掷骰路径）再次落到该纪念碑
+    movePlayerTo(5);
+
+    expect(monumentHandler.repairedThisVisit.get(repairKey)).toBe(false);
   });
 });
