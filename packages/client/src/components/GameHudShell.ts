@@ -230,6 +230,8 @@ export class GameHudShell {
     this.root.querySelector('[data-action="back"]')?.setAttribute('aria-label', t('common.backToStart'));
     this.root.querySelector('[data-action="settings"]')?.setAttribute('aria-label', t('hud.settings'));
     this.root.querySelector('[data-action="achievements"]')?.setAttribute('aria-label', t('hud.achievements'));
+    // 收起态仅显示一个字形图标，此处为容器补可读屏名称（展开后为带文字按钮）
+    this.root.querySelector('[data-ui="panel-actions"]')?.setAttribute('aria-label', t('hud.panels'));
 
     // 下拉频道选项与输入框占位符
     this.channel.replaceChildren(

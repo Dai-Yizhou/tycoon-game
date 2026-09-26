@@ -331,7 +331,9 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     if (isCurrentPlayer) {
       // 底色呼吸（§3.7）：仅本玩家数值"实际变化"时触发；首次同步（无前值）不触发，避免进页面即呼吸
       if (typeof prevValue === 'number' && prevValue !== payload.current) {
-        options.valueEffects?.onValueChange(payload.fieldId, payload.delta, payload.current);
+        // 变化量取本地观测到的前后差：服务端绝对值广播的 delta 固定为 0（见 valuePublisher），
+        // 不可用作展示值；此处 prevValue 与 current 都是权威值，差值即本次真实变化量。
+        options.valueEffects?.onValueChange(payload.fieldId, payload.current - prevValue, payload.current);
       }
       refresh();
     }
@@ -474,7 +476,8 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
       // 底色呼吸（§3.7）：仅当变化的是"本玩家所在区域"且数值实际变化时触发（HUD 区域状态条随之呼吸）
       const currentRegionId = store.getCell(store.getSnapshot().currentPlayerPosition)?.regionId;
       if (typeof prevValue === 'number' && prevValue !== payload.value && currentRegionId === payload.regionId) {
-        options.valueEffects?.onValueChange(payload.fieldId, payload.delta, payload.value);
+        // 同 valueChanged：用本地观测到的前后差，而非服务端契约里恒为 0 的 delta
+        options.valueEffects?.onValueChange(payload.fieldId, payload.value - prevValue, payload.value);
       }
     }
   });

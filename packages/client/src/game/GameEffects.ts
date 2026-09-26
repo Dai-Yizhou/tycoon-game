@@ -269,7 +269,7 @@ export class CssTransitionEffectHooks extends NoOpEffectHooks {
 
   /** 数值结算（§3.7 底色呼吸）：仅"发生变化的那一个数值显示框"填充底色快速提亮再归位。
    *  目标元素由 HUD 写入 data-field=<fieldId>（玩家字段与区域字段都落在各自的数值框上）。 */
-  onValueChange(fieldId: string, _delta: number, _newValue: number): void {
+  onValueChange(fieldId: string, delta: number, _newValue: number): void {
     const target = this.root.querySelector<HTMLElement>(`[data-field~="${fieldId}"]`);
     if (!target) return;
     target.classList.remove('fx-value-breathe');
@@ -277,6 +277,26 @@ export class CssTransitionEffectHooks extends NoOpEffectHooks {
     target.classList.add('fx-value-breathe');
     // 时长与 CSS 动画共用 --motion-value-breathe 单点，避免定时器短于动画而把呼吸截断
     this.removeClassFromAfter(target, 'fx-value-breathe', this.motionMs('--motion-value-breathe', 500));
+    this.showValueDelta(target, delta);
+  }
+
+  /** 数值变化量横条（§3.7 续）：在数值框正下方紧贴临时显示本次带符号变化量。
+   *  增用强调色、减用墨色（不新增主题令牌）。条本身由 CSS 动画 forwards 淡出，
+   *  定时器只负责清理节点；时长与动画共用 --motion-value-delta 单点。 */
+  private showValueDelta(pill: HTMLElement, delta: number): void {
+    const rounded = Math.round(delta);
+    // 绝对值覆写广播（契约 delta:0）与无变化场景不显示横条
+    if (!Number.isFinite(rounded) || rounded === 0) return;
+    pill.querySelector('.value-delta')?.remove();
+    const bar = document.createElement('span');
+    bar.className = `value-delta${rounded < 0 ? ' value-delta--down' : ''}`;
+    bar.textContent = `${rounded > 0 ? '+' : ''}${rounded}`;
+    pill.appendChild(bar);
+    const timer = setTimeout(() => {
+      bar.remove();
+      this.timers.delete(timer);
+    }, this.motionMs('--motion-value-delta', 1000) + 60);
+    this.timers.add(timer);
   }
 
   onIntersectionPrompt(options: number[]): void {

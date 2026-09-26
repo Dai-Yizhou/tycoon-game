@@ -13,16 +13,20 @@
   --motion-fast: 0.15s ease;
   --motion-normal: 0.25s ease;
   /* 数值底色呼吸总时长（§3.7）：CSS 与 JS 共用此单点，避免定时器把动画截断 */
-  --motion-value-breathe: 0.5s;
+  --motion-value-breathe: 500ms;
+  /* 数值变化量横条停留时长（§3.7 续）：比呼吸略长，保证读完数字再淡出。
+     必须写 ms：JS 侧用 readCssVarNumber（parseInt）读取，写 1s 会被解析成 1。 */
+  --motion-value-delta: 1000ms;
   /* 纸纹噪点（全局材质效果，不属于地域身份）：棋盘底纸与半透明浮层共用。
      浮层本身是半透明的，若背后只有一片纯色，任何 alpha 都读作实心；
      底纸带上噪点后，浮层后面的纹理确实可见，这才是"浮层被看穿"的视觉依据。
      强度取 0.26：既保证隔层可辨的纸感，又不至于让底色发脏。 */
   --gp-paper-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='10' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.2'/%3E%3C/svg%3E");
   /* SVG 地图连线几何（箭头尺寸 / 端点与格子边缘的留白，布局常量）
-     线宽由主题令牌 dimension.line.map 驱动（--map-link-width） */
-  --map-arrow-size: 22;
-  --map-link-gap: 4;
+     线宽由主题令牌 dimension.line.map 驱动（--map-link-width）。
+     路径指示定位为"背景参考"而非主体：线更细、箭头更小，避免抢格子的视觉权重。 */
+  --map-arrow-size: 14;
+  --map-link-gap: 6;
   /* HUD 上下栏高度（布局常量）：既是两条栏自身的几何，也是相机安全区的依据。
      相机据此把跟随目标限制在两栏渐变覆盖带之内，避免玩家与所在格贴到画面边缘被渐变盖住，
      故两处必须同源（改栏高只需改这里）。
@@ -97,8 +101,36 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   bottom: 16px;
   z-index: 35;
   display: flex;
+  align-items: center;
   gap: 6px;
 }
+/* 右下功能面板：默认收起为单个菜单字形图标，鼠标悬停区域内（或键盘聚焦）展开全部按钮。
+   收起态的按钮不做 display:none —— 它们仍留在 Tab 序中，只是被压到 0 宽且透明，
+   键盘用户 Tab 进来即触发 :focus-within 展开，保证全键盘可达；
+   展开后即为带文字按钮，满足"不只靠图标识别"的要求。
+   悬停命中区四周外扩 8px：收起态只有一个字形，命中目标偏小；该扩区必须在所有状态下
+   都存在，否则"进入扩区→扩区消失→丢失 hover→扩区恢复"会形成抖动循环。 */
+.hud-panel-actions::before { content: ""; position: absolute; inset: -8px; }
+.hud-panel-actions:not(:hover):not(:focus-within) { gap: 0; }
+.hud-panel-actions:not(:hover):not(:focus-within) > .panel-button {
+  width: 0; min-width: 0; padding: 0; border-width: 0;
+  opacity: 0; overflow: hidden; white-space: nowrap; pointer-events: none;
+}
+.hud-panel-actions::after {
+  content: "\2261";
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; padding: 6px 10px;
+  border: 1px solid var(--gp-border, var(--region-rule));
+  border-radius: var(--region-radius);
+  background: var(--gp-surface, var(--region-board-bg));
+  color: var(--gp-fg, var(--region-fg));
+  font-size: 13px; line-height: 1;
+}
+/* 展开态：字形让位给三个按钮 */
+.hud-panel-actions:hover::after,
+.hud-panel-actions:focus-within::after { content: none; }
+.hud-panel-actions > .panel-button { transition: opacity var(--motion-fast); }
+
 .panel-button,
 .settings-panel button {
   padding: 6px 10px;
@@ -337,7 +369,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .map-link__arrow {
   fill: var(--region-motion-fg);
   stroke: color-mix(in srgb, var(--region-board-bg) 60%, transparent);
-  stroke-width: 2; stroke-linejoin: round;
+  /* 描边收到 1.2：保留箭头与格底的分离度，同时去掉"大箭头"的厚重感 */
+  stroke-width: 1.2; stroke-linejoin: round;
 }
 .map-node {
   cursor: pointer;
@@ -460,6 +493,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 /* 本玩家行：名次与名字一并高亮，便于在榜中定位自己 */
 .leaderboard-row--self .leaderboard-row__name,
 .leaderboard-row--self .leaderboard-row__score { color: var(--gp-accent); }
+/* 榜单默认只展示自己一行；鼠标悬停榜单区域才展开全部名次（行内只有文本、不可聚焦，
+   故不设 :focus-within）。悬停目标限定在榜单面板内，区域名与时间（.region-status__row）
+   始终常驻不受影响；展开时面板向下生长（顶部锚定），不会挤动上方的区域名与时间。 */
+.region-status .leaderboard-panel .leaderboard-row:not(.leaderboard-row--self) { display: none; }
+.region-status .leaderboard-panel:hover .leaderboard-row { display: flex; }
 /* 底栏遮罩略重于顶栏：容器内控件密集，需要更实的底才读得清（同用墨色，理由见顶栏注释） */
 .gp-actionbar {
   bottom: 0; left: 0; right: 0;  height: var(--gp-actionbar-h); z-index: 20;
@@ -485,6 +523,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 
 .value-pills { display: flex; gap: 6px; flex-shrink: 0; }
 .value-pill {
+  /* 定位基准：数值变化量横条紧贴本框下沿（见 .value-delta） */
+  position: relative;
   display: flex; flex-direction: column; align-items: center;
   padding: 2px 8px; min-width: 56px;
   border: var(--region-border-w) solid var(--gp-border);
@@ -504,6 +544,29 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .fx-value-breathe {
   border-radius: var(--region-radius);
   animation: gp-value-breathe var(--motion-value-breathe, 0.5s) ease-out 1;
+}
+
+/* 数值变化量横条（§3.7 续）：数值变化时在数值框正下方紧贴一条与框同宽的横条，
+   显示本次带符号变化量（增=强调色，减=墨色）。节点由 GameEffects 写入并按同一时长清理；
+   动画 forwards 自行淡出，避免移除节点前闪回。 */
+.value-delta {
+  /* 左右各外扩一个边框宽，使横条与数值框的外沿对齐（而非缩在边框内） */
+  position: absolute; top: 100%; margin-top: 2px;
+  left: calc(-1 * var(--region-border-w)); right: calc(-1 * var(--region-border-w));
+  padding: 1px 4px; text-align: center;
+  font-family: var(--font-num); font-size: 10px; font-weight: 700;
+  border-radius: var(--region-radius);
+  border: var(--region-border-w) solid var(--gp-border);
+  background: var(--gp-surface);
+  color: var(--gp-accent);
+  pointer-events: none;
+  animation: gp-value-delta var(--motion-value-delta, 1s) ease-out 1 forwards;
+}
+.value-delta--down { color: var(--gp-fg); }
+@keyframes gp-value-delta {
+  0% { opacity: 0; transform: translateY(-4px); }
+  15%, 70% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
 }
 
 .topbar-spacer { flex: 1; }
@@ -789,4 +852,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   .username-input, .password-input { transition: none; }
   .fx-step-start, .fx-step-arrive, .fx-move-complete { animation: none; }
   .fx-value-breathe { animation: none; }
+  /* 变化量横条保留（信息性），仅去掉位移与淡出，节点仍由同一时长清理 */
+  .value-delta { animation: none; }
 }

@@ -229,7 +229,7 @@
     },
     "line": {
       "map": {
-        "$value": 10,
+        "$value": 5,
         "$type": "number"
       },
       "current": {
