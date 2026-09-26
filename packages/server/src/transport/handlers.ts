@@ -14,10 +14,10 @@
  * ```
  */
 
-import { ChatChannels, DomainEvents, participatesInEconomy, type ChatChannel, type ChatMessage, parseChatCommand, type CommandResult } from '@game/shared';
+import { ChatChannels, DomainEvents, participatesInEconomy, type ChatChannel, type ChatMessage, parseChatCommand, type CommandResult, type Player } from '@game/shared';
 import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from './SocketManager.js';
-import type { GameWorld } from '../world/GameWorld.js';
+import { WorldEvents, type GameWorld } from '../world/GameWorld.js';
 import { ChatManager, DEFAULT_CHAT_CONFIG, FeedbackManager } from '../chat/index.js';
 import { Bankruptcy, EconomyService } from '../economy/index.js';
 import { DiceHandler, MovementHandler, PropertyHandler, JailHandler, InvestmentHandler, TransportHandler, MonumentHandler, TeamHandler } from '../handlers/index.js';
@@ -120,6 +120,16 @@ export class HandlerRegistry {
     this.teamHandler = new TeamHandler(io, world, this.teamManager);
     this.chatManager = new ChatManager({ ...DEFAULT_CHAT_CONFIG, bannedWords: ['testword'] });
     this.feedbackManager = new FeedbackManager(this.chatManager, world.getWorldIdentity()?.worldId);
+
+    // 「本次停靠」语义统一到「玩家位置真实变化」这一唯一锚点：只要玩家落到某格就复位该格的
+    // 停靠操作标记。此前只有掷骰落地（handleCellEvent）会复位，经传送、行为位移等非掷骰路径
+    // 再次落到同一格时标记仍是上一次停靠留下的 true，导致客户端显示动作可用、服务端却以
+    // action_used_this_stop 拒绝（"本次停留未使用的行动被误判为已使用"）。
+    world.on(WorldEvents.PlayerPositionChanged, ({ player }: { player: Player }) => {
+      this.propertyHandler.handlePlayerArrive(player.id, player.position.cellId);
+      this.investmentHandler.handlePlayerArrive(player.id, player.position.cellId);
+      this.transportHandler.handlePlayerArrive(player.id, player.position.cellId);
+    });
   }
 
   /**

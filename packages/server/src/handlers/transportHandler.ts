@@ -503,6 +503,16 @@ export class TransportHandler {
   }
 
   /**
+   * 玩家到达某格时重置本次停靠传送标记（停一次只允许传送一次）。
+   *
+   * 由 HandlerRegistry 统一挂到「玩家位置真实变化」事件上调用，因此经传送、行为位移
+   * 等非掷骰路径落到同一枢纽时同样会复位，不会把上一次停靠的传送记录误算到本次停靠。
+   */
+  handlePlayerArrive(playerId: string, cellId: number): void {
+    this.teleportedThisVisit.set(`${playerId}:${cellId}`, false);
+  }
+
+  /**
    * 处理交通枢纽格子事件（玩家到达时调用）
    *
    * 由 MovementHandler 或 HandlerRegistry 调用
@@ -514,8 +524,7 @@ export class TransportHandler {
     const hubCell = mapIndex.getById(hubId);
     if (!hubCell) return;
 
-    // 玩家本次停靠（到达）时重置传送标记，实现"停一次只能传送一次"
-    this.teleportedThisVisit.set(`${playerId}:${hubId}`, false);
+    this.handlePlayerArrive(playerId, hubId);
 
     const hubState = this.hubStates.get(hubId);
     if (!hubState) {
