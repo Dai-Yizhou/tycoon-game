@@ -1,0 +1,8 @@
+<svg width="60" height="66" viewBox="-30 -26 60 66" xmlns="http://www.w3.org/2000/svg">
+  <!-- 沿用棋子图标 -->
+  <!-- 头部：黄色填充 + 黑色描边 -->
+  <circle cx="0" cy="-4" r="12" fill="#F3D68A" stroke="#1A1A1A" stroke-width="4" />
+  
+  <!-- 身体：铁锈红填充 + 黑色描边 + 圆角 -->
+  <path d="M-18 34 L-11 2 L11 2 L18 34 Z" fill="#A13E32" stroke="#1A1A1A" stroke-width="4" stroke-linejoin="round" />
+</svg>

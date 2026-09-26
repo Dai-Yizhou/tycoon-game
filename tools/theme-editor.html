@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>主题令牌编辑器</title>
+<!--
+  主题令牌编辑器（单文件，零依赖，零构建）
+  ---------------------------------------------------------------
+  用途：手动导入 DTCG 主题令牌与地图文件，实时预览令牌改动的观感，导出整份主题 JSON 覆盖回仓库。
+
+  同源说明（改一处需同步，避免两处漂移）：
+  - 令牌 → CSS 变量映射表 CSS_VAR_MAP 与 packages/client/src/design/DesignAdapter.ts 的 DOM_TOKEN_MAP 同源；
+  - 预览样式镜像 packages/client/src/style.css 中消费令牌的关键规则（栏遮罩/数值框/榜单/掷骰/聊天/地图/夜晚叠加）；
+  - 昼夜相位按 packages/shared/src/daynight/phase.ts 的口径本地复算（白昼窗口以 12:00 为中点，
+    偏移按 offsetMinutes/1440 且不对周期取模）；阴影/夜晚强度按 DayNightShadow.ts 的公式复算；
+  - 纸纹噪点与 style.css 的 --gp-paper-noise 同源。
+
+  非目标：不写盘、不请求服务端、不编辑地图与数值、不做构建。
+-->
+<style>
+/* ============================================================
+   编辑器外壳（独立配色，不消费主题令牌，避免编辑令牌时自身抖动）
+   ============================================================ */
+:root {
+  --ed-bg: #14161a;
+  --ed-panel: #1c1f25;
+  --ed-line: #2c313a;
+  --ed-fg: #dfe3ea;
+  --ed-muted: #8b93a1;
+  --ed-accent: #d98a4a;
+  --ed-ok: #6fae7c;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  display: grid; grid-template-columns: 380px 1fr; grid-template-rows: 44px 1fr;
+  height: 100vh; overflow: hidden;
+  background: var(--ed-bg); color: var(--ed-fg);
+  font-family: "PingFang SC", "Noto Sans SC", system-ui, sans-serif; font-size: 12px;
+}
+header.ed-bar {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 10px;
+  padding: 0 12px; border-bottom: 1px solid var(--ed-line); background: var(--ed-panel);
+}
+.ed-title { font-weight: 700; letter-spacing: 0.04em; }
+.ed-hint { color: var(--ed-muted); font-size: 11px; }
+.ed-actions { margin-left: auto; display: flex; gap: 6px; }
+button.ed-btn, label.ed-file {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--ed-line); border-radius: 3px;
+  background: #23272e; color: var(--ed-fg); cursor: pointer;
+}
+button.ed-btn:hover, label.ed-file:hover { background: #2b3038; }
+button.ed-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+label.ed-file input { display: none; }
+
+aside.ed-panel { border-right: 1px solid var(--ed-line); overflow: hidden; display: flex; flex-direction: column; }
+.ed-tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-bottom: 1px solid var(--ed-line); }
+.ed-tab {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; font-size: 11px;
+  border: 1px solid var(--ed-line); border-radius: 3px; background: #20242a; cursor: pointer;
+}
+.ed-tab--active { border-color: var(--ed-accent); color: var(--ed-accent); }
+.ed-tab__dirty { color: var(--ed-ok); font-size: 10px; }
+.ed-search { padding: 8px; border-bottom: 1px solid var(--ed-line); display: flex; gap: 6px; }
+.ed-search input {
+  flex: 1; padding: 5px 8px; font-size: 11px; color: var(--ed-fg);
+  background: #171a1f; border: 1px solid var(--ed-line); border-radius: 3px;
+}
+.ed-tokens { flex: 1; overflow-y: auto; padding: 4px 8px 20px; }
+.ed-group { margin-top: 10px; }
+.ed-group__title {
+  position: sticky; top: 0; padding: 4px 0; background: var(--ed-bg);
+  color: var(--ed-accent); font-weight: 700; font-size: 11px; letter-spacing: 0.06em;
+}
+.ed-sub { margin: 4px 0 2px; color: var(--ed-muted); font-size: 10px; }
+.tk { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.tk__sw { width: 12px; height: 12px; border: 1px solid var(--ed-line); border-radius: 2px; flex-shrink: 0; }
+.tk__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk__var { color: var(--ed-muted); font-size: 10px; font-family: Menlo, monospace; }
+.tk__ctl { display: flex; gap: 3px; flex-shrink: 0; }
+.tk__ctl input {
+  width: 74px; padding: 2px 4px; font-size: 11px; font-family: Menlo, monospace;
+  color: var(--ed-fg); background: #171a1f; border: 1px solid var(--ed-line); border-radius: 2px;
+}
+.tk__ctl input[type=color] { width: 20px; padding: 0; height: 20px; }
+.tk__reset { padding: 0 5px; font-size: 11px; background: none; border: none; color: var(--ed-muted); cursor: pointer; }
+.tk__reset:hover { color: var(--ed-fg); }
+.tk--dirty .tk__name { color: var(--ed-ok); }
+
+main.ed-stage-wrap { position: relative; overflow: hidden; background: #0f1114; }
+
+/* ============================================================
+   预览区（镜像 style.css 的令牌消费规则；预览自身不参与编辑器配色）
+   ============================================================ */
+#stage {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+}
+.pv-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 6px 12px; border-bottom: 1px solid var(--ed-line); background: var(--ed-panel);
+  font-size: 11px; color: var(--ed-muted); flex-shrink: 0;
+}
+.pv-toolbar label { display: inline-flex; align-items: center; gap: 5px; }
+.pv-toolbar input[type=range] { width: 150px; }
+.pv-toolbar select, .pv-toolbar input[type=number] {
+  padding: 3px 6px; font-size: 11px; color: var(--ed-fg);
+  background: #171a1f; border: 1px solid var(--ed-line); border-radius: 3px;
+}
+.pv-toolbar .pv-val { color: var(--ed-fg); font-family: Menlo, monospace; min-width: 62px; display: inline-block; }
+.pv-stage { position: relative; flex: 1; overflow: hidden; }
+.pv-empty {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  color: var(--ed-muted); font-size: 12px; text-align: center; padding: 20px;
+}
+
+/* —— 预览：地图 —— */
+.pv-map {
+  position: absolute; inset: 0;
+  background-color: var(--gp-map-bg, #ccc);
+  background-image: var(--gp-paper-noise), var(--region-texture);
+  background-blend-mode: multiply, normal;
+}
+.pv-svg { width: 100%; height: 100%; display: block; }
+.map-link {
+  fill: none;
+  stroke: color-mix(in srgb, var(--region-motion-fg) 80%, transparent);
+  stroke-width: var(--map-link-width, 10);
+  stroke-linecap: round;
+}
+.map-link__arrow { fill: var(--region-motion-fg); }
+.map-node__shape { fill: var(--region-cell-bg); stroke: var(--region-border); stroke-width: 3; }
+.pv-nodes .map-node:nth-child(even) .map-node__shape { fill: var(--region-cell-bg-alt); }
+.map-node--hov .map-node__shape { fill: var(--region-box-bg); }
+.map-node--held .map-node__shape { stroke: var(--region-accent); stroke-width: 4; }
+.map-node__type {
+  fill: var(--region-label-fg); font-weight: 700; font-size: 13px;
+  font-family: var(--font-func); letter-spacing: 0.14em;
+}
+.map-node__name {
+  fill: var(--region-fg); font-weight: var(--font-title-weight, 900);
+  font-size: 16px; font-family: var(--font-title);
+}
+.map-player__body { fill: var(--gp-player-self); stroke: var(--tycoon-piece-outline); }
+.map-player__head { fill: var(--tycoon-piece-head); }
+/* 夜晚光照叠加（§3.11）：颜色取主题令牌 --gp-cycle-night，强度由 --gp-night-alpha 插值 */
+.pv-night {
+  position: absolute; inset: 0; z-index: 15; pointer-events: none;
+  background: var(--gp-cycle-night); mix-blend-mode: multiply;
+  opacity: var(--gp-night-alpha, 0);
+}
+
+/* —— 预览：HUD 骨架 —— */
+.pv-hud { position: absolute; inset: 0; z-index: 20; pointer-events: none; }
+.pv-hud .gp-topbar, .pv-hud .gp-actionbar { position: absolute; }
+.pv-hud .cell-hover-card, .pv-hud .hud-chat-dock { position: absolute; }
+.player-badge { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.player-badge__avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--gp-fg); background: var(--gp-accent);
+  display: grid; place-items: center; color: var(--gp-paper); font-size: 10px; font-weight: 800;
+}
+.player-badge__name { font-weight: 800; font-size: 12px; color: var(--gp-fg); }
+.player-badge__team { font-size: 9px; color: var(--gp-muted); }
+.value-pills { display: flex; gap: 6px; flex-shrink: 0; }
+.value-pill {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 2px 8px; min-width: 56px;
+  border: var(--region-border-w) solid var(--gp-border);
+  border-radius: var(--region-radius); background: var(--gp-surface);
+}
+.value-pill__label {
+  font-size: 8px; color: var(--gp-muted); font-family: var(--font-func);
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.value-pill__num { font-family: var(--font-num); font-size: 13px; font-weight: 700; color: var(--gp-fg); }
+.value-pill--accent .value-pill__num { color: var(--gp-accent); }
+.region-status {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+  text-align: right; padding: 4px 8px; max-width: 52%;
+  border: var(--region-border-w) solid var(--gp-border);
+  border-radius: var(--region-radius); background: var(--gp-surface);
+}
+.region-status__row { display: flex; align-items: center; gap: 8px; }
+.region-status__name { white-space: nowrap; font-weight: 800; font-size: 12px; color: var(--gp-fg); }
+.cycle-indicator { display: flex; align-items: center; gap: 6px; }
+.cycle-dot { width: 10px; height: 10px; border-radius: 50%; border: var(--region-border-w) solid var(--gp-border); }
+.cycle-dot--day { background: var(--gp-cycle-day); }
+.cycle-dot--night { background: var(--gp-cycle-night); }
+.cycle-text { font-size: 10px; color: var(--gp-muted); font-family: var(--font-num); }
+.region-status .leaderboard-panel {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--gp-border);
+  color: var(--gp-muted); font-family: var(--font-num); font-size: 11px;
+}
+.leaderboard-row { display: flex; align-items: baseline; gap: 6px; justify-content: flex-end; }
+.leaderboard-row__rank { min-width: 14px; text-align: right; color: var(--gp-accent); font-weight: 700; }
+.leaderboard-row__name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboard-row__score { color: var(--gp-fg); font-weight: 700; }
+.leaderboard-row--self .leaderboard-row__name,
+.leaderboard-row--self .leaderboard-row__score { color: var(--gp-accent); }
+.cell-hover-card {
+  top: 96px; left: 24px; width: 186px; padding: 10px;
+  border: var(--region-border-w) solid var(--gp-border); border-radius: var(--region-radius);
+  background: var(--gp-surface); color: var(--gp-fg);
+  box-shadow: var(--gp-shadow-paper, 2px 2px 0 rgba(0,0,0,.3));
+}
+.cell-hover-card__type {
+  font-family: var(--font-func); font-size: 8px; letter-spacing: 0.08em;
+  color: var(--gp-accent); text-transform: uppercase;
+}
+.cell-hover-card__title {
+  font-family: var(--font-title); font-weight: var(--font-title-weight, 900); font-size: 15px; margin: 3px 0;
+}
+.cell-hover-card__description { font-family: var(--font-func); margin: 2px 0 5px; font-size: 10px; }
+.cell-hover-card__rows {
+  font-family: var(--font-func); display: grid; grid-template-columns: 1fr 1fr;
+  gap: 3px 10px; font-size: 9px;
+}
+.cell-hover-card__rows span { color: var(--gp-muted); }
+.cell-hover-card__rows b { font-family: var(--font-num); font-size: 9px; }
+.hud-chat-dock {
+  left: 18px; bottom: 104px; width: 260px;
+  border: var(--region-border-w) solid var(--gp-border); border-radius: var(--region-radius);
+  background: var(--gp-surface); color: var(--gp-fg);
+  box-shadow: var(--gp-shadow-paper, 2px 2px 0 rgba(0,0,0,.3));
+  overflow: hidden; backdrop-filter: blur(4px);
+}
+.hud-chat-dock__ticker { display: flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; }
+.hud-chat-dock__ticker-icon { font-size: 9px; font-weight: 900; color: var(--gp-accent); }
+.hud-chat-dock__ticker-text {
+  flex: 1; font-size: 9px; color: var(--gp-fg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hud-chat-dock__expanded { display: none; flex-direction: column; }
+.hud-chat-dock.is-expanded .hud-chat-dock__expanded { display: flex; }
+.hud-chat-dock.is-expanded .hud-chat-dock__ticker { display: none; }
+.hud-chat-dock__filters {
+  display: flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px;
+  border-bottom: var(--region-border-w) solid var(--gp-border);
+}
+.hud-chat-dock__filter { font-size: 9px; color: var(--gp-muted); }
+.hud-chat-dock__filter--checked { color: var(--gp-fg); }
+.hud-chat-msgs { max-height: 96px; overflow-y: auto; padding: 2px 8px; }
+.hud-chat-msg {
+  font-size: 9.5px; line-height: 1.3; padding: 2px 0; color: var(--gp-fg);
+  border-bottom: 1px dotted color-mix(in srgb, var(--gp-fg) 8%, transparent);
+}
+.hud-chat-msg:last-child { border-bottom: none; }
+.hud-chat-msg b { color: var(--gp-accent); font-weight: 700; font-size: 8px; margin-right: 3px; }
+.hud-chat-dock__input {
+  display: flex; gap: 3px; padding: 3px 8px 5px;
+  border-top: var(--region-border-w) solid var(--gp-border);
+}
+.hud-chat-dock__input span {
+  flex: 2; min-width: 0; padding: 2px 5px; font-size: 9px; color: var(--gp-muted);
+  border: var(--region-border-w) solid var(--gp-border);
+  border-radius: var(--region-radius); background: var(--gp-card);
+}
+.hud-chat-dock__input button {
+  padding: 2px 7px; font-size: 8px; font-weight: 800; border: none;
+  border-radius: var(--region-radius); background: var(--gp-accent); color: var(--gp-paper);
+}
+.dice-zone { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; }
+.dice-btn {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 13px; padding: 8px 18px; overflow: hidden;
+  border: var(--region-border-w) solid var(--gp-border); border-radius: var(--region-radius);
+  background: var(--gp-card); color: var(--gp-fg);
+  box-shadow: 2px 2px 0 var(--gp-border);
+}
+.dice-btn__face { position: relative; display: flex; align-items: center; gap: 6px; }
+.dice-btn__fill {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--gp-accent); color: var(--gp-paper);
+  clip-path: inset(0 calc(100% - 100% * var(--cooldown, 1)) 0 0);
+}
+#pvDice:disabled { cursor: not-allowed; box-shadow: none; }
+#pvDice:disabled .dice-btn__fill { clip-path: inset(0 100% 0 0); }
+.dice-status { font-size: 11px; color: var(--gp-muted); font-family: var(--font-num); }
+.action-cluster { display: flex; gap: 5px; flex-shrink: 0; }
+.act-btn {
+  font-size: 12px; font-weight: 700; padding: 6px 12px; white-space: nowrap;
+  border: var(--region-border-w) solid var(--gp-border); border-radius: var(--region-radius);
+  background: var(--gp-card); color: var(--gp-fg);
+}
+.act-btn--accent { background: var(--gp-accent); color: var(--gp-paper); border-color: var(--gp-accent); }
+.act-btn__price { display: block; font-family: var(--font-num); font-size: 8px; font-weight: 700; }
+
+/* 顶栏 / 底栏：墨色遮罩带（与 style.css 同源，见其注释） */
+.gp-topbar {
+  top: 0; left: 0; right: 0; height: var(--gp-topbar-h, 76px);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 14px 18px;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--gp-border) 30%, transparent) 0%,
+    color-mix(in srgb, var(--gp-border) 14%, transparent) 55%,
+    color-mix(in srgb, var(--gp-border) 6%, transparent) 100%);
+  border-bottom: 1px solid color-mix(in srgb, var(--gp-border) 32%, transparent);
+}
+.gp-actionbar {
+  bottom: 0; left: 0; right: 0; height: var(--gp-actionbar-h, 88px);
+  display: flex; align-items: center; gap: 12px; padding: 0 18px;
+  background: linear-gradient(0deg,
+    color-mix(in srgb, var(--gp-border) 34%, transparent) 0%,
+    color-mix(in srgb, var(--gp-border) 16%, transparent) 55%,
+    color-mix(in srgb, var(--gp-border) 6%, transparent) 100%);
+  border-top: 1px solid color-mix(in srgb, var(--gp-border) 32%, transparent);
+}
+/* 动效关闭：预览内一切过渡/动画停用（等价 reduced-motion 观感） */
+.pv-no-motion * { animation: none !important; transition: none !important; }
+</style>
+</head>
+<body>
+
+<header class="ed-bar">
+  <span class="ed-title">主题令牌编辑器</span>
+  <span class="ed-hint">导入主题令牌与地图文件（可多选，按内容自动识别）</span>
+  <span class="ed-actions">
+    <label class="ed-file">导入令牌<input id="themeFiles" type="file" accept=".json,application/json" multiple /></label>
+    <label class="ed-file">导入地图<input id="mapFiles" type="file" accept=".json,application/json" multiple /></label>
+    <button class="ed-btn" id="exportBtn" disabled>导出当前主题 JSON</button>
+    <button class="ed-btn" id="resetBtn" disabled>全部还原</button>
+  </span>
+</header>
+
+<aside class="ed-panel">
+  <div class="ed-tabs" id="tabs"></div>
+  <div class="ed-search"><input id="tkSearch" type="search" placeholder="搜索令牌路径…" /></div>
+  <div class="ed-tokens" id="tokens"></div>
+</aside>
+
+<main class="ed-stage-wrap">
+  <div id="stage">
+    <div class="pv-toolbar" id="toolbar">
+      <label>语言
+        <select id="locale">
+          <option value="zh-CN">zh-CN</option>
+          <option value="en-US">en-US</option>
+        </select>
+      </label>
+      <label>昼夜
+        <input id="timeSlider" type="range" min="0" max="1439" step="1" value="720" />
+        <span class="pv-val" id="timeVal">12:00</span>
+      </label>
+      <label>CD
+        <input id="cdSlider" type="range" min="0" max="100" step="1" value="100" />
+        <span class="pv-val" id="cdVal">100%</span>
+      </label>
+      <label><input id="diceDisabled" type="checkbox" /> 掷骰禁用</label>
+      <label><input id="motionToggle" type="checkbox" checked /> 动效</label>
+      <label><input id="chatToggle" type="checkbox" /> 聊天展开</label>
+      <label>格子状态
+        <select id="cellState">
+          <option value="plain">未持股</option>
+          <option value="held">已持股（自己）</option>
+          <option value="hover">悬停</option>
+        </select>
+      </label>
+    </div>
+    <div class="pv-stage" id="pvStage">
+      <div class="pv-empty" id="pvEmpty">请先导入主题令牌文件（如 northeast.json），地图可选</div>
+    </div>
+  </div>
+</main>
+
+<script>
+"use strict";
+
+/* ============================================================
+   1. 常量：令牌 → CSS 变量映射、预览常量、文案
+   ============================================================ */
+
+/** 与 DesignAdapter.DOM_TOKEN_MAP 同源：[CSS 变量, 取值种类, 令牌路径] */
+const CSS_VAR_MAP = [
+  ["--tycoon-piece-head", "color", "color.piece.head"],
+  ["--tycoon-piece-outline", "color", "color.piece.outline"],
+  ["--map-link-width", "number", "dimension.line.map"],
+  ["--gp-player-self", "color", "color.player.self"],
+  ["--gp-player-teammate", "color", "color.player.teammate"],
+  ["--gp-player-other", "color", "color.player.other"],
+  ["--gp-bar-bg", "color", "color.hud.barBg"],
+  ["--gp-sidebar-bg", "color", "color.hud.sidebarBg"],
+  ["--gp-map-bg", "color", "color.hud.mapBg"],
+  ["--gp-card", "color", "color.hud.card"],
+  ["--gp-fg", "color", "color.hud.fg"],
+  ["--gp-border", "color", "color.hud.cellBorder"],
+  ["--gp-muted", "color", "color.hud.muted"],
+  ["--gp-accent", "color", "color.palette.accent"],
+  ["--gp-aux", "color", "color.hud.aux"],
+  ["--gp-cell-a", "color", "color.hud.cellA"],
+  ["--gp-cell-b", "color", "color.hud.cellB"],
+  ["--font-body", "color", "font.body"],
+  ["--font-title", "color", "font.title"],
+  ["--font-func", "color", "font.func"],
+  ["--font-num", "color", "font.number"],
+  ["--font-title-weight", "number", "font.titleWeight"],
+  ["--font-title-spacing", "string", "font.titleSpacing"],
+  ["--font-body-spacing", "string", "font.bodySpacing"],
+  ["--font-title-line", "number", "font.titleLineHeight"],
+  ["--region-board-bg", "color", "color.region.board"],
+  ["--region-fg", "color", "color.region.fg"],
+  ["--region-border", "color", "color.region.border"],
+  ["--region-border-w", "px", "color.region.borderWidth"],
+  ["--region-radius", "px", "color.region.radius"],
+  ["--region-accent", "color", "color.region.accent"],
+  ["--region-aux", "color", "color.region.aux"],
+  ["--region-label-fg", "color", "color.region.labelFg"],
+  ["--region-motion-fg", "color", "color.region.motionFg"],
+  ["--region-rule", "color", "color.region.ruleColor"],
+  ["--region-cell-bg", "color", "color.region.cellBg"],
+  ["--region-cell-bg-alt", "color", "color.region.cellBgAlt"],
+  ["--region-box-bg", "color", "color.region.boxBg"],
+  ["--region-texture", "color", "texture.region.background"],
+  ["--auth-bg", "color", "color.region.board"],
+  ["--auth-fg", "color", "color.region.fg"],
+  ["--auth-card", "color", "color.region.boxBg"],
+  ["--auth-surface", "color", "color.region.cellBg"],
+  ["--auth-muted", "color", "color.region.labelFg"],
+  ["--auth-accent", "color", "color.region.accent"],
+  ["--auth-accent-hover", "color", "color.region.accentHover"],
+  ["--auth-border", "color", "color.region.border"],
+  ["--auth-border-soft", "color", "color.region.cellBorder"],
+  ["--auth-error", "color", "color.region.error"],
+  ["--auth-track", "color", "color.region.board"],
+  ["--auth-paper", "color", "color.region.btnFg"],
+  ["--auth-radius", "px", "color.region.radius"],
+  ["--gp-paper", "color", "color.region.btnFg"],
+  ["--gp-cycle-day", "color", "color.region.cycleDay"],
+  ["--gp-cycle-night", "color", "color.region.cycleNight"],
+  ["--motion-fast", "string", "motion.fast"],
+  ["--motion-normal", "string", "motion.normal"],
+  ["--motion-hover", "ms", "motion.hover"],
+  ["--motion-bounce", "string", "motion.bounce"],
+  ["--motion-transition", "string", "motion.transition"],
+  ["--motion-step", "ms", "motion.step"],
+  ["--motion-step-arrive", "ms", "motion.stepArrive"],
+  ["--motion-move-complete", "ms", "motion.moveComplete"],
+  ["--motion-dice-settled", "ms", "motion.diceSettled"],
+  ["--motion-property-bought", "ms", "motion.propertyBought"],
+  ["--motion-bankrupt", "ms", "motion.bankrupt"],
+  ["--motion-slideup-title", "string", "motion.slideUpTitle"],
+  ["--motion-slideup", "string", "motion.slideUp"],
+  ["--motion-spin", "string", "motion.spin"],
+  ["--gp-light-piece-span", "number", "light.pieceSpan"],
+  ["--gp-light-piece-dy", "number", "light.pieceDy"],
+  ["--gp-light-piece-alpha-day", "number", "light.pieceAlphaDay"],
+  ["--gp-light-piece-alpha-night", "number", "light.pieceAlphaNight"],
+  ["--gp-light-cell-span", "number", "light.cellSpan"],
+  ["--gp-light-cell-dy", "number", "light.cellDy"],
+  ["--gp-light-cell-alpha-day", "number", "light.cellAlphaDay"],
+  ["--gp-light-cell-alpha-night", "number", "light.cellAlphaNight"],
+  ["--gp-light-night-overlay-max", "number", "light.nightOverlayMax"],
+  // 预览专用：棋子描边宽度（DesignAdapter 该值走 canvas 快照，未映射为 CSS 变量）
+  ["--pv-piece-outline-w", "number", "dimension.piece.outline"],
+];
+
+/** 预览用固定常量：非主题身份，与 style.css 的 :root 同源 */
+const PREVIEW_CONSTANTS = {
+  "--motion-value-breathe": "0.5s",
+  "--map-arrow-size": "22",
+  "--map-link-gap": "4",
+  "--gp-topbar-h": "76px",
+  "--gp-actionbar-h": "88px",
+  "--gp-paper-noise": "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='10' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.2'/%3E%3C/svg%3E\")",
+};
+
+/** 预览文案（最小集） */
+const I18N = {
+  "zh-CN": {
+    roll: "掷骰", ranking: "榜单", you: "你", player: "玩家一", team: "无队伍",
+    buy: "购买", upgrade: "升级", transport: "传送", price: "价格", rent: "租金",
+    cd: "冷却中", ready: "可行动", region: "区域", chatPlaceholder: "输入消息…",
+    chatSend: "发送", tagSelf: "本玩家", tagTeammate: "队友", tagOther: "其他玩家",
+    noMap: "未导入地图文件：地图区留空（顶栏/底栏/聊天仍可预览）",
+    noTheme: "请先导入主题令牌文件（如 northeast.json）",
+  },
+  "en-US": {
+    roll: "Roll", ranking: "Ranking", you: "You", player: "Player 1", team: "No team",
+    buy: "Buy", upgrade: "Upgrade", transport: "Transport", price: "Price", rent: "Rent",
+    cd: "Cooldown", ready: "Ready", region: "Region", chatPlaceholder: "Type a message…",
+    chatSend: "Send", tagSelf: "You", tagTeammate: "Teammate", tagOther: "Other",
+    noMap: "No map file imported: map area stays empty (HUD can still be previewed)",
+    noTheme: "Import a theme token file first (e.g. northeast.json)",
+  },
+};
+
+/* ============================================================
+   2. 令牌工具：遍历 / 取值 / 别名解析 / 写值
+   ============================================================ */
+
+function isTokenNode(node) {
+  return typeof node === "object" && node !== null && "$value" in node;
+}
+
+/** 扁平化令牌树：保留 JSON 键序，返回 [{path, $value, $type}] */
+function flattenTokens(tree) {
+  const out = [];
+  (function walk(node, prefix) {
+    for (const key of Object.keys(node)) {
+      const child = node[key];
+      const path = prefix ? prefix + "." + key : key;
+      if (isTokenNode(child)) out.push({ path, $value: child.$value, $type: child.$type });
+      else if (typeof child === "object" && child !== null) walk(child, path);
+    }
+  })(tree, "");
+  return out;
+}
+
+function readTokenNode(tree, path) {
+  return path.split(".").reduce((node, key) => (
+    typeof node === "object" && node !== null ? node[key] : undefined
+  ), tree);
+}
+
+function writeTokenValue(tree, path, value) {
+  const keys = path.split(".");
+  const last = keys.pop();
+  const parent = keys.reduce((node, key) => (
+    typeof node === "object" && node !== null ? node[key] : undefined
+  ), tree);
+  if (isTokenNode(parent)) parent[last].$value = value;
+}
+
+/** 颜色别名解析：{color.palette.surface} → 实际色值（与 DesignAdapter.resolveValue 同口径） */
+function resolveColor(value, tree, depth) {
+  if (typeof value !== "string") return String(value);
+  const match = /^\{(.+)}$/.exec(value);
+  if (!match) return value;
+  if ((depth || 0) > 12) return value;
+  const target = readTokenNode(tree, match[1]);
+  return isTokenNode(target) ? resolveColor(target.$value, tree, (depth || 0) + 1) : value;
+}
+
+/** 令牌值 → CSS 变量值（color 走别名解析，其余原样/加单位） */
+function cssValueOf(source, tree) {
+  const node = readTokenNode(tree, source.path);
+  if (!isTokenNode(node)) return null;
+  switch (source.kind) {
+    case "color": return resolveColor(node.$value, tree, 0);
+    case "px": return node.$value + "px";
+    case "ms": return node.$value + "ms";
+    case "number": return String(node.$value);
+    default: return String(node.$value);
+  }
+}
+
+/** 路径 → CSS 变量名（可能多个，如 board 同时喂 auth-bg） */
+function cssVarsForPath(path) {
+  const list = [];
+  for (const [cssVar, kind, tokenPath] of CSS_VAR_MAP) {
+    if (tokenPath === path) list.push(cssVar);
+  }
+  return list;
+}
+
+/* ============================================================
+   3. 状态
+   ============================================================ */
+
+const state = {
+  themes: new Map(),      // id → { tree, original, dirty:Set<path> }
+  currentThemeId: null,
+  cells: [],
+  meta: null,
+  locale: "zh-CN",
+  timeMinutes: 720,       // 0..1439
+  cooldown: 1,            // 0..1 掷骰填充揭示比例
+  diceDisabled: false,
+  motion: true,
+  chatExpanded: false,
+  cellState: "plain",
+  search: "",
+};
+
+/* ============================================================
+   4. 多语言 / 地图取值
+   ============================================================ */
+
+/** 与 client 的 localizedText 同口径：当前语言 → zh-CN → en-US → 任意非空键 */
+function localized(value, fallback) {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object") {
+    const order = [state.locale, "zh-CN", "en-US"];
+    for (const key of order) if (typeof value[key] === "string" && value[key]) return value[key];
+    for (const key of Object.keys(value)) if (typeof value[key] === "string" && value[key]) return value[key];
+  }
+  return fallback;
+}
+
+function t(key) {
+  const dict = I18N[state.locale] || I18N["zh-CN"];
+  return dict[key] !== undefined ? dict[key] : key;
+}
+
+/** 首格时区（分钟），用于昼夜相位 */
+function tzOffsetMinutes() {
+  const first = state.cells[0];
+  return first && typeof first.timezone === "number" ? first.timezone : 0;
+}
+
+function dayRatio() {
+  const ratio = state.meta && state.meta.dayNightRatio;
+  return typeof ratio === "number" && ratio > 0 && ratio < 1 ? ratio : 0.5;
+}
+
+/* ============================================================
+   5. 昼夜相位与光照（复算，公式同源）
+   ============================================================ */
+
+function normalize01(value) {
+  return ((value % 1) + 1) % 1;
+}
+
+function currentPhase() {
+  const ratio = dayRatio();
+  const progress = normalize01(state.timeMinutes / 1440 + tzOffsetMinutes() / 1440);
+  const half = ratio / 2;
+  const dayStart = 0.5 - half;
+  const dayEnd = 0.5 + half;
+  const isDay = progress >= dayStart && progress < dayEnd;
+  const totalMinutes = Math.floor(progress * 1440 + 1e-6) % 1440;
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  return {
+    isDay,
+    progress,
+    timeStr: String(hour).padStart(2, "0") + ":" + String(minute).padStart(2, "0"),
+    dayPhase: normalize01(progress - dayStart) / ratio,
+    nightPhase: normalize01(progress - dayEnd) / (1 - ratio),
+  };
+}
+
+function lightParams(tree) {
+  const read = (path, fallback) => {
+    const node = readTokenNode(tree, path);
+    return isTokenNode(node) && typeof node.$value === "number" ? node.$value : fallback;
+  };
+  return {
+    pieceSpan: read("light.pieceSpan", 14),
+    pieceDy: read("light.pieceDy", 3),
+    pieceAlphaDay: read("light.pieceAlphaDay", 0.5),
+    pieceAlphaNight: read("light.pieceAlphaNight", 0.22),
+    cellSpan: read("light.cellSpan", 6),
+    cellDy: read("light.cellDy", 1),
+    cellAlphaDay: read("light.cellAlphaDay", 0.3),
+    cellAlphaNight: read("light.cellAlphaNight", 0.14),
+    nightOverlayMax: read("light.nightOverlayMax", 0.42),
+  };
+}
+
+function clamp01(value) {
+  return Math.min(Math.max(value, 0), 1);
+}
+
+/** 阴影/夜晚强度：与 DayNightShadow.computeDayNightShadow 同口径；动效关闭时退化为静态值 */
+function shadowStyles(phase, params, motion) {
+  if (!motion) {
+    return { pieceDx: 0, pieceDy: params.pieceDy, pieceAlpha: 0.45, cellDx: 0, cellDy: params.cellDy, cellAlpha: 0.3, nightAlpha: 0 };
+  }
+  if (phase.isDay) {
+    const dayP = clamp01(phase.dayPhase);
+    const grade = 1 - Math.abs(dayP - 0.5) * 2;
+    return {
+      pieceDx: (dayP - 0.5) * params.pieceSpan,
+      pieceDy: params.pieceDy,
+      pieceAlpha: params.pieceAlphaDay * (0.55 + 0.45 * grade),
+      cellDx: (dayP - 0.5) * params.cellSpan,
+      cellDy: params.cellDy,
+      cellAlpha: params.cellAlphaDay * (0.55 + 0.45 * grade),
+      nightAlpha: 0,
+    };
+  }
+  const nightP = clamp01(phase.nightPhase);
+  return {
+    pieceDx: (nightP - 0.5) * params.pieceSpan * 0.7,
+    pieceDy: params.pieceDy,
+    pieceAlpha: params.pieceAlphaNight,
+    cellDx: (nightP - 0.5) * params.cellSpan * 0.7,
+    cellDy: params.cellDy,
+    cellAlpha: params.cellAlphaNight,
+    nightAlpha: params.nightOverlayMax * Math.sin(Math.PI * nightP),
+  };
+}
+
+/* ============================================================
+   6. 预览骨架
+   ============================================================ */
+
+const pvStage = document.getElementById("pvStage");
+
+function esc(text) {
+  return String(text).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+}
+
+function buildPreviewSkeleton() {
+  pvStage.innerHTML = `
+    <div class="pv-map"><svg class="pv-svg" id="pvSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    <div class="pv-night"></div>
+    <div class="pv-hud">
+      <header class="gp-topbar">
+        <div class="player-badge">
+          <span class="player-badge__avatar">P1</span>
+          <span>
+            <span class="player-badge__name" data-pv="playerName"></span><br />
+            <span class="player-badge__team" data-pv="playerTeam"></span>
+          </span>
+        </div>
+        <div class="value-pills" data-pv="valuePills"></div>
+        <div class="region-status">
+          <div class="region-status__row">
+            <div class="value-pill value-pill--accent" data-pv="regionPill"></div>
+            <span class="region-status__name" data-pv="regionName"></span>
+            <span class="cycle-indicator">
+              <i class="cycle-dot cycle-dot--day" data-pv="cycleDot"></i>
+              <span class="cycle-text" data-pv="cycleText"></span>
+            </span>
+          </div>
+          <div class="leaderboard-panel" data-pv="leaderboard"></div>
+        </div>
+      </header>
+      <div class="cell-hover-card" data-pv="hoverCard" hidden>
+        <div class="cell-hover-card__type" data-pv="hoverType"></div>
+        <div class="cell-hover-card__title" data-pv="hoverTitle"></div>
+        <div class="cell-hover-card__description" data-pv="hoverDesc"></div>
+        <div class="cell-hover-card__rows" data-pv="hoverRows"></div>
+      </div>
+      <div class="hud-chat-dock" id="pvChat">
+        <div class="hud-chat-dock__ticker">
+          <span class="hud-chat-dock__ticker-icon">&gt;</span>
+          <span class="hud-chat-dock__ticker-text" data-pv="ticker"></span>
+        </div>
+        <div class="hud-chat-dock__expanded">
+          <div class="hud-chat-dock__filters" data-pv="chatFilters"></div>
+          <div class="hud-chat-msgs" data-pv="chatMsgs"></div>
+          <div class="hud-chat-dock__input">
+            <span data-pv="chatPlaceholder"></span>
+            <button type="button" data-pv="chatSend"></button>
+          </div>
+        </div>
+      </div>
+      <footer class="gp-actionbar">
+        <div class="dice-zone">
+          <button class="dice-btn" id="pvDice" type="button">
+            <span class="dice-btn__face" data-pv="rollFace"></span>
+            <span class="dice-btn__fill" data-pv="rollFill"></span>
+          </button>
+          <span class="dice-status" data-pv="diceStatus"></span>
+        </div>
+        <div class="action-cluster" data-pv="actionCluster"></div>
+      </footer>
+    </div>`;
+}
+
+function pv(name) {
+  return pvStage.querySelector('[data-pv="' + name + '"]');
+}
+
+/* ============================================================
+   7. 令牌 → CSS 变量应用
+   ============================================================ */
+
+function currentTheme() {
+  return state.themes.get(state.currentThemeId) || null;
+}
+
+function applyTheme() {
+  const theme = currentTheme();
+  if (!theme) return;
+  const tree = theme.tree;
+  const stage = document.getElementById("stage");
+
+  for (const key of Object.keys(PREVIEW_CONSTANTS)) stage.style.setProperty(key, PREVIEW_CONSTANTS[key]);
+
+  for (const [cssVar, kind, path] of CSS_VAR_MAP) {
+    const value = cssValueOf({ kind, path }, tree);
+    if (value !== null) stage.style.setProperty(cssVar, value);
+  }
+
+  // 派生变量（与 style.css 的 .game-page 同源）
+  stage.style.setProperty("--gp-surface", "color-mix(in srgb, var(--gp-card) 85%, transparent)");
+  stage.style.setProperty("--gp-breathe-tint", "color-mix(in srgb, var(--gp-accent) 30%, var(--gp-surface))");
+  stage.style.setProperty("--gp-shadow-paper", "2px 2px 0 color-mix(in srgb, var(--gp-border) 40%, transparent)");
+
+  renderStates();
+}
+
+/* ============================================================
+   8. HUD / 地图 / 状态渲染
+   ============================================================ */
+
+function renderStates() {
+  const theme = currentTheme();
+  if (!theme) return;
+  const phase = currentPhase();
+  const styles = shadowStyles(phase, lightParams(theme.tree), state.motion);
+  const stage = document.getElementById("stage");
+
+  stage.style.setProperty("--gp-night-alpha", String(styles.nightAlpha));
+  stage.style.setProperty("--gp-shadow-piece-dx", styles.pieceDx.toFixed(2) + "px");
+  stage.style.setProperty("--gp-shadow-piece-dy", styles.pieceDy + "px");
+  stage.style.setProperty("--gp-shadow-piece-alpha", String(styles.pieceAlpha));
+  stage.style.setProperty("--gp-shadow-cell-dx", styles.cellDx.toFixed(2) + "px");
+  stage.style.setProperty("--gp-shadow-cell-dy", styles.cellDy + "px");
+  stage.style.setProperty("--gp-shadow-cell-alpha", String(styles.cellAlpha));
+  stage.style.setProperty("--cooldown", String(state.cooldown));
+  stage.classList.toggle("pv-no-motion", !state.motion);
+
+  pv("cycleText").textContent = phase.timeStr;
+  pv("cycleDot").className = "cycle-dot " + (phase.isDay ? "cycle-dot--day" : "cycle-dot--night");
+
+  const dice = document.getElementById("pvDice");
+  dice.disabled = state.diceDisabled;
+  pv("diceStatus").textContent = state.diceDisabled
+    ? t("cd")
+    : (state.cooldown < 1 ? t("cd") + " " + Math.round(state.cooldown * 100) + "%" : t("ready"));
+
+  document.getElementById("pvChat").classList.toggle("is-expanded", state.chatExpanded);
+  pvStage.classList.toggle("pv-no-motion", !state.motion);
+}
+
+function renderHud() {
+  const dict = I18N[state.locale] || I18N["zh-CN"];
+  pv("playerName").textContent = dict.player;
+  pv("playerTeam").textContent = dict.team;
+  pv("rollFace").textContent = dict.roll;
+  pv("rollFill").textContent = dict.roll;
+  pv("chatPlaceholder").textContent = dict.chatPlaceholder;
+  pv("chatSend").textContent = dict.chatSend;
+
+  // 数值框：字段取自地图 meta，未导入地图时用最小占位
+  const fields = state.meta && Array.isArray(state.meta.valueFieldDefinitions)
+    ? state.meta.valueFieldDefinitions
+    : [{ id: "money", name: { "zh-CN": "财产", "en-US": "Money" } }];
+  const playerValues = (state.meta && state.meta.playerInitial && state.meta.playerInitial.player) || {};
+  pv("valuePills").innerHTML = fields.map((field, index) => {
+    const raw = playerValues[field.id];
+    const value = typeof raw === "number" ? raw : (index === 0 ? 1200 : 5);
+    return '<div class="value-pill' + (index === 0 ? "" : "") + '">' +
+      '<span class="value-pill__label">' + esc(localized(field.name, field.id)) + "</span>" +
+      '<span class="value-pill__num">' + value + "</span></div>";
+  }).join("");
+
+  // 区域信息块：区域名 + 区域 UCT 数值 + 时间 + 榜单
+  const cell = state.cells[0];
+  const region = state.meta && Array.isArray(state.meta.regions)
+    ? state.meta.regions.find((item) => item.id === (cell && cell.regionId)) || state.meta.regions[0]
+    : null;
+  pv("regionName").textContent = region ? localized(region.name, region.id) : dict.region;
+  const prosField = fields.find((field) => field.scope === "region") || { id: "pros", name: { "zh-CN": "繁荣度", "en-US": "Prosperity" } };
+  const regionValue = region && region.initial && region.initial.region && typeof region.initial.region[prosField.id] === "number"
+    ? region.initial.region[prosField.id] : 5;
+  pv("regionPill").innerHTML =
+    '<span class="value-pill__label">' + esc(localized(prosField.name, prosField.id)) + "</span>" +
+    '<span class="value-pill__num">' + regionValue + "</span>";
+
+  const rows = [
+    { rank: 1, name: dict.tagOther, score: 42, self: false },
+    { rank: 2, name: dict.player, score: 30, self: true },
+    { rank: 3, name: dict.tagTeammate, score: 18, self: false },
+  ];
+  pv("leaderboard").innerHTML = rows.map((row) =>
+    '<div class="leaderboard-row' + (row.self ? " leaderboard-row--self" : "") + '">' +
+    '<span class="leaderboard-row__rank">' + row.rank + "</span>" +
+    '<span class="leaderboard-row__name">' + esc(row.name) + "</span>" +
+    '<span class="leaderboard-row__score">' + row.score + "</span></div>"
+  ).join("");
+
+  pv("ticker").innerHTML = '<span class="ch">' + esc(dict.region) + "</span>" +
+    esc(localized(cell && cell.name, dict.region) + " · " + (state.meta ? "系统" : dict.region));
+  pv("chatFilters").innerHTML = ["region", "system", "team", "global"].map((id, index) =>
+    '<span class="hud-chat-dock__filter' + (index < 2 ? " hud-chat-dock__filter--checked" : "") + '">' + id + "</span>"
+  ).join("");
+  pv("chatMsgs").innerHTML = [
+    { ch: "region", text: localized(cell && cell.description, "…") },
+    { ch: "system", text: state.meta ? ("dayRatio " + dayRatio()) : "—" },
+    { ch: "team", text: dict.tagTeammate + ": ok" },
+  ].map((msg) => '<div class="hud-chat-msg"><b>' + esc(msg.ch) + "</b><span>" + esc(msg.text) + "</span></div>").join("");
+
+  // 行动按钮簇：价格用占位数值（预览不跑结算）
+  const actions = [
+    { label: dict.buy, price: 200, accent: true },
+    { label: dict.upgrade, price: 150, accent: false },
+    { label: dict.transport, price: 80, accent: false },
+  ];
+  pv("actionCluster").innerHTML = actions.map((action) =>
+    '<button class="act-btn' + (action.accent ? " act-btn--accent" : "") + '" type="button">' +
+    esc(action.label) + '<span class="act-btn__price">' + action.price + "</span></button>"
+  ).join("");
+}
+
+function renderMap() {
+  const svg = document.getElementById("pvSvg");
+  const dict = I18N[state.locale] || I18N["zh-CN"];
+  if (!state.cells.length) {
+    svg.innerHTML = "";
+    pv("hoverCard").hidden = true;
+    return;
+  }
+
+  const halfW = 68;
+  const halfH = 46;
+  const pad = 110;
+  const xs = state.cells.map((cell) => cell.x);
+  const ys = state.cells.map((cell) => cell.y);
+  const minX = Math.min.apply(null, xs) - halfW - pad;
+  const minY = Math.min.apply(null, ys) - halfH - pad;
+  const width = Math.max.apply(null, xs) - Math.min.apply(null, xs) + (halfW + pad) * 2;
+  const height = Math.max.apply(null, ys) - Math.min.apply(null, ys) + (halfH + pad) * 2;
+  svg.setAttribute("viewBox", minX + " " + minY + " " + width + " " + height);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+  const byId = new Map(state.cells.map((cell) => [cell.id, cell]));
+  const linkWidth = cssValueOf({ kind: "number", path: "dimension.line.map" }, currentTheme().tree) || "10";
+
+  const links = state.cells.flatMap((cell) => (cell.destinations || []).map((targetId) => {
+    const target = byId.get(targetId);
+    if (!target) return "";
+    const dx = target.x - cell.x;
+    const dy = target.y - cell.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const inset = (ux, uy) => Math.min(
+      Math.abs(ux) < 1e-4 ? Infinity : halfW / Math.abs(ux),
+      Math.abs(uy) < 1e-4 ? Infinity : halfH / Math.abs(uy),
+    ) + 6;
+    const from = inset(ux, uy);
+    const to = inset(-ux, -uy);
+    if (len <= from + to) return "";
+    return '<line class="map-link" x1="' + (cell.x + ux * from).toFixed(1) + '" y1="' + (cell.y + uy * from).toFixed(1) +
+      '" x2="' + (target.x - ux * to).toFixed(1) + '" y2="' + (target.y - uy * to).toFixed(1) +
+      '" marker-end="url(#pvArrow)" />';
+  })).join("");
+
+  const targetId = state.cells[0].id;
+  const nodes = state.cells.map((cell) => {
+    const classes = ["map-node"];
+    if (cell.id === targetId) {
+      if (state.cellState === "held") classes.push("map-node--held");
+      if (state.cellState === "hover") classes.push("map-node--hov");
+    }
+    return '<g class="' + classes.join(" ") + '" data-cell="' + cell.id + '">' +
+      '<rect class="map-node__shape" x="' + (-halfW) + '" y="' + (-halfH) + '" width="' + (halfW * 2) +
+      '" height="' + (halfH * 2) + '" rx="' + (cssValueOf({ kind: "px", path: "color.region.radius" }, currentTheme().tree) || "0") +
+      '" transform="translate(' + cell.x + " " + cell.y + ')" />' +
+      '<text class="map-node__name" x="' + (cell.x - halfW + 10) + '" y="' + (cell.y - 2) + '">' +
+      esc(localized(cell.name, "cell " + cell.id)) + "</text>" +
+      '<text class="map-node__type" x="' + (cell.x - halfW + 10) + '" y="' + (cell.y + 24) + '">' +
+      esc(String(cell.type || "").toUpperCase()) + "</text></g>";
+  }).join("");
+
+  const startCell = state.cells[0];
+  const piece = '<g class="map-player">' +
+    '<circle class="map-player__body" cx="' + startCell.x + '" cy="' + (startCell.y + 4) + '" r="18" ' +
+    'stroke-width="' + (cssValueOf({ kind: "number", path: "dimension.piece.outline" }, currentTheme().tree) || "3") + '" />' +
+    '<circle class="map-player__head" cx="' + startCell.x + '" cy="' + (startCell.y - 2) + '" r="7" /></g>';
+
+  svg.innerHTML = '<defs><marker id="pvArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">' +
+    '<path class="map-link__arrow" d="M0,0 L10,5 L0,10 z" /></marker></defs>' +
+    '<g class="pv-links" style="stroke-width:' + linkWidth + '">' + links + "</g>" +
+    '<g class="pv-nodes">' + nodes + "</g>" + piece;
+
+  // hover 卡：单元格状态切到「悬停」时显示
+  const hoverCard = pv("hoverCard");
+  hoverCard.hidden = state.cellState !== "hover";
+  if (state.cellState === "hover") {
+    pv("hoverType").textContent = String(startCell.type || "").toUpperCase();
+    pv("hoverTitle").textContent = localized(startCell.name, "cell " + startCell.id);
+    pv("hoverDesc").textContent = localized(startCell.description, "");
+    pv("hoverRows").innerHTML =
+      "<span>" + t("price") + "</span><b>200</b>" +
+      "<span>" + t("rent") + "</span><b>50</b>" +
+      "<span>pros</span><b>5</b>" +
+      "<span>level</span><b>1</b>";
+  }
+  void dict;
+}
+
+function renderAll() {
+  const theme = currentTheme();
+  const empty = document.getElementById("pvEmpty");
+  if (!theme) {
+    empty.hidden = false;
+    empty.textContent = t("noTheme");
+    return;
+  }
+  empty.hidden = true;
+  applyTheme();
+  renderHud();
+  renderMap();
+  renderStates();
+  renderTabs();
+  renderTokenList();
+  document.getElementById("exportBtn").disabled = false;
+  document.getElementById("resetBtn").disabled = false;
+}
+
+/* ============================================================
+   9. 令牌列表（编辑 UI）
+   ============================================================ */
+
+function renderTabs() {
+  const tabs = document.getElementById("tabs");
+  if (!state.themes.size) {
+    tabs.innerHTML = '<span class="ed-hint">尚未导入主题</span>';
+    return;
+  }
+  tabs.innerHTML = Array.from(state.themes.keys()).map((id) => {
+    const dirty = state.themes.get(id).dirty.size;
+    return '<span class="ed-tab' + (id === state.currentThemeId ? " ed-tab--active" : "") + '" data-theme="' + esc(id) + '">' +
+      esc(id) + (dirty ? '<span class="ed-tab__dirty">●' + dirty + "</span>" : "") + "</span>";
+  }).join("");
+}
+
+function renderTokenList() {
+  const host = document.getElementById("tokens");
+  const theme = currentTheme();
+  if (!theme) {
+    host.innerHTML = "";
+    return;
+  }
+  const tokens = flattenTokens(theme.tree).filter((token) =>
+    !state.search || token.path.toLowerCase().indexOf(state.search) >= 0
+  );
+  const groups = [];
+  const byGroup = new Map();
+  for (const token of tokens) {
+    const keys = token.path.split(".");
+    const group = keys[0];
+    const sub = keys.length > 2 ? keys[1] : "";
+    const groupKey = group + "|" + sub;
+    if (!byGroup.has(groupKey)) {
+      const entry = { group, sub, rows: [] };
+      byGroup.set(groupKey, entry);
+      groups.push(entry);
+    }
+    byGroup.get(groupKey).rows.push(token);
+  }
+
+  // 顶层组标题只在分组首次出现时打印；同组的不同子段（sub）各自另起一小标题
+  let prevGroup = null;
+  host.innerHTML = groups.map((entry) => {
+    const groupTitle = entry.group !== prevGroup
+      ? '<div class="ed-group__title">' + esc(entry.group) + "</div>"
+      : "";
+    prevGroup = entry.group;
+    return '<div class="ed-group">' +
+      groupTitle +
+      (entry.sub ? '<div class="ed-sub">' + esc(entry.sub) + "</div>" : "") +
+      entry.rows.map((token) => tokenRow(token, theme)).join("") + "</div>";
+  }).join("");
+}
+
+function tokenRow(token, theme) {
+  const isColor = token.$type === "color";
+  const isNumber = token.$type === "number";
+  const isAlpha = /alpha/i.test(token.path);
+  const dirty = theme.dirty.has(token.path);
+  const cssVars = cssVarsForPath(token.path);
+  const value = resolveColor(token.$value, theme.tree, 0);
+  const short = token.path.split(".").slice(1).join(".");
+  const hex = /^#[0-9a-f]{6}$/i.test(String(value)) ? String(value) : "#000000";
+
+  const controls = isColor
+    ? '<input type="color" data-path="' + esc(token.path) + '" data-role="color" value="' + hex + '" />' +
+      '<input type="text" data-path="' + esc(token.path) + '" data-role="text" value="' + esc(String(token.$value)) + '" />'
+    : '<input type="' + (isNumber ? "number" : "text") + '" data-path="' + esc(token.path) + '" data-role="text"' +
+      (isNumber ? ' step="' + (isAlpha ? "0.01" : "any") + '"' + (isAlpha ? ' min="0" max="1"' : "") : "") +
+      ' value="' + esc(String(token.$value)) + '" />';
+
+  return '<div class="tk' + (dirty ? " tk--dirty" : "") + '" data-row="' + esc(token.path) + '">' +
+    (isColor ? '<span class="tk__sw" style="background:' + esc(value) + '"></span>' : '<span class="tk__sw" style="visibility:hidden"></span>') +
+    '<span class="tk__name" title="' + esc(token.path) + '">' + esc(short) + "</span>" +
+    '<span class="tk__var">' + esc(cssVars.length ? cssVars[0] + (cssVars.length > 1 ? " +" + (cssVars.length - 1) : "") : "未映射") + "</span>" +
+    '<span class="tk__ctl">' + controls + "</span>" +
+    '<button class="tk__reset" data-reset="' + esc(token.path) + '" title="还原该令牌"' + (dirty ? "" : " disabled") + ">↺</button>" +
+    "</div>";
+}
+
+/* ============================================================
+   10. 文件导入（手动）
+   ============================================================ */
+
+function readFiles(fileList, onEach) {
+  Array.from(fileList).forEach((file) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        onEach(file.name.replace(/\.json$/i, ""), JSON.parse(String(reader.result)));
+      } catch (error) {
+        window.alert("解析失败：" + file.name + "\n" + error.message);
+      }
+    };
+    reader.readAsText(file);
+  });
+}
+
+function looksLikeTheme(json) {
+  return !!json && typeof json === "object" && !Array.isArray(json) && !!json.color && !!json.font;
+}
+
+function looksLikeCells(json) {
+  return Array.isArray(json) && json.length > 0 && json[0] && typeof json[0].x === "number";
+}
+
+function looksLikeMeta(json) {
+  return !!json && typeof json === "object" && !Array.isArray(json) &&
+    (Array.isArray(json.regions) || Array.isArray(json.valueFieldDefinitions));
+}
+
+function importTheme(id, json) {
+  if (!looksLikeTheme(json)) {
+    window.alert("不是主题令牌文件（缺少 color / font 段）：" + id);
+    return;
+  }
+  state.themes.set(id, { tree: json, original: JSON.parse(JSON.stringify(json)), dirty: new Set() });
+  state.currentThemeId = id;
+}
+
+function importMap(id, json) {
+  if (looksLikeCells(json)) {
+    state.cells = json;
+    return;
+  }
+  if (looksLikeMeta(json)) {
+    state.meta = json;
+    return;
+  }
+  window.alert("无法识别的地图文件（既非 cells 数组也非 meta 对象）：" + id);
+}
+
+/* ============================================================
+   11. 事件绑定
+   ============================================================ */
+
+document.getElementById("themeFiles").addEventListener("change", (event) => {
+  readFiles(event.target.files, (id, json) => {
+    // 令牌输入框也可能被塞进地图文件：按内容路由，避免误报
+    if (looksLikeTheme(json)) importTheme(id, json);
+    else importMap(id, json);
+    renderAll();
+  });
+  event.target.value = "";
+});
+
+document.getElementById("mapFiles").addEventListener("change", (event) => {
+  readFiles(event.target.files, (id, json) => {
+    if (looksLikeTheme(json)) importTheme(id, json);
+    else importMap(id, json);
+    renderAll();
+  });
+  event.target.value = "";
+});
+
+document.getElementById("tabs").addEventListener("click", (event) => {
+  const tab = event.target.closest("[data-theme]");
+  if (!tab) return;
+  state.currentThemeId = tab.dataset.theme;
+  renderAll();
+});
+
+document.getElementById("tkSearch").addEventListener("input", (event) => {
+  state.search = event.target.value.trim().toLowerCase();
+  renderTokenList();
+});
+
+/** 值控件 → 写回令牌树（并标记 dirty） */
+document.getElementById("tokens").addEventListener("input", (event) => {
+  const input = event.target.closest("input[data-path]");
+  if (!input) return;
+  const theme = currentTheme();
+  if (!theme) return;
+  const path = input.dataset.path;
+  const token = readTokenNode(theme.tree, path);
+  if (!isTokenNode(token)) return;
+
+  if (input.dataset.role === "color") {
+    token.$value = input.value;
+  } else if (token.$type === "number") {
+    const parsed = Number(input.value);
+    if (!Number.isFinite(parsed)) return;
+    token.$value = parsed;
+  } else {
+    token.$value = input.value;
+  }
+  theme.dirty.add(path);
+  const original = readTokenNode(theme.original, path);
+  if (isTokenNode(original) && original.$value === token.$value) theme.dirty.delete(path);
+
+  applyTheme();
+  renderMap();
+  renderTabs();
+  // 同步同路径的另一个控件（色块 ↔ 文本）与行状态
+  const row = document.querySelector('[data-row="' + CSS.escape(path) + '"]');
+  if (row) {
+    row.classList.toggle("tk--dirty", theme.dirty.has(path));
+    const swatch = row.querySelector(".tk__sw");
+    if (swatch) swatch.style.background = resolveColor(token.$value, theme.tree, 0);
+    row.querySelectorAll("input[data-path]").forEach((peer) => {
+      if (peer === input) return;
+      if (peer.dataset.role === "color") peer.value = /^#[0-9a-f]{6}$/i.test(String(token.$value)) ? token.$value : peer.value;
+      else peer.value = String(token.$value);
+    });
+    const reset = row.querySelector("[data-reset]");
+    if (reset) reset.disabled = !theme.dirty.has(path);
+  }
+});
+
+document.getElementById("tokens").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-reset]");
+  if (!button) return;
+  const theme = currentTheme();
+  if (!theme) return;
+  const path = button.dataset.reset;
+  const original = readTokenNode(theme.original, path);
+  const target = readTokenNode(theme.tree, path);
+  if (!isTokenNode(original) || !isTokenNode(target)) return;
+  target.$value = original.$value;
+  theme.dirty.delete(path);
+  renderAll();
+});
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  const theme = currentTheme();
+  if (!theme) return;
+  const original = theme.original;
+  theme.original = JSON.parse(JSON.stringify(original));
+  theme.tree = JSON.parse(JSON.stringify(original));
+  theme.dirty.clear();
+  renderAll();
+});
+
+document.getElementById("exportBtn").addEventListener("click", () => {
+  const theme = currentTheme();
+  if (!theme) return;
+  const blob = new Blob([JSON.stringify(theme.tree, null, 2) + "\n"], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = state.currentThemeId + ".json";
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
+
+document.getElementById("locale").addEventListener("change", (event) => {
+  state.locale = event.target.value;
+  renderAll();
+});
+
+document.getElementById("timeSlider").addEventListener("input", (event) => {
+  state.timeMinutes = Number(event.target.value);
+  const phase = currentPhase();
+  document.getElementById("timeVal").textContent = phase.timeStr + " · " + (phase.isDay ? "昼" : "夜");
+  renderStates();
+});
+
+document.getElementById("cdSlider").addEventListener("input", (event) => {
+  state.cooldown = Number(event.target.value) / 100;
+  document.getElementById("cdVal").textContent = event.target.value + "%";
+  renderStates();
+});
+
+document.getElementById("diceDisabled").addEventListener("change", (event) => {
+  state.diceDisabled = event.target.checked;
+  renderStates();
+});
+
+document.getElementById("motionToggle").addEventListener("change", (event) => {
+  state.motion = event.target.checked;
+  renderStates();
+});
+
+document.getElementById("chatToggle").addEventListener("change", (event) => {
+  state.chatExpanded = event.target.checked;
+  renderStates();
+});
+
+document.getElementById("cellState").addEventListener("change", (event) => {
+  state.cellState = event.target.value;
+  renderMap();
+});
+
+/* ============================================================
+   12. 初始化
+   ============================================================ */
+
+buildPreviewSkeleton();
+renderAll();
+</script>
+</body>
+</html>
