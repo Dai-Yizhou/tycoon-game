@@ -52,7 +52,7 @@
 ### 10. 经济配置化与信息边界（2026-09-06 ~ 09-12）
 - `22393db` 经济事件配置化链路；`1e6f144` cell-hover/act-bar 信息边界 + 静态价格购买；`5cc9f39` 内测前清理 ServerConfig 字段。
 
-### 11. 视听收尾与收敛（2026-09-13 ~ 09-14)
+### 11. 视听收尾与收敛（2026-09-13 ~ 09-14）
 - 掷骰按钮冷却揭示、全屏转场视效、动画参数令牌化；含 revert（撤销事件 toast/时区拆分），收敛内测前过度设计。
 
 ### 12. 权威收敛 + 内测口径落定（2026-09-17 ~ 09-25）
@@ -163,3 +163,65 @@ Git 跨度约 2.5 个自然月。若单人全职，567 人日 / 56 天 ≈ 10 �
 - **内测账号口径（已确认）**：账号与设备一一绑定，转正仅输入新的用户名、不设密码，接受换设备/清缓存即丢失。因此 `migrateGuest`（`packages/server/src/auth/AuthService.ts:309-318`）设 `passwordHash = null` 导致的「转正后无法再登录」不作为缺陷处理。转正瞬间 socket 仍持旧 token（世界内 `player.username` 仍为 `guest_xxx`，以该前缀判定游客身份处仍按游客对待，须等一次重连刷新）；客户端已改为从已保存 token 的载荷水合身份（`packages/client/src/auth/authApi.ts:decodeTokenUser`、`AuthSession`），重启后仍能区分游客/正式账号并保留转正入口。
 - **跨进程保持依赖显式存档名**：账号与局内进度都需跨进程保持。账号落在 Mongo（`users`），局内进度落在 Mongo `world_snapshots`（键为 `WORLD_ID` + `WORLD_NAMESPACE`）。未设 `WORLD_ID` 时每次启动生成新的临时存档（`temp_*`，按 TTL 清理），适合调试用新档；要续档须显式 `WORLD_ID=<存档名> pnpm dev`。启动脚本（`scripts/dev-services.mjs`）强制注入 `MONGO_URI`，文件/内存实现已弃用。跨进程恢复链路由 `packages/server/tests/storage/MongoWorldStore.test.ts` 覆盖。
 - **`Frozen` 状态口径不一致**：地产购买/升级入口显式拒绝 `Frozen`（`packages/server/src/handlers/propertyHandler.ts:198`），而经济资格体系 `participatesInEconomy` 认为 `Frozen` 可参与（离线照常计税与收租）。是刻意分层还是遗漏待确认。
+
+---
+
+## 八、内测部署（ngrok）
+
+### 1. 方案要点与理由
+
+- **只暴露一条隧道**：客户端 socket 使用 `window.location.origin`（同源），`vite.config.ts` 的 `server.proxy` 已把 `/api`、`/socket.io`（含 ws）转发到服务端 3000；服务端 `corsOrigin` 默认 `*`。因此只需把客户端端口 `5173` 暴露出去，代理链路自然覆盖服务端，无需第二条隧道。
+- **必须走 dev server**：`vite.config.ts` 只在 `server` 段配置了 proxy，`preview` 段没有，构建产物（`pnpm build` + `preview`）无法转发 API/ws，故当前只能用 dev server。
+- **Host 头必须改写**：Vite 5.4.21 强制 Host 白名单校验，ngrok 域名会被 403（响应含 `Blocked request. This host ... is not allowed`）。官方已废弃 `--host-header` 参数，改用 Traffic Policy 的 `add-headers` 动作把 Host 改回 `localhost`。
+- **开放时段用手动开关控制**：不引入定时逻辑，开测时启动、收测时 `Ctrl+C`，避免误开放。
+
+### 2. 一次性准备
+
+```bash
+# 安装 ngrok 独立二进制（本机无 brew，架构 x86_64）
+curl -L -o /tmp/ngrok.zip https://bin.ngrok.com/c/bNyj1mQVY4c/ngrok-v3-stable-darwin-amd64.zip
+unzip -o /tmp/ngrok.zip -d ~/.local/bin
+ngrok config add-authtoken <TOKEN>
+```
+
+在仓库外创建 Traffic Policy 文件 `~/.config/ngrok/vite-policy.yml`（放仓库外，避免误提交）：
+
+```yaml
+on_http_request:
+  - actions:
+      - type: add-headers
+        config:
+          headers:
+            host: localhost
+```
+
+免费版会分配固定 dev domain，裸 `ngrok http` 会复用它，URL 重启后保持稳定。
+
+### 3. 开测 / 收测
+
+```bash
+# 终端 1：启动服务（续档用 WORLD_ID=beta；不设即临时新档，仅调试用）
+WORLD_ID=beta pnpm dev
+
+# 终端 2：暴露客户端端口
+ngrok http 5173 --traffic-policy-file ~/.config/ngrok/vite-policy.yml
+```
+
+收测：在终端 2 `Ctrl+C` 关闭隧道。需要真正下线时同时停掉终端 1。
+
+### 4. 链路自检
+
+```bash
+# 客户端页面可达
+curl -sS -o /dev/null -w '%{http_code}\n' -H 'ngrok-skip-browser-warning: 1' https://<dev-domain>/
+# API 经 Vite 代理到服务端
+curl -sS -H 'ngrok-skip-browser-warning: 1' https://<dev-domain>/api/map | head -c 200
+```
+
+两条均返回 2xx/正常内容即链路通畅。
+
+### 5. 已登记风险
+
+- **免费版配额是硬约束**：HTTP 请求 20,000/月、出网流量 1 GB/月。Vite dev server 按模块请求，单次页面加载约 150–400 次请求，按内测规模可能触顶。缓解方案为改用 `pnpm build` + `preview`，但需给 `vite.config.ts` 的 `preview` 段补 proxy，本轮不改代码，暂不实施。
+- **首次访问提示页**：免费版 HTML 流量会插入 ngrok 提示页（ERR_NGROK_6024），点击一次后 7 天内不再出现；自动化请求可用 `ngrok-skip-browser-warning` 头跳过。
+- **dev 模式暴露源码**：dev server 会提供源码与 sourcemap 访问，内测期间仅应面向可信参与者开放，测试时段外务必关闭隧道。
