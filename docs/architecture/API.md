@@ -31,6 +31,8 @@
 
 所有业务请求都应先由服务端验证；客户端只发送意图，不发送可直接信任的余额、位置或所有权。
 
+负债式破产下，可能把钱扣成负数的主动操作（`buyProperty`/`upgradeProperty`/`buyInvestment`/`useTransport`/`repairMonument`）走**服务端权威二次确认**：若结算后任一字段会低于其 `min`（破产阈值），首次请求返回 `{ ok: false, error: 'would_bankrupt', wouldBankrupt: BankruptcyPreview }`，`wouldBankrupt` 含各字段的 `fieldId/current/min` 预览；客户端确认后带 `confirm: true` 重发同一请求才执行。被动路径（租金/税收/事件）不提供确认，可直接致破产。
+
 ## 服务端到客户端
 
 | 事件 | 语义 |

@@ -62,7 +62,7 @@ map.json / map-meta.json / achievements.json / behaviors/*.json
 | 字段 | 说明 |
 |---|---|
 | `id` / `version` / `name` | 地图标识与双语名 |
-| `valueFieldDefinitions[]` | 数值字段：`{ id, name, scope: player|region, min?, max? }` |
+| `valueFieldDefinitions[]` | 数值字段：`{ id, name, scope: player|region, min?, max? }`。注意 `min` 是**破产阈值**而非扣减下限：数值允许被扣成负数，任一 `current < min` 即触发破产（负债式口径）；`max` 仍是数值上界 |
 | `uct` | 声明哪些字段为 UCT：`{ player: [字段…], region: [字段…] }` |
 | `playerInitial` | 玩家初始值：`{ player: { 字段: 值 } }` |
 | `startCellId` | 起点格 ID |
@@ -73,6 +73,7 @@ map.json / map-meta.json / achievements.json / behaviors/*.json
 | `ranking` | `{ enabled, topN, refreshMs, score: { constant, player: {字段:权重}, region: {字段:权重} } }` |
 | `tax` | 计税配置，见下 |
 | `valueModifiers[]` | 可选；数值调节规则，见下 |
+| `inactivityCleanup` | 可选；长期离线清理：`{ thresholdMs, sweepIntervalMs? }`。离线超过 `thresholdMs` 的玩家被释放全部股份并置破产态（不删号）；未配置则关闭 |
 
 ### 税收（`tax`）
 

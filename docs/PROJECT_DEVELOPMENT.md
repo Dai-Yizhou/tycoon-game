@@ -159,10 +159,27 @@ Git 跨度约 2.5 个自然月。若单人全职，567 人日 / 56 天 ≈ 10 �
 - 同一特性"实现→部分 revert"反复（toast、时区拆分、动效），最新已收敛。
 - 道具/天赋/成就曾全部移除又逐个回归（成就已回归），item/talent 仍"未实现"，规划重于实装。
 - AI 玩家（ai-bot）因主仓清理被移出，当前 `shared-repo` 内已无。
-- **破产口径（已确认，已补可观测性）**：money/credit 的 `min` 为 0（`packages/server/map-meta.json`），`EconomyService.changeValue`（`packages/server/src/economy/EconomyService.ts:34`）把所有扣减钳制到 min 且不因余额不足报错，因此玩家在任何经济操作下都无法负债——口径定为「任意玩家数值 ≤ min 即破产」。触发点 `Bankruptcy.onPlayerUpdated` 逐字段判定（`previous > min && current <= min` 才计入，起始值本就等于 min 不触发），记录触底明细（fieldId/fieldName/previous/current/min）后广播系统消息，并在 `server.playerBankrupt` 载荷携带 `triggeredFields`，客户端破产页据此展示「触发原因」专属提示。覆盖：`packages/server/tests/bankAuthority.test.ts`、`packages/client/tests/pages.test.ts`。
+- **破产口径（负债式，已确认并实施，推翻 09-25 的钳制式口径）**：`min` 由「数值下限」重定义为「破产阈值」（`packages/server/map-meta.json` 中 money/credit 的 `min` 仍为 0，但语义已变：不再是扣减下限，而是破产界线）。`EconomyService.changeValue`（`packages/server/src/economy/EconomyService.ts`）改为只钳制 `max`、允许扣成负数；触发点 `Bankruptcy`（`packages/server/src/economy/Bankruptcy.ts`）逐字段判定条件改为 `current < min`（只看结果，允许一步跨入负值）。触发后释放全部股份（`clearPlayerAssets`）并置破产态，派发 `ShareholderBankrupt`，记录 fieldId/fieldName/previous/current/min 明细并广播系统消息，`server.playerBankrupt` 载荷携带 `triggeredFields`。覆盖：`packages/server/tests/bankAuthority.test.ts`、`tests/economy/EconomyService.test.ts`、`tests/handlers/propertyHandler-v2.test.ts`、`tests/handlers/transportHandler.test.ts`、`packages/client/tests/cell-action-resolver.test.ts`、`pages.test.ts`。
+  - **结算时序**：判定推迟到当前同步操作完整结算之后（`queueMicrotask` + `flushPendingBankruptcies`），保证「先结算操作、再破产」。若在扣款瞬间就清算，会把清算后才登记的股权留在已破产玩家名下（购买/投资先扣款、再登记股权），构成套利。
+  - **已确认边界（实施时不得再改，共 8 条）**：
+    1. 负债范围：玩家主动操作（购买/升级/投资/修缮/传送）+ 租金 + 税收 + 事件，全部纳入负债与破产判定。
+    2. 二次确认走服务端权威：预检不足时首次请求返回 `ok:false, error:'would_bankrupt'` 与 `wouldBankrupt` 预览值，客户端确认后带 `confirm:true` 重发；客户端不得自行放行。
+    3. 五个 handler（`propertyHandler` 购买/升级、`investmentHandler`、`transportHandler`、`monumentHandler`）的预检一律改为可确认放行（`assessUct` 只判字段缺失与 `max` 上界，不再判 min）。
+    4. 主动操作被确认后：先结算操作、再破产（spec 字面），不为「能否买得起」另设阻断。
+    5. 租金/税收/事件等被动路径：可无二次确认直接致破产。
+    6. 租金改为全额结算（`propertyHandler` 去掉 `next < min` 的「全额或拒绝」分支），可直接把付款方扣成负债。
+    7. 归股释放、已触底者兜底不在本轮实施：新口径下不存在「僵尸态」，被核心改动覆盖。
+    8. 长期离线清理：超期释放全部股份 + 置破产态（复用 `clearPlayerAssets`，不删号），阈值进 `map-meta.inactivityCleanup`（可配置、带宽限期）。
+  - **前端体验欠债（登记，暂不改）**：主动操作被确认并结算后立即触发破产，玩家在破产页可能看不到刚才那次操作的即时效果（如刚买下的地产闪现即被清算）。此为前端体验范畴，须靠后续交互优化（如破产结算动画/操作回执）解决，本轮不为它加豁免逻辑。
 - **内测账号口径（已确认）**：账号与设备一一绑定，转正仅输入新的用户名、不设密码，接受换设备/清缓存即丢失。因此 `migrateGuest`（`packages/server/src/auth/AuthService.ts:309-318`）设 `passwordHash = null` 导致的「转正后无法再登录」不作为缺陷处理。转正瞬间 socket 仍持旧 token（世界内 `player.username` 仍为 `guest_xxx`，以该前缀判定游客身份处仍按游客对待，须等一次重连刷新）；客户端已改为从已保存 token 的载荷水合身份（`packages/client/src/auth/authApi.ts:decodeTokenUser`、`AuthSession`），重启后仍能区分游客/正式账号并保留转正入口。
 - **跨进程保持依赖显式存档名**：账号与局内进度都需跨进程保持。账号落在 Mongo（`users`），局内进度落在 Mongo `world_snapshots`（键为 `WORLD_ID` + `WORLD_NAMESPACE`）。未设 `WORLD_ID` 时每次启动生成新的临时存档（`temp_*`，按 TTL 清理），适合调试用新档；要续档须显式 `WORLD_ID=<存档名> pnpm dev`。启动脚本（`scripts/dev-services.mjs`）强制注入 `MONGO_URI`，文件/内存实现已弃用。跨进程恢复链路由 `packages/server/tests/storage/MongoWorldStore.test.ts` 覆盖。
 - **`Frozen` 状态口径不一致**：地产购买/升级入口显式拒绝 `Frozen`（`packages/server/src/handlers/propertyHandler.ts:198`），而经济资格体系 `participatesInEconomy` 认为 `Frozen` 可参与（离线照常计税与收租）。是刻意分层还是遗漏待确认。
+- **组队能力与展示缺口（仅记录，暂不实现）**：内测反馈「当前缺乏组队能力/展示，聊天框发送组队指令无响应」。核对代码现状如下，供后续实现时定位起点：
+  - 服务端已存在完整实现：`TeamManager`（`packages/server/src/team/`）与 `TeamHandler`（`packages/server/src/handlers/teamHandler.ts`），在 `packages/server/src/transport/handlers.ts:119-120` 实例化、`:155` 注册；除 socket 接口（`client.inviteToTeam` 等）外，聊天指令 `/invite 用户名`、`/accept`、`/reject`、`/leave` 也已接入 `handleChatCommand`（`packages/server/src/transport/handlers.ts:470-485`），`/help` 的帮助文案同样列出了这几个指令。
+  - 客户端已有零散入口：邀请玩家弹窗（`packages/client/src/pages/GamePage.ts:447-490`）、收到邀请的接受/拒绝弹窗（`packages/client/src/game/systems/SocketEventHandler.ts:390-420`）、离开队伍按钮（`GamePage.ts:519-526`）。
+  - 缺失的是**队伍状态与成员名单的常驻展示**：HUD 中没有任何位置持续显示「我在哪个队、队友是谁」，因此组队后玩家看不到结果，观感上等同「没有组队能力」。
+  - 「聊天框发送组队指令无响应」尚未复现定位：按代码链路（客户端 `GameHudShell.sendChat` 原样透传 → `GamePage.onChatSend` 发 `client.chat` → 服务端 `handleChat` → `handleChatCommand`）判断指令应当可达，服务端也会用 `server.chat`（system 频道）回执，而客户端默认过滤器已包含 `system`。因此该症状要么源于未复现的运行时问题，要么是「指令其实生效了、但没有任何队伍界面变化可看」的体验误判。后续实现时须先用一次实际操作用于区分这两者，再决定是修链路还是补展示。
+  - 顺带记录一处已验证的显示缺陷：`GameHudShell` 的频道归类函数把非 `system`/`team` 的频道一律归到 `region`（`packages/client/src/components/GameHudShell.ts:649`），因此 `global` 频道消息在聊天区会被标成「区域」。
 
 ---
 

@@ -8,7 +8,7 @@ Node.js + Express + Socket.IO 服务端。`src/index.ts:bootstrap()` 调用 `src
 |---|---|
 | `src/world/` | GameWorld、PlayerManager、昼夜（DayNightCycle / DayNightValueChange）、时区（TimeZoneManager） |
 | `src/handlers/` | 掷骰、移动、地产、监狱、投资、交通、纪念碑、组队处理器 |
-| `src/economy/` | 计税、破产清算、持股/合租模型与经济操作守卫、EconomyService 数值中枢 |
+| `src/economy/` | 计税、破产清算（负债式：`min` 为破产阈值，允许扣成负数）、长期离线清理、持股/合租模型与经济操作守卫、EconomyService 数值中枢 |
 | `src/events/`、`src/behavior/` | 事件格分发；从地图同级 `behaviors/*.json` 执行格子行为 |
 | `src/transport/` | SocketManager 与 HandlerRegistry |
 | `src/net/` | `valuePublisher`（数值变更唯一发射点，按域广播绝对值）与 `systemChat` |
