@@ -53,9 +53,9 @@
     "investmentEventTriggered": "Investment \"{{cell}}\" reacted to event {{event}}: {{detail}}",
     "bankruptTriggered": "{{player}} went bankrupt ({{reason}})",
     "bankruptTriggeredDetail": "{{player}} went bankrupt ({{reason}}): {{detail}}",
-    "bankruptFieldDetail": "{{field}} {{previous}} → {{current}} (floor {{min}})",
+    "bankruptFieldDetail": "{{field}} {{previous}} → {{current}} (bankruptcy threshold {{min}})",
     "bankruptReason": {
-      "negative_net_worth": "value hit the floor",
+      "negative_net_worth": "value crossed the threshold",
       "debt_overdue": "debt overdue",
       "manual": "manual trigger"
     }

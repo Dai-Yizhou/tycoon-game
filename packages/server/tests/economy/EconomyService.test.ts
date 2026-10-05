@@ -26,7 +26,7 @@ describe('EconomyService', () => {
     expect(world.getPlayer('p1')?.values.money?.current).toBe(65);
   });
 
-  it('触底后按现有破产机制立即将玩家标记为破产', () => {
+  it('允许扣成负数，低于 min（破产阈值）后按负债式破产标记为破产', () => {
     const world = new GameWorld();
     const player = {
       id: 'p1', username: '玩家', position: { cellId: 0 }, status: 'normal',
@@ -36,12 +36,14 @@ describe('EconomyService', () => {
     const bankruptcy = new Bankruptcy({ emit: jest.fn() } as never, world, { clearTaxRecords: jest.fn(), getAllTaxRecords: jest.fn(() => new Map()) } as never);
     const service = new EconomyService(world);
 
-    expect(service.changeValue('p1', 'money', -20, 'rent_payment')).toMatchObject({ ok: true, current: 0, delta: -5 });
+    // 负债口径：不再钳 min，实扣等于配置增量；判定推迟到结算边界
+    expect(service.changeValue('p1', 'money', -20, 'rent_payment')).toMatchObject({ ok: true, current: -15, delta: -20 });
+    bankruptcy.flushPendingBankruptcies();
     expect(world.getPlayer('p1')?.status).toBe('bankrupt');
     bankruptcy.cleanup();
   });
 
-  it('clamps values to their configured bounds', () => {
+  it('只钳上界（max），不再钳下界', () => {
     const world = new GameWorld();
     world.addPlayer({
       id: 'p1',
@@ -52,6 +54,7 @@ describe('EconomyService', () => {
     } as never);
     const service = new EconomyService(world);
 
-    expect(service.changeValue('p1', 'credit', -20, 'jail')).toMatchObject({ ok: true, current: 0 });
+    expect(service.changeValue('p1', 'credit', -20, 'jail')).toMatchObject({ ok: true, current: -15 });
+    expect(service.changeValue('p1', 'credit', 200, 'bonus')).toMatchObject({ ok: true, current: 100 });
   });
 });

@@ -44,20 +44,20 @@ import type { AchievementSnapshot } from './achievement.js';
 /**
  * 触发破产的单个数值字段明细
  *
- * 内测口径：任何经济操作都把数值钳在 `min` 之上，玩家不可能负债，
- * 因此「数值 ≤ min」即视为破产。该结构用于向客户端与聊天框说明
- * 究竟是哪个字段触底，提供可观测性。
+ * 负债式破产口径：数值不钳下界、允许负债，字段的 `min` 即破产阈值。
+ * 任一字段低于其 `min` 即触发破产。该结构用于向客户端与聊天框说明
+ * 究竟是哪个字段越线，提供可观测性。
  */
 export interface BankruptFieldTrigger {
   /** 字段 ID（如 money） */
   fieldId: string;
   /** 字段显示名（按服务端当前语言回退后的文本） */
   fieldName: string;
-  /** 触发前值 */
+  /** 触发前值（上一次结算边界时的值） */
   previous: number;
-  /** 触发后值（已达到或低于下限） */
+  /** 触发后值（已低于破产阈值） */
   current: number;
-  /** 该字段的下限 */
+  /** 该字段的破产阈值（原 min 语义） */
   min: number;
 }
 

@@ -72,7 +72,7 @@ describe('bankruptcy socket authority', () => {
     bankruptcy.cleanup();
   });
 
-  test('数值触底时广播破产系统消息并携带触发字段', () => {
+  test('数值低于破产阈值时广播破产系统消息并携带触发字段', async () => {
     const world = new GameWorld();
     const map = [{ id: 0, x: 0, y: 0, type: 'property', name: { 'zh-CN': '地产', 'en-US': 'Property' }, description: { 'zh-CN': '', 'en-US': '' }, destinations: [], teleportDestinations: [], theme: 'northeast', regionId: 'r1', timezone: 0, extra: {} }] as any;
     world.loadMap(map, {
@@ -94,15 +94,17 @@ describe('bankruptcy socket authority', () => {
     const emit = jest.fn();
     const bankruptcy = new Bankruptcy({ emit } as unknown as TypedServer, world, { clearTaxRecords: jest.fn(), getAllTaxRecords: jest.fn(() => new Map()) } as any);
 
-    player.values.money.current = 0;
+    // 负债口径：允许扣成负数，低于 min（破产阈值）即破产；判定在微任务中结算后执行
+    player.values.money.current = -50;
     world.updatePlayer(player);
+    bankruptcy.flushPendingBankruptcies();
 
     const chat = emit.mock.calls.find(([event]) => event === 'server.chat');
     expect(chat?.[1].message.channel).toBe('system');
-    expect(chat?.[1].message.content).toBe('player-1 破产（数值触底）：财产 200 → 0（下限 0）');
+    expect(chat?.[1].message.content).toBe('player-1 破产（数值越线）：财产 200 → -50（破产阈值 0）');
     const bankruptEvent = emit.mock.calls.find(([event]) => event === 'server.playerBankrupt');
     expect(bankruptEvent?.[1].triggeredFields).toEqual([
-      { fieldId: 'money', fieldName: '财产', previous: 200, current: 0, min: 0 },
+      { fieldId: 'money', fieldName: '财产', previous: 200, current: -50, min: 0 },
     ]);
     expect(world.getPlayer('player-1')?.status).toBe(PlayerStatus.Bankrupt);
     bankruptcy.cleanup();

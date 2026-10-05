@@ -31,7 +31,11 @@ export class EconomyService {
       : undefined);
     if (!field) return { ...base, error: 'value_field_not_found' };
     const previous = field.current;
-    const current = Math.min(field.max ?? Number.POSITIVE_INFINITY, Math.max(field.min ?? Number.NEGATIVE_INFINITY, previous + delta));
+    // 负债式破产口径：数值只钳上界（max），不钳下界。
+    // `min` 不再是「数值下限」，而是该字段的破产阈值——允许扣成负数，
+    // 由 Bankruptcy 在结算后判定 `current < min` 触发破产。若仍钳 min，
+    // 玩家永远停在 min，破产判定与回收通道均无法生效。
+    const current = Math.min(field.max ?? Number.POSITIVE_INFINITY, previous + delta);
     field.current = current;
     player.lastActiveAt = Date.now();
     this.world.updatePlayer(player);
