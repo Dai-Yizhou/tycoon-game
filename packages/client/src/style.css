@@ -116,6 +116,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   width: 0; min-width: 0; padding: 0; border-width: 0;
   opacity: 0; overflow: hidden; white-space: nowrap; pointer-events: none;
 }
+/* TODO：鼠标离开区域后自动收起，不等再次点击，且不保留面板打开状态。展开按钮 / 打开面板需要一点动画。 */
+.hud-panel-actions:not(:hover):not(:focus-within) ~ .hud-panel:not(:hover):not(:focus-within) {
+  display: none;
+  visibility: hidden;
+}
 .hud-panel-actions::after {
   content: "\2261";
   display: inline-flex; align-items: center; justify-content: center;
@@ -129,7 +134,12 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 /* 展开态：字形让位给三个按钮 */
 .hud-panel-actions:hover::after,
 .hud-panel-actions:focus-within::after { content: none; }
-.hud-panel-actions > .panel-button { transition: opacity var(--motion-fast); }
+/* 按钮必须压在外扩命中区之上：该扩区是绝对定位元素，按绘制顺序会盖住静态定位的按钮，
+   导致展开后点击被透明扩区吃掉（hover 仍正常，故只表现为"点不动"）。 */
+.hud-panel-actions > .panel-button {
+  position: relative; z-index: 1;
+  transition: opacity var(--motion-fast);
+}
 
 .panel-button,
 .settings-panel button {
@@ -381,9 +391,16 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   fill: var(--region-cell-bg);
   stroke: var(--region-border); stroke-width: 3;
 }
-/* 棋盘格双色：相邻格子交替取 cellBg / cellBgAlt（令牌层拆分的两档同族色） */
-.interactive-map-surface__nodes .map-node:nth-child(even) .map-node__shape { fill: var(--region-cell-bg-alt); }
-.map-node:hover .map-node__shape { fill: var(--region-box-bg); }
+/* 格子底色统一取 --region-cell-bg，不做任何位置特化着色。
+   地图是环形路线而非网格阵，按 DOM 顺序（nth-child(even)）做奇偶交替会与视觉邻接关系脱钩，
+   读作"相邻格同色、隔格异色"的底色不一致，故取消交替。
+   --region-cell-bg-alt 令牌仍保留在主题面（cellBg/cellBgAlt 两档同族色），此处不再引用。 */
+/* 悬停高亮：全部格子统一，取"很轻"的强调色水洗 —— 底色与悬停色同族，只做轻描不做染色。
+   此前混入 28% accent 的版本过强（已弃用）；现取 12%，在四种主题下都刚好可辨。
+   底色统一后不再有棋盘格特异性冲突，故选择器简化为 .map-node:hover。 */
+.map-node:hover .map-node__shape {
+  fill: color-mix(in srgb, var(--region-accent) 3%, var(--region-cell-bg));
+}
 /* 仅 2 种边框样式：默认（未持股 / 不能持股）与已持股高亮 */
 .map-node--held .map-node__shape { stroke: var(--region-accent); stroke-width: 4; }
 .map-node__type { fill: var(--region-label-fg); font-weight: 700; font-size: 13px; font-family: var(--font-func); letter-spacing: 0.14em; }
@@ -513,13 +530,17 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .gp-topbar .region-status { margin-left: auto; }
 
 .player-badge { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.player-badge__meta { display: flex; flex-direction: column; }
+/* 玩家头像：只显示一个圆，圆内不写玩家名（仅以悬停说明表意）。
+   填充用身份色令牌 --gp-player-self，仍是同一套 value-pill 旁的身份标识。 */
 .player-badge__avatar {
   width: 22px; height: 22px; border-radius: 50%;
-  border: 2px solid var(--gp-fg); background: var(--gp-accent); flex-shrink: 0;
-  display: grid; place-items: center; color: var(--gp-paper); font-size: 10px; font-weight: 800;
+  border: 2px solid var(--gp-fg); flex-shrink: 0;
+  background: var(--gp-player-self, var(--gp-accent));
 }
 .player-badge__name { font-weight: 800; font-size: 12px; color: var(--gp-fg); }
-.player-badge__team { font-size: 9px; color: var(--gp-muted); }
+/* 队伍行可读性向本玩家名称靠拢：字号/字重提升，颜色改用前景色（仅字重略低于本名以保留层级差） */
+.player-badge__team { font-size: 11px; font-weight: 600; color: var(--gp-fg); }
 
 .value-pills { display: flex; gap: 6px; flex-shrink: 0; }
 .value-pill {
@@ -531,8 +552,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   border-radius: var(--region-radius); background: var(--gp-surface);
 }
 .value-pill__label { font-size: 8px; color: var(--gp-muted); font-family: var(--font-func); letter-spacing: 0.06em; text-transform: uppercase; }
+/* 所有数值框同一套配色：数字一律用 --gp-fg，不针对任何字段（含财产/UCT 作用域）做特化着色 */
 .value-pill__num { font-family: var(--font-num); font-size: 13px; font-weight: 700; color: var(--gp-fg); }
-.value-pill--accent .value-pill__num { color: var(--gp-accent); }
 
 /* 底色呼吸（§3.7）：数值结算时，仅"发生变化的那个数值显示框"填充底色快速提亮再归位。
    玩家数值与区域数值都落在各自字段的 .value-pill 上（由 HUD 写入 data-field 锚点）。
@@ -793,9 +814,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   .gp-topbar { height: 84px; padding: 16px 22px; }
   .gp-actionbar { height: 96px; padding: 0 22px; }
   .region-status__name { font-size: 13px; }
-  .player-badge__avatar { width: 26px; height: 26px; font-size: 11px; }
+  .player-badge__avatar { width: 26px; height: 26px; }
   .player-badge__name { font-size: 13px; }
-  .player-badge__team { font-size: 10px; }
+  .player-badge__team { font-size: 12px; }
   .value-pill { min-width: 64px; padding: 3px 10px; }
   .value-pill__label { font-size: 9px; }
   .value-pill__num { font-size: 14px; }

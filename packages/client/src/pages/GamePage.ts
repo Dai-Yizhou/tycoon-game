@@ -44,7 +44,7 @@ import {
 } from '../game/systems/MovementSystem.js';
 import { createMovementLoop, browserLoopHost, type MovementLoop } from '../game/systems/MovementLoop.js';
 
-import { registerSocketHandlers, unregisterSocketHandlers } from '../game/systems/SocketEventHandler.js';
+import { registerSocketHandlers, unregisterSocketHandlers, trackOutgoingTeamInvite } from '../game/systems/SocketEventHandler.js';
 import { createDayNightShadowLoop, readLightParams, DEFAULT_LIGHT_PARAMS, type LightParams } from '../game/systems/DayNightShadow.js';
 import { DesignAdapter } from '../design/DesignAdapter.js';
 import { getRegionThemeId, getThemeId, getThemeTokens, SAVED_REGION_THEME_KEY } from '../design/ThemeConfig.js';
@@ -181,6 +181,12 @@ export function createGamePage(controller: GameController): HTMLElement {
       gameHudShell?.updateDiceButton();
     },
     onBack: () => controller.reset(true),
+    // 队伍入口：无队伍时打开邀请列表，已有队友时打开队伍管理（队伍操作指引的唯一入口）
+    onTeam: () => {
+      const members = gameStore?.getSnapshot().teamMembers ?? [];
+      if (members.length > 1) window.showTeamManagement();
+      else window.showTeamInvite();
+    },
     onRoll: () => {
       if (gameStore && gameSocket) {
         const index = mapIndex ?? ({ getById: () => undefined } as unknown as MapIndex);
@@ -399,6 +405,8 @@ function initTeam(): void {
   if (gameSocket) {
     gameSocket.emit('client.getTeamState', {}, (result) => {
       if (result.ok && result.data) {
+        // 自身 teamId 与服务端权威一致（登录后补一次，修复组队前的角色判定不对称）
+        gameStore?.setCurrentPlayerTeamId(result.data.team?.id ?? null);
         gameStore?.applyEvent({ sequence: gameStore.nextSequence(), type: 'team', members: result.data.members });
         gameHudShell?.update();
       }
@@ -419,8 +427,12 @@ function leaveTeam(): void {
   }
   gameSocket.emit('client.leaveTeam', {}, (result) => {
     if (result.ok) {
+      // 立即复位本地队伍视图：离开者的 server.teamUpdated 不会下发（只发给剩余成员），
+      // 故此处主动清空，保证自己页面上的队友棋子立即回到「路人」角色。
+      gameStore?.applyEvent({ sequence: gameStore.nextSequence(), type: 'team', members: [] });
+      gameStore?.setCurrentPlayerTeamId(null);
+      gameStore?.setTeamValueTable({});
       addChatMessage(t('team.leftTeam'), 'system');
-      // 本地状态由 server.teamMemberLeft / server.teamDisbanded 事件更新
     } else {
       addChatMessage(t('team.leaveFailed', { error: result.error || t('common.unknownError') }), 'system');
     }
@@ -479,7 +491,11 @@ window.showTeamInvite = function(): void {
       if (gameSocket) {
         gameSocket.emit('client.inviteToTeam', { targetPlayerId: playerId }, (result) => {
           if (result.ok) {
-            addChatMessage(t('team.inviteSent', { name: playerName }), 'system');
+            // 等待反馈：用服务端权威过期时间登记待响应，到期给出超时提示
+            const expiresAt = result.data?.invite?.expiresAt ?? Date.now() + 60000;
+            const seconds = Math.max(1, Math.round((expiresAt - Date.now()) / 1000));
+            trackOutgoingTeamInvite(playerId, playerName, expiresAt);
+            addChatMessage(t('team.inviteSentPending', { name: playerName, seconds }), 'system');
           } else {
             addChatMessage(t('team.inviteError', { error: result.error || t('common.unknownError') }), 'system');
           }

@@ -200,6 +200,9 @@ export class TeamHandler {
       return;
     }
 
+    // 拒绝分支需要提前读取邀请元信息（respondInvite 会删除邀请），用于回执邀请者
+    const pendingInvite = payload.accept ? undefined : this.teamManager.getInvite(payload.inviteId);
+
     // 调用 TeamManager 响应邀请（服务端权威）
     const team = this.teamManager.respondInvite(
       payload.inviteId,
@@ -231,6 +234,14 @@ export class TeamHandler {
       ack?.({ ok: true, data: { team } });
     } else {
       logger.info(`玩家 ${playerId} 拒绝了组队邀请`);
+      // 回执邀请者：被拒绝（否则邀请者只能等到本地超时，得到"已过期"的错误反馈）
+      if (pendingInvite && pendingInvite.targetId === playerId) {
+        this.emitToPlayer(pendingInvite.inviterId, 'server.teamInviteRejected', {
+          inviteId: pendingInvite.id,
+          targetId: playerId,
+          targetName: player.username,
+        });
+      }
       ack?.({ ok: true, data: { team: null } });
     }
   }

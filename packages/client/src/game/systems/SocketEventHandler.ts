@@ -43,10 +43,46 @@ const SOCKET_EVENTS = [
   'server.valueChanged', 'server.error', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
   'server.behaviorMessage',
   'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft',
-  'server.teamUpdated', 'server.teamDisbanded', 'server.regionValueChanged', 'server.teamValueTable', 'server.gameState',
+  'server.teamUpdated', 'server.teamDisbanded', 'server.teamInviteRejected', 'server.regionValueChanged', 'server.teamValueTable', 'server.gameState',
   'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.achievementUnlocked', 'server.playerBankrupt', 'server.playerRestarted',
   'server.propertyBought', 'server.propertyUpgraded', 'server.investmentBought', 'server.investmentEventTriggered',
 ] as const;
+
+/**
+ * 已发出、等待对方响应的组队邀请登记（用于「等待响应 / 超时」反馈）。
+ * 目标接受（server.teamMemberJoined / server.teamUpdated）或拒绝（server.teamInviteRejected）时清除；
+ * 到期未清除则输出「邀请已过期」。键为目标玩家 id。
+ */
+interface PendingTeamInvite { targetId: string; targetName: string; timer: ReturnType<typeof setTimeout>; }
+const pendingOutgoingInvites = new Map<string, PendingTeamInvite>();
+
+/**
+ * 登记一条已发出的组队邀请，到期后自动输出超时反馈。
+ * @param expiresAt 服务端权威过期时间戳（邀请 ack 的 invite.expiresAt）
+ */
+export function trackOutgoingTeamInvite(targetId: string, targetName: string, expiresAt: number): void {
+  const existing = pendingOutgoingInvites.get(targetId);
+  if (existing) clearTimeout(existing.timer);
+  const timer = setTimeout(() => {
+    pendingOutgoingInvites.delete(targetId);
+    addChatMessage(t('team.inviteExpired', { name: targetName }), 'system');
+  }, Math.max(0, expiresAt - Date.now()));
+  pendingOutgoingInvites.set(targetId, { targetId, targetName, timer });
+}
+
+/** 目标已成为队伍成员（接受）时清除其待响应登记，避免超时误报 */
+function resolveOutgoingInvite(targetId: string): void {
+  const pending = pendingOutgoingInvites.get(targetId);
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  pendingOutgoingInvites.delete(targetId);
+}
+
+/** 清除全部待响应登记（断线/注销或本队解散时，避免定时器泄漏与残留超时提示） */
+function clearOutgoingInvites(): void {
+  for (const pending of pendingOutgoingInvites.values()) clearTimeout(pending.timer);
+  pendingOutgoingInvites.clear();
+}
 
 /**
  * 注册所有 socket 事件处理器
@@ -389,7 +425,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     }
   });
 
-  socket.on('server.teamInviteReceived', (payload: { inviterName: string; inviteId: string }) => {
+  socket.on('server.teamInviteReceived', (payload) => {
     addChatMessage(t('team.inviteReceived', { name: payload.inviterName }), 'system');
 
     const modal = document.createElement('div');
@@ -399,6 +435,7 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
         <div class="modal-header">${t('team.inviteTitle')}</div>
         <div class="modal-body">
           <div>${t('team.inviteDescription', { name: payload.inviterName })}</div>
+          <div data-ui="invite-guidance" style="margin-top:8px; font-size:0.78rem; color:var(--secondary); line-height:1.5;"></div>
           <div class="modal-actions" style="margin-top: 20px;">
             <button data-action="accept" style="padding: 8px 24px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">${t('team.inviteAccept')}</button>
             <button data-action="reject" style="padding: 8px 24px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">${t('team.inviteReject')}</button>
@@ -408,14 +445,32 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     `;
     document.body.appendChild(modal);
 
+    // 操作指引 + 倒计时：让被邀请人知道接受的含义与剩余时限，避免只有一条消息无从下手
+    const guidanceEl = modal.querySelector<HTMLElement>('[data-ui=invite-guidance]');
+    const updateGuidance = (): void => {
+      const seconds = Math.max(0, Math.ceil((payload.expiresAt - Date.now()) / 1000));
+      if (guidanceEl) guidanceEl.textContent = t('team.inviteGuidance', { name: payload.inviterName, seconds });
+    };
+    updateGuidance();
+    const countdown = setInterval(updateGuidance, 1000);
+    // 到期自动关闭并提示，避免邀请长时间悬挂无反馈
+    const expiryTimer = setTimeout(() => {
+      clearInterval(countdown);
+      modal.remove();
+      addChatMessage(t('team.inviteExpiredForTarget'), 'system');
+    }, Math.max(0, payload.expiresAt - Date.now()));
+    const stopTimers = (): void => { clearInterval(countdown); clearTimeout(expiryTimer); };
+
     const respond = (accept: boolean): void => {
       const buttons = modal.querySelectorAll('button');
       buttons.forEach(button => { button.disabled = true; });
       socket.emit('client.respondToTeamInvite', { inviteId: payload.inviteId, accept }, (result: { ok: boolean; error?: string }) => {
         if (result.ok) {
+          stopTimers();
           modal.remove();
           addChatMessage(t(accept ? 'team.inviteAccepted' : 'team.inviteRejected', { name: payload.inviterName }), 'system');
         } else {
+          // 失败（如已过期）保留弹窗供重试，倒计时继续；过期定时器会自行收尾
           buttons.forEach(button => { button.disabled = false; });
           addChatMessage(t(accept ? 'team.joinFailed' : 'team.rejectFailed', { error: result.error || t('common.unknown') }), 'system');
         }
@@ -426,8 +481,10 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   });
 
   // 监听成员加入队伍（仅显示提示，队伍状态以 server.teamUpdated 为准）
-  socket.on('server.teamMemberJoined', (payload: { playerName: string }) => {
+  socket.on('server.teamMemberJoined', (payload) => {
     addChatMessage(t('team.memberJoined', { name: payload.playerName }), 'system');
+    // 被邀请人已加入：清除邀请者的待响应登记，避免随后误报「邀请已过期」
+    resolveOutgoingInvite(payload.playerId);
     // teamMembers 由 server.teamUpdated 事件权威更新
   });
 
@@ -439,17 +496,30 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
   // 监听队伍状态更新（服务端权威：完整重建本地队伍视图）
   socket.on('server.teamUpdated', (payload) => {
     if (payload.team && store.getSnapshot().currentPlayer) {
+      // 同步自身 teamId，角色判定（自己/队友/路人）才能与其他玩家对称
+      store.setCurrentPlayerTeamId(payload.team.id ?? null);
       // 用服务端推送的成员显示数据完整重建 teamMembers
       if (payload.members) {
         store.applyEvent({ sequence: store.nextSequence(), type: 'team', members: payload.members });
+        // 待响应邀请的目标若已在成员列表中，说明已接受，清除其超时登记
+        for (const member of payload.members) resolveOutgoingInvite(member.id);
       }
       refresh();
     }
   });
 
+  // 监听邀请被拒绝（发给邀请者）：清除待响应登记并给出明确反馈
+  socket.on('server.teamInviteRejected', (payload) => {
+    resolveOutgoingInvite(payload.targetId);
+    addChatMessage(t('team.inviteRejectedNotify', { name: payload.targetName }), 'system');
+  });
+
   // 监听队伍解散（服务端权威）
   socket.on('server.teamDisbanded', () => {
     store.applyEvent({ sequence: store.nextSequence(), type: 'team', members: [] });
+    store.setCurrentPlayerTeamId(null);
+    store.setTeamValueTable({});
+    clearOutgoingInvites();
     addChatMessage(t('team.teamDisbanded'), 'system');
     refresh();
   });
@@ -515,4 +585,6 @@ export function unregisterSocketHandlers(socket: TypedClientSocket): void {
   }
   eventObservers.delete(socket);
   registeredSockets.delete(socket);
+  // 注销时清除待响应邀请定时器，避免断线后残留回调与内存泄漏
+  clearOutgoingInvites();
 }

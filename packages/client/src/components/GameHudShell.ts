@@ -1,5 +1,5 @@
 import type { GameEffectHooks } from "../game/GameEffects.js";
-import type { GameViewModel, ValueFieldDef } from "../game/GameViewModel.js";
+import type { GameViewModel, ValueFieldDef, TeamSlice } from "../game/GameViewModel.js";
 import { t, localizedText } from "../game/i18n.js";
 import { parseChatCommand } from "@game/shared";
 import type { LeaderboardEntry } from "@game/shared";
@@ -19,6 +19,7 @@ export interface GameHudShellConfig {
   onRoll?: () => void;
   onBack?: () => void;
   onChatSend?: (message: string, channel: string, onResult?: (ok: boolean) => void) => void;
+  onTeam?: () => void;
   onPathChoice?: (cellId: number) => void;
   onCellAction?: (actionId: string, data?: Record<string, unknown>) => void;
   onCellHover?: (cellId: number, x: number, y: number) => void;
@@ -76,12 +77,13 @@ export class GameHudShell {
     this.root.innerHTML = `
       <div class="gp-layout" data-ui="hud-layout">
         <header class="gp-topbar" data-ui="top-bar">
-          <div class="player-badge" data-ui="player-badge" aria-live="polite">
-            <div class="player-badge__avatar"></div>
-            <div>
+          <div class="player-badge" data-ui="player-badge">
+            <div class="player-badge__avatar" data-ui="player-avatar"></div>
+            <div class="player-badge__meta" aria-live="polite">
               <div class="player-badge__name" data-ui="player-name"></div>
               <div class="player-badge__team" data-ui="player-team"></div>
             </div>
+            <div class="value-pills" data-ui="team-strip"></div>
           </div>
           <div class="value-pills" data-ui="resource-strip"></div>
           <div class="topbar-spacer"></div>
@@ -101,6 +103,7 @@ export class GameHudShell {
 
         <div class="hud-panel-actions" data-ui="panel-actions" role="group">
            <button class="panel-button" data-action="back" type="button"></button>
+           <button class="panel-button" data-action="team" type="button"></button>
            <button class="panel-button" data-action="settings" type="button"></button>
            <button class="panel-button" data-action="achievements" type="button"></button>
         </div>
@@ -155,6 +158,7 @@ export class GameHudShell {
     this.root.querySelector('[data-action="chat-send"]')?.addEventListener("click", () => this.sendChat());
     this.input.addEventListener("keydown", (e) => { if (e.key === "Enter") this.sendChat(); });
     this.root.querySelector('[data-action="achievements"]')?.addEventListener("click", () => this.showAchievements());
+    this.root.querySelector('[data-action="team"]')?.addEventListener("click", () => this.config.onTeam?.());
     this.root.querySelector('[data-action="settings"]')?.addEventListener("click", () => this.showSettings());
     this.root.querySelector('[data-action="back"]')?.addEventListener("click", () => this.config.onBack?.());
     this.root.querySelector('[data-action="roll"]')?.addEventListener("click", () => this.config.onRoll?.());
@@ -225,9 +229,11 @@ export class GameHudShell {
     this.root.querySelector('[data-action="roll"] .dice-btn__fill')!.textContent = rollLabel;
     set('[data-action="chat-send"]', "chat.send");
     set('[data-action="back"]', "common.backToStart");
+    set('[data-action="team"]', "hud.team");
     set('[data-action="settings"]', "hud.settings");
     set('[data-action="achievements"]', "hud.achievements");
     this.root.querySelector('[data-action="back"]')?.setAttribute('aria-label', t('common.backToStart'));
+    this.root.querySelector('[data-action="team"]')?.setAttribute('aria-label', t('hud.team'));
     this.root.querySelector('[data-action="settings"]')?.setAttribute('aria-label', t('hud.settings'));
     this.root.querySelector('[data-action="achievements"]')?.setAttribute('aria-label', t('hud.achievements'));
     // 收起态仅显示一个字形图标，此处为容器补可读屏名称（展开后为带文字按钮）
@@ -338,20 +344,55 @@ export class GameHudShell {
     this.renderCellHover();
   }
 
-  /** 玩家名牌 + 队伍状态 */
+  /**
+   * 玩家名牌 + 队伍信息（单一头像圆 + 名牌 + 队伍作用域数值）。
+   * 头像只显示一个圆、不写玩家名（仅以悬停说明表意）；无队伍时队伍行显示「独行」、不渲染队伍数值框。
+   */
   private updatePlayerBadge(): void {
     const player = this.vm.getPlayer();
-    const avatarEl = this.root.querySelector("[data-ui=player-badge] .player-badge__avatar");
-    if (avatarEl) {
-      const playerName = player.currentPlayerName || t("game.defaultPlayerName");
-      avatarEl.textContent = playerName.charAt(0).toUpperCase();
-      avatarEl.setAttribute("aria-label", playerName);
-    }
     const team = this.vm.getTeam();
+    const playerName = player.currentPlayerName || t("game.defaultPlayerName");
+    const currentId = player.currentPlayer?.id;
+
+    const avatar = this.root.querySelector<HTMLElement>("[data-ui=player-avatar]");
+    if (avatar) {
+      // 头像内不写玩家名：仅保留悬停/读屏说明，满足"不靠图形单独表意"
+      avatar.title = playerName;
+      avatar.setAttribute("aria-label", playerName);
+    }
+
     const nameEl = this.root.querySelector("[data-ui=player-name]")!;
-    nameEl.textContent = player.currentPlayerName || t("game.defaultPlayerName");
+    nameEl.textContent = playerName;
     const teamEl = this.root.querySelector("[data-ui=player-team]")!;
-    teamEl.textContent = team.members.length > 1 ? t("hud.teamCount", { count: team.members.length }) : t("hud.lone");
+    const mates = team.members.filter((member) => member.id !== currentId).map((member) => member.username);
+    teamEl.textContent = mates.length > 0
+      ? t("hud.teamWith", { names: mates.join(t("hud.teamNameSeparator")) })
+      : t("hud.lone");
+
+    this.renderTeamValues(team);
+  }
+
+  /**
+   * 队伍作用域数值：字段沿用玩家作用域定义（队伍值 = 各成员该字段均值，服务端权威）。
+   * 数值框与玩家/区域数值共用同一套 .value-pill 外观，仅在标签上以「队 ·」前缀区分作用域；
+   * 用独立的 data-field 前缀（team:）避免与玩家数值框的呼吸/变化量锚点冲突。
+   */
+  private renderTeamValues(team: TeamSlice): void {
+    const strip = this.root.querySelector<HTMLElement>("[data-ui=team-strip]");
+    if (!strip) return;
+    const inTeam = team.members.length > 1;
+    const defs = inTeam ? this.vm.getRegions().valueFieldDefs.filter((def) => def.scope === "player") : [];
+    const readTeamValue = (def: ValueFieldDef): number => {
+      const authoritative = team.values[def.id];
+      if (typeof authoritative === "number") return authoritative;
+      // teamValueTable 尚未下发时的回退：按成员实时值取算术均值（与服务端口径一致）
+      const sum = team.members.reduce((acc, member) => acc + (member.values?.[def.id] ?? 0), 0);
+      return team.members.length > 0 ? sum / team.members.length : 0;
+    };
+    this.renderValuePills(strip, defs, readTeamValue, (def) => def.id, {
+      keyPrefix: "team:",
+      labelPrefix: t("hud.teamValuePrefix"),
+    });
   }
 
   /** 顶部数值条：由地图 valueFieldDefinitions 驱动，仅渲染玩家作用域字段。
@@ -366,7 +407,6 @@ export class GameHudShell {
       defs.filter((def) => def.scope === "player"),
       (def) => playerValues[def.id]?.current ?? 0,
       (def) => t("hud." + def.id),
-      true,
     );
   }
 
@@ -380,28 +420,30 @@ export class GameHudShell {
     slots: ValueFieldDef[],
     readValue: (def: ValueFieldDef) => number,
     readLabel: (def: ValueFieldDef) => string,
-    accentFirst: boolean,
+    options: { keyPrefix?: string; labelPrefix?: string } = {},
   ): void {
+    const keyOf = (def: ValueFieldDef): string => (options.keyPrefix ?? "") + def.id;
     const existing = new Map<string, HTMLElement>();
     strip.querySelectorAll<HTMLElement>(".value-pill").forEach((el) => {
       if (el.dataset.field) existing.set(el.dataset.field, el);
     });
-    const next = slots.map((def, index) => {
-      let pill = existing.get(def.id);
+    const next = slots.map((def) => {
+      let pill = existing.get(keyOf(def));
       if (!pill) {
         pill = document.createElement("div");
         pill.className = "value-pill";
-        // 底色呼吸（§3.7）目标锚点：仅该字段变化时提亮这一个数值框的填充底色
-        pill.dataset.field = def.id;
+        // 底色呼吸（§3.7）目标锚点：仅该字段变化时提亮这一个数值框的填充底色。
+        // 队伍数值框用 keyPrefix 前缀（team:）与玩家数值框的 data-field 锚点区分开，互不误伤。
+        pill.dataset.field = keyOf(def);
         const label = document.createElement("span");
         label.className = "value-pill__label";
         const num = document.createElement("span");
         num.className = "value-pill__num";
         pill.append(label, num);
       }
-      // 只切换修饰类，不能用 className 整体赋值，否则会一并清掉 fx-value-breathe
-      pill.classList.toggle("value-pill--accent", accentFirst && index === 0);
-      pill.querySelector(".value-pill__label")!.textContent = localizedText(def.name, readLabel(def));
+      // 数值框不再有字段特化修饰类；用 className 整体赋值会清掉 fx-value-breathe，故也不动 className
+      pill.querySelector(".value-pill__label")!.textContent =
+        (options.labelPrefix ?? "") + localizedText(def.name, readLabel(def));
       const raw = readValue(def);
       const value = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
       pill.querySelector(".value-pill__num")!.textContent = String(Math.round(value));
@@ -544,7 +586,6 @@ export class GameHudShell {
         definitions,
         (def) => regionValues[def.id] ?? 0,
         (def) => def.id,
-        false,
       );
     }
   }

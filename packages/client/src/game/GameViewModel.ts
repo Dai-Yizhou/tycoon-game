@@ -131,6 +131,8 @@ export interface CellActionOption {
 /** 队伍状态 */
 export interface TeamSlice {
   members: TeamMember[];
+  /** 当前团队的字段均值（服务端权威 teamValueTable）；无团队或未下发时为空对象 */
+  values: Record<string, number>;
 }
 
 /** 其他玩家状态 */
@@ -376,7 +378,10 @@ export class GameViewModel {
   }
 
   // ===== Team =====
-  getTeam(): TeamSlice { return { members: this.projectedSnapshot().teamMembers }; }
+  getTeam(): TeamSlice {
+    const snapshot = this.projectedSnapshot();
+    return { members: snapshot.teamMembers, values: snapshot.teamValueTable };
+  }
 
   // ===== Tutorial =====
   getTutorial(): TutorialSlice { return { step: 0, active: false }; }

@@ -399,6 +399,13 @@ export interface ServerToClientEvents {
 
   /** 队伍解散通知 */
   'server.teamDisbanded': (payload: { teamId: string }) => void;
+
+  /** 组队邀请被拒绝通知（发给邀请者，避免其等到超时才得知，造成错误反馈） */
+  'server.teamInviteRejected': (payload: {
+    inviteId: string;
+    targetId: string;
+    targetName: string;
+  }) => void;
   /** 昼夜切换 */
   'server.dayNightChanged': (payload: {
     isDay: boolean;

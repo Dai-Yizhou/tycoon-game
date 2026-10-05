@@ -305,6 +305,11 @@ export class TeamManager {
     );
   }
 
+  /** 按邀请 ID 查询邀请（用于在响应前读取邀请者等元信息，拒绝通知需要） */
+  getInvite(inviteId: string): TeamInvite | undefined {
+    return this.invites.get(inviteId);
+  }
+
   /**
    * 定时检查邀请过期
    */

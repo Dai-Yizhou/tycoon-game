@@ -224,6 +224,18 @@ export class GameStore {
     this.publish();
   }
 
+  /**
+   * 同步当前玩家自身的 teamId。
+   * 角色判定（自己 / 队友 / 路人）依赖 currentPlayer.teamId 与 teamMembers 是否命中，
+   * 而该字段原先只在登录 server.gameState 下发，组队/退队后不刷新，导致棋子被绘为路人。
+   * 组队、退队、解散事件都必须调用本方法刷新。
+   */
+  setCurrentPlayerTeamId(teamId: string | null): void {
+    if (!this.snapshot.currentPlayer) return;
+    this.snapshot = { ...this.snapshot, currentPlayer: { ...this.snapshot.currentPlayer, teamId } };
+    this.publish();
+  }
+
   setRegionValue(regionId: string, fieldId: string, value: number): void {
     const regionValues = new Map(this.snapshot.regionValues);
     regionValues.set(regionId, { ...(regionValues.get(regionId) ?? {}), [fieldId]: value });
