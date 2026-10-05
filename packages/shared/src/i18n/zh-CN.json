@@ -45,7 +45,6 @@
     "rentLevelConfigMissing": "「{{cell}}」缺少等级 {{level}} 的租金配置，本次不收租",
     "rentZero": "「{{cell}}」当前租金为 0，本次不收租",
     "rentFieldMissing": "{{payer}} 缺少字段「{{field}}」，本次不收租",
-    "rentInsufficient": "{{payer}} 余额不足，应付「{{cell}}」租金 {{amount}} 未结算",
     "rentDebitFailed": "{{payer}} 租金扣款未生效，本次不收租",
     "dayNightChanged": "进入{{phase}}：{{region}} {{detail}}",
     "dayNightPhaseDay": "白昼",

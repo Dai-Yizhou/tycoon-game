@@ -45,7 +45,6 @@
     "rentLevelConfigMissing": "\"{{cell}}\" has no rent configured for level {{level}}, so no rent is charged",
     "rentZero": "Current rent of \"{{cell}}\" is 0, so no rent is charged",
     "rentFieldMissing": "{{payer}} has no field \"{{field}}\", so no rent is charged",
-    "rentInsufficient": "{{payer}} has insufficient balance; rent of {{amount}} for \"{{cell}}\" was not settled",
     "rentDebitFailed": "Rent debit for {{payer}} did not take effect, so no rent is charged",
     "dayNightChanged": "{{phase}} begins: {{region}} {{detail}}",
     "dayNightPhaseDay": "Daytime",

@@ -176,4 +176,23 @@ describe('PropertyHandler v2', () => {
     expect(owner.values.money.current).toBe(10);
     expect(owner.values.credit.current).toBe(2);
   });
+
+  it('租金全额结算可致负债：付款方余额不足时扣成负数而非拒付（被动路径无需确认）', () => {
+    const world = new GameWorld();
+    world.loadMap([property], meta);
+    const payer = { id: 'payer', status: 'normal', values: { money: { id: 'money', name: 'money', current: 30, min: 0 } } } as any;
+    const owner = { id: 'owner', status: 'normal', values: { money: { id: 'money', name: 'money', current: 0, min: 0 } } } as any;
+    world.addPlayer(payer);
+    world.addPlayer(owner);
+    property.rent = [{ player: { money: -100 } }];
+    world.getRuntimeState().replaceOwnerships(1, [{ playerId: 'owner', share: 1, purchasePrice: 100 }]);
+    const handler = new PropertyHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
+
+    const result = handler.handleRentPayment('payer', 1, {} as any);
+
+    // 不再因 next < min 而拒付，实扣 -100，payer 越线至 -70（越线破产由 Bankruptcy 结算边界触发）
+    expect(result).not.toBeNull();
+    expect(payer.values.money.current).toBe(-70);
+    expect(owner.values.money.current).toBe(100);
+  });
 });

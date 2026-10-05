@@ -594,12 +594,8 @@ export class PropertyHandler {
           broadcastSystemMessage(this.io, t('server.rentFieldMissing', { payer: payer.username, field: fieldId }));
           return null;
         }
-        const next = field.current - payableMagnitude;
-        if (next < (field.min ?? Number.NEGATIVE_INFINITY) || next > (field.max ?? Number.POSITIVE_INFINITY)) {
-          // 余额不足（字段有 min 下限）时不结算：此前静默返回，导致「收租未触发」难以定位
-          broadcastSystemMessage(this.io, t('server.rentInsufficient', { payer: payer.username, cell: this.cellLabel(cell), amount: payableMagnitude }));
-          return null;
-        }
+        // 负债式破产：租金全额结算，不做余额预检。扣成负数由 Bankruptcy 的越线判定
+        // 在结算边界触发破产（被动路径无需二次确认）。
         payerDeltas[fieldId] = -payableMagnitude;
       }
       const payerChanges = this.applyUct(payer, { player: payerDeltas }, 'rent_payment');
