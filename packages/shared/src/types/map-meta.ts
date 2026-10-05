@@ -57,6 +57,20 @@ export interface DayNightValueChangeConfig {
   night: Uct;
 }
 
+/**
+ * 长期离线清理配置（可选）
+ *
+ * 对离线超过 `thresholdMs` 的玩家执行清理：释放其全部股份并置为破产态，
+ * 不删除账号。用于回收被长期离线玩家永久占用的股东位（地图饱和问题）。
+ * 未配置则关闭该清理通道。
+ */
+export interface InactivityCleanupConfig {
+  /** 离线时长阈值（毫秒）；超过即触发清理 */
+  thresholdMs: number;
+  /** 扫描周期（毫秒），缺省 60000 */
+  sweepIntervalMs?: number;
+}
+
 export interface MapMeta {
   id: string;
   version: string;
@@ -76,11 +90,15 @@ export interface MapMeta {
   dayNight?: DayNightValueChangeConfig;
   /** 全局数值调节规则（可选，D8）；命中 cellType+base 时覆盖/联动目标字段 */
   valueModifiers?: ValueModifierRule[];
+  /** 长期离线清理配置（可选，未配置则关闭） */
+  inactivityCleanup?: InactivityCleanupConfig;
 }
 
 export const DEFAULT_DAY_NIGHT_CYCLE_MINUTES = 15;
 /** 白昼占全天比例的默认值（0.5 → 白昼 06:00-18:00，12:00 为正午中点） */
 export const DEFAULT_DAY_NIGHT_RATIO = 0.5;
+/** 长期离线清理的默认扫描周期（毫秒） */
+export const DEFAULT_INACTIVITY_SWEEP_INTERVAL_MS = 60_000;
 
 export function buildPlayerValues(meta: MapMeta): Record<string, ValueField> {
   const values: Record<string, ValueField> = {};

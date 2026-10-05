@@ -23,7 +23,7 @@ import { logger } from './utils/logger.js';
 import { GameWorld } from './world/GameWorld.js';
 import { SocketManager, type TypedServer } from './transport/SocketManager.js';
 import { HandlerRegistry, registerHandlers } from './transport/handlers.js';
-import { EconomyService, Taxation, Bankruptcy, type TaxConfig } from './economy/index.js';
+import { EconomyService, Taxation, Bankruptcy, InactivityCleanup, type TaxConfig } from './economy/index.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { parseMapData, parseMapMeta } from '@game/shared';
 import { DayNightCycle, DEFAULT_DAY_NIGHT_CONFIG } from './world/DayNightCycle.js';
@@ -122,6 +122,7 @@ export interface CreatedApp {
   economy?: {
     taxation: Taxation;
     bankruptcy: Bankruptcy;
+    inactivityCleanup?: InactivityCleanup;
   };
   /** 昼夜循环实例 */
   dayNightCycle?: DayNightCycle;
@@ -311,8 +312,14 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
   const taxation = new Taxation(io, world, readTaxConfig(mapMeta), economy);
   const bankruptcy = new Bankruptcy(io, world, taxation);
 
+  // 长期离线清理：回收被长期离线玩家永久占用的股东位（未配置则关闭）
+  const inactivityCleanup = mapMeta.inactivityCleanup
+    ? new InactivityCleanup(world, bankruptcy, mapMeta.inactivityCleanup)
+    : undefined;
+
   // 启动经济系统定时器
   taxation.startTaxTimer();
+  inactivityCleanup?.start();
 
   logger.info('Economy system initialized (taxation, bankruptcy)');
 
@@ -465,7 +472,7 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
     world,
     socketManager,
     httpServer,
-    economy: { taxation, bankruptcy },
+    economy: { taxation, bankruptcy, inactivityCleanup },
     dayNightCycle,
     timeZoneManager,
     dayNightValueChange,
@@ -527,7 +534,7 @@ export function startHttpServer(
 export async function gracefulShutdown(
   httpServer: http.Server,
   socketManager?: SocketManager,
-  economy?: { taxation: Taxation; bankruptcy: Bankruptcy },
+  economy?: { taxation: Taxation; bankruptcy: Bankruptcy; inactivityCleanup?: InactivityCleanup },
   dayNightCycle?: DayNightCycle,
   dayNightValueChange?: DayNightValueChange,
   timeoutMs: number = 5000,
@@ -583,6 +590,7 @@ export async function gracefulShutdown(
     try {
       economy.taxation.stopTaxTimer();
       economy.bankruptcy.cleanup();
+      economy.inactivityCleanup?.cleanup();
       logger.info('Economy system cleaned up');
     } catch (err) {
       logger.error('error cleaning up economy system', err);

@@ -4,11 +4,14 @@ import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import { broadcastSystemMessage } from '../net/systemChat.js';
 import type { Taxation } from './Taxation.js';
 
+/** 破产原因：负数越线 / 债务逾期 / 手动触发 / 长期离线清理 */
+export type BankruptcyReason = 'negative_net_worth' | 'debt_overdue' | 'manual' | 'inactivity';
+
 export interface BankruptcyRecord {
   id: string;
   playerId: string;
   bankruptcyTime: number;
-  reason: 'negative_net_worth' | 'debt_overdue' | 'manual';
+  reason: BankruptcyReason;
   netWorthAtBankruptcy: number;
   /** 触发破产的数值字段明细，便于事后追溯 */
   triggeredFields: BankruptFieldTrigger[];
@@ -120,7 +123,7 @@ export class Bankruptcy {
     for (const player of this.world.getAllPlayers()) this.onPlayerAdded({ player });
   }
 
-  triggerBankruptcy(playerId: string, reason: 'negative_net_worth' | 'debt_overdue' | 'manual', triggeredFields: BankruptFieldTrigger[] = []): BankruptcyResult {
+  triggerBankruptcy(playerId: string, reason: BankruptcyReason, triggeredFields: BankruptFieldTrigger[] = []): BankruptcyResult {
     const player = this.world.getPlayer(playerId);
     if (!player) return { success: false, error: '玩家不存在' };
     if (player.status === PlayerStatus.Bankrupt) return { success: false, error: '玩家已破产' };

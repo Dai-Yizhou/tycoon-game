@@ -296,7 +296,12 @@ export class PlayerManager {
     this.frozen.delete(playerId);
     const previousStatus = this.statusBeforeFreeze.get(playerId) ?? PlayerStatus.Normal;
     this.statusBeforeFreeze.delete(playerId);
-    this.updateStatus(playerId, previousStatus);
+    // 仅在离线期间状态未被改写时才回滚为冻结前状态：
+    // 长期离线清理会在玩家离线期间将其置为破产态，若此处无条件回滚，
+    // 重连会把 Bankruptcy 洗回 Normal，导致「资产已清空却显示正常」。
+    if (player.status === PlayerStatus.Frozen) {
+      this.updateStatus(playerId, previousStatus);
+    }
     if (newSocketId) {
       this.socketBindings.set(playerId, newSocketId);
     }

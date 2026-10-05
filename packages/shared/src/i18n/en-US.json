@@ -56,7 +56,8 @@
     "bankruptReason": {
       "negative_net_worth": "value crossed the threshold",
       "debt_overdue": "debt overdue",
-      "manual": "manual trigger"
+      "manual": "manual trigger",
+      "inactivity": "Inactivity cleanup"
     }
   },
   "game": {

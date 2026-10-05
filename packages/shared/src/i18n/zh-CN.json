@@ -56,7 +56,8 @@
     "bankruptReason": {
       "negative_net_worth": "数值越线",
       "debt_overdue": "债务逾期",
-      "manual": "手动触发"
+      "manual": "手动触发",
+      "inactivity": "长期离线清理"
     }
   },
   "game": {
