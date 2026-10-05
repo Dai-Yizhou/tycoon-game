@@ -21,7 +21,7 @@ import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
-import type { EconomyService } from '../economy/EconomyService.js';
+import { assessUct, type EconomyService } from '../economy/EconomyService.js';
 import { publishValueChanged } from '../net/valuePublisher.js';
 
 /**
@@ -132,7 +132,7 @@ export class TransportHandler {
    */
   private handleUseTransport(
     socket: TypedSocket,
-    payload: { hubCellId: number; targetCellId: number },
+    payload: { hubCellId: number; targetCellId: number; confirm?: boolean },
     ack?: (result: AckResult<TransportResult>) => void,
   ): void {
     try {
@@ -221,10 +221,15 @@ export class TransportHandler {
       }
       const cost = teleportCost;
 
-      // 10. 检查玩家财产是否足够
-      if (!this.canApplyUct(player, cost)) {
+      // 10. 负债式预检：非法（字段缺失/超上界）直接拒绝；会致负债则返回预览待二次确认
+      const assessment = assessUct(player, cost);
+      if (assessment.missingField || assessment.overMax) {
         emitError(socket, ErrorCodes.InvalidPayload, `数值不足，需要 ${this.formatUct(cost)}`);
         ack?.({ ok: false, error: 'insufficient_money' });
+        return;
+      }
+      if (assessment.preview && payload.confirm !== true) {
+        ack?.({ ok: false, error: 'would_bankrupt', wouldBankrupt: assessment.preview });
         return;
       }
 
@@ -582,20 +587,11 @@ export class TransportHandler {
     logger.debug(`玩家 ${playerId} 到达交通枢纽 ${hubId}`);
   }
 
-  /**
-   * 获取玩家财产
-   */
-  private canApplyUct(player: Player, uct: Uct): boolean {
-    return Object.entries(uct.player ?? {}).every(([fieldId, delta]) => {
-      const field = player.values[fieldId];
-      return Boolean(field) && field.current + delta >= (field.min ?? Number.NEGATIVE_INFINITY) && field.current + delta <= (field.max ?? Number.POSITIVE_INFINITY);
-    });
-  }
-
+  /** 直接改值兜底（economy 未注入时使用）：与 EconomyService 一致，只钳上界 */
   private changePlayerValue(player: Player, fieldId: string, delta: number): boolean {
     const field = player.values[fieldId];
     if (!field || !Number.isFinite(delta)) return false;
-    field.current = Math.min(field.max ?? Number.POSITIVE_INFINITY, Math.max(field.min ?? Number.NEGATIVE_INFINITY, field.current + delta));
+    field.current = Math.min(field.max ?? Number.POSITIVE_INFINITY, field.current + delta);
     this.world.updatePlayer(player);
     return true;
   }

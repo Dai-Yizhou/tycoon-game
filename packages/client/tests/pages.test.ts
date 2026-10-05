@@ -227,7 +227,7 @@ describe('Pages', () => {
       const page = createBankruptcyPage(controller);
 
       expect(page.querySelector('.bankruptcy-cause h2')?.textContent).toBe('触发原因');
-      expect(page.querySelector('.bankruptcy-cause li')?.textContent).toBe('财产：200 → 0（下限 0）');
+      expect(page.querySelector('.bankruptcy-cause li')?.textContent).toBe('财产：200 → 0（破产阈值 0）');
     });
   });
 

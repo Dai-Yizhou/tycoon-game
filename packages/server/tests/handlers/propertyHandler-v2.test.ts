@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { PropertyHandler } from '../../src/handlers/propertyHandler.js';
+import { assessUct } from '../../src/economy/EconomyService.js';
 import { GameWorld } from '../../src/world/GameWorld.js';
 import type { Cell, MapMeta } from '@game/shared';
 import type { TypedServer } from '../../src/transport/SocketManager.js';
@@ -116,15 +117,21 @@ describe('PropertyHandler v2', () => {
     expect(player.values.credit.current).toBe(4);
   });
 
-  it('accepts a price UCT that has no money field', () => {
+  it('accepts a price UCT that has no money field（assessUct 只按字段存在性与负债预览判定）', () => {
     const world = new GameWorld();
     world.loadMap([property], meta);
     const handler = new PropertyHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
     const player = { id: 'p2', values: { credit: { id: 'credit', name: 'credit', current: 10, min: 0 } } } as any;
     world.addPlayer(player);
+    expect(handler).toBeDefined();
 
-    expect((handler as any).canApplyUct(player, { player: { credit: -4 } })).toBe(true);
-    expect((handler as any).canApplyUct(player, { player: { credit: -11 } })).toBe(false);
+    // 仅含 credit 字段的 UCT 不因缺少 money 而报 missingField
+    expect(assessUct(player, { player: { credit: -4 } })).toMatchObject({ overMax: false, preview: null });
+    // 越线（结算后低于 min）时返回预览而非直接拒绝
+    expect(assessUct(player, { player: { credit: -11 } })).toMatchObject({
+      overMax: false,
+      preview: { fields: [{ fieldId: 'credit', current: -1, min: 0 }] },
+    });
   });
 
   it('distributes rent using all configured player fields', () => {

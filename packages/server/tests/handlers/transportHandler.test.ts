@@ -236,8 +236,8 @@ describe('TransportHandler', () => {
   });
 
   describe('财产检查', () => {
-    it('财产不足时传送失败', () => {
-      const player = createTestPlayer('player1', 30); // 财产不足
+    it('财产不足时传送仍按负债口径实扣（越线判定与放行由预检负责）', () => {
+      const player = createTestPlayer('player1', 30); // 财产 30，费用 50
       player.position.cellId = 1;
       world.addPlayer(player);
 
@@ -245,12 +245,11 @@ describe('TransportHandler', () => {
       const targetCell = world.getMapIndex()!.getById(2)!;
       const cost = { player: { money: -50 } };
 
-      // 执行传送（由于财产不足，会失败）
+      // executeTransport 只执行操作，不钳 min：负债式破产下扣成 -20
       const result = (handler as any).executeTransport(player, hubCell, targetCell, cost);
 
-      // 结果应该为 null（因为财产不足）
-      expect(result).not.toBeNull(); // executeTransport 不检查财产，只执行操作
-      expect(player.values['money'].current).toBe(0);
+      expect(result).not.toBeNull();
+      expect(player.values['money'].current).toBe(-20);
     });
   });
 

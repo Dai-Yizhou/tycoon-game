@@ -1,9 +1,10 @@
 import { t, localizedText } from '../i18n.js';
 import { formatUctDisplay } from '../cellDisplayModel.js';
-import type { Cell, MapIndex, Uct } from '@game/shared';
+import type { BankruptcyPreview, Cell, MapIndex, Uct } from '@game/shared';
 import type { TypedClientSocket } from '../../hooks/useSocket.js';
 import type { ClientGameSnapshot, GameStore } from '../../state/GameStore.js';
 import { addChatMessage } from './ChatSystem.js';
+import { canApplyUct } from '../cellActionResolver.js';
 import { noopHudRefresh, type HudRefresh } from '../ClientHudBridge.js';
 
 export interface GameRuntime {
@@ -74,9 +75,51 @@ export function onPlayerArrived(runtime: GameRuntime): void {
   (runtime.onHudRefresh ?? noopHudRefresh)();
 }
 
-function emitAction(runtime: GameRuntime, event: 'client.buyProperty' | 'client.upgradeProperty' | 'client.buyInvestment' | 'client.repairMonument', payload: Record<string, number>): void {
-  runtime.socket.emit(event, payload as never, (result: { ok: boolean; error?: string }) => {
+/**
+ * 负债式破产二次确认弹窗。
+ *
+ * 服务端预检发现放行该操作会让数值越过破产阈值时，不直接结算也不直接拒绝，
+ * 而是回传权威预览（哪些字段、结算后值、破产阈值）。此处展示预览，玩家确认后
+ * 以 confirm 重发由服务端放行并结算，随后由 Bankruptcy 触发破产。
+ */
+function showBankruptcyConfirm(preview: BankruptcyPreview, onConfirm: () => void): void {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  const rows = preview.fields
+    .map((f) => `<div>${t('bankruptcy.confirmField', { field: f.fieldName ?? f.fieldId, current: f.current, min: f.min })}</div>`)
+    .join('');
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">${t('bankruptcy.confirmTitle')}</div>
+      <div class="modal-body">
+        <div style="font-size:0.85rem; line-height:1.6; color:var(--secondary); margin-bottom:10px;">${t('bankruptcy.confirmBody')}</div>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">${rows}</div>
+        <button class="modal-btn btn-danger" data-bankruptcy-confirm>${t('common.confirm')}</button>
+        <button class="modal-btn btn-cancel" data-bankruptcy-cancel>${t('common.close')}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('[data-bankruptcy-confirm]')?.addEventListener('click', () => {
+    overlay.remove();
+    onConfirm();
+  });
+  overlay.querySelector('[data-bankruptcy-cancel]')?.addEventListener('click', () => overlay.remove());
+}
+
+function emitAction(
+  runtime: GameRuntime,
+  event: 'client.buyProperty' | 'client.upgradeProperty' | 'client.buyInvestment' | 'client.repairMonument',
+  payload: Record<string, number>,
+  confirm = false,
+): void {
+  runtime.socket.emit(event, { ...payload, confirm } as never, (result: { ok: boolean; error?: string; wouldBankrupt?: BankruptcyPreview }) => {
     if (!result.ok) {
+      // 服务端权威二次确认：先展示预览，确认后带 confirm 重发（不消耗本回合行动权）
+      if (result.wouldBankrupt) {
+        showBankruptcyConfirm(result.wouldBankrupt, () => emitAction(runtime, event, payload, true));
+        return;
+      }
       addChatMessage(result.error || t('common.unknownError'), 'error');
       return;
     }
@@ -140,7 +183,7 @@ export function loadTransportDestinations(runtime: GameRuntime): void {
       id: 'transport',
       label: localizedText(dest.name, `目的地 ${dest.cellId}`),
       detail: formatUctDisplay(dest.cost, current.valueFieldDefs),
-      enabled: !current.isBankrupt && canAffordUct(player, dest.cost),
+      enabled: !current.isBankrupt && canApplyUct(player, dest.cost),
       data: { targetCellId: dest.cellId },
     }));
     runtime.store.setCellActions(actions);
@@ -148,24 +191,21 @@ export function loadTransportDestinations(runtime: GameRuntime): void {
 }
 
 /** 从 act-bar 目标目的地动作直接发起传送（不再弹窗） */
-export function handleUseTransport(runtime: GameRuntime, targetCellId: number): void {
+export function handleUseTransport(runtime: GameRuntime, targetCellId: number, confirm = false): void {
   const snapshot = runtime.store.getSnapshot();
   const cell = runtime.mapIndex.getById(snapshot.currentPlayerPosition);
   if (!cell || cellType(cell) !== 'transport' || !Number.isInteger(targetCellId)) return;
-  runtime.socket.emit('client.useTransport', { hubCellId: cell.id, targetCellId }, (result: { ok: boolean; error?: string }) => {
+  runtime.socket.emit('client.useTransport', { hubCellId: cell.id, targetCellId, confirm }, (result: { ok: boolean; error?: string; wouldBankrupt?: BankruptcyPreview }) => {
     if (!result.ok) {
+      // 服务端权威二次确认：先展示预览，确认后带 confirm 重发
+      if (result.wouldBankrupt) {
+        showBankruptcyConfirm(result.wouldBankrupt, () => handleUseTransport(runtime, targetCellId, true));
+        return;
+      }
       addChatMessage(t('transport.teleportFailed'), 'error');
       if (result.error) addChatMessage(result.error, 'error');
     }
     // 传送成功时以全屏转场 + 棋子位移直观呈现，不再推送聊天提示
-  });
-}
-
-function canAffordUct(player: ClientGameSnapshot['currentPlayer'], uct: Uct | undefined): boolean {
-  if (!player || !uct) return false;
-  return Object.entries(uct.player ?? {}).every(([fieldId, delta]) => {
-    const field = player.values[fieldId];
-    return Boolean(field) && field.current + delta >= (field.min ?? Number.NEGATIVE_INFINITY) && field.current + delta <= (field.max ?? Number.POSITIVE_INFINITY);
   });
 }
 

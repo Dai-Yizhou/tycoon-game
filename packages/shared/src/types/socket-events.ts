@@ -75,11 +75,36 @@ export interface CellIdPayload {
   cellId: number;
 }
 
+/** 操作将触发负债式破产时，单个字段的结算后预览 */
+export interface BankruptcyPreviewField {
+  /** 字段 ID（如 money） */
+  fieldId: string;
+  /** 字段显示名（服务端当前语言回退后的文本） */
+  fieldName?: string;
+  /** 结算后值（已低于破产阈值） */
+  current: number;
+  /** 破产阈值（原 min 语义） */
+  min: number;
+}
+
+/**
+ * 操作会触发负债式破产时的服务端权威预览。
+ *
+ * 服务端在预检阶段计算出「若放行该操作，哪些字段会越线、结算后是多少」，
+ * 首次请求不直接拒绝也不直接结算，而是把预览回给客户端；客户端二次确认后
+ * 带 `confirm: true` 重发，服务端放行并结算（随后由 Bankruptcy 触发破产）。
+ */
+export interface BankruptcyPreview {
+  fields: BankruptcyPreviewField[];
+}
+
 /** 通用结果回执 */
 export interface AckResult<T = unknown> {
   ok: boolean;
   error?: string;
   data?: T;
+  /** 该操作会致负债破产：携带权威预览，客户端确认后带 confirm 重发 */
+  wouldBankrupt?: BankruptcyPreview;
 }
 
 /** 数值变化广播 */
@@ -129,13 +154,13 @@ export interface ClientToServerEvents {
 
   /** 购买地产/项目 */
   'client.buyProperty': (
-    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number; confirm?: boolean },
     ack?: (result: AckResult<{ cell: Cell; price: import('./cell.js').Uct }>) => void,
   ) => void;
 
   /** 升级地产 */
   'client.upgradeProperty': (
-    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number; confirm?: boolean },
     ack?: (result: AckResult<{ cell: Cell; cost: import('./cell.js').Uct }>) => void,
   ) => void;
 
@@ -179,7 +204,7 @@ export interface ClientToServerEvents {
 
   /** 使用交通枢纽传送 */
   'client.useTransport': (
-    payload: { hubCellId: number; targetCellId: number },
+    payload: { hubCellId: number; targetCellId: number; confirm?: boolean },
     ack?: (result: AckResult) => void,
   ) => void;
 
@@ -191,13 +216,13 @@ export interface ClientToServerEvents {
 
   /** 购买投资项目 */
   'client.buyInvestment': (
-    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number; confirm?: boolean },
     ack?: (result: AckResult<{ cell: Cell }>) => void,
   ) => void;
 
   /** 修缮纪念碑 */
   'client.repairMonument': (
-    payload: { monumentId: number },
+    payload: { monumentId: number; confirm?: boolean },
     ack?: (result: AckResult) => void,
   ) => void;
 

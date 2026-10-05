@@ -10,6 +10,9 @@
  * - 动作 ID 与已注册处理器一一对应：buy-property / upgrade-property /
  *   buy-investment / transport / restore-monument。
  * - 客户端 enabled 仅为投影，服务端校验才是权威。
+ * - 负债式破产下 min 只是破产阈值，不再作为可点性下限：买不起也应保持可点，
+ *   由服务端返回 wouldBankrupt 预览、客户端二次确认后放行（详见
+ *   docs/superpowers/specs/2026-09-22-economy-saturation-and-bankruptcy.md）。
  */
 
 import type { Cell, Player, Uct } from '@game/shared';
@@ -45,14 +48,19 @@ export interface CellActionInput {
   resolution?: CellHoverResolutionCtx | null;
 }
 
-/** 检查玩家能否承受 UCT 扣减（逐字段校验 min/max 边界） */
+/**
+ * 检查玩家是否具备执行 UCT 扣减的前提（字段存在且不越过 max 上界）。
+ *
+ * 负债式破产下不再校验 min：min 已被重定义为破产阈值，越过它只是触发破产，
+ * 不再代表「扣不动」。买不起的动作保持可点，交由服务端预检返回 wouldBankrupt
+ * 预览并由客户端二次确认。
+ */
 export function canApplyUct(player: Player | null, uct: Uct | undefined): boolean {
   if (!player || !uct) return false;
   return Object.entries(uct.player ?? {}).every(([fieldId, delta]) => {
     const field = player.values[fieldId];
     if (!field) return false;
-    const next = field.current + delta;
-    return next >= (field.min ?? Number.NEGATIVE_INFINITY) && next <= (field.max ?? Number.POSITIVE_INFINITY);
+    return field.current + delta <= (field.max ?? Number.POSITIVE_INFINITY);
   });
 }
 

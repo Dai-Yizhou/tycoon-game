@@ -180,7 +180,10 @@
     "title": "破产",
     "bankrupt": "你已破产。资产已清零，请使用地图初始值重新开始。",
     "causeTitle": "触发原因",
-    "causeField": "{{field}}：{{previous}} → {{current}}（下限 {{min}}）",
+    "causeField": "{{field}}：{{previous}} → {{current}}（破产阈值 {{min}}）",
+    "confirmTitle": "确认操作",
+    "confirmBody": "此操作会使以下数值越过破产阈值，继续将立即破产：",
+    "confirmField": "{{field}}：结算后 {{current}}（破产阈值 {{min}}）",
     "restart": "使用地图初始值重新开始",
     "playerNotFound": "破产玩家不存在"
   },

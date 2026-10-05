@@ -29,7 +29,7 @@ import {
   type Ownership,
 } from '../economy/index.js';
 import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
-import { EconomyService } from '../economy/EconomyService.js';
+import { EconomyService, assessUct } from '../economy/EconomyService.js';
 import { publishValueChanged } from '../net/valuePublisher.js';
 import { broadcastSystemMessage, formatFieldAmounts } from '../net/systemChat.js';
 
@@ -169,7 +169,7 @@ export class PropertyHandler {
    */
   private handleBuyProperty(
     socket: TypedSocket,
-    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number; confirm?: boolean },
     ack?: (result: AckResult<{ cell: Cell; price: Uct }>) => void,
   ): void {
     try {
@@ -247,9 +247,25 @@ export class PropertyHandler {
       // 7. 获取价格
       const priceUct = this.resolvePurchasePrice(cell, player);
       const price = this.getUctCost(priceUct);
-      if (Object.keys(priceUct?.player ?? {}).length === 0 || !this.canApplyUct(player, priceUct)) {
+      if (Object.keys(priceUct?.player ?? {}).length === 0) {
         emitError(socket, ErrorCodes.InvalidPayload, '该地产无价格信息');
         ack?.({ ok: false, error: 'no_price' });
+        return;
+      }
+      // 7.5 负债式预检：非法（字段缺失/超上界）直接拒绝；会致负债则返回预览待二次确认
+      const assessment = assessUct(player, priceUct);
+      if (assessment.missingField) {
+        emitError(socket, ErrorCodes.InvalidPayload, '该地产无价格信息');
+        ack?.({ ok: false, error: 'no_price' });
+        return;
+      }
+      if (assessment.overMax) {
+        emitError(socket, ErrorCodes.InvalidPayload, '数值超出上限');
+        ack?.({ ok: false, error: 'value_over_max' });
+        return;
+      }
+      if (assessment.preview && payload.confirm !== true) {
+        ack?.({ ok: false, error: 'would_bankrupt', wouldBankrupt: assessment.preview });
         return;
       }
 
@@ -325,7 +341,7 @@ export class PropertyHandler {
    */
   private handleUpgradeProperty(
     socket: TypedSocket,
-    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number; confirm?: boolean },
     ack?: (result: AckResult<{ cell: Cell; cost: Uct }>) => void,
   ): void {
     try {
@@ -422,9 +438,15 @@ export class PropertyHandler {
         ownerCount: ownerships.length,
         payer: player,
       }) as Uct;
-      if (!this.canApplyUct(player, upgradeCost)) {
+      // 负债式预检：非法（字段缺失/超上界）直接拒绝；会致负债则返回预览待二次确认
+      const assessment = assessUct(player, upgradeCost);
+      if (assessment.missingField || assessment.overMax) {
         emitError(socket, ErrorCodes.InvalidPayload, '升级费用无效');
         ack?.({ ok: false, error: 'invalid_upgrade_cost' });
+        return;
+      }
+      if (assessment.preview && payload.confirm !== true) {
+        ack?.({ ok: false, error: 'would_bankrupt', wouldBankrupt: assessment.preview });
         return;
       }
 
@@ -769,15 +791,6 @@ export class PropertyHandler {
 
   private getUctCost(uct: Uct | undefined): number {
     return Object.values(uct?.player ?? {}).reduce((total, value) => total + Math.abs(value), 0);
-  }
-
-  private canApplyUct(player: Player, uct: Uct | undefined, scale = 1): boolean {
-    return Object.entries(uct?.player ?? {}).every(([fieldId, configuredDelta]) => {
-      const field = player.values[fieldId];
-      if (!field) return false;
-      const next = field.current + configuredDelta * scale;
-      return next >= (field.min ?? Number.NEGATIVE_INFINITY) && next <= (field.max ?? Number.POSITIVE_INFINITY);
-    });
   }
 
   private applyUct(player: Player, uct: Uct | undefined, reason: string, scale = 1): Array<{ fieldId: string; delta: number; previous: number }> {

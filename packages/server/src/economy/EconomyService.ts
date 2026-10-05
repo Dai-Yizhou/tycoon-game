@@ -1,5 +1,40 @@
-import type { Player } from '@game/shared';
+import type { BankruptcyPreview, Player, Uct } from '@game/shared';
 import type { GameWorld } from '../world/GameWorld.js';
+
+/**
+ * 负债式破产预检结果
+ *
+ * 用于主动操作（购买/升级/投资/修缮/传送）在结算前判断该操作是否会致破产，
+ * 以便向客户端回传权威预览、要求二次确认。
+ */
+export interface UctAssessment {
+  /** 引用了玩家身上不存在的字段（非法，直接拒绝） */
+  missingField?: string;
+  /** 结算后会超过字段上界（非法，直接拒绝） */
+  overMax: boolean;
+  /** 结算后会有字段低于破产阈值（需要二次确认，含权威预览） */
+  preview: BankruptcyPreview | null;
+}
+
+/**
+ * 评估对玩家应用一份 UCT 的后果（纯函数）
+ *
+ * - 字段缺失 / 超出上界：非法，应拒绝；
+ * - 低于 min（破产阈值）：允许，但返回预览供客户端二次确认。
+ */
+export function assessUct(player: Player, uct: Uct | undefined, scale = 1): UctAssessment {
+  let overMax = false;
+  const fields: BankruptcyPreview['fields'] = [];
+  for (const [fieldId, configuredDelta] of Object.entries(uct?.player ?? {})) {
+    const field = player.values[fieldId];
+    if (!field) return { missingField: fieldId, overMax: false, preview: null };
+    const next = field.current + configuredDelta * scale;
+    if (field.max !== undefined && next > field.max) overMax = true;
+    const min = field.min ?? Number.NEGATIVE_INFINITY;
+    if (next < min) fields.push({ fieldId, fieldName: field.name, current: next, min });
+  }
+  return { overMax, preview: fields.length > 0 ? { fields } : null };
+}
 
 export interface EconomyChangeResult {
   ok: boolean;

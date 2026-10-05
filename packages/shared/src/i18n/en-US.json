@@ -180,7 +180,10 @@
     "title": "Bankruptcy",
     "bankrupt": "You are bankrupt. Assets were cleared; restart with the map's initial values.",
     "causeTitle": "Trigger",
-    "causeField": "{{field}}: {{previous}} → {{current}} (floor {{min}})",
+    "causeField": "{{field}}: {{previous}} → {{current}} (bankruptcy threshold {{min}})",
+    "confirmTitle": "Confirm action",
+    "confirmBody": "This action will push the following values past the bankruptcy threshold; continuing will bankrupt you immediately:",
+    "confirmField": "{{field}}: after settlement {{current}} (bankruptcy threshold {{min}})",
     "restart": "Restart with map initial values",
     "playerNotFound": "Bankrupt player not found"
   },

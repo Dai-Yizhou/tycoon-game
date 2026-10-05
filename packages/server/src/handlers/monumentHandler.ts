@@ -21,7 +21,7 @@ import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
-import { EconomyService } from '../economy/EconomyService.js';
+import { EconomyService, assessUct } from '../economy/EconomyService.js';
 import { publishValueChanged } from '../net/valuePublisher.js';
 
 /**
@@ -140,7 +140,7 @@ export class MonumentHandler {
    */
   private handleRepairMonument(
     socket: TypedSocket,
-    payload: { monumentId: number },
+    payload: { monumentId: number; confirm?: boolean },
     ack?: (result: AckResult<RepairResult>) => void,
   ): void {
     try {
@@ -191,13 +191,30 @@ export class MonumentHandler {
         return;
       }
 
-      // 6. 获取修缮费用
-      // 7. 检查玩家修缮费用字段是否足够
-      const insufficientField = Object.entries(monumentCell.repairCost?.player ?? {}).find(([fieldId, delta]) => (player.values[fieldId]?.current ?? 0) + delta < 0);
-      if (insufficientField) {
-        const [fieldId, delta] = insufficientField;
-        emitError(socket, ErrorCodes.InvalidPayload, `数值字段 ${fieldId} 不足，需要 ${Math.abs(delta)}，当前 ${player.values[fieldId]?.current ?? 0}`);
+      // 6. 获取修缮费用（结算时刻按 D8 规则求一次并固定），并做负债式预检
+      if (!monumentCell.repairCost) {
+        emitError(socket, ErrorCodes.InvalidPayload, '该纪念碑无修缮费用配置');
         ack?.({ ok: false, error: 'insufficient_value' });
+        return;
+      }
+      const repairCost = this.world.resolveValueModifier({
+        cellType: 'monument',
+        baseField: 'repairCost',
+        base: monumentCell.repairCost,
+        cell: monumentCell,
+        level: 0,
+        ownerCount: 0,
+        payer: player,
+      }) as Uct;
+      // 7. 负债式预检：非法（字段缺失/超上界）直接拒绝；会致负债则返回预览待二次确认
+      const assessment = assessUct(player, repairCost);
+      if (assessment.missingField || assessment.overMax) {
+        emitError(socket, ErrorCodes.InvalidPayload, '修缮费用数值不足');
+        ack?.({ ok: false, error: 'insufficient_value' });
+        return;
+      }
+      if (assessment.preview && payload.confirm !== true) {
+        ack?.({ ok: false, error: 'would_bankrupt', wouldBankrupt: assessment.preview });
         return;
       }
 

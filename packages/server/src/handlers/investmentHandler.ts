@@ -26,7 +26,7 @@ import { broadcastSystemMessage, formatFieldAmounts } from '../net/systemChat.js
 import type { PropertyOwnership } from './propertyHandler.js';
 import type { BehaviorEngine } from '../behavior/BehaviorEngine.js';
 import { EconomicOperationGuard } from '../economy/EconomicOperationGuard.js';
-import { EconomyService } from '../economy/EconomyService.js';
+import { EconomyService, assessUct } from '../economy/EconomyService.js';
 
 /**
  * 投资收益结果
@@ -126,7 +126,7 @@ export class InvestmentHandler {
    */
   private handleBuyInvestment(
     socket: TypedSocket,
-    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number; confirm?: boolean },
     ack?: (result: AckResult<{ cell: Cell }>) => void,
   ): void {
     try {
@@ -210,10 +210,15 @@ export class InvestmentHandler {
         return;
       }
 
-      // 8. 检查玩家财产是否足够
-      if (!this.canApplyUct(player, priceUct)) {
+      // 8. 负债式预检：非法（字段缺失/超上界）直接拒绝；会致负债则返回预览待二次确认
+      const assessment = assessUct(player, priceUct);
+      if (assessment.missingField || assessment.overMax) {
         emitError(socket, ErrorCodes.InvalidPayload, '投资费用字段余额不足');
         ack?.({ ok: false, error: 'insufficient_money' });
+        return;
+      }
+      if (assessment.preview && payload.confirm !== true) {
+        ack?.({ ok: false, error: 'would_bankrupt', wouldBankrupt: assessment.preview });
         return;
       }
 
@@ -453,15 +458,6 @@ export class InvestmentHandler {
 
   private getUctCost(uct: Uct | undefined): number {
     return Object.values(uct?.player ?? {}).reduce((sum, value) => sum + Math.abs(value), 0);
-  }
-
-  private canApplyUct(player: Player, uct: Uct | undefined): boolean {
-    return Object.entries(uct?.player ?? {}).every(([fieldId, delta]) => {
-      const field = player.values[fieldId];
-      if (!field) return false;
-      const next = field.current + delta;
-      return next >= (field.min ?? Number.NEGATIVE_INFINITY) && next <= (field.max ?? Number.POSITIVE_INFINITY);
-    });
   }
 
   private applyUct(player: Player, uct: Uct | undefined, reason: string): Array<{ fieldId: string; delta: number }> {

@@ -64,9 +64,17 @@ describe('act-bar 动作解析器', () => {
     expect(actions[0].detail).toContain('财产 -100');
   });
 
-  it('property 静态价格不足时禁用购买（不使用倍率）', () => {
+  it('property 余额不足时仍保持可点（负债式破产：min 为破产阈值，由服务端二次确认放行）', () => {
     const cell = makeCell('property', { maxOwnerCount: 5, price });
     const actions = resolveCellActions({ cell, state: makeState(), currentPlayer: makePlayer(50), valueFieldDefs: definitions });
+    expect(actions[0]).toMatchObject({ id: 'buy-property', enabled: true });
+  });
+
+  it('property 缺少所需字段时禁用购买（UCT 无法施加）', () => {
+    const cell = makeCell('property', { maxOwnerCount: 5, price });
+    const player = makePlayer(200);
+    delete (player.values as Record<string, unknown>).money;
+    const actions = resolveCellActions({ cell, state: makeState(), currentPlayer: player, valueFieldDefs: definitions });
     expect(actions[0]).toMatchObject({ id: 'buy-property', enabled: false });
   });
 
