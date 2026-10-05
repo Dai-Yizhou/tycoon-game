@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HUD 队伍显示方案预览</title>
+<style>
+/* ============================================================
+   主题令牌（取 northeast 主题的典型值）
+   ============================================================ */
+:root {
+  --motion-fast: 0.15s ease;
+  --motion-hover: 160ms;
+  --gp-topbar-h: 76px;
+  --gp-actionbar-h: 88px;
+  --gp-paper-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='10' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.2'/%3E%3C/svg%3E");
+
+  --gp-card: #F0E7D0;
+  --gp-fg: #3C3326;
+  --gp-border: #7B8D7A;
+  --gp-muted: #6B6450;
+  --gp-accent: #8C4E3A;
+  --gp-aux: #5C6B7A;
+  --gp-cell-a: #E6DCC3;
+  --gp-map-bg: #E6DCC3;
+  --gp-paper: #FBF8F1;
+  --gp-cycle-day: #E8C84A;
+  --gp-player-self: #A03E32;
+  --gp-player-teammate: #35688F;
+  --gp-player-other: #5D7A46;
+
+  --region-fg: #3C3326;
+  --region-border: #7B8D7A;
+  --region-border-w: 1px;
+  --region-radius: 16px;
+  --region-accent: #8C4E3A;
+
+  --font-body: 'PingFang SC', 'Noto Sans SC', system-ui, sans-serif;
+  --font-func: Georgia, serif;
+  --font-num: 'IBM Plex Mono', Menlo, monospace;
+  --font-title: Georgia, serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--region-fg);
+  background: #0f1114;
+}
+
+/* ============================================================
+   工具条（编辑器自身的壳，与游戏无关）
+   ============================================================ */
+.toolbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100; height: 40px;
+  display: flex; align-items: center; gap: 6px; padding: 0 12px;
+  background: rgba(15, 17, 20, 0.94); color: #dfe3ea; font-size: 12px;
+  border-bottom: 1px solid #2c313a;
+}
+.toolbar__title { font-weight: 700; letter-spacing: 0.05em; margin-right: 6px; }
+.toolbar__btn {
+  padding: 5px 10px; font-size: 11px; font-weight: 600;
+  border: 1px solid #2c313a; border-radius: 3px;
+  background: #23272e; color: #dfe3ea; cursor: pointer;
+}
+.toolbar__btn[aria-pressed="true"] { border-color: #d98a4a; color: #d98a4a; }
+.toolbar__hint { margin-left: auto; color: #8b93a1; font-size: 11px; }
+
+/* ============================================================
+   舞台（地图底纸 + 叠加 HUD）
+   ============================================================ */
+.stage {
+  position: fixed; top: 40px; left: 0; right: 0; bottom: 0;
+  overflow: hidden;
+  background: var(--gp-map-bg);
+  background-image:
+    var(--gp-paper-noise),
+    repeating-linear-gradient(91deg, rgba(60,51,38,0.06) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(0deg, rgba(60,51,38,0.04) 0 1px, transparent 1px 5px);
+  background-blend-mode: multiply, normal, normal;
+}
+
+/* ============================================================
+   HUD 骨架
+   ============================================================ */
+.hud { position: absolute; inset: 0; pointer-events: none; color: var(--gp-fg); font-size: 11px; }
+.hud > * { pointer-events: auto; }
+
+.gp-topbar {
+  position: absolute; top: 0; left: 0; right: 0; height: var(--gp-topbar-h);
+  display: flex; align-items: flex-start; gap: 14px; padding: 14px 18px;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--gp-border) 30%, transparent) 0%,
+    color-mix(in srgb, var(--gp-border) 14%, transparent) 55%,
+    color-mix(in srgb, var(--gp-border) 5%, transparent) 85%,
+    color-mix(in srgb, var(--gp-border) 1%, transparent) 100%);
+}
+.gp-actionbar {
+  position: absolute; bottom: 0; left: 0; right: 0; height: var(--gp-actionbar-h);
+  display: flex; align-items: center; gap: 12px; padding: 0 18px;
+  background: linear-gradient(0deg,
+    color-mix(in srgb, var(--gp-border) 34%, transparent) 0%,
+    color-mix(in srgb, var(--gp-border) 16%, transparent) 55%,
+    color-mix(in srgb, var(--gp-border) 6%, transparent) 85%,
+    color-mix(in srgb, var(--gp-border) 1%, transparent) 100%);
+}
+.spacer { flex: 1; }
+
+/* 玩家名牌 */
+.player-badge { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.player-badge__avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--gp-fg); background: var(--gp-player-self);
+  display: grid; place-items: center;
+  color: var(--gp-paper); font-size: 10px; font-weight: 800;
+  flex-shrink: 0;
+}
+.player-badge__name { font-weight: 800; font-size: 12px; color: var(--gp-fg); }
+.player-badge__team { font-size: 9px; color: var(--gp-muted); }
+
+/* 数值 pill（玩家 / 队伍共用，队伍版用队伍色描边） */
+.value-pills { display: flex; gap: 6px; flex-shrink: 0; }
+.value-pill {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 2px 8px; min-width: 56px;
+  border: var(--region-border-w) solid var(--gp-border);
+  border-radius: var(--region-radius);
+  background: var(--gp-card);
+}
+.value-pill__label {
+  font-size: 8px; color: var(--gp-muted);
+  font-family: var(--font-func); letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.value-pill__num { font-family: var(--font-num); font-size: 13px; font-weight: 700; color: var(--gp-fg); }
+.value-pill--accent .value-pill__num { color: var(--gp-accent); }
+.value-pill--team {
+  border-color: var(--gp-player-teammate);
+  background: color-mix(in srgb, var(--gp-player-teammate) 8%, var(--gp-card));
+}
+.value-pill--team .value-pill__label { color: var(--gp-player-teammate); }
+
+/* 队友名 chip */
+.team-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 7px; font-size: 10px;
+  border: 1px solid var(--gp-border); border-radius: 999px;
+  background: var(--gp-card); color: var(--gp-fg);
+  white-space: nowrap;
+}
+.team-chip__dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--gp-player-teammate); flex-shrink: 0;
+}
+
+/* 区域状态块（右上，常驻） */
+.region-status {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+  text-align: right; max-width: 52%;
+  padding: 4px 8px;
+  border: var(--region-border-w) solid var(--gp-border);
+  border-radius: var(--region-radius);
+  background: var(--gp-card);
+}
+.region-status__row { display: flex; align-items: center; gap: 8px; }
+.region-status__name { white-space: nowrap; font-weight: 800; font-size: 12px; color: var(--gp-fg); }
+.cycle-indicator { display: flex; align-items: center; gap: 6px; padding-left: 7px; border-left: 1px solid var(--gp-border); }
+.cycle-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--gp-border); background: var(--gp-cycle-day); }
+.cycle-text { font-size: 10px; color: var(--gp-muted); font-family: var(--font-num); }
+.leaderboard-panel {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%; margin-top: 4px; padding-top: 4px;
+  border-top: 1px solid var(--gp-border);
+  color: var(--gp-muted); font-family: var(--font-num); font-size: 11px;
+}
+.leaderboard-row { display: flex; align-items: baseline; gap: 6px; justify-content: flex-end; }
+.leaderboard-row__rank { min-width: 14px; text-align: right; color: var(--gp-accent); font-weight: 700; }
+.leaderboard-row__name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboard-row__score { color: var(--gp-fg); font-weight: 700; }
+.leaderboard-row--self .leaderboard-row__name,
+.leaderboard-row--self .leaderboard-row__score { color: var(--gp-accent); }
+
+/* 底栏控件（占位） */
+.dice-zone { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; }
+.dice-btn {
+  position: relative; padding: 12px 20px;
+  font-weight: 1000; font-size: 14px;
+  border: var(--region-border-w) solid var(--gp-border);
+  border-radius: var(--region-radius);
+  background: var(--gp-accent); color: var(--gp-paper);
+  box-shadow: 2px 2px 0 var(--gp-border); cursor: pointer;
+}
+.dice-status { font-size: 11px; color: var(--gp-muted); font-family: var(--font-num); }
+.action-cluster { display: flex; gap: 5px; flex-shrink: 0; }
+.act-btn {
+  font-size: 12px; font-weight: 700; padding: 6px 12px;
+  border: var(--region-border-w) solid var(--gp-border);
+  border-radius: var(--region-radius);
+  background: var(--gp-card); color: var(--gp-fg); cursor: pointer;
+}
+.act-btn--accent { background: var(--gp-accent); color: var(--gp-paper); border-color: var(--gp-accent); }
+.act-btn__price { display: block; font-family: var(--font-num); font-size: 9px; font-weight: 600; }
+
+/* ============================================================
+   方案切换：body[data-plan] 控制 [data-plan-block] 显隐
+   ============================================================ */
+[data-plan-block] { display: none; }
+body[data-plan="A"] [data-plan-block="A"] { display: flex; }
+body[data-plan="B"] [data-plan-block="B"] { display: flex; }
+body[data-plan="C"] [data-plan-block="C"] { display: flex; }
+body[data-plan="D"] [data-plan-block="D"] { display: flex; }
+body[data-plan="E"] [data-plan-block="E"] { display: flex; }
+
+/* ============================================================
+   方案 A · 名牌内联扩展
+   名牌 + 队友 chips + 队伍数值，一行横向排开
+   ============================================================ */
+.plan-a { align-items: center; gap: 10px; flex-shrink: 0; }
+.plan-a .team-inline {
+  display: flex; align-items: center; gap: 5px;
+  padding-left: 10px;
+  border-left: 1px solid color-mix(in srgb, var(--gp-border) 60%, transparent);
+}
+
+/* ============================================================
+   方案 B · 名牌下方独立面板
+   ============================================================ */
+.plan-b__panel {
+  position: absolute;
+  top: calc(var(--gp-topbar-h) + 6px);
+  left: 18px;
+  flex-direction: column; gap: 6px;
+  min-width: 240px; padding: 8px 10px;
+  border: var(--region-border-w) solid var(--gp-border);
+  border-radius: var(--region-radius);
+  background: var(--gp-card);
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--gp-border) 40%, transparent);
+  color: var(--gp-fg); font-size: 11px;
+}
+.team-panel__title {
+  font-size: 9px; font-family: var(--font-func);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--gp-muted);
+}
+.team-panel__members { display: flex; flex-wrap: wrap; gap: 4px; }
+.team-panel__values { display: flex; gap: 6px; }
+
+/* ============================================================
+   方案 C · 头像簇 + 队名 + 队伍数值
+   ============================================================ */
+.plan-c { align-items: center; gap: 10px; flex-shrink: 0; }
+.team-cluster { display: flex; align-items: center; padding-right: 4px; }
+.team-cluster__avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--gp-fg);
+  display: grid; place-items: center;
+  color: var(--gp-paper); font-size: 10px; font-weight: 800;
+  flex-shrink: 0;
+}
+.team-cluster__avatar + .team-cluster__avatar { margin-left: -8px; }
+.team-cluster__avatar--self  { background: var(--gp-player-self); z-index: 3; }
+.team-cluster__avatar--mate  { background: var(--gp-player-teammate); z-index: 2; }
+.team-cluster__avatar--mate2 { background: color-mix(in srgb, var(--gp-player-teammate) 60%, var(--gp-paper)); z-index: 1; }
+
+/* ============================================================
+   方案 D · Hover 展开
+   ============================================================ */
+.plan-d { align-items: center; flex-shrink: 0; position: relative; }
+.plan-d__trigger { display: flex; align-items: center; gap: 8px; cursor: default; }
+.plan-d__caret { color: var(--gp-muted); font-size: 9px; }
+.plan-d__card {
+  position: absolute; top: 100%; left: 0;
+  flex-direction: column; gap: 6px;
+  min-width: 220px; padding: 8px 10px;
+  border: var(--region-border-w) solid var(--gp-border);
+  border-radius: var(--region-radius);
+  background: var(--gp-card);
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--gp-border) 40%, transparent);
+  color: var(--gp-fg); font-size: 11px;
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--motion-hover) ease-out;
+}
+/* 桥接：把触发区与卡片的 6px 间隙盖住，鼠标过渡不丢 hover */
+.plan-d__card::before {
+  content: ""; position: absolute; top: -8px; left: 0; right: 0; height: 8px;
+}
+.plan-d:hover .plan-d__card,
+.plan-d:focus-within .plan-d__card { opacity: 1; pointer-events: auto; }
+
+/* ============================================================
+   方案 E · 底栏左侧队伍码头
+   ============================================================ */
+.plan-e {
+  align-items: center; gap: 10px;
+  padding-right: 12px; margin-right: 4px;
+  border-right: 1px solid color-mix(in srgb, var(--gp-border) 50%, transparent);
+  flex-shrink: 0;
+}
+.plan-e .value-pill { padding: 1px 6px; min-width: 48px; }
+.plan-e .value-pill__label { font-size: 7px; }
+.plan-e .value-pill__num { font-size: 11px; }
+</style>
+</head>
+<body data-plan="A">
+
+<div class="toolbar">
+  <span class="toolbar__title">HUD 队伍显示方案</span>
+  <button class="toolbar__btn" data-set-plan="A" aria-pressed="true">A · 名牌内联</button>
+  <button class="toolbar__btn" data-set-plan="B">B · 下方面板</button>
+  <button class="toolbar__btn" data-set-plan="C">C · 头像簇</button>
+  <button class="toolbar__btn" data-set-plan="D">D · Hover 展开</button>
+  <button class="toolbar__btn" data-set-plan="E">E · 底栏码头</button>
+  <span class="toolbar__hint">玩家：张三 · 队友：李四、王五 · 队伍数值 = 三人总和</span>
+</div>
+
+<div class="stage">
+  <div class="hud">
+    <header class="gp-topbar">
+
+      <!-- ========== 方案 A：名牌内联 ========== -->
+      <div class="plan-a" data-plan-block="A">
+        <div class="player-badge">
+          <div class="player-badge__avatar">张</div>
+          <div>
+            <div class="player-badge__name">张三</div>
+            <div class="player-badge__team">3 人队</div>
+          </div>
+        </div>
+        <div class="team-inline">
+          <span class="team-chip"><i class="team-chip__dot"></i>李四</span>
+          <span class="team-chip"><i class="team-chip__dot"></i>王五</span>
+        </div>
+        <div class="value-pills">
+          <div class="value-pill value-pill--team">
+            <span class="value-pill__label">队 · 财产</span>
+            <span class="value-pill__num">6200</span>
+          </div>
+          <div class="value-pill value-pill--team">
+            <span class="value-pill__label">队 · 信用</span>
+            <span class="value-pill__num">140</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== 方案 B：顶栏只留名牌，面板另立 ========== -->
+      <div class="player-badge" data-plan-block="B">
+        <div class="player-badge__avatar">张</div>
+        <div>
+          <div class="player-badge__name">张三</div>
+          <div class="player-badge__team">3 人队</div>
+        </div>
+      </div>
+
+      <!-- ========== 方案 C：头像簇 + 队名 + 队伍数值 ========== -->
+      <div class="plan-c" data-plan-block="C">
+        <div class="team-cluster">
+          <span class="team-cluster__avatar team-cluster__avatar--self">张</span>
+          <span class="team-cluster__avatar team-cluster__avatar--mate">李</span>
+          <span class="team-cluster__avatar team-cluster__avatar--mate2">王</span>
+        </div>
+        <div>
+          <div class="player-badge__name">张三</div>
+          <div class="player-badge__team">与 李四、王五 组队</div>
+        </div>
+        <div class="value-pills">
+          <div class="value-pill value-pill--team">
+            <span class="value-pill__label">队 · 财产</span>
+            <span class="value-pill__num">6200</span>
+          </div>
+          <div class="value-pill value-pill--team">
+            <span class="value-pill__label">队 · 信用</span>
+            <span class="value-pill__num">140</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== 方案 D：Hover 展开 ========== -->
+      <div class="plan-d" data-plan-block="D">
+        <div class="plan-d__trigger">
+          <div class="player-badge__avatar">张</div>
+          <div>
+            <div class="player-badge__name">张三 <span class="plan-d__caret">▾</span></div>
+            <div class="player-badge__team">3 人队 · 悬停查看</div>
+          </div>
+        </div>
+        <div class="plan-d__card">
+          <div class="team-panel__title">队伍成员</div>
+          <div class="team-panel__members">
+            <span class="team-chip"><i class="team-chip__dot" style="background:var(--gp-player-self)"></i>张三（自己）</span>
+            <span class="team-chip"><i class="team-chip__dot"></i>李四</span>
+            <span class="team-chip"><i class="team-chip__dot"></i>王五</span>
+          </div>
+          <div class="team-panel__title" style="margin-top:2px">队伍数值</div>
+          <div class="team-panel__values">
+            <div class="value-pill value-pill--team">
+              <span class="value-pill__label">队 · 财产</span>
+              <span class="value-pill__num">6200</span>
+            </div>
+            <div class="value-pill value-pill--team">
+              <span class="value-pill__label">队 · 信用</span>
+              <span class="value-pill__num">140</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== 方案 E：顶栏仅留普通名牌 ========== -->
+      <div class="player-badge" data-plan-block="E">
+        <div class="player-badge__avatar">张</div>
+        <div>
+          <div class="player-badge__name">张三</div>
+          <div class="player-badge__team">3 人队</div>
+        </div>
+      </div>
+
+      <!-- ========== 常驻：玩家数值 ========== -->
+      <div class="value-pills">
+        <div class="value-pill value-pill--accent">
+          <span class="value-pill__label">财产</span>
+          <span class="value-pill__num">2000</span>
+        </div>
+        <div class="value-pill">
+          <span class="value-pill__label">信用值</span>
+          <span class="value-pill__num">50</span>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <!-- ========== 常驻：区域状态块 ========== -->
+      <section class="region-status">
+        <div class="region-status__row">
+          <div class="region-status__name">东北区域</div>
+          <div class="cycle-indicator">
+            <div class="cycle-dot"></div>
+            <span class="cycle-text">昼 12:00</span>
+          </div>
+        </div>
+        <section class="leaderboard-panel">
+          <div class="leaderboard-row"><span class="leaderboard-row__rank">1</span><span class="leaderboard-row__name">陌生人</span><span class="leaderboard-row__score">4200</span></div>
+          <div class="leaderboard-row leaderboard-row--self"><span class="leaderboard-row__rank">3</span><span class="leaderboard-row__name">张三</span><span class="leaderboard-row__score">2000</span></div>
+        </section>
+      </section>
+    </header>
+
+    <!-- ========== 方案 B：名牌下方独立面板 ========== -->
+    <div class="plan-b__panel" data-plan-block="B">
+      <div class="team-panel__title">队伍成员</div>
+      <div class="team-panel__members">
+        <span class="team-chip"><i class="team-chip__dot" style="background:var(--gp-player-self)"></i>张三（自己）</span>
+        <span class="team-chip"><i class="team-chip__dot"></i>李四</span>
+        <span class="team-chip"><i class="team-chip__dot"></i>王五</span>
+      </div>
+      <div class="team-panel__title" style="margin-top:2px">队伍数值</div>
+      <div class="team-panel__values">
+        <div class="value-pill value-pill--team">
+          <span class="value-pill__label">队 · 财产</span>
+          <span class="value-pill__num">6200</span>
+        </div>
+        <div class="value-pill value-pill--team">
+          <span class="value-pill__label">队 · 信用</span>
+          <span class="value-pill__num">140</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 底栏 ========== -->
+    <footer class="gp-actionbar">
+      <!-- 方案 E：底栏左侧队伍码头 -->
+      <div class="plan-e" data-plan-block="E">
+        <div class="team-cluster">
+          <span class="team-cluster__avatar team-cluster__avatar--self">张</span>
+          <span class="team-cluster__avatar team-cluster__avatar--mate">李</span>
+          <span class="team-cluster__avatar team-cluster__avatar--mate2">王</span>
+        </div>
+        <div>
+          <div class="player-badge__name" style="font-size:11px">与 李四、王五 组队</div>
+          <div class="player-badge__team">3 人队</div>
+        </div>
+        <div class="value-pills">
+          <div class="value-pill value-pill--team">
+            <span class="value-pill__label">队 · 财产</span>
+            <span class="value-pill__num">6200</span>
+          </div>
+          <div class="value-pill value-pill--team">
+            <span class="value-pill__label">队 · 信用</span>
+            <span class="value-pill__num">140</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="dice-zone">
+        <button class="dice-btn">掷骰</button>
+        <span class="dice-status">可行动</span>
+      </div>
+      <div class="action-cluster">
+        <button class="act-btn act-btn--accent">购买<span class="act-btn__price">200</span></button>
+        <button class="act-btn">升级<span class="act-btn__price">150</span></button>
+        <button class="act-btn">传送<span class="act-btn__price">80</span></button>
+      </div>
+      <div class="spacer"></div>
+    </footer>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll("[data-set-plan]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.body.dataset.plan = btn.dataset.setPlan;
+    document.querySelectorAll("[data-set-plan]").forEach((b) =>
+      b.setAttribute("aria-pressed", String(b === btn))
+    );
+  });
+});
+</script>
+</body>
+</html>
