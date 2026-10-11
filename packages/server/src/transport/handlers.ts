@@ -247,6 +247,13 @@ export class HandlerRegistry {
   }
 
   /**
+   * 获取 TeamHandler（用于外部调用，如破产自动离队）
+   */
+  getTeamHandler(): TeamHandler {
+    return this.teamHandler;
+  }
+
+  /**
    * 设置 Bankruptcy 实例（在 app.ts 中调用）
    */
   setBankruptcy(bankruptcy: Bankruptcy): void {
@@ -410,16 +417,8 @@ export class HandlerRegistry {
           ack?.({ ok: false, error: 'player_not_found' });
           return;
         }
-        if (channel === ChatChannels.Team && !player.teamId) {
-          ack?.({ ok: false, error: 'no_team_channel' });
-          return;
-        }
-        const regionId = this.getPlayerRegionId(player.position.cellId);
-        if (channel === ChatChannels.Region && !regionId) {
-          ack?.({ ok: false, error: 'no_region_channel' });
-          return;
-        }
-
+        // 无队伍/无区域不再拒绝：消息照常入库，广播时无匹配收件人即只有发送者自己可见。
+        // 见「频道可见性」边界：队伍频道按 teamId、区域频道按区域隔离。
         const metadata = channel === ChatChannels.Team
           ? { ...payload.metadata, teamId: player.teamId }
           : channel === ChatChannels.Region
@@ -461,8 +460,10 @@ export class HandlerRegistry {
       return;
     }
     if (command.kind === 'channel') {
-      if (command.channel === ChatChannels.Team && !player.teamId) { this.emitCommandError(socket, '当前没有可用的队伍频道'); ack?.({ ok: false, error: 'no_team_channel' }); return; }
-      if (command.channel === ChatChannels.Region && !this.getPlayerRegionId(player.position.cellId)) { this.emitCommandError(socket, '当前没有可用的区域频道'); ack?.({ ok: false, error: 'no_region_channel' }); return; }
+      // 无队伍/无区域时不再拒绝切换：显示提醒后照常进入该频道，
+      // 消息仍可发送，但不会有其他玩家收到（broadcastChat 无匹配收件人）。
+      if (command.channel === ChatChannels.Team && !player.teamId) this.emitSystemChat(socket, '当前没有加入队伍，队伍频道的消息其他玩家看不到');
+      if (command.channel === ChatChannels.Region && !this.getPlayerRegionId(player.position.cellId)) this.emitSystemChat(socket, '当前所在位置没有区域，区域频道的消息其他玩家看不到');
       if (command.content !== undefined) this.sendCommandChat(socket, command.channel, command.content, ack);
       else { this.emitSystemChat(socket, `频道已切换至 ${command.channel}`); ack?.({ ok: true }); }
       return;
@@ -520,11 +521,17 @@ export class HandlerRegistry {
     }
     const sender = this.world.getPlayer(senderId);
     if (!sender) return;
+    // 频道可见性：队伍频道只有同队伍玩家可见，区域频道只有同区域玩家可见。
+    // 发送者自己始终收到自己的消息（无队伍/无区域时即只有自己可见，但不拒绝发送）。
     const regionId = this.getPlayerRegionId(sender.position.cellId);
     for (const target of this.io.sockets.sockets.values()) {
       const targetPlayerId = target.data.playerId;
       const targetPlayer = targetPlayerId ? this.world.getPlayer(targetPlayerId) : undefined;
       if (!targetPlayer) continue;
+      if (targetPlayerId === senderId) {
+        target.emit('server.chat', payload);
+        continue;
+      }
       const matches = channel === ChatChannels.Team
         ? Boolean(sender.teamId && targetPlayer.teamId === sender.teamId)
         : Boolean(regionId && this.getPlayerRegionId(targetPlayer.position.cellId) === regionId);

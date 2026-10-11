@@ -19,6 +19,8 @@ export interface GameHudShellConfig {
   onRoll?: () => void;
   onBack?: () => void;
   onChatSend?: (message: string, channel: string, onResult?: (ok: boolean) => void) => void;
+  /** 切换聊天频道时回调（用于无队伍时插入提醒） */
+  onChatChannelChange?: (channel: string) => void;
   onTeam?: () => void;
   onPathChoice?: (cellId: number) => void;
   onCellAction?: (actionId: string, data?: Record<string, unknown>) => void;
@@ -157,6 +159,8 @@ export class GameHudShell {
     // Event wiring
     this.root.querySelector('[data-action="chat-send"]')?.addEventListener("click", () => this.sendChat());
     this.input.addEventListener("keydown", (e) => { if (e.key === "Enter") this.sendChat(); });
+    // 切换频道时通知外部（GamePage 据此在无队伍时插入 system 提醒）
+    this.channel.addEventListener("change", () => this.config.onChatChannelChange?.(this.channel.value));
     this.root.querySelector('[data-action="achievements"]')?.addEventListener("click", () => this.showAchievements());
     this.root.querySelector('[data-action="team"]')?.addEventListener("click", () => this.config.onTeam?.());
     this.root.querySelector('[data-action="settings"]')?.addEventListener("click", () => this.showSettings());
@@ -241,7 +245,7 @@ export class GameHudShell {
 
     // 下拉频道选项与输入框占位符
     this.channel.replaceChildren(
-      ...["team", "region", "global"].map((value) => {
+      ...["region", "team", "global"].map((value) => {
         const opt = document.createElement("option");
         opt.value = value;
         opt.textContent = t(`chat.channel.${value}`);
@@ -687,7 +691,7 @@ export class GameHudShell {
   private updateChat(): void {
     const chat = this.vm.getChat();
     const msgsEl = this.root.querySelector("[data-ui=chat-messages]")!;
-    const channelId = (channel: string): string => channel === "system" ? "system" : channel === "team" ? "team" : "region";
+    const channelId = (channel: string): string => channel === "system" ? "system" : channel === "team" ? "team" : channel === "global" ? "global" : "region";
     const recent = chat.history.filter(message => this.activeFilters.has(channelId(message.channel))).slice(-50);
     if (recent.length > 0) {
       msgsEl.innerHTML = recent.map(m => {

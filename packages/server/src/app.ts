@@ -334,6 +334,7 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
 
   handlerRegistry.setBankruptcy(bankruptcy);
   bankruptcy.setOwnershipChangedHandler((playerId, guest) => handlerRegistry.refreshOwnedCells(playerId, guest));
+  bankruptcy.setTeamLeaveHandler((playerId) => handlerRegistry.getTeamHandler().handleBankruptLeave(playerId));
   bankruptcy.setDomainEventDispatcher((eventName) => {
     handlerRegistry.getInvestmentHandler().dispatchDomainEvent(eventName);
   });

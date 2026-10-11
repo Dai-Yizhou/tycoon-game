@@ -181,6 +181,14 @@ export function createGamePage(controller: GameController): HTMLElement {
       gameHudShell?.updateDiceButton();
     },
     onBack: () => controller.reset(true),
+    // 切到队伍频道且未组队时插入本地 system 提醒（服务端允许无队伍发送，仅自己可见）
+    onChatChannelChange: (channel) => {
+      if (channel !== 'team') return;
+      const members = gameStore?.getSnapshot().teamMembers ?? [];
+      if (members.length <= 1) {
+        gameStore?.appendChatMessage({ text: t('chat.noTeamChannelReminder'), channel: 'system', timestamp: Date.now() });
+      }
+    },
     // 队伍入口：无队伍时打开邀请列表，已有队友时打开队伍管理（队伍操作指引的唯一入口）
     onTeam: () => {
       const members = gameStore?.getSnapshot().teamMembers ?? [];

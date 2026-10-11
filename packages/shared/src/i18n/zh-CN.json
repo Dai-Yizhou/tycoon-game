@@ -235,6 +235,7 @@
     "inputPlaceholder": "输入消息...",
     "send": "发送",
     "sendFailed": "消息发送失败: {{error}}",
+    "noTeamChannelReminder": "当前没有加入队伍，队伍频道的消息其他玩家看不到",
     "channel": {
       "system": "系统",
       "world": "世界",

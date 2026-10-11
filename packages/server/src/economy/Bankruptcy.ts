@@ -44,6 +44,8 @@ export class Bankruptcy {
   private readonly lastSettledValues = new Map<string, Record<string, number>>();
   private domainEventDispatcher: ((eventName: DomainEvent) => void) | null = null;
   private ownershipChanged?: (playerId: string, guest: boolean) => void;
+  /** 破产自动离队回调（由 app.ts 注入 TeamHandler，避免 Bankruptcy 直接依赖组队模块） */
+  private teamLeaveHandler: ((playerId: string) => void) | null = null;
   private readonly onPlayerAdded = ({ player }: { player: import('@game/shared').Player }): void => {
     this.lastSettledValues.set(player.id, this.snapshotValues(player));
   };
@@ -141,6 +143,9 @@ export class Bankruptcy {
 
     this.taxation.clearTaxRecords(playerId);
     this.world.getPlayerManager().updateStatus(playerId, PlayerStatus.Bankrupt);
+    // 破产即自动离队（已确认边界）：清空 ownership 的同时退出所属队伍，
+    // 避免破产者继续占用队伍位/参与团队 UCT 均值计算。
+    this.teamLeaveHandler?.(playerId);
     this.clearPlayerAssets(playerId);
     this.ownershipChanged?.(playerId, player.username.startsWith('guest_'));
     this.world.updatePlayer(player);
@@ -175,6 +180,10 @@ export class Bankruptcy {
 
   setOwnershipChangedHandler(handler: (playerId: string, guest: boolean) => void): void {
     this.ownershipChanged = handler;
+  }
+
+  setTeamLeaveHandler(handler: (playerId: string) => void): void {
+    this.teamLeaveHandler = handler;
   }
 
   setDomainEventDispatcher(dispatcher: (eventName: DomainEvent) => void): void {
@@ -227,6 +236,7 @@ export class Bankruptcy {
     this.lastSettledValues.clear();
     this.flushScheduled = false;
     this.domainEventDispatcher = null;
+    this.teamLeaveHandler = null;
   }
 }
 

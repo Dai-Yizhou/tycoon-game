@@ -22,7 +22,7 @@ describe("GameHudShell", () => {
     input.value = "测试消息";
     (root.querySelector('[data-action="chat-send"]') as HTMLButtonElement).click();
     expect(onRoll).toHaveBeenCalledTimes(1);
-    expect(onChatSend).toHaveBeenCalledWith("测试消息", "team");
+    expect(onChatSend).toHaveBeenCalledWith("测试消息", "region");
     shell.destroy();
   });
 

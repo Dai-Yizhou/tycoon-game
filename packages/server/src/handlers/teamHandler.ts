@@ -294,6 +294,30 @@ export class TeamHandler {
   }
 
   /**
+   * 破产自动离队（由 Bankruptcy 通过回调触发，无需 socket）
+   *
+   * 与主动离队同链路：移出成员、清世界侧 teamId、向剩余成员广播。
+   * 解散时由构造器挂的 onTeamDisbanded 监听器负责清 teamId 与通知。
+   */
+  handleBankruptLeave(playerId: string): void {
+    const team = this.teamManager.getPlayerTeam(playerId);
+    if (!team) return;
+
+    const result = this.teamManager.leaveTeam(playerId);
+    if (!result) return;
+
+    logger.info(`破产玩家 ${playerId} 自动离开队伍 ${team.id}`);
+    if (result.team) {
+      this.clearWorldTeamIds([playerId], team.id);
+      this.broadcastToTeam(result.team, 'server.teamMemberLeft', {
+        teamId: result.team.id,
+        playerId,
+      });
+      this.notifyTeamUpdated(result.team);
+    }
+  }
+
+  /**
    * 处理获取队伍状态
    */
   private handleGetTeamState(

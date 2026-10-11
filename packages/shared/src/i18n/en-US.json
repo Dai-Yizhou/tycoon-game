@@ -235,6 +235,7 @@
     "inputPlaceholder": "Type a message...",
     "send": "Send",
     "sendFailed": "Message send failed: {{error}}",
+    "noTeamChannelReminder": "You are not in a team; messages in the team channel are invisible to other players",
     "channel": {
       "system": "System",
       "world": "World",

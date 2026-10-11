@@ -72,6 +72,37 @@ describe('bankruptcy socket authority', () => {
     bankruptcy.cleanup();
   });
 
+  test('破产触发时回调自动离队处理器', () => {
+    const world = new GameWorld();
+    const map = [{ id: 0, x: 0, y: 0, type: 'property', name: { 'zh-CN': '地产', 'en-US': 'Property' }, description: { 'zh-CN': '', 'en-US': '' }, destinations: [], teleportDestinations: [], theme: 'northeast', regionId: 'r1', timezone: 0, extra: {} }] as any;
+    world.loadMap(map, {
+      id: 'test',
+      version: '1',
+      name: { 'zh-CN': '测试', 'en-US': 'Test' },
+      valueFieldDefinitions: [{ id: 'money', name: { 'zh-CN': '财产', 'en-US': 'Money' }, scope: 'player', min: 0 }],
+      uct: { player: ['money'], region: [] },
+      playerInitial: { player: { money: 100 } },
+      startCellId: 0,
+      regions: [{ id: 'r1', name: { 'zh-CN': '区域', 'en-US': 'Region' }, initial: { region: {} } }],
+      dayNightCycle: 15,
+      dice: { cooldownMs: 1000, min: 1, max: 6 },
+      tax: { baseTax: { rates: { player: {} }, taxInterval: 1000 }, shareTax: { rates: { player: {} }, taxInterval: 1000 } },
+    } as any);
+    const player = buildPlayer();
+    world.addPlayer(player);
+    const bankruptcy = new Bankruptcy({ emit: jest.fn() } as unknown as TypedServer, world, { clearTaxRecords: jest.fn(), getAllTaxRecords: jest.fn(() => new Map()) } as any);
+    const teamLeave = jest.fn<(playerId: string) => void>();
+    bankruptcy.setTeamLeaveHandler(teamLeave);
+
+    expect(bankruptcy.triggerBankruptcy(player.id, 'manual').success).toBe(true);
+    expect(teamLeave).toHaveBeenCalledWith(player.id);
+    // 已破产者重复触发不再离队（早退于回调之前）
+    teamLeave.mockClear();
+    bankruptcy.triggerBankruptcy(player.id, 'manual');
+    expect(teamLeave).not.toHaveBeenCalled();
+    bankruptcy.cleanup();
+  });
+
   test('数值低于破产阈值时广播破产系统消息并携带触发字段', async () => {
     const world = new GameWorld();
     const map = [{ id: 0, x: 0, y: 0, type: 'property', name: { 'zh-CN': '地产', 'en-US': 'Property' }, description: { 'zh-CN': '', 'en-US': '' }, destinations: [], teleportDestinations: [], theme: 'northeast', regionId: 'r1', timezone: 0, extra: {} }] as any;
