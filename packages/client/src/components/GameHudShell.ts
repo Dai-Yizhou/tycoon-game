@@ -21,7 +21,6 @@ export interface GameHudShellConfig {
   onChatSend?: (message: string, channel: string, onResult?: (ok: boolean) => void) => void;
   /** 切换聊天频道时回调（用于无队伍时插入提醒） */
   onChatChannelChange?: (channel: string) => void;
-  onTeam?: () => void;
   onPathChoice?: (cellId: number) => void;
   onCellAction?: (actionId: string, data?: Record<string, unknown>) => void;
   onCellHover?: (cellId: number, x: number, y: number) => void;
@@ -85,9 +84,10 @@ export class GameHudShell {
               <div class="player-badge__name" data-ui="player-name"></div>
               <div class="player-badge__team" data-ui="player-team"></div>
             </div>
-            <div class="value-pills" data-ui="team-strip"></div>
           </div>
           <div class="value-pills" data-ui="resource-strip"></div>
+          <!-- 队伍数值紧贴个人数值内侧：与玩家数值同一套 value-pill，仅以「队 ·」前缀区分作用域 -->
+          <div class="value-pills" data-ui="team-strip"></div>
           <div class="topbar-spacer"></div>
           <!-- 区域作用域数值（区域 UCT）：与玩家数值同一套 value-pill 样式，置于区域信息块左侧 -->
           <div class="value-pills value-pills--region" data-ui="region-uct-strip"></div>
@@ -105,7 +105,6 @@ export class GameHudShell {
 
         <div class="hud-panel-actions" data-ui="panel-actions" role="group">
            <button class="panel-button" data-action="back" type="button"></button>
-           <button class="panel-button" data-action="team" type="button"></button>
            <button class="panel-button" data-action="settings" type="button"></button>
            <button class="panel-button" data-action="achievements" type="button"></button>
         </div>
@@ -162,7 +161,6 @@ export class GameHudShell {
     // 切换频道时通知外部（GamePage 据此在无队伍时插入 system 提醒）
     this.channel.addEventListener("change", () => this.config.onChatChannelChange?.(this.channel.value));
     this.root.querySelector('[data-action="achievements"]')?.addEventListener("click", () => this.showAchievements());
-    this.root.querySelector('[data-action="team"]')?.addEventListener("click", () => this.config.onTeam?.());
     this.root.querySelector('[data-action="settings"]')?.addEventListener("click", () => this.showSettings());
     this.root.querySelector('[data-action="back"]')?.addEventListener("click", () => this.config.onBack?.());
     this.root.querySelector('[data-action="roll"]')?.addEventListener("click", () => this.config.onRoll?.());
@@ -233,11 +231,9 @@ export class GameHudShell {
     this.root.querySelector('[data-action="roll"] .dice-btn__fill')!.textContent = rollLabel;
     set('[data-action="chat-send"]', "chat.send");
     set('[data-action="back"]', "common.backToStart");
-    set('[data-action="team"]', "hud.team");
     set('[data-action="settings"]', "hud.settings");
     set('[data-action="achievements"]', "hud.achievements");
     this.root.querySelector('[data-action="back"]')?.setAttribute('aria-label', t('common.backToStart'));
-    this.root.querySelector('[data-action="team"]')?.setAttribute('aria-label', t('hud.team'));
     this.root.querySelector('[data-action="settings"]')?.setAttribute('aria-label', t('hud.settings'));
     this.root.querySelector('[data-action="achievements"]')?.setAttribute('aria-label', t('hud.achievements'));
     // 收起态仅显示一个字形图标，此处为容器补可读屏名称（展开后为带文字按钮）

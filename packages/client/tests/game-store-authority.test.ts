@@ -118,6 +118,11 @@ describe('GameStore authority', () => {
       text: '玩家二: 你好',
       channel: 'global',
       timestamp: 100,
+      // 服务端消息额外保留发送者身份与原始正文：聊天区仍显示「发送者: 正文」，
+      // 棋盘发言悬浮框据此锚定到发言者棋子并只展示正文
+      senderId: 'player-2',
+      senderName: '玩家二',
+      content: '你好',
     }]);
   });
 

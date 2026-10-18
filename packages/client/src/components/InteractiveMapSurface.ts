@@ -37,6 +37,10 @@ function playerSlotOffset(index: number): { x: number; y: number } {
 /** 格子矩形几何（矩形相对格子中心对称，故用半宽/半高）：名称变长只横向扩展，不截断 */
 const BASE_RECT_HALF_W = 68;
 const RECT_HALF_H = 46;
+/** 玩家发言悬浮框的停留时长（临时提示，到期自动消失） */
+const PLAYER_CHAT_BUBBLE_MS = 6000;
+/** 发言悬浮框底边距棋子锚点的留白：盖住棋子图形上缘(16px)+待机跳动上浮(9px)，贴住整枚棋子 */
+const PIECE_TOP_CLEARANCE = 26;
 /** 名称/类型文字距矩形左右边缘的内边距 */
 const RECT_TEXT_PAD_X = 10;
 /** 名称字号（与 .map-node__name 的 font-size 对应，用于估算所需宽度） */
@@ -133,6 +137,10 @@ export class InteractiveMapSurface {
   private heldCellIds = new Set<number>();
   // 本玩家最近一次渲染/放置所在的格子，用于识别瞬时传送等非动画位置跳变
   private selfCellId: number | null = null;
+  /** 玩家发言悬浮框层：HTML 覆盖在 SVG 之上，锚定到发言者棋子，随镜头移动 */
+  private readonly chatLayer = document.createElement("div");
+  /** playerId → 当前悬浮框元素及其自动隐藏/移除定时器（同一玩家只保留最新一条） */
+  private readonly chatBubbles = new Map<string, { el: HTMLElement; hideTimer: number; removeTimer: number }>();
 
   setMovementLocked(locked: boolean): void {
     if (this.movementLocked === locked) return;
@@ -157,6 +165,8 @@ export class InteractiveMapSurface {
   constructor() {
     this.root.className = "interactive-map-surface";
     this.root.dataset.ui = "interactive-map";
+    this.chatLayer.className = "map-chat-layer";
+    this.root.appendChild(this.chatLayer);
   }
 
   getElement(): HTMLElement {
@@ -400,6 +410,7 @@ export class InteractiveMapSurface {
         const y = displayed?.y ?? defaultY;
         g.setAttribute("transform", `translate(${x} ${y})`);
         g.dataset.playerId = player.id;
+        g.dataset.cellId = String(restId);
         
         /* 角色语义：本玩家 / 队友 / 其他玩家。决定棋子图像源（各自独立 SVG）与颜色令牌，
            颜色规则不再变化（--gp-player-self|teammate|other，棋子 SVG 内 body 取 --gp-player-color） */
@@ -420,11 +431,39 @@ export class InteractiveMapSurface {
         const icon = getPieceTemplate(role);
         if (icon) bounce.appendChild(icon.cloneNode(true));
         g.append(bounce);
+        /* 悬停显示玩家名：名字挂在外层 g 上（不随 bounce 上下浮动），默认隐藏、hover 由 CSS 显形；
+           不依赖图标即可辨认棋子属于谁 */
+        const nameLabel = document.createElementNS(ns, "text");
+        nameLabel.classList.add("map-player__name");
+        nameLabel.setAttribute("x", "0");
+        nameLabel.setAttribute("y", "52");
+        nameLabel.textContent = player.username;
+        g.appendChild(nameLabel);
+        /* 棋子会遮挡其所在格子的命中面，悬停棋子时补发一次该格 hover；
+           仅当前格（本玩家所在格）需要悬浮卡，其余格不补发以维持"只显示当前格"的口径 */
+        if (restId === this.selfCellId) {
+          g.addEventListener("mouseenter", () => this.emitCellHoverAt(restId));
+          g.addEventListener("mouseleave", () => this.root.dispatchEvent(new Event("map:leave")));
+        }
         pieces.appendChild(g);
       });
     svg.appendChild(pieces);
 
-    this.root.replaceChildren(svg);
+    this.root.replaceChildren(svg, this.chatLayer);
+    this.repositionPlayerChats();
+  }
+
+  /** 以当前格节点的真实矩形补发 grid hover（棋子遮挡场景下替代节点的 mouseenter） */
+  private emitCellHoverAt(cellId: number): void {
+    if (cellId !== this.selfCellId) return;
+    const node = this.root.querySelector<SVGGElement>(`.map-node[data-cell-id="${cellId}"]`);
+    const b = node?.getBoundingClientRect();
+    if (!b || b.width === 0 || b.height === 0) return;
+    this.root.dispatchEvent(
+      new CustomEvent("map:hover", {
+        detail: { cellId, clientX: b.right, clientY: b.top, rect: { left: b.left, right: b.right, top: b.top, width: b.width, height: b.height } }
+      })
+    );
   }
 
   updatePlayers(players: Player[]): void {
@@ -455,6 +494,8 @@ export class InteractiveMapSurface {
       const cell = this.map.find((item) => item.id === this.selfCellId);
       if (cell) this.setPlayerDisplayPosition(self.id, cell.x, cell.y);
     }
+    // 其他玩家可能仅位置变化而未触发整体重绘，这里同步重定位其发言悬浮框
+    this.repositionPlayerChats();
   }
 
   setPlayerDisplayPosition(playerId: string, x: number, y: number): void {
@@ -468,6 +509,7 @@ export class InteractiveMapSurface {
     const player = Array.from(this.root.querySelectorAll('[data-player-id]'))
       .find((element) => element.getAttribute('data-player-id') === playerId);
     if (player) player.setAttribute('transform', `translate(${tx} ${ty})`);
+    this.repositionPlayerChats();
   }
 
   setDisplayPosition(x: number, y: number): void {
@@ -510,6 +552,115 @@ export class InteractiveMapSurface {
       "viewBox",
       `${centerX - width / 2} ${centerY - height / 2} ${width} ${height}`
     );
+    this.repositionPlayerChats();
+  }
+
+  /** 展示某玩家的一条发言悬浮框：名称 + 正文两行；同一玩家复用同一框，限时自动渐隐 */
+  showPlayerChat(playerId: string, senderName: string, text: string, durationMs = PLAYER_CHAT_BUBBLE_MS): void {
+    if (!this.map.length) return;
+    let entry = this.chatBubbles.get(playerId);
+    if (!entry) {
+      const el = document.createElement("div");
+      el.className = "map-chat-bubble";
+      el.dataset.playerId = playerId;
+      this.chatLayer.appendChild(el);
+      entry = { el, hideTimer: 0, removeTimer: 0 };
+      this.chatBubbles.set(playerId, entry);
+    }
+    // 若正处于上一轮的渐隐过程，取消失效的移除定时器直接恢复显形
+    window.clearTimeout(entry.removeTimer);
+    entry.removeTimer = 0;
+    // 之前因发言者不在棋盘上被隐藏的话，这里恢复布局后再测量
+    entry.el.style.display = "";
+    const nameEl = document.createElement("div");
+    nameEl.className = "map-chat-bubble__name";
+    nameEl.textContent = senderName;
+    const textEl = document.createElement("div");
+    textEl.className = "map-chat-bubble__text";
+    textEl.textContent = text;
+    entry.el.replaceChildren(nameEl, textEl);
+    // 先测量再定位：尺寸缓存到 dataset，之后每帧重定位只读缓存、不触发强制重排
+    entry.el.dataset.w = String(entry.el.offsetWidth);
+    entry.el.dataset.h = String(entry.el.offsetHeight);
+    this.repositionPlayerChats();
+    if (!entry.el.classList.contains("is-visible")) {
+      // 读一次布局让初始 opacity:0 生效，过渡才会真正播放；否则直接跳到终态、没有渐显
+      void entry.el.offsetWidth;
+      entry.el.classList.add("is-visible");
+    }
+    window.clearTimeout(entry.hideTimer);
+    entry.hideTimer = window.setTimeout(() => this.hidePlayerChat(playerId), durationMs);
+  }
+
+  private hidePlayerChat(playerId: string): void {
+    const entry = this.chatBubbles.get(playerId);
+    if (!entry) return;
+    window.clearTimeout(entry.hideTimer);
+    // 先退掉显形态播放渐隐，过渡结束后再移除节点
+    entry.el.classList.remove("is-visible");
+    const fadeMs = readCssVarNumber(this.root, "--motion-chat-bubble", 250);
+    window.clearTimeout(entry.removeTimer);
+    entry.removeTimer = window.setTimeout(() => {
+      entry.el.remove();
+      this.chatBubbles.delete(playerId);
+    }, fadeMs);
+  }
+
+  /** 把各悬浮框重新锚定到发言者棋子上方；发言者出视野时夹到对应边缘 */
+  private repositionPlayerChats(): void {
+    if (this.chatBubbles.size === 0) return;
+    const svg = this.root.querySelector<SVGSVGElement>("svg.interactive-map-surface__svg");
+    if (!svg) return;
+    // 用属性解析 viewBox（jsdom 不实现 SVGAnimatedRect，baseVal 会缺失）
+    const viewBoxAttr = svg.getAttribute("viewBox");
+    if (!viewBoxAttr) return;
+    const [vbX, vbY, vbW, vbH] = viewBoxAttr.trim().split(/[\s,]+/).map(Number);
+    if (![vbX, vbY, vbW, vbH].every(Number.isFinite) || vbW <= 0 || vbH <= 0) return;
+    const rect = this.root.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    // preserveAspectRatio=xMidYMid meet：等比缩放后居中，故需把留边计入坐标换算
+    const scale = Math.min(rect.width / vbW, rect.height / vbH);
+    const padX = (rect.width - vbW * scale) / 2;
+    const padY = (rect.height - vbH * scale) / 2;
+    const topInset = readCssVarNumber(this.root, "--gp-topbar-h", 0);
+    const bottomInset = readCssVarNumber(this.root, "--gp-actionbar-h", 0);
+    const margin = 8;
+    this.chatBubbles.forEach((entry, playerId) => {
+      const world = this.playerWorldPosition(playerId);
+      if (!world) {
+        entry.el.style.display = "none";
+        return;
+      }
+      entry.el.style.display = "";
+      const anchorX = padX + (world.x - vbX) * scale;
+      const anchorY = padY + (world.y - vbY) * scale;
+      const w = Number(entry.el.dataset.w) || entry.el.offsetWidth;
+      const h = Number(entry.el.dataset.h) || entry.el.offsetHeight;
+      // 锚点取棋子原点：图形上缘在该点上方约 16px，待机跳动再上浮约 9px，
+      // 故气泡底边留 26px 才能稳定地贴在整个棋子之上（留白不足会压住头部，看着像"位置偏了"）
+      const left = anchorX - w / 2;
+      const top = anchorY - PIECE_TOP_CLEARANCE - h;
+      const clampedLeft = Math.max(margin, Math.min(left, rect.width - w - margin));
+      const clampedTop = Math.max(topInset + margin, Math.min(top, rect.height - bottomInset - margin - h));
+      // 发生夹紧即说明发言者不在视野内，标记出来供样式区分
+      entry.el.classList.toggle("map-chat-bubble--edge", clampedLeft !== left || clampedTop !== top);
+      entry.el.style.left = `${clampedLeft}px`;
+      entry.el.style.top = `${clampedTop}px`;
+    });
+  }
+
+  /** 发言者棋子的世界坐标：优先取移动中的插值位置，回退到其所在格的错位落点 */
+  private playerWorldPosition(playerId: string): { x: number; y: number } | null {
+    const index = this.players.findIndex((player) => player?.id === playerId);
+    if (index < 0) return null;
+    const displayed = this.displayedPlayerPositions.get(playerId);
+    if (displayed) return displayed;
+    const player = this.players[index];
+    const cellId = index === 0 ? (this.selfCellId ?? player.position.cellId) : player.position.cellId;
+    const cell = this.map.find((item) => item.id === cellId);
+    if (!cell) return null;
+    const slot = playerSlotOffset(index);
+    return { x: cell.x + slot.x, y: cell.y + slot.y };
   }
 
   /**

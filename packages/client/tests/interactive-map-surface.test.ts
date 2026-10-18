@@ -80,4 +80,45 @@ describe('InteractiveMapSurface 格子渲染', () => {
     expect(root.querySelector('[data-player-id="p1"]')?.getAttribute('transform')).toBe('translate(100 120)');
   });
 
+  it('棋子渲染玩家名文本（悬停时由 CSS 显形）', () => {
+    const surface = new InteractiveMapSurface();
+    const root = surface.getElement();
+    const map = [{ id: 1, x: 10, y: 20, destinations: [], extra: { type: 'property', name: '起点' } }];
+    const me = { id: 'p1', username: '玩家一', position: { cellId: 1 }, status: 'normal', values: {}, teamId: null, createdAt: 0, lastActiveAt: 0 } as never;
+    const other = { id: 'p2', username: '路人甲', position: { cellId: 1 }, status: 'normal', values: {}, teamId: null, createdAt: 0, lastActiveAt: 0 } as never;
+    surface.render(map, [me, other]);
+
+    expect(root.querySelector('[data-player-id="p1"] text.map-player__name')?.textContent).toBe('玩家一');
+    expect(root.querySelector('[data-player-id="p2"] text.map-player__name')?.textContent).toBe('路人甲');
+  });
+
+  it('玩家发言在棋盘生成悬浮框，同一玩家再次发言复用同一个元素', () => {
+    const surface = new InteractiveMapSurface();
+    const root = surface.getElement();
+    const map = [{ id: 1, x: 10, y: 20, destinations: [], extra: { type: 'property', name: '起点' } }];
+    const me = { id: 'p1', username: '玩家一', position: { cellId: 1 }, status: 'normal', values: {}, teamId: null, createdAt: 0, lastActiveAt: 0 } as never;
+    const other = { id: 'p2', username: '路人甲', position: { cellId: 1 }, status: 'normal', values: {}, teamId: null, createdAt: 0, lastActiveAt: 0 } as never;
+    surface.render(map, [me, other]);
+
+    surface.showPlayerChat('p2', '路人甲', '你好');
+    const bubbles = root.querySelectorAll('.map-chat-bubble');
+    expect(bubbles.length).toBe(1);
+    expect(bubbles[0].getAttribute('data-player-id')).toBe('p2');
+    expect(bubbles[0].querySelector('.map-chat-bubble__name')?.textContent).toBe('路人甲');
+    expect(bubbles[0].querySelector('.map-chat-bubble__text')?.textContent).toBe('你好');
+    expect(bubbles[0].classList.contains('is-visible')).toBe(true);
+
+    surface.showPlayerChat('p2', '路人甲', '在吗');
+    const afterBubbles = root.querySelectorAll('.map-chat-bubble');
+    expect(afterBubbles.length).toBe(1);
+    expect(afterBubbles[0].querySelector('.map-chat-bubble__text')?.textContent).toBe('在吗');
+  });
+
+  it('发言悬浮框在地图尚未渲染时不创建', () => {
+    const surface = new InteractiveMapSurface();
+    const root = surface.getElement();
+    surface.showPlayerChat('p2', '路人甲', '你好');
+    expect(root.querySelectorAll('.map-chat-bubble').length).toBe(0);
+  });
+
 });

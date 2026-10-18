@@ -22,7 +22,7 @@ import { CssTransitionEffectHooks } from '../game/GameEffects.js';
 import type { MovementEffectHooks } from '../game/GameEffects.js';
 import { EffectController } from '../game/EffectController.js';
 import { GameViewModel } from '../game/GameViewModel.js';
-import { GameStore } from '../state/GameStore.js';
+import { GameStore, type ClientChatMessage } from '../state/GameStore.js';
 import type { TypedClientSocket } from '../hooks/useSocket.js';
 
 import {
@@ -139,10 +139,21 @@ export function createGamePage(controller: GameController): HTMLElement {
     });
     return gameMovementLoop;
   };
+  // 棋盘发言悬浮框：只认"新增的玩家消息"——尾元素的对象引用发生变化即代表新消息到达
+  let lastSeenChat: ClientChatMessage | undefined;
   unsubscribeGameStore = gameStore.subscribe((snapshot) => {
     const players = toInteractivePlayers(snapshot);
     interactiveMap.setMovementLocked(snapshot.isMoving);
     interactiveMap.updatePlayers(players);
+    // 新增玩家消息在发言者棋子上方弹框（放在 updatePlayers 之后：确保地图已渲染再定位）
+    const latestChat = snapshot.chatHistory[snapshot.chatHistory.length - 1];
+    if (latestChat && latestChat !== lastSeenChat) {
+      lastSeenChat = latestChat;
+      // 仅玩家消息（非系统、非本人）；系统消息继续只走聊天区
+      if (latestChat.senderId && latestChat.channel !== 'system' && latestChat.senderId !== snapshot.currentPlayer?.id) {
+        interactiveMap.showPlayerChat(latestChat.senderId, latestChat.senderName ?? '', latestChat.content ?? latestChat.text);
+      }
+    }
     // hover 用权威移动字段定位本玩家所在格（players[0].position 在 serverPath 移动中可能滞后）
     interactiveMap.setSelfCell(snapshot.currentPlayerPosition);
     // 持股描边仅代表「我持有」：运行时态里只看当前玩家自己的持股，
@@ -188,12 +199,6 @@ export function createGamePage(controller: GameController): HTMLElement {
       if (members.length <= 1) {
         gameStore?.appendChatMessage({ text: t('chat.noTeamChannelReminder'), channel: 'system', timestamp: Date.now() });
       }
-    },
-    // 队伍入口：无队伍时打开邀请列表，已有队友时打开队伍管理（队伍操作指引的唯一入口）
-    onTeam: () => {
-      const members = gameStore?.getSnapshot().teamMembers ?? [];
-      if (members.length > 1) window.showTeamManagement();
-      else window.showTeamInvite();
     },
     onRoll: () => {
       if (gameStore && gameSocket) {

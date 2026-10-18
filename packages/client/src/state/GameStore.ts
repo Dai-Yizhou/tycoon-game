@@ -133,6 +133,12 @@ export interface ClientChatMessage {
   text: string;
   channel: string;
   timestamp: number;
+  /** 发送者玩家 id；系统消息与本地提示为 null/省略，用于在棋盘上锚定发言者 */
+  senderId?: string | null;
+  /** 发送者用户名 */
+  senderName?: string;
+  /** 未经拼接的原始正文（悬浮框只展示正文，不带"发送者:"前缀） */
+  content?: string;
 }
 
 export class GameStore {
@@ -415,8 +421,16 @@ export class GameStore {
   }
 
   appendChatMessage(message: ServerChatMessage | ClientChatMessage): void {
+    // 服务端消息额外保留发送者身份与原始正文：聊天区仍显示"发送者: 正文"，棋盘悬浮框只用正文并据此定位
     const chatMessage: ClientChatMessage = 'content' in message
-      ? { text: `${message.senderName || '匿名'}: ${message.content}`, channel: message.channel, timestamp: message.timestamp }
+      ? {
+          text: `${message.senderName || '匿名'}: ${message.content}`,
+          channel: message.channel,
+          timestamp: message.timestamp,
+          senderId: message.senderId,
+          senderName: message.senderName,
+          content: message.content,
+        }
       : message;
     this.snapshot = { ...this.snapshot, chatHistory: [...this.snapshot.chatHistory, chatMessage].slice(-100) };
     this.publish();
