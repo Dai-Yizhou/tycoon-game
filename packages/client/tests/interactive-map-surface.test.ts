@@ -121,4 +121,47 @@ describe('InteractiveMapSurface 格子渲染', () => {
     expect(root.querySelectorAll('.map-chat-bubble').length).toBe(0);
   });
 
+  it('发言输入气泡默认收起，唤起后可输入并聚焦', () => {
+    const surface = new InteractiveMapSurface();
+    const root = surface.getElement();
+    document.body.appendChild(root);
+    const map = [{ id: 1, x: 10, y: 20, destinations: [], extra: { type: 'property', name: '起点' } }];
+    const me = { id: 'p1', username: '玩家一', position: { cellId: 1 }, status: 'normal', values: {}, teamId: null, createdAt: 0, lastActiveAt: 0 } as never;
+    surface.render(map, [me]);
+
+    const composer = root.querySelector('[data-ui="map-chat-composer"]') as HTMLElement;
+    expect(composer).not.toBeNull();
+    expect(composer.classList.contains('is-open')).toBe(false);
+    // 输入气泡只保留输入框：频道下拉与快捷键提示已移除
+    expect(composer.querySelector('select')).toBeNull();
+    expect(composer.querySelector('.map-chat-composer__hint')).toBeNull();
+
+    surface.openChatComposer();
+    expect(composer.classList.contains('is-open')).toBe(true);
+    expect(document.activeElement).toBe(composer.querySelector('input'));
+    root.remove();
+  });
+
+  it('发送发言需要 Ctrl/Cmd+Enter，普通 Enter 不提交', () => {
+    const surface = new InteractiveMapSurface();
+    const root = surface.getElement();
+    document.body.appendChild(root);
+    const map = [{ id: 1, x: 10, y: 20, destinations: [], extra: { type: 'property', name: '起点' } }];
+    const me = { id: 'p1', username: '玩家一', position: { cellId: 1 }, status: 'normal', values: {}, teamId: null, createdAt: 0, lastActiveAt: 0 } as never;
+    surface.render(map, [me]);
+    const onSend = jest.fn();
+    surface.setChatComposerConfig({ onSend });
+    surface.openChatComposer();
+
+    const input = root.querySelector('.map-chat-composer__input') as HTMLInputElement;
+    input.value = '你好';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(onSend).not.toHaveBeenCalled();
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+    expect(onSend).toHaveBeenCalledWith('你好', 'region');
+    expect(input.value).toBe('');
+    root.remove();
+  });
+
 });

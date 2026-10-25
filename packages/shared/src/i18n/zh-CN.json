@@ -107,6 +107,7 @@
     "effectsOn": "动效：开",
     "effectsOff": "动效：关",
     "noMessage": "暂无消息",
+    "logTitle": "日志",
     "choosePath": "选择路径",
     "price": "价格",
     "level": "等级",
@@ -127,7 +128,8 @@
     "owners": "持股",
     "trigger": "钩子 {{id}}",
     "jailCooldown": "冷却时长",
-    "jailCost": "出狱费用"
+    "jailCost": "出狱费用",
+    "secondsFormat": "{{value}} 秒"
   },
   "uct": {
     "player": "玩家",
@@ -154,6 +156,7 @@
   "property": {
     "buyTitle": "购买地产",
     "nextRentFormat": "下一级租金 {{rent}}",
+    "nextRentLabel": "下一级租金",
     "upgradeTitle": "升级地产",
     "price": "价格",
     "rent": "租金",

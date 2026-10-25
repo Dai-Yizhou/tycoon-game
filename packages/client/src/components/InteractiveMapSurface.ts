@@ -1,5 +1,5 @@
-import { type MapData, type Player, type ValueFieldDefinition } from "@game/shared";
-import { localizedText } from "../game/i18n.js";
+import { type MapData, type Player, type ValueFieldDefinition, parseChatCommand } from "@game/shared";
+import { localizedText, t } from "../game/i18n.js";
 import { readCssVarNumber } from "../design/DesignAdapter.js";
 // 图形资源（矢量）：以 Vite ?raw 内联，颜色由应用样式表按类名/CSS 变量驱动
 import pieceSelfSvgRaw from "../assets/piece-self.svg?raw";
@@ -124,6 +124,16 @@ function getCellIconTemplate(type: string): SVGElement | null {
   return g;
 }
 
+/** 玩家发言输入气泡的对外回调（发送由 GamePage 注入） */
+export interface MapChatComposerConfig {
+  onSend: (message: string, channel: string, onResult?: (ok: boolean) => void) => void;
+  /** 指令显式指定频道时回调（如 /t，用于提示队伍频道可见性） */
+  onChannelChange?: (channel: string) => void;
+}
+
+/** 未写频道指令时的默认发言频道 */
+const DEFAULT_CHAT_CHANNEL = "region";
+
 export class InteractiveMapSurface {
   private root = document.createElement("div");
   private map: MapData = [];
@@ -141,6 +151,11 @@ export class InteractiveMapSurface {
   private readonly chatLayer = document.createElement("div");
   /** playerId → 当前悬浮框元素及其自动隐藏/移除定时器（同一玩家只保留最新一条） */
   private readonly chatBubbles = new Map<string, { el: HTMLElement; hideTimer: number; removeTimer: number }>();
+  /** 玩家发言输入气泡：与发言悬浮框同层，锚定在本玩家棋子正上方 */
+  private readonly chatComposer = document.createElement("div");
+  private readonly chatComposerInput = document.createElement("input");
+  private chatComposerConfig: MapChatComposerConfig | null = null;
+  private chatComposerOpen = false;
 
   setMovementLocked(locked: boolean): void {
     if (this.movementLocked === locked) return;
@@ -167,6 +182,72 @@ export class InteractiveMapSurface {
     this.root.dataset.ui = "interactive-map";
     this.chatLayer.className = "map-chat-layer";
     this.root.appendChild(this.chatLayer);
+    this.buildChatComposer();
+  }
+
+  /** 构建玩家发言输入气泡：仅输入框（频道由 /r /t /g 指令指定），默认收起 */
+  private buildChatComposer(): void {
+    this.chatComposer.className = "map-chat-composer";
+    this.chatComposer.dataset.ui = "map-chat-composer";
+    this.chatComposerInput.className = "map-chat-composer__input";
+    this.chatComposerInput.maxLength = 200;
+    this.chatComposerInput.placeholder = t("chat.inputPlaceholder");
+    this.chatComposerInput.setAttribute("aria-label", t("chat.inputPlaceholder"));
+    this.chatComposer.appendChild(this.chatComposerInput);
+    this.chatLayer.appendChild(this.chatComposer);
+
+    this.chatComposerInput.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        this.closeChatComposer();
+        return;
+      }
+      if (event.key !== "Enter") return;
+      // 普通 Enter 不发送，避免误触；Ctrl/Cmd+Enter 才提交
+      event.preventDefault();
+      if (!(event.ctrlKey || event.metaKey)) return;
+      this.sendChatComposer();
+    });
+    // 焦点离开气泡（如点击棋盘）时收起
+    this.chatComposerInput.addEventListener("blur", () => {
+      window.setTimeout(() => {
+        if (this.chatComposerOpen && !this.chatComposer.contains(document.activeElement)) this.closeChatComposer();
+      }, 150);
+    });
+  }
+
+  /** 注入发送/频道切换回调（GamePage 持有 socket 与 store） */
+  setChatComposerConfig(config: MapChatComposerConfig): void {
+    this.chatComposerConfig = config;
+  }
+
+  /** 唤起玩家头顶的发言输入气泡并聚焦 */
+  openChatComposer(): void {
+    if (!this.map.length) return;
+    this.chatComposerOpen = true;
+    this.chatComposer.classList.add("is-open");
+    // 展开后测量一次尺寸并缓存，后续相机每帧重定位只读缓存、不触发重排
+    this.chatComposer.dataset.w = String(this.chatComposer.offsetWidth);
+    this.chatComposer.dataset.h = String(this.chatComposer.offsetHeight);
+    this.repositionChatOverlays();
+    this.chatComposerInput.focus();
+  }
+
+  private closeChatComposer(): void {
+    this.chatComposerOpen = false;
+    this.chatComposer.classList.remove("is-open");
+  }
+
+  /** 提交发言：支持 /r /t /g 频道前缀，未指定时发往默认频道；成功后保持输入框聚焦以便连续发送 */
+  private sendChatComposer(): void {
+    const message = this.chatComposerInput.value.trim();
+    if (!message) return;
+    const command = parseChatCommand(message);
+    const channel = command.kind === "channel" ? command.channel : DEFAULT_CHAT_CHANNEL;
+    if (command.kind === "channel") this.chatComposerConfig?.onChannelChange?.(command.channel);
+    this.chatComposerInput.value = "";
+    this.chatComposerConfig?.onSend(message, channel);
+    this.chatComposerInput.focus();
   }
 
   getElement(): HTMLElement {
@@ -450,7 +531,7 @@ export class InteractiveMapSurface {
     svg.appendChild(pieces);
 
     this.root.replaceChildren(svg, this.chatLayer);
-    this.repositionPlayerChats();
+    this.repositionChatOverlays();
   }
 
   /** 以当前格节点的真实矩形补发 grid hover（棋子遮挡场景下替代节点的 mouseenter） */
@@ -495,7 +576,7 @@ export class InteractiveMapSurface {
       if (cell) this.setPlayerDisplayPosition(self.id, cell.x, cell.y);
     }
     // 其他玩家可能仅位置变化而未触发整体重绘，这里同步重定位其发言悬浮框
-    this.repositionPlayerChats();
+    this.repositionChatOverlays();
   }
 
   setPlayerDisplayPosition(playerId: string, x: number, y: number): void {
@@ -509,7 +590,7 @@ export class InteractiveMapSurface {
     const player = Array.from(this.root.querySelectorAll('[data-player-id]'))
       .find((element) => element.getAttribute('data-player-id') === playerId);
     if (player) player.setAttribute('transform', `translate(${tx} ${ty})`);
-    this.repositionPlayerChats();
+    this.repositionChatOverlays();
   }
 
   setDisplayPosition(x: number, y: number): void {
@@ -552,7 +633,7 @@ export class InteractiveMapSurface {
       "viewBox",
       `${centerX - width / 2} ${centerY - height / 2} ${width} ${height}`
     );
-    this.repositionPlayerChats();
+    this.repositionChatOverlays();
   }
 
   /** 展示某玩家的一条发言悬浮框：名称 + 正文两行；同一玩家复用同一框，限时自动渐隐 */
@@ -582,7 +663,7 @@ export class InteractiveMapSurface {
     // 先测量再定位：尺寸缓存到 dataset，之后每帧重定位只读缓存、不触发强制重排
     entry.el.dataset.w = String(entry.el.offsetWidth);
     entry.el.dataset.h = String(entry.el.offsetHeight);
-    this.repositionPlayerChats();
+    this.repositionChatOverlays();
     if (!entry.el.classList.contains("is-visible")) {
       // 读一次布局让初始 opacity:0 生效，过渡才会真正播放；否则直接跳到终态、没有渐显
       void entry.el.offsetWidth;
@@ -606,9 +687,9 @@ export class InteractiveMapSurface {
     }, fadeMs);
   }
 
-  /** 把各悬浮框重新锚定到发言者棋子上方；发言者出视野时夹到对应边缘 */
-  private repositionPlayerChats(): void {
-    if (this.chatBubbles.size === 0) return;
+  /** 把各悬浮框与输入气泡重新锚定到对应棋子上方；发言者出视野时夹到对应边缘 */
+  private repositionChatOverlays(): void {
+    if (this.chatBubbles.size === 0 && !this.chatComposerOpen) return;
     const svg = this.root.querySelector<SVGSVGElement>("svg.interactive-map-surface__svg");
     if (!svg) return;
     // 用属性解析 viewBox（jsdom 不实现 SVGAnimatedRect，baseVal 会缺失）
@@ -625,6 +706,9 @@ export class InteractiveMapSurface {
     const topInset = readCssVarNumber(this.root, "--gp-topbar-h", 0);
     const bottomInset = readCssVarNumber(this.root, "--gp-actionbar-h", 0);
     const margin = 8;
+    const selfId = this.players[0]?.id;
+    // 本玩家自己的发言气泡顶边：输入气泡出现时叠在它上方，避免两者重叠
+    let selfBubbleTop: number | null = null;
     this.chatBubbles.forEach((entry, playerId) => {
       const world = this.playerWorldPosition(playerId);
       if (!world) {
@@ -646,7 +730,27 @@ export class InteractiveMapSurface {
       entry.el.classList.toggle("map-chat-bubble--edge", clampedLeft !== left || clampedTop !== top);
       entry.el.style.left = `${clampedLeft}px`;
       entry.el.style.top = `${clampedTop}px`;
+      if (playerId === selfId) selfBubbleTop = clampedTop;
     });
+
+    if (!this.chatComposerOpen) return;
+    const selfWorld = selfId ? this.playerWorldPosition(selfId) : null;
+    if (!selfWorld) {
+      this.chatComposer.style.display = "none";
+      return;
+    }
+    this.chatComposer.style.display = "";
+    const anchorX = padX + (selfWorld.x - vbX) * scale;
+    const anchorY = padY + (selfWorld.y - vbY) * scale;
+    const w = Number(this.chatComposer.dataset.w) || this.chatComposer.offsetWidth;
+    const h = Number(this.chatComposer.dataset.h) || this.chatComposer.offsetHeight;
+    const left = anchorX - w / 2;
+    let top = anchorY - PIECE_TOP_CLEARANCE - h;
+    if (selfBubbleTop !== null) top = Math.min(top, selfBubbleTop - h - 4);
+    const clampedLeft = Math.max(margin, Math.min(left, rect.width - w - margin));
+    const clampedTop = Math.max(topInset + margin, Math.min(top, rect.height - bottomInset - margin - h));
+    this.chatComposer.style.left = `${clampedLeft}px`;
+    this.chatComposer.style.top = `${clampedTop}px`;
   }
 
   /** 发言者棋子的世界坐标：优先取移动中的插值位置，回退到其所在格的错位落点 */

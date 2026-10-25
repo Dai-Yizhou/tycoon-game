@@ -69,11 +69,47 @@ export function buildUctDisplayGroups(uct: Uct | undefined, definitions: ValueFi
   return groups;
 }
 
-/** 单行分组文本：`Player: A -100, B +2; Region: C +5` */
+/** 单行文本（不显示作用域前缀，仅用字段名区分）：`财产 -100, 信用 +2, 繁荣 +5` */
 export function formatUctDisplay(uct: Uct | undefined, definitions: ValueFieldDefLike[]): string {
   return buildUctDisplayGroups(uct, definitions)
-    .map((group) => `${group.label}: ${group.fields.map((field) => field.text).join(', ')}`)
-    .join('; ');
+    .flatMap((group) => group.fields.map((field) => field.text))
+    .join(', ');
+}
+
+/**
+ * 展示 base 被 modifier 改写后的结果：只有被改动的数值带内联箭头，未变化字段只出现一次。
+ * 不显示作用域前缀（字段名本身即可区分），数字与 UCT 走同一套规则。
+ * 例：`财产 -200 → -250`、`财产 +11, 繁荣 +2`。
+ */
+export function formatUctChange(
+  base: number | Uct,
+  final: number | Uct,
+  definitions: ValueFieldDefLike[],
+  mapScalar: (val: number | Uct) => string = (val) => String(val),
+): string {
+  if (typeof base === 'number' || typeof final === 'number') {
+    const before = mapScalar(base);
+    const after = mapScalar(final);
+    return before === after ? before : `${before} → ${after}`;
+  }
+  const parts: string[] = [];
+  for (const scope of ['player', 'region'] as const) {
+    const fieldIds = new Set([...Object.keys(base[scope] ?? {}), ...Object.keys(final[scope] ?? {})]);
+    for (const fieldId of fieldIds) {
+      const before = base[scope]?.[fieldId];
+      const after = final[scope]?.[fieldId];
+      const beforeText = isValidValue(before) ? fieldValueText(before) : null;
+      const afterText = isValidValue(after) ? fieldValueText(after) : null;
+      if (!beforeText && !afterText) continue;
+      const label = fieldLabel(scope, fieldId, definitions);
+      if (beforeText && afterText) {
+        parts.push(beforeText === afterText ? `${label} ${beforeText}` : `${label} ${beforeText} → ${afterText}`);
+      } else {
+        parts.push(`${label} ${beforeText ?? afterText}`);
+      }
+    }
+  }
+  return parts.join(', ');
 }
 
 export interface CellHoverRow {
@@ -108,6 +144,8 @@ export interface CellHoverResolutionCtx {
   teamValue?: (fieldId: string) => number | undefined;
   regionUct: Uct;
   regionTime: number;
+  /** 数值字段定义：用于生成不带作用域前缀的字段名与 diff 文本 */
+  valueFieldDefs?: ValueFieldDefLike[];
   /** 服务端权威结算购买价（购买成功后回传）；存在时价格行直接展示实际扣款，不再走乐观重算 */
   authoritativePrice?: Uct;
 }
@@ -135,14 +173,14 @@ export function resolveModifierText(
     curCellLevel: level,
     curCellOwnerCount: ownerCount,
   };
-  let final: string;
+  let resolved: number | Uct;
   try {
-    final = mapValue(resolveField(rule.calc, view) as number | Uct);
+    resolved = resolveField(rule.calc, view) as number | Uct;
   } catch {
     // 求值异常时退回 base 展示，不阻塞悬浮
     return null;
   }
-  return `${mapValue(base)} → ${final}`;
+  return formatUctChange(base, resolved, ctx.valueFieldDefs ?? [], mapValue);
 }
 
 /** UCT 字段展示用映射 */
@@ -172,13 +210,21 @@ export function resolveCellHoverModel(
     if (price) {
       const value = ctx?.authoritativePrice
         ? mapUct(ctx.authoritativePrice)
-        : ctx ? resolveModifierText('property', 'price', price, level, ownerCount, ctx, mapUct) ?? mapUct(price) : mapUct(price);
+        : ctx ? resolveModifierText('property', 'price', price, level, ownerCount, { ...ctx, valueFieldDefs: definitions }, mapUct) ?? mapUct(price) : mapUct(price);
       model.rows.push({ label: t('hud.price'), value });
     }
     const rent = cell.rent?.[Math.min(level, (cell.rent?.length ?? 1) - 1)];
     if (rent) {
-      const value = ctx ? resolveModifierText('property', 'rent', rent, level, ownerCount, ctx, mapUct) ?? mapUct(rent) : mapUct(rent);
+      const value = ctx ? resolveModifierText('property', 'rent', rent, level, ownerCount, { ...ctx, valueFieldDefs: definitions }, mapUct) ?? mapUct(rent) : mapUct(rent);
       model.rows.push({ label: t('hud.rent'), value });
+    }
+    // 升级后的租金：原本展示在底部升级按钮上，移入悬浮卡（act-bar 只保留升级费用）
+    const nextRent = cell.rent?.[level + 1];
+    if (nextRent) {
+      const value = ctx
+        ? resolveModifierText('property', 'rent', nextRent, level + 1, ownerCount, { ...ctx, valueFieldDefs: definitions }, mapUct) ?? mapUct(nextRent)
+        : mapUct(nextRent);
+      model.rows.push({ label: t('property.nextRentLabel'), value });
     }
     if ((cell.upgradeCost?.length ?? 0) > 0) {
       model.rows.push({ label: t('hud.level'), value: t('hud.levelFormat', { current: level, max: cell.upgradeCost!.length }) });
@@ -190,25 +236,25 @@ export function resolveCellHoverModel(
     if (price) {
       const value = ctx?.authoritativePrice
         ? mapUct(ctx.authoritativePrice)
-        : ctx ? resolveModifierText('investment', 'price', price, 0, ownerCount, ctx, mapUct) ?? mapUct(price) : mapUct(price);
+        : ctx ? resolveModifierText('investment', 'price', price, 0, ownerCount, { ...ctx, valueFieldDefs: definitions }, mapUct) ?? mapUct(price) : mapUct(price);
       model.rows.push({ label: t('hud.price'), value });
     }
     model.rows.push({ label: t('hud.owners'), value: t('hud.ownerCountFormat', { current: ownerCount, max: cell.maxOwnerCount }) });
     for (const trigger of cell.investmentTriggers ?? []) {
       const delta = trigger.delta;
-      const value = ctx ? resolveModifierText('investment', 'investmentTriggers.delta', delta, 0, ownerCount, ctx, mapUct) ?? mapUct(delta) : mapUct(delta);
+      const value = ctx ? resolveModifierText('investment', 'investmentTriggers.delta', delta, 0, ownerCount, { ...ctx, valueFieldDefs: definitions }, mapUct) ?? mapUct(delta) : mapUct(delta);
       model.rows.push({ label: t('hud.trigger', { id: trigger.id }), value });
     }
   } else if (cell.type === 'jail') {
     const ownerCount = runtime?.ownerCount ?? 0;
     if (cell.jailCooldown !== undefined) {
-      const numMap = (val: number | Uct) => String(val as number);
-      const base = cell.jailCooldown;
-      const value = ctx ? resolveModifierText('jail', 'jailCooldown', base, 0, ownerCount, ctx, numMap) ?? String(base) : String(base);
+      // jailCooldown 原始单位为毫秒，展示给玩家时换算为秒
+      const toSeconds = (val: number | Uct) => t('hud.secondsFormat', { value: Number(((val as number) / 1000).toFixed(1)) });
+      const value = ctx ? resolveModifierText('jail', 'jailCooldown', cell.jailCooldown, 0, ownerCount, ctx, toSeconds) ?? toSeconds(cell.jailCooldown) : toSeconds(cell.jailCooldown);
       model.rows.push({ label: t('hud.jailCooldown'), value });
     }
     if (cell.jailCost) {
-      const value = ctx ? resolveModifierText('jail', 'jailCost', cell.jailCost, 0, ownerCount, ctx, mapUct) ?? mapUct(cell.jailCost) : mapUct(cell.jailCost);
+      const value = ctx ? resolveModifierText('jail', 'jailCost', cell.jailCost, 0, ownerCount, { ...ctx, valueFieldDefs: definitions }, mapUct) ?? mapUct(cell.jailCost) : mapUct(cell.jailCost);
       model.rows.push({ label: t('hud.jailCost'), value });
     }
   }

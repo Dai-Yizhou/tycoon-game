@@ -368,6 +368,7 @@ export class GameViewModel {
     const local = this.getLocalDayNight(targetOffset);
     return {
       valueModifiers: snapshot.valueModifiers,
+      valueFieldDefs: snapshot.valueFieldDefs,
       playerUct,
       teamMemberCount: snapshot.teamMembers.length || 1,
       teamValue,

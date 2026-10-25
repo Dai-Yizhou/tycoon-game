@@ -73,7 +73,7 @@ export function resolveCellActions(input: CellActionInput): CellActionModel[] {
   const modDetail = (baseField: string, base: Uct | undefined, level: number): string => {
     if (!base) return '';
     if (resolution) {
-      const text = resolveModifierText(cell.type, baseField, base, level, state.ownerCount, resolution, mapUct);
+      const text = resolveModifierText(cell.type, baseField, base, level, state.ownerCount, { ...resolution, valueFieldDefs }, mapUct);
       if (text) return text;
     }
     return formatUctDisplay(base, valueFieldDefs);
@@ -84,12 +84,10 @@ export function resolveCellActions(input: CellActionInput): CellActionModel[] {
     if (state.owned) {
       const cost = cell.upgradeCost?.[state.level];
       if (!cost || state.level >= maxLevel) return [];
-      const nextRent = cell.rent?.[state.level + 1];
-      const rentText = nextRent ? ` · ${t('property.nextRentFormat', { rent: modDetail('rent', nextRent, state.level + 1) })}` : '';
       return [{
         id: 'upgrade-property',
         label: t('property.upgradeTitle'),
-        detail: `${modDetail('upgradeCost', cost, state.level)}${rentText}`,
+        detail: modDetail('upgradeCost', cost, state.level),
         enabled: actionAvailable && canApplyUct(currentPlayer, cost),
       }];
     }

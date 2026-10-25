@@ -1,7 +1,6 @@
 import type { GameEffectHooks } from "../game/GameEffects.js";
 import type { GameViewModel, ValueFieldDef, TeamSlice } from "../game/GameViewModel.js";
 import { t, localizedText } from "../game/i18n.js";
-import { parseChatCommand } from "@game/shared";
 import type { LeaderboardEntry } from "@game/shared";
 import { resolveCellHoverModel } from "../game/cellDisplayModel.js";
 import { readCssVarNumber } from "../design/DesignAdapter.js";
@@ -15,12 +14,18 @@ export interface CellScreenRect {
   height: number;
 }
 
+/** 玩家发言频道：这些消息只走棋盘悬浮框，不进入左下聊天栏 */
+const PLAYER_CHAT_CHANNELS = new Set(["region", "team", "global"]);
+
+function isSystemChannel(message: { channel: string }): boolean {
+  return !PLAYER_CHAT_CHANNELS.has(message.channel);
+}
+
 export interface GameHudShellConfig {
   onRoll?: () => void;
   onBack?: () => void;
-  onChatSend?: (message: string, channel: string, onResult?: (ok: boolean) => void) => void;
-  /** 切换聊天频道时回调（用于无队伍时插入提醒） */
-  onChatChannelChange?: (channel: string) => void;
+  /** 唤起棋盘上方的发言输入气泡（快捷键触发；输入框不再位于聊天栏） */
+  onChatCompose?: () => void;
   onPathChoice?: (cellId: number) => void;
   onCellAction?: (actionId: string, data?: Record<string, unknown>) => void;
   onCellHover?: (cellId: number, x: number, y: number) => void;
@@ -44,10 +49,7 @@ export interface GameHudShellConfig {
  */
 export class GameHudShell {
   private readonly root = document.createElement("div");
-  private readonly input: HTMLInputElement;
-  private readonly channel: HTMLSelectElement;
   private readonly unsubscribers: Array<() => void> = [];
-  private readonly activeFilters = new Set(["region", "system", "team"]);
   private isExpanded = false;
   private destroyed = false;
   private hoveredCell: { id: number; rect: CellScreenRect } | null = null;
@@ -61,9 +63,7 @@ export class GameHudShell {
     if (target?.tagName === "INPUT" || target?.tagName === "SELECT" || target?.tagName === "TEXTAREA" || target?.tagName === "BUTTON") return;
     if (!this.root.isConnected) return;
     event.preventDefault();
-    this.root.querySelector('[data-ui="chat-panel"]')?.classList.add("is-expanded");
-    this.isExpanded = true;
-    this.input.focus();
+    this.config.onChatCompose?.();
   };
 
   constructor(
@@ -121,17 +121,11 @@ export class GameHudShell {
 
         <div class="hud-chat-dock" data-ui="chat-panel">
           <div class="hud-chat-dock__ticker" data-ui="chat-toggle" role="button" tabindex="0">
-            <span class="hud-chat-dock__ticker-icon">&gt;</span>
+            <span class="hud-chat-dock__ticker-title" data-ui="chat-title"></span>
             <span class="hud-chat-dock__ticker-text" data-ui="chat-ticker"></span>
           </div>
           <div class="hud-chat-dock__expanded">
-            <div class="hud-chat-dock__filters" data-ui="chat-filters"></div>
             <div class="hud-chat-msgs" data-ui="chat-messages"></div>
-            <div class="hud-chat-dock__input">
-              <select data-ui="chat-channel"></select>
-              <input data-ui="chat-input" maxlength="200" />
-              <button data-action="chat-send"></button>
-            </div>
           </div>
         </div>
 
@@ -141,7 +135,6 @@ export class GameHudShell {
               <span class="dice-btn__face"></span>
               <span class="dice-btn__fill" aria-hidden="true"></span>
             </button>
-            <span class="dice-status" data-ui="dice-status"></span>
           </div>
           <div class="action-cluster" data-ui="action-cluster">
           </div>
@@ -149,17 +142,10 @@ export class GameHudShell {
         </footer>
       </div>`;
 
-    this.input = this.root.querySelector("[data-ui=chat-input]") as HTMLInputElement;
-    this.channel = this.root.querySelector("[data-ui=chat-channel]") as HTMLSelectElement;
-
     // 静态文本国际化（语言在会话启动时固定；如需运行中切换语言，需在切换时重调本方法）
     this.bindStaticLabels();
 
     // Event wiring
-    this.root.querySelector('[data-action="chat-send"]')?.addEventListener("click", () => this.sendChat());
-    this.input.addEventListener("keydown", (e) => { if (e.key === "Enter") this.sendChat(); });
-    // 切换频道时通知外部（GamePage 据此在无队伍时插入 system 提醒）
-    this.channel.addEventListener("change", () => this.config.onChatChannelChange?.(this.channel.value));
     this.root.querySelector('[data-action="achievements"]')?.addEventListener("click", () => this.showAchievements());
     this.root.querySelector('[data-action="settings"]')?.addEventListener("click", () => this.showSettings());
     this.root.querySelector('[data-action="back"]')?.addEventListener("click", () => this.config.onBack?.());
@@ -173,30 +159,8 @@ export class GameHudShell {
     // hover / focus-within 由 CSS 直接展开（不经过 setExpanded），故在容器上补一次滚底
     this.root.querySelector('[data-ui="chat-panel"]')?.addEventListener("mouseenter", () => this.scrollChatToBottom());
     toggle?.addEventListener("click", () => setExpanded(!this.isExpanded));
-    this.root.addEventListener("keydown", (event) => {
-      const keyboardEvent = event as KeyboardEvent;
-      if (keyboardEvent.key !== "Enter" && keyboardEvent.key !== " ") return;
-      const target = keyboardEvent.target as HTMLElement | null;
-      if (target === this.input || target === this.channel || target?.tagName === "BUTTON") return;
-      event.preventDefault();
-      setExpanded(true);
-      this.input.focus();
-    });
+    // 键盘唤起发言气泡：聊天栏本身只显示系统消息，输入框已移到棋盘上方
     window.addEventListener("keydown", this.handleGlobalChatShortcut);
-    toggle?.addEventListener("keydown", (event) => {
-      const keyboardEvent = event as KeyboardEvent;
-      if (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") {
-        event.preventDefault();
-        setExpanded(!this.isExpanded);
-        this.input.focus();
-      }
-    });
-    this.input.addEventListener("focus", () => setExpanded(true));
-    this.input.addEventListener("blur", () => {
-      window.setTimeout(() => {
-        if (!this.root.contains(document.activeElement)) setExpanded(false);
-      }, 150);
-    });
 
     // Subscriptions
     this.unsubscribers.push(
@@ -215,10 +179,6 @@ export class GameHudShell {
 
   getElement(): HTMLElement { return this.root; }
 
-  setChatChannel(channel: string): void {
-    if (channel === "team" || channel === "region" || channel === "global") this.channel.value = channel;
-  }
-
   /** 写入不进 innerHTML、只在语言切换时变化的静态文案。 */
   private bindStaticLabels(): void {
     const set = (selector: string, key: string): void => {
@@ -229,7 +189,7 @@ export class GameHudShell {
     const rollLabel = t("dice.roll");
     this.root.querySelector('[data-action="roll"] .dice-btn__face')!.textContent = rollLabel;
     this.root.querySelector('[data-action="roll"] .dice-btn__fill')!.textContent = rollLabel;
-    set('[data-action="chat-send"]', "chat.send");
+    set('[data-ui="chat-title"]', "hud.logTitle");
     set('[data-action="back"]', "common.backToStart");
     set('[data-action="settings"]', "hud.settings");
     set('[data-action="achievements"]', "hud.achievements");
@@ -238,17 +198,6 @@ export class GameHudShell {
     this.root.querySelector('[data-action="achievements"]')?.setAttribute('aria-label', t('hud.achievements'));
     // 收起态仅显示一个字形图标，此处为容器补可读屏名称（展开后为带文字按钮）
     this.root.querySelector('[data-ui="panel-actions"]')?.setAttribute('aria-label', t('hud.panels'));
-
-    // 下拉频道选项与输入框占位符
-    this.channel.replaceChildren(
-      ...["region", "team", "global"].map((value) => {
-        const opt = document.createElement("option");
-        opt.value = value;
-        opt.textContent = t(`chat.channel.${value}`);
-        return opt;
-      }),
-    );
-    this.input.placeholder = t("chat.inputPlaceholder");
   }
 
   showCellHover(cellId: number, rect: CellScreenRect): void {
@@ -628,11 +577,6 @@ export class GameHudShell {
       ? Math.min(1, Math.max(0, 1 - Math.max(activeEnd - Date.now(), 0) / activeMs))
       : 0;
     rollBtn.style.setProperty("--cooldown", String(progress));
-
-    const statusEl = this.root.querySelector("[data-ui=dice-status]")!;
-    statusEl.textContent = movement.isMoving
-      ? t("hud.moving")
-      : canRoll ? t("hud.ready") : t("hud.cooldown");
   }
 
   /** 动作/岔路按钮簇 */
@@ -683,29 +627,21 @@ export class GameHudShell {
     actionCluster.replaceChildren(...widgets, ...actionButtons);
   }
 
-  /** 聊天消息、ticker 与频道筛选 */
+  /** 聊天栏只展示系统类消息：玩家发言改由棋盘上方的悬浮框承载，这里不提供输入 */
   private updateChat(): void {
     const chat = this.vm.getChat();
     const msgsEl = this.root.querySelector("[data-ui=chat-messages]")!;
-    const channelId = (channel: string): string => channel === "system" ? "system" : channel === "team" ? "team" : channel === "global" ? "global" : "region";
-    const recent = chat.history.filter(message => this.activeFilters.has(channelId(message.channel))).slice(-50);
-    if (recent.length > 0) {
-      msgsEl.innerHTML = recent.map(m => {
-        const chanKey = channelId(m.channel);
-        return `<div class="hud-chat-msg"><b>${this.escapeHtml(t(`chat.channel.${chanKey}`))}</b><span>${this.escapeHtml(m.text)}</span></div>`;
+    const systemMessages = chat.history.filter(isSystemChannel).slice(-50);
+    if (systemMessages.length > 0) {
+      msgsEl.innerHTML = systemMessages.map(m => {
+        return `<div class="hud-chat-msg"><span>${this.escapeHtml(m.text)}</span></div>`;
       }).join("");
     } else {
       msgsEl.innerHTML = `<div class="hud-chat-msg"><span>${this.escapeHtml(t("hud.noMessage"))}</span></div>`;
     }
-    const lastMessage = chat.history[chat.history.length - 1];
+    const lastMessage = systemMessages[systemMessages.length - 1];
     const ticker = this.root.querySelector("[data-ui=chat-ticker]")!;
-    if (lastMessage) {
-      const key = channelId(lastMessage.channel);
-      ticker.innerHTML = `<span class="ch">${this.escapeHtml(t(`chat.channel.${key}`))}</span>${this.escapeHtml(lastMessage.text)}`;
-    } else {
-      ticker.textContent = t("hud.noMessage");
-    }
-    this.renderFilters();
+    ticker.textContent = lastMessage ? lastMessage.text : t("hud.noMessage");
     // 列表每次都是整体重建（scrollTop 归零），展开态下需重新贴底，否则新消息要手动滚才可见
     if (this.isExpanded) this.scrollChatToBottom();
   }
@@ -716,28 +652,6 @@ export class GameHudShell {
     if (list) list.scrollTop = list.scrollHeight;
   }
 
-  private renderFilters(): void {
-    const filters = this.root.querySelector("[data-ui=chat-filters]")!;
-    const channels = [
-      { id: "region", labelKey: "chat.channel.region" },
-      { id: "system", labelKey: "chat.channel.system" },
-      { id: "team", labelKey: "chat.channel.team" },
-      { id: "global", labelKey: "chat.channel.global" },
-    ];
-    filters.innerHTML = channels.map(channel => {
-      const checked = this.activeFilters.has(channel.id);
-      return `<label class="hud-chat-dock__filter${checked ? " hud-chat-dock__filter--checked" : ""}" data-channel="${channel.id}"><input type="checkbox" data-ui="filter-${channel.id}"${checked ? " checked" : ""}>${this.escapeHtml(t(channel.labelKey))}</label>`;
-    }).join("");
-    channels.forEach(channel => {
-      const checkbox = this.root.querySelector(`[data-ui="filter-${channel.id}"]`) as HTMLInputElement | null;
-      checkbox?.addEventListener("change", () => {
-        if (checkbox.checked) this.activeFilters.add(channel.id);
-        else this.activeFilters.delete(channel.id);
-        this.updateChat();
-      });
-    });
-  }
-
   destroy(): void {
     this.destroyed = true;
     window.removeEventListener("keydown", this.handleGlobalChatShortcut);
@@ -745,22 +659,6 @@ export class GameHudShell {
     this.unsubscribers.forEach(fn => fn());
     this.effects.onNotifyDismiss("game-hud-shell");
     this.root.remove();
-  }
-
-  private sendChat(): void {
-    const message = this.input.value.trim();
-    if (!message) return;
-    const command = parseChatCommand(message);
-    const channel = command.kind === "channel" ? command.channel : this.channel.value;
-    if (command.kind === "channel") {
-      this.config.onChatSend?.(message, channel, (ok) => {
-        if (ok) this.channel.value = command.channel;
-      });
-    } else {
-      this.config.onChatSend?.(message, channel);
-    }
-    this.input.value = "";
-    this.input.focus();
   }
 
   private escapeHtml(s: string): string {

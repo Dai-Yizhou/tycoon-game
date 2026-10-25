@@ -8,21 +8,23 @@ describe("GameHudShell", () => {
   it("渲染稳定 data-ui/data-action 结构并连接操作回调", () => {
     const vm = new GameViewModel(new GameStore());
     const onRoll = jest.fn();
-    const onChatSend = jest.fn();
-    const shell = new GameHudShell(vm, new NoOpEffectHooks(), { onRoll, onChatSend });
+    const onChatCompose = jest.fn();
+    const shell = new GameHudShell(vm, new NoOpEffectHooks(), { onRoll, onChatCompose });
     const root = shell.getElement();
     expect(root.dataset.ui).toBe("game-hud-shell");
     // 验证关键 HUD 覆盖层元素存在
     for (const ui of ["top-bar", "player-badge", "resource-strip", "day-night", "zone-tag", "chat-panel", "action-dock", "hover-card"]) {
       expect(root.querySelector(`[data-ui="${ui}"]`)).not.toBeNull();
     }
+    // 聊天栏不再内嵌输入框，掷骰按钮下也不再有状态文字
+    expect(root.querySelector('[data-ui="chat-input"]')).toBeNull();
+    expect(root.querySelector('[data-ui="dice-status"]')).toBeNull();
     // 验证操作回调
     (root.querySelector('[data-action="roll"]') as HTMLButtonElement).click();
-    const input = root.querySelector('[data-ui="chat-input"]') as HTMLInputElement;
-    input.value = "测试消息";
-    (root.querySelector('[data-action="chat-send"]') as HTMLButtonElement).click();
+    document.body.appendChild(root);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
     expect(onRoll).toHaveBeenCalledTimes(1);
-    expect(onChatSend).toHaveBeenCalledWith("测试消息", "region");
+    expect(onChatCompose).toHaveBeenCalledTimes(1);
     shell.destroy();
   });
 

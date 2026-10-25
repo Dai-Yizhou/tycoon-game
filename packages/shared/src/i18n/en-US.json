@@ -107,6 +107,7 @@
     "effectsOn": "Effects: On",
     "effectsOff": "Effects: Off",
     "noMessage": "No messages yet",
+    "logTitle": "Log",
     "choosePath": "Choose path",
     "price": "Price",
     "level": "Level",
@@ -127,7 +128,8 @@
     "owners": "Owners",
     "trigger": "Trigger {{id}}",
     "jailCooldown": "Cooldown",
-    "jailCost": "Jail cost"
+    "jailCost": "Jail cost",
+    "secondsFormat": "{{value}}s"
   },
   "uct": {
     "player": "Player",
@@ -154,6 +156,7 @@
   "property": {
     "buyTitle": "Buy Property",
     "nextRentFormat": "Next-level rent {{rent}}",
+    "nextRentLabel": "Next-level rent",
     "upgradeTitle": "Upgrade Property",
     "price": "Price",
     "rent": "Rent",

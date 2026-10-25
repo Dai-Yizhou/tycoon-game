@@ -1,4 +1,4 @@
-import { buildUctDisplayGroups, formatUctDisplay, resolveCellHoverModel } from '../src/game/cellDisplayModel.js';
+import { buildUctDisplayGroups, formatUctChange, formatUctDisplay, resolveCellHoverModel } from '../src/game/cellDisplayModel.js';
 import type { Cell, Uct, ValueFieldDefinition } from '@game/shared';
 
 const definitions: ValueFieldDefinition[] = [
@@ -47,9 +47,21 @@ describe('UCT 展示模型', () => {
     expect(formatUctDisplay(undefined, definitions)).toBe('');
   });
 
-  it('单行格式使用分组文本并用分号连接', () => {
+  it('单行格式不显示作用域前缀，仅用字段名区分', () => {
     const text = formatUctDisplay({ player: { money: -100 }, region: { pros: 2 } }, definitions);
-    expect(text).toBe('玩家: 财产 -100; 区域: 繁荣 +2');
+    expect(text).toBe('财产 -100, 繁荣 +2');
+  });
+
+  it('modifier 结果仅给改动字段加内联箭头', () => {
+    const base: Uct = { player: { money: -200, credit: 2 }, region: { pros: 5 } };
+    const final: Uct = { player: { money: -250, credit: 2 }, region: { pros: 5 } };
+    expect(formatUctChange(base, final, definitions)).toBe('财产 -200 → -250, 信用 +2, 繁荣 +5');
+    expect(formatUctChange(base, base, definitions)).toBe('财产 -200, 信用 +2, 繁荣 +5');
+  });
+
+  it('数字型 modifier 结果使用内联箭头', () => {
+    expect(formatUctChange(30, 45, definitions)).toBe('30 → 45');
+    expect(formatUctChange(30, 30, definitions)).toBe('30');
   });
 });
 
@@ -81,10 +93,28 @@ describe('cell-hover 展示模型', () => {
     const rows = model.rows.map((row) => row.label);
     expect(rows).toEqual(['价格', '租金', '等级', '持股']);
     const priceRow = model.rows[0];
-    expect(priceRow.value).toBe('玩家: 财产 -100');
-    expect(model.rows[1].value).toBe('玩家: 财产 -20');
+    expect(priceRow.value).toBe('财产 -100');
+    expect(model.rows[1].value).toBe('财产 -20');
     expect(model.rows[2].value).toBe('1/2');
     expect(model.rows[3].value).toBe('2/5');
+  });
+
+  it('property 在悬浮卡展示下一级租金（act-bar 只留升级费用）', () => {
+    const cell = {
+      ...baseCell,
+      id: 1,
+      type: 'property',
+      name: { 'zh-CN': '地产', 'en-US': 'Property' },
+      maxOwnerCount: 5,
+      price: { player: { money: -100 } },
+      rent: [{ player: { money: -10 } }, { player: { money: -20 } }],
+      upgradeCost: [{ player: { money: -40 } }, { player: { money: -80 } }],
+    } as unknown as Cell;
+    const model = resolveCellHoverModel(cell, { level: 0, ownerCount: 1 }, definitions);
+
+    expect(model.rows.map((row) => row.label)).toEqual(['价格', '租金', '下一级租金', '等级', '持股']);
+    expect(model.rows[1].value).toBe('财产 -10');
+    expect(model.rows[2].value).toBe('财产 -20');
   });
 
   it('investment 展示静态价格、持股人数/上限和每个钩子', () => {
@@ -105,10 +135,10 @@ describe('cell-hover 展示模型', () => {
 
     const labels = model.rows.map((row) => row.label);
     expect(labels).toEqual(['价格', '持股', '钩子 boom', '钩子 crash']);
-    expect(model.rows[0].value).toBe('玩家: 财产 -100, 信用 -2');
+    expect(model.rows[0].value).toBe('财产 -100, 信用 -2');
     expect(model.rows[1].value).toBe('1/3');
-    expect(model.rows[2].value).toBe('玩家: 财产 +10');
-    expect(model.rows[3].value).toBe('区域: 繁荣 -2');
+    expect(model.rows[2].value).toBe('财产 +10');
+    expect(model.rows[3].value).toBe('繁荣 -2');
   });
 
   it('jail 展示冷却时长和出狱费用', () => {
@@ -118,13 +148,14 @@ describe('cell-hover 展示模型', () => {
       type: 'jail',
       name: { 'zh-CN': '监狱', 'en-US': 'Jail' },
       description: { 'zh-CN': '监狱描述', 'en-US': 'Desc' },
-      jailCooldown: 30,
+      jailCooldown: 8000,
       jailCost: { player: { money: -50 } },
     } as unknown as Cell;
     const model = resolveCellHoverModel(cell, null, definitions);
 
     expect(model.rows.map((row) => row.label)).toEqual(['冷却时长', '出狱费用']);
-    expect(model.rows[0].value).toBe('30');
-    expect(model.rows[1].value).toBe('玩家: 财产 -50');
+    // jailCooldown 原始单位为毫秒，展示换算为秒
+    expect(model.rows[0].value).toBe('8 秒');
+    expect(model.rows[1].value).toBe('财产 -50');
   });
 });

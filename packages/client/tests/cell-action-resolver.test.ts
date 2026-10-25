@@ -95,8 +95,8 @@ describe('act-bar 动作解析器', () => {
 
     expect(actions).toHaveLength(1);
     expect(actions[0]).toMatchObject({ id: 'upgrade-property', enabled: true });
-    expect(actions[0].detail).toContain('财产 -40');
-    expect(actions[0].detail).toContain('财产 -25');
+    // 下一级租金已移入悬浮卡，act-bar 只保留升级费用
+    expect(actions[0].detail).toBe('财产 -40');
   });
 
   it('property 已达最高等级时不提供升级动作', () => {
@@ -152,7 +152,7 @@ describe('act-bar 动作解析器', () => {
     }
   });
 
-  it('传入 resolution 且命中 valueModifier 规则时，动作成本 detail 显示 base → final', () => {
+  it('传入 resolution 且 modifier 未改变数值时不加箭头，字段名不带作用域前缀', () => {
     const cell = makeCell('property', { maxOwnerCount: 5, price });
     const resolution = {
       valueModifiers: [{ scope: { cellType: 'property', base: 'price' }, calc: { player: { money: { $ref: 'base.player.money' } } } }],
@@ -163,7 +163,6 @@ describe('act-bar 动作解析器', () => {
     } as unknown as CellHoverResolutionCtx;
     const actions = resolveCellActions({ cell, state: makeState(), currentPlayer: makePlayer(200), valueFieldDefs: definitions, resolution });
 
-    expect(actions[0].detail).toContain('→');
-    expect(actions[0].detail).toContain('财产 -100');
+    expect(actions[0].detail).toBe('财产 -100');
   });
 });

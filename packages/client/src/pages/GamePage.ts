@@ -126,6 +126,30 @@ export function createGamePage(controller: GameController): HTMLElement {
   const boardContainer = document.createElement('div');
   boardContainer.className = 'board-container';
   const interactiveMap = new InteractiveMapSurface();
+  // 发言输入气泡挂在棋盘上，发送/频道切换仍由本页持有 socket 与 store
+  interactiveMap.setChatComposerConfig({
+    onChannelChange: (channel) => {
+      // 切到队伍频道且未组队时插入本地 system 提醒（服务端允许无队伍发送，仅自己可见）
+      if (channel !== 'team') return;
+      const members = gameStore?.getSnapshot().teamMembers ?? [];
+      if (members.length <= 1) {
+        gameStore?.appendChatMessage({ text: t('chat.noTeamChannelReminder'), channel: 'system', timestamp: Date.now() });
+      }
+    },
+    onSend: (message, channel, onResult) => {
+      if (!gameSocket) {
+        gameStore?.appendChatMessage({ text: t('chat.noConnection'), channel: 'error', timestamp: Date.now() });
+        onResult?.(false);
+        return;
+      }
+      gameSocket.emit('client.chat', { channel, content: message }, (result) => {
+        if (!result.ok) {
+          gameStore?.appendChatMessage({ text: result.error || t('chat.sendFailed'), channel: 'error', timestamp: Date.now() });
+        }
+        onResult?.(result.ok);
+      });
+    },
+  });
   boardContainer.appendChild(interactiveMap.getElement());
   const ensureMovementLoop = (): MovementLoop | null => {
     if (gameMovementLoop) return gameMovementLoop;
@@ -149,8 +173,8 @@ export function createGamePage(controller: GameController): HTMLElement {
     const latestChat = snapshot.chatHistory[snapshot.chatHistory.length - 1];
     if (latestChat && latestChat !== lastSeenChat) {
       lastSeenChat = latestChat;
-      // 仅玩家消息（非系统、非本人）；系统消息继续只走聊天区
-      if (latestChat.senderId && latestChat.channel !== 'system' && latestChat.senderId !== snapshot.currentPlayer?.id) {
+      // 玩家消息（含本人的发言）在发言者棋子上方弹框；系统消息只走聊天栏
+      if (latestChat.senderId && latestChat.channel !== 'system') {
         interactiveMap.showPlayerChat(latestChat.senderId, latestChat.senderName ?? '', latestChat.content ?? latestChat.text);
       }
     }
@@ -192,14 +216,8 @@ export function createGamePage(controller: GameController): HTMLElement {
       gameHudShell?.updateDiceButton();
     },
     onBack: () => controller.reset(true),
-    // 切到队伍频道且未组队时插入本地 system 提醒（服务端允许无队伍发送，仅自己可见）
-    onChatChannelChange: (channel) => {
-      if (channel !== 'team') return;
-      const members = gameStore?.getSnapshot().teamMembers ?? [];
-      if (members.length <= 1) {
-        gameStore?.appendChatMessage({ text: t('chat.noTeamChannelReminder'), channel: 'system', timestamp: Date.now() });
-      }
-    },
+    // 快捷键唤起玩家头顶的发言输入气泡（聊天栏只显示系统消息）
+    onChatCompose: () => interactiveMap.openChatComposer(),
     onRoll: () => {
       if (gameStore && gameSocket) {
         const index = mapIndex ?? ({ getById: () => undefined } as unknown as MapIndex);
@@ -224,23 +242,6 @@ export function createGamePage(controller: GameController): HTMLElement {
         'restore-monument': () => invokeGameAction(handleRestoreMonument),
       };
       actions[actionId]?.(data);
-    },
-    onChatSend: (message, channel, onResult) => {
-      if (!gameSocket) {
-        gameStore?.appendChatMessage({ text: t('chat.noConnection'), channel: 'error', timestamp: Date.now() });
-        onResult?.(false);
-        return;
-      }
-      gameSocket.emit('client.chat', { channel, content: message }, (result) => {
-        if (!result.ok) {
-          gameStore?.appendChatMessage({ text: result.error || t('chat.sendFailed'), channel: 'error', timestamp: Date.now() });
-        }
-        if (result.ok && (message.startsWith('/team') || message.startsWith('/region') || message.startsWith('/global'))) {
-          const target = message.split(' ')[0]?.slice(1);
-          if (target) gameHudShell?.setChatChannel(target);
-        }
-        onResult?.(result.ok);
-      });
     },
   });
   page.appendChild(gameHudShell.getElement());

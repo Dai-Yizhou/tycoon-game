@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { resolveCellHoverModel, formatUctDisplay } from '../src/game/cellDisplayModel.js';
+import { resolveCellHoverModel, formatUctChange } from '../src/game/cellDisplayModel.js';
 import { GameStore } from '../src/state/GameStore.js';
 import { resolveField, parseMapData } from '@game/shared';
 import type { Cell, MapMeta, Player, Uct, ValueFieldDefinition } from '@game/shared';
@@ -107,6 +107,7 @@ describe('mini-map 双端一致：server计算&发送 → client接收&显示', 
     expect(store.getSnapshot().currentPlayer!.values.money.current).toBe(1650);
     const ctx = {
       valueModifiers: mapMeta.valueModifiers as ValueModifierRule[],
+      valueFieldDefs: defs,
       playerUct: { player: { money: 2000, credit: 50 } },
       teamMemberCount: 1,
       regionUct: { region: { pros: 5 } },
@@ -114,7 +115,7 @@ describe('mini-map 双端一致：server计算&发送 → client接收&显示', 
     };
     const model = resolveCellHoverModel(cell, { level: 0, ownerCount: 0 }, defs, ctx);
     const priceRow = model.rows.find((r) => r.label !== '等级')!;
-    expect(priceRow.value).toBe(`${formatUctDisplay(base, defs)} → ${formatUctDisplay(final, defs)}`);
+    expect(priceRow.value).toBe(formatUctChange(base, final, defs));
   });
 
   it('property.rent 昼夜：cell1 白天 final -6 → 1994；夜晚 final -8 → 1992；展示一致', () => {
@@ -127,9 +128,9 @@ describe('mini-map 双端一致：server计算&发送 → client接收&显示', 
     seedStore(dStore);
     project(dStore, 2, 'p1', 'money', 1994);
     expect(dStore.getSnapshot().currentPlayer!.values.money.current).toBe(1994);
-    const dCtx = { valueModifiers: mapMeta.valueModifiers as ValueModifierRule[], playerUct: { player: { money: 2000 } }, teamMemberCount: 1, regionUct: { region: { pros: 5 } }, regionTime: 0 };
+    const dCtx = { valueModifiers: mapMeta.valueModifiers as ValueModifierRule[], valueFieldDefs: defs, playerUct: { player: { money: 2000 } }, teamMemberCount: 1, regionUct: { region: { pros: 5 } }, regionTime: 0 };
     const dModel = resolveCellHoverModel(cellOf(1), { level: 0, ownerCount: 1 }, defs, dCtx);
-    expect(dModel.rows.find((r) => r.label === '租金')!.value).toBe(`${formatUctDisplay(base, defs)} → ${formatUctDisplay(day, defs)}`);
+    expect(dModel.rows.find((r) => r.label === '租金')!.value).toBe(formatUctChange(base, day, defs));
     // 夜晚
     const night = finalOf(mapData, mapMeta, cell, 'rent', base, 0, 1, 1, 1);
     expect(fieldOf(night, 'player', 'money')).toBe(-8);
@@ -149,9 +150,9 @@ describe('mini-map 双端一致：server计算&发送 → client接收&显示', 
     seedStore(store);
     project(store, 2, 'p1', 'money', 1761);
     expect(store.getSnapshot().currentPlayer!.values.money.current).toBe(1761);
-    const ctx = { valueModifiers: mapMeta.valueModifiers as ValueModifierRule[], playerUct: { player: { money: 2000 } }, teamMemberCount: 1, regionUct: { region: { pros: 3 } }, regionTime: 0 };
+    const ctx = { valueModifiers: mapMeta.valueModifiers as ValueModifierRule[], valueFieldDefs: defs, playerUct: { player: { money: 2000 } }, teamMemberCount: 1, regionUct: { region: { pros: 3 } }, regionTime: 0 };
     const model = resolveCellHoverModel(cellOf(4), { level: 0, ownerCount: 1 }, defs, ctx);
-    expect(model.rows.find((r) => r.label.includes('钩子'))!.value).toBe(`${formatUctDisplay(base, defs)} → ${formatUctDisplay(final, defs)}`);
+    expect(model.rows.find((r) => r.label.includes('钩子'))!.value).toBe(formatUctChange(base, final, defs));
   });
 
   it('investment.price 团队信用：单人 teamValue 50 → -250 → 1750；团队 30 → -230 → 1770（server 计算发送）', () => {
@@ -166,9 +167,9 @@ describe('mini-map 双端一致：server计算&发送 → client接收&显示', 
     project(store, 2, 'p1', 'money', 1750);
     expect(store.getSnapshot().currentPlayer!.values.money.current).toBe(1750);
     // 悬浮展示：单人 teamValue 回退自身 50，价格行应显示 base → final = -200 → -250（而非旧的 -200 → -200）
-    const hoverCtx = { valueModifiers: mapMeta.valueModifiers as ValueModifierRule[], playerUct: { player: { money: 2000, credit: 50 } }, teamMemberCount: 1, teamValue: () => 50, regionUct: { region: { pros: 3 } }, regionTime: 0 };
+    const hoverCtx = { valueModifiers: mapMeta.valueModifiers as ValueModifierRule[], valueFieldDefs: defs, playerUct: { player: { money: 2000, credit: 50 } }, teamMemberCount: 1, teamValue: () => 50, regionUct: { region: { pros: 3 } }, regionTime: 0 };
     const model = resolveCellHoverModel(cell, { level: 0, ownerCount: 1 }, defs, hoverCtx);
-    expect(model.rows.find((r) => r.label === '价格')!.value).toBe(`${formatUctDisplay(base, defs)} → ${formatUctDisplay(solo, defs)}`);
+    expect(model.rows.find((r) => r.label === '价格')!.value).toBe(formatUctChange(base, solo, defs));
   });
 
   it('jail：冷却 clamp(8000*3)=9000；费用 credit -4 → 46；展示一致', () => {
@@ -181,10 +182,10 @@ describe('mini-map 双端一致：server计算&发送 → client接收&显示', 
     seedStore(store);
     project(store, 2, 'p1', 'credit', 46);
     expect(store.getSnapshot().currentPlayer!.values.credit.current).toBe(46);
-    const ctx = { valueModifiers: mapMeta.valueModifiers as ValueModifierRule[], playerUct: { player: { credit: 50 } }, teamMemberCount: 1, regionUct: { region: { pros: 2 } }, regionTime: 0 };
+    const ctx = { valueModifiers: mapMeta.valueModifiers as ValueModifierRule[], valueFieldDefs: defs, playerUct: { player: { credit: 50 } }, teamMemberCount: 1, regionUct: { region: { pros: 2 } }, regionTime: 0 };
     const model = resolveCellHoverModel(cellOf(5), null, defs, ctx);
-    expect(model.rows.find((r) => r.label === '冷却时长')!.value).toBe('8000 → 9000');
-    expect(model.rows.find((r) => r.label === '出狱费用')!.value).toBe(`${formatUctDisplay(cell.jailCost, defs)} → ${formatUctDisplay(cost, defs)}`);
+    expect(model.rows.find((r) => r.label === '冷却时长')!.value).toBe('8 秒 → 9 秒');
+    expect(model.rows.find((r) => r.label === '出狱费用')!.value).toBe(formatUctChange(cell.jailCost, cost, defs));
   });
 
   it('monument.repairCost：单人 money -45 → 1955；团队 memberCount2 -50 → 1950（server 计算发送）', () => {
