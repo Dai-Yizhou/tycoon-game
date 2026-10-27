@@ -66,7 +66,7 @@
     "startButton": "开始游戏",
     "guestButton": "游客模式",
     "welcome": "欢迎来到rentfree.io！点击\"掷骰子\"开始游戏",
-    "version": "游戏版本: v1.0.0",
+    "version": "游戏版本: v alpha",
     "unknownRegion": "未知区域",
     "defaultPlayerName": "玩家",
     "welcomeMessage": "欢迎来到rentfree.io！点击\"掷骰子\"开始游戏"
@@ -225,13 +225,6 @@
     "waitingForPlayers": "等待其他玩家加入游戏",
     "invitePlayersTitle": "邀请队友",
     "managementTitle": "队伍管理"
-  },
-  "leaderboard": {
-    "loading": "榜单加载中",
-    "empty": "暂无榜单数据",
-    "disabled": "榜单未启用",
-    "error": "榜单服务异常",
-    "offline": "榜单连接断开"
   },
   "chat": {
     "noConnection": "连接断开时无法发送聊天消息",

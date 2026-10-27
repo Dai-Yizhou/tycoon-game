@@ -38,9 +38,9 @@ export interface SocketHandlerOptions {
 
 const SOCKET_EVENTS = [
   'server.dayNightProgress', 'server.dayNightChanged', 'server.pong',
-  'server.chat', 'server.leaderboardUpdated', 'connect', 'disconnect',
+  'server.chat', 'connect', 'disconnect',
   'server.playerJoined', 'server.playerLeft', 'server.playerMoved', 'server.askPath',
-  'server.valueChanged', 'server.error', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
+  'server.valueChanged', 'server.playerJailed', 'server.playerReleased', 'server.playerStatusChanged',
   'server.behaviorMessage',
   'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft',
   'server.teamUpdated', 'server.teamDisbanded', 'server.teamInviteRejected', 'server.regionValueChanged', 'server.teamValueTable', 'server.gameState',
@@ -118,11 +118,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     options.onNotification?.(payload);
   });
 
-  socket.on('server.leaderboardUpdated', (payload) => {
-    store.setLeaderboard(payload);
-    refresh();
-  });
-
   socket.on('server.achievementUnlocked', (payload) => {
     const current = store.getSnapshot().achievements.snapshot;
     store.setAchievements(current ? { ...current, generatedAt: Date.now(), achievements: current.achievements.map((item) => item.id === payload.achievement.id ? payload.achievement : item) } : { enabled: true, mapId: payload.achievement.record.mapId ?? '', generatedAt: Date.now(), achievements: [payload.achievement] });
@@ -130,25 +125,13 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     refresh();
   });
 
-  socket.on('server.error', (payload) => {
-    if (payload.code.toLowerCase().includes('leaderboard') || payload.message.toLowerCase().includes('榜单')) {
-      store.setLeaderboardError(payload.message);
-      refresh();
-    }
-  });
-
   socket.on('disconnect', () => {
     store.setAchievementsOffline();
-    store.setLeaderboardOffline();
     refresh();
   });
 
   socket.on('connect', () => {
     const currentSnapshot = store.getSnapshot();
-    if (currentSnapshot.leaderboard.status === 'offline') {
-      store.setLeaderboard(currentSnapshot.leaderboard.snapshot);
-      refresh();
-    }
     // 重连对账：若已登录（currentPlayer 存在），此 connect 为断线重连而非首次连接。
     // 重发 client.login（服务端幂等，仅解冻）拉取权威 existingPlayers，重建 otherPlayers，
     // 避免断线期间 playerLeft/playerJoined 增量丢失导致"视野内其他玩家不显示"。
@@ -183,7 +166,6 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     const currentSnapshot = store.getSnapshot();
     if (currentSnapshot.isServerAnimating && payload.player?.id === currentSnapshot.currentPlayer?.id) return;
     const teamMembers = payload.members ?? [];
-    if (payload.leaderboard) store.setLeaderboard(payload.leaderboard);
     if (payload.achievements) store.setAchievements(payload.achievements);
     if (payload.visibleCells?.length) store.setCells(payload.visibleCells);
     // 登录即以服务端权威 region UCT 覆盖 regionValues，替换静态配置 initial 的过期快照

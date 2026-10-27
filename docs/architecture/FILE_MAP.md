@@ -25,7 +25,7 @@
 | `packages/shared/src/types/socket-events.ts` | ClientToServerEvents、ServerToClientEvents、SocketData、AckResult | 两端 typed Socket 契约 |
 | `packages/shared/src/types/team.ts` / `chat.ts` / `transport.ts` / `event.ts` / `era.ts` / `auth.ts` / `server-config.ts` | 队伍、聊天、交通、事件、时代、认证、服务端配置契约 | 对应 server/client 模块 |
 | `packages/shared/src/types/uct.ts` / `economy-rules.ts` | UCT 数值与计税/持股规则契约 | 服务端经济、客户端 UCT 显示 |
-| `packages/shared/src/types/achievement.ts` / `leaderboard.ts` | 成就快照/解锁与榜单快照契约 | 服务端 achievement/ranking、客户端成就面板与榜单 |
+| `packages/shared/src/types/achievement.ts` | 成就快照/解锁契约 | 服务端 achievement、客户端成就面板 |
 | `packages/shared/src/map/map-parser.ts` | 校验并标准化地图 JSON | app 与客户端地图链 |
 | `packages/shared/src/map/map-index.ts` | 按 cell id 建索引 | MovementHandler、客户端地图加载 |
 | `packages/shared/src/map/path-finder.ts` | 沿 destinations 查路径/邻居 | 服务端移动 |
@@ -37,7 +37,7 @@
 | `packages/shared/src/i18n/index.ts`、`zh-CN.json`、`en-US.json` | 翻译与语言资源 | 客户端界面 |
 | `packages/shared/package.json` | CJS/ESM 构建出口与 build/lint/test scripts | 独立构建包 |
 
-`packages/shared/src/types` 与 Socket 契约已包含 `achievement`、`leaderboard`、`uct`、`economy-rules` 等现行能力；`item`、`talent` 仍不属于当前运行时能力（见 ARCHITECTURE.md 删除边界）。
+`packages/shared/src/types` 与 Socket 契约已包含 `achievement`、`uct`、`economy-rules` 等现行能力；`item`、`talent` 仍不属于当前运行时能力（见 ARCHITECTURE.md 删除边界）。
 
 ## server
 
@@ -82,8 +82,7 @@
 | `src/economy/Taxation.ts`、`Bankruptcy.ts` | 计税、破产清算 |
 | `src/economy/Ownership.ts`、`EconomicOperationGuard.ts` | 持股/合租模型与经济操作守卫 |
 | `src/economy/EconomyService.ts` | 经济数值中枢（计税联动、UCT 变更回调） |
-| `src/achievement/AchievementManager.ts`、`AchievementStore.ts`（Mongo/File/InMemory 实现）、`AchievementConfigLoader.ts` | 成就定义加载、六类触发、owner 级并发串行化与持久化 |
-| `src/ranking/LeaderboardManager.ts` | 榜单脏标记与正式刷新广播 |
+| `src/achievement/AchievementManager.ts`、`AchievementStore.ts`（Mongo/File/InMemory 实现）、`AchievementConfigLoader.ts` | 成就定义加载、五类触发、owner 级并发串行化与持久化 |
 | `src/events/EventHandler.ts`、`index.ts` | 事件格落地分发；读取 `cell.behaviorLand`，由 BehaviorEngine 执行，行为失败不触发投资域事件 |
 | `src/behavior/BehaviorEngine.ts` | 加载显式注入目录中的行为 JSON；通过 EconomyService 执行玩家数值操作，并支持多玩家目标、所有权和位置操作 |
 | `src/team/TeamManager.ts`、`src/handlers/teamHandler.ts` | 队伍纯数据与 Socket 协议 |

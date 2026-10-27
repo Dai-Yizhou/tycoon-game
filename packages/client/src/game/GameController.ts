@@ -9,7 +9,7 @@
  */
 
 import type { TypedClientSocket } from '../hooks/useSocket.js';
-import type { LeaderboardSnapshot, LoginResponse, Player, BankruptFieldTrigger } from '@game/shared';
+import type { LoginResponse, Player, BankruptFieldTrigger } from '@game/shared';
 import { AuthSession } from '../auth/AuthSession.js';
 
 export type GameState = 'start' | 'login' | 'loading' | 'game' | 'bankruptcy';
@@ -28,7 +28,6 @@ export interface GameContext {
   cycleMinutes: number | null;
   /** 已有玩家列表（登录时返回） */
   existingPlayers: Player[];
-  leaderboard: LeaderboardSnapshot | null;
 }
 
 export type StateChangeListener = (context: GameContext) => void;
@@ -47,7 +46,6 @@ export class GameController {
     cycleStartTime: null,
     cycleMinutes: null,
     existingPlayers: [],
-    leaderboard: null,
   };
 
   private listeners: Set<StateChangeListener> = new Set();
@@ -194,25 +192,16 @@ export class GameController {
    * 注意：此处只落地数据、不切换页面状态——加载页需要先补足最短停留（让玩家读完 tips）
    * 再显式调用 setState。若在此直接切到 game/bankruptcy，加载页会瞬间被替换，停留逻辑失效。
    */
-  setLoginResult(player: Player, cycleStartTime: number, cycleMinutes: number, existingPlayers: Player[] = [], leaderboard: LeaderboardSnapshot | null = null): void {
+  setLoginResult(player: Player, cycleStartTime: number, cycleMinutes: number, existingPlayers: Player[] = []): void {
     this.context.player = player;
     this.context.cycleStartTime = cycleStartTime;
     this.context.cycleMinutes = cycleMinutes;
     this.context.existingPlayers = existingPlayers;
-    this.context.leaderboard = leaderboard;
     this.notifyListeners();
   }
 
   updatePlayer(player: Player): void {
     this.context.player = player;
-    this.notifyListeners();
-  }
-
-  /**
-   * 标记榜单离线（加载期未连接成功时由 controller 统一持有，避免在 LoadingPage 另建 GameStore）
-   */
-  setLeaderboardOffline(): void {
-    this.context.leaderboard = null;
     this.notifyListeners();
   }
 
@@ -261,7 +250,6 @@ export class GameController {
       cycleStartTime: null,
       cycleMinutes: null,
       existingPlayers: [],
-      leaderboard: null,
     };
     this.notifyListeners();
   }

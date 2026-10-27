@@ -561,34 +561,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
   
 }
 .region-status {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; max-width: 52%;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; max-width: 52%;
   padding: 4px 8px; border: var(--region-border-w) solid var(--gp-border);
   border-radius: var(--region-radius); background: var(--gp-surface);
 }
-.region-status__row { display: flex; align-items: center; gap: 8px; max-width: 100%; }
-.region-status__name { white-space: nowrap; font-weight: 800; font-size: 12px; color: var(--gp-fg); }
-.region-status .cycle-indicator { padding-left: 7px; border-left: 1px solid var(--gp-border); }
-/* 榜单：纵向列表，每行一个玩家（名次 / 玩家名 / 分数），行数多时自身滚动。
-   顶部横线把榜单与上方区域名/时间分隔开（同一面板内的两段信息）。 */
-.region-status .leaderboard-panel {
-  display: flex; flex-direction: column; gap: 2px;
-  width: 100%; margin-top: 4px; padding-top: 4px;
-  border-top: 1px solid var(--gp-border);
-  max-height: 30vh; overflow-y: auto;
-  color: var(--gp-muted); font-family: var(--font-num); font-size: 11px;
-}
-.leaderboard-row { display: flex; align-items: baseline; gap: 6px; justify-content: flex-end; }
-.leaderboard-row__rank { min-width: 14px; text-align: right; color: var(--gp-accent); font-weight: 700; }
-.leaderboard-row__name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.leaderboard-row__score { color: var(--gp-fg); font-weight: 700; }
-/* 本玩家行：名次与名字一并高亮，便于在榜中定位自己 */
-.leaderboard-row--self .leaderboard-row__name,
-.leaderboard-row--self .leaderboard-row__score { color: var(--gp-accent); }
-/* 榜单默认只展示自己一行；鼠标悬停榜单区域才展开全部名次（行内只有文本、不可聚焦，
-   故不设 :focus-within）。悬停目标限定在榜单面板内，区域名与时间（.region-status__row）
-   始终常驻不受影响；展开时面板向下生长（顶部锚定），不会挤动上方的区域名与时间。 */
-.region-status .leaderboard-panel .leaderboard-row:not(.leaderboard-row--self) { display: none; }
-.region-status .leaderboard-panel:hover .leaderboard-row { display: flex; }
+.region-status__name { white-space: nowrap; font-weight: 600; font-size: 11px; letter-spacing: 0.08em; color: var(--gp-muted); }
+/* 时间层级高于区域名：字号更大、字重更重、用前景色；区域名退为次要标签 */
+.region-status .cycle-text { font-size: 18px; font-weight: 800; letter-spacing: 0.04em; color: var(--gp-fg); }
 /* 底栏遮罩略重于顶栏：容器内控件密集，需要更实的底才读得清（同用墨色，理由见顶栏注释） */
 .gp-actionbar {
   bottom: 0; left: 0; right: 0;  height: var(--gp-actionbar-h); z-index: 20;
@@ -781,7 +760,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
 .dice-btn {
   position: relative;
   display: inline-flex; align-items: center; justify-content: center;
-  font-weight: 1000; font-size: 14px; letter-spacing: 0.08em;
+  font-weight: 900; font-size: 16px; letter-spacing: 0.08em;
   padding: 12px 24px;
   border: calc(var(--region-border-w) + 1px) solid var(--gp-border);
   border-radius: var(--region-radius);

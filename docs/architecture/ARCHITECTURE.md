@@ -158,7 +158,7 @@ InteractiveMapSurface：每个格子 <g> 的 mouseenter / tap
 
 - item、talent 未实现；achievement 已作为现行系统实现（见下）。
 - 客户端与部分文档曾出现的历史 "item / talent / achievement 均未实现" 的结论已过时。现状：
-  - 成就系统已成现行功能：`AchievementManager` 支持六类触发（visitCells、completeEvents、uctThreshold、ownedCells、purchasedCells、ranking），经 `MongoAchievementStore` / `FileAchievementStore` 持久化，owner 级并发串行化，解锁通知经 Socket 下发。配置在 `packages/server/achievements.json`（由 `config.achievementConfigPath` 指向）。
+  - 成就系统已成现行功能：`AchievementManager` 支持五类触发（visitCells、completeEvents、uctThreshold、ownedCells、purchasedCells），经 `MongoAchievementStore` / `FileAchievementStore` 持久化，owner 级并发串行化，解锁通知经 Socket 下发。配置在 `packages/server/achievements.json`（由 `config.achievementConfigPath` 指向）。
   - 游客转正（`AuthService.migrateGuest`）不改变用户 ID，不执行成就迁移/合并；成就按稳定 owner ID 读取。
 - `ai-bot` 与 `ai_bot_try` 不属于本次清理边界。
 - 破产重开仍是基础 Player 状态流程，不提供远程恢复或道具恢复机制。

@@ -4,7 +4,7 @@
 
 ## 一页概览
 
-rentfree.io 是多人在线网页棋盘游戏。玩家以服务端生成的骰子点数沿有向棋盘移动，在岔路选择合法方向；落点按格子类型结算：起点补给、事件、地产收租、交通枢纽、监狱、纪念碑、投资。玩家可以购买/升级地产与投资项目、付费传送、修缮纪念碑、组队、聊天、解锁成就、竞争榜单。
+rentfree.io 是多人在线网页棋盘游戏。玩家以服务端生成的骰子点数沿有向棋盘移动，在岔路选择合法方向；落点按格子类型结算：起点补给、事件、地产收租、交通枢纽、监狱、纪念碑、投资。玩家可以购买/升级地产与投资项目、付费传送、修缮纪念碑、组队、聊天、解锁成就。
 
 客户端只发送操作意图；服务端保存位置、数值、状态、所有权与经济结果，并以 `server.*` 事件广播。动画、按钮状态和 ack 都不能替代服务端最终状态。数值以服务端广播的**绝对值**为准（`server.valueChanged` 采用 `current` + `delta:0` 的覆写语义，客户端不得自行推算）。
 
@@ -32,7 +32,7 @@ UCT 声明（`uct`）：player = `[money, credit]`；region = `[pros]`。
 
 玩家初始值：`money` 2000、`credit` 50。区域初始繁荣度：northeast 85、south 80、midwest 75、west 70。
 
-骰子：冷却 3000ms、范围 1–3。榜单：启用、topN 5、刷新 1000ms、分数 = `money×1 + credit×0.5`（区域繁荣度权重 0）。计税：基础税对 `money` 按 2%，`money` 低于 1000 免征，周期 900000ms；股份税 `money` 每股税率 0（默认不征）、总持股阈值 0。昼夜区域变化：白昼 `region pros +20`、夜晚 `region pros -20`。
+骰子：冷却 3000ms、范围 1–3。计税：基础税对 `money` 按 2%，`money` 低于 1000 免征，周期 900000ms；股份税 `money` 每股税率 0（默认不征）、总持股阈值 0。昼夜区域变化：白昼 `region pros +20`、夜晚 `region pros -20`。
 
 ### 数值的书写形态（UCT）
 
@@ -155,16 +155,12 @@ UCT 声明（`uct`）：player = `[money, credit]`；region = `[pros]`。
 - 频道：global、team、region，外加系统消息。region 按区域匹配，team 按队伍匹配，global 广播全体；消息清洗 HTML 并限长限频。
 - 斜杠指令：`/global`、`/team`、`/region`（可带内容切频道）、`/help`、`/accept`、`/reject`、`/leave`、`/invite <用户名>`、`/report <内容>`（反馈，含结构化日志）。
 
-## 八、榜单、成就与区域
-
-### 榜单
-
-- 启用时按 `ranking.score`（默认 `money×1 + credit×0.5`，另有 `constant` 常量项）计算，取 `topN` 前 5 名，按 `refreshMs` 刷新并广播快照。
+## 八、成就与区域
 
 ### 成就
 
-- 定义来自 `achievements.json`；`scope` 分 `map`/`global`，`category` 分 movement/economy/social/event/ranking。
-- 六类触发：`visitCells`（访问指定格）、`completeEvents`（完成指定事件）、`uctThreshold`（某 UCT 字段达到阈值）、`ownedCells`（持有格数）、`purchasedCells`（购买格数）、`ranking`（名次达到 `targetRank`）。
+- 定义来自 `achievements.json`；`scope` 分 `map`/`global`，`category` 分 movement/economy/social/event。
+- 五类触发：`visitCells`（访问指定格）、`completeEvents`（完成指定事件）、`uctThreshold`（某 UCT 字段达到阈值）、`ownedCells`（持有格数）、`purchasedCells`（购买格数）。
 - 默认地图含 1 个成就「初来乍到」（访问起点格）。
 - 解锁与进度经 `server.*` 投影到客户端成就面板；游客转正不迁移/合并成就。
 
@@ -181,7 +177,7 @@ UCT 声明（`uct`）：player = `[money, credit]`；region = `[pros]`。
 
 ## 十、服务端权威边界
 
-以下必须以服务端事件或重新同步的完整状态为准：骰子与步数、冷却、位置与路径、岔路合法选项、落点效果、money/credit/pros、玩家状态、地产与投资价格/所有权/等级、租金、传送目的地与费用、税收、破产与重开、队伍成员与团队数值、榜单、成就。
+以下必须以服务端事件或重新同步的完整状态为准：骰子与步数、冷却、位置与路径、岔路合法选项、落点效果、money/credit/pros、玩家状态、地产与投资价格/所有权/等级、租金、传送目的地与费用、税收、破产与重开、队伍成员与团队数值、成就。
 
 客户端只能：展示地图与服务端状态、请求操作、在 `server.askPath` 中选方向、播放动画、展示 ack 错误。客户端发送的余额、位置、所有权、租金、税额、胜负都不是可信输入；服务端会重新读取玩家、地图与配置并校验身份、类型、位置、所有权、余额、状态与合法目标。
 

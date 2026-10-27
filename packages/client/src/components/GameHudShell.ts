@@ -1,7 +1,6 @@
 import type { GameEffectHooks } from "../game/GameEffects.js";
 import type { GameViewModel, ValueFieldDef, TeamSlice } from "../game/GameViewModel.js";
 import { t, localizedText } from "../game/i18n.js";
-import type { LeaderboardEntry } from "@game/shared";
 import { resolveCellHoverModel } from "../game/cellDisplayModel.js";
 import { readCssVarNumber } from "../design/DesignAdapter.js";
 
@@ -92,14 +91,11 @@ export class GameHudShell {
           <!-- 区域作用域数值（区域 UCT）：与玩家数值同一套 value-pill 样式，置于区域信息块左侧 -->
           <div class="value-pills value-pills--region" data-ui="region-uct-strip"></div>
           <section class="region-status" data-ui="region-status" aria-live="polite" role="status">
-            <div class="region-status__row">
-              <div class="region-status__name" data-ui="zone-tag">--</div>
-              <div class="cycle-indicator" data-ui="day-night">
-                <div class="cycle-dot" data-ui="cycle-dot"></div>
-                <span class="cycle-text" data-ui="day-time">--:--</span>
-              </div>
+            <div class="region-status__name" data-ui="zone-tag">--</div>
+            <div class="cycle-indicator" data-ui="day-night">
+              <div class="cycle-dot" data-ui="cycle-dot"></div>
+              <span class="cycle-text" data-ui="day-time">--:--</span>
             </div>
-            <section class="leaderboard-panel" data-ui="leaderboard" aria-live="polite"></section>
           </section>
         </header>
 
@@ -171,7 +167,6 @@ export class GameHudShell {
       this.vm.subscribe("chat", () => this.update()),
       this.vm.subscribe("pathChoice", () => this.update()),
       this.vm.subscribe("cellActions", () => this.update()),
-      this.vm.subscribe("leaderboard", () => this.update()),
       this.vm.subscribe("achievements", () => this.updateAchievements()),
     );
     this.update();
@@ -289,7 +284,6 @@ export class GameHudShell {
     this.updateDiceButton();
     this.updateActionCluster();
     this.updateChat();
-    this.updateLeaderboard();
     this.renderCellHover();
   }
 
@@ -465,57 +459,6 @@ export class GameHudShell {
         return `<div class="achievement-row"><strong>${this.escapeHtml(localizedText(item.name))}</strong><span>${item.record.unlocked ? t('hud.achievementUnlocked') : progress}</span><p>${this.escapeHtml(localizedText(item.description))}</p></div>`;
       }).join('');
     }
-  }
-
-  private updateLeaderboard(): void {
-    const panel = this.root.querySelector('[data-ui="leaderboard"]');
-    if (!panel) return;
-    const state = this.vm.getLeaderboard().leaderboard;
-    if (state.status === 'loading') {
-      panel.textContent = t('leaderboard.loading');
-      return;
-    }
-    if (state.status === 'disabled') {
-      panel.textContent = t('leaderboard.disabled');
-      return;
-    }
-    if (state.status === 'error') {
-      panel.textContent = state.error ?? t('leaderboard.error');
-      return;
-    }
-    if (state.status === 'offline') {
-      panel.textContent = t('leaderboard.offline');
-      return;
-    }
-    const leaderboard = state.snapshot;
-    if (!leaderboard || state.status === 'empty') {
-      panel.textContent = t('leaderboard.empty');
-      return;
-    }
-    // 纵向列表：每行一个玩家（名次 / 玩家名 / 分数），本玩家行单独标记。
-    // 原实现把整张榜单压成一行 "1. a 100 | 2. b 90"，名字一多就横着跑出面板。
-    const current = leaderboard.currentPlayer;
-    const entries = [...leaderboard.top];
-    if (current && !entries.some((entry) => entry.playerId === current.playerId)) entries.push(current);
-    panel.replaceChildren(...entries.map((entry) => this.buildLeaderboardRow(entry, entry.playerId === current?.playerId)));
-  }
-
-  /** 榜单单行：名次、玩家名、分数三段（分数右对齐，玩家名过长时省略） */
-  private buildLeaderboardRow(entry: LeaderboardEntry, isSelf: boolean): HTMLElement {
-    const row = document.createElement('div');
-    row.className = `leaderboard-row${isSelf ? ' leaderboard-row--self' : ''}`;
-    row.dataset.ui = 'leaderboard-row';
-    const rank = document.createElement('span');
-    rank.className = 'leaderboard-row__rank';
-    rank.textContent = String(entry.rank);
-    const name = document.createElement('span');
-    name.className = 'leaderboard-row__name';
-    name.textContent = entry.username;
-    const score = document.createElement('span');
-    score.className = 'leaderboard-row__score';
-    score.textContent = String(entry.score);
-    row.append(rank, name, score);
-    return row;
   }
 
   private updateRegionStatus(): void {

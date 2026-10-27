@@ -87,14 +87,6 @@ export class AchievementManager {
     });
   }
 
-  async recordRanking(owner: AchievementOwner, rank: number | null): Promise<void> {
-    await this.update(owner, undefined, (definition, record) => {
-      if (definition.scope !== 'global' || definition.trigger.type !== 'ranking' || rank === null) return false;
-      record.progress.current = rank <= record.progress.target ? record.progress.target : 0;
-      return rank <= record.progress.target;
-    });
-  }
-
   private async update(owner: AchievementOwner, mapId: string | undefined, action: (definition: AchievementDefinition, record: Awaited<ReturnType<AchievementStore['load']>>[number]) => boolean): Promise<void> {
     const key = ownerKey(owner);
     const previous = this.ownerQueues.get(key) ?? Promise.resolve();
@@ -140,7 +132,6 @@ function defaultTarget(definition: AchievementDefinition): number {
   const trigger = definition.trigger;
   if (trigger.type === 'visitCells' || trigger.type === 'completeEvents') return trigger.cellIds.length;
   if (trigger.type === 'ownedCells' || trigger.type === 'purchasedCells') return trigger.target;
-  if (trigger.type === 'ranking') return trigger.targetRank;
   return 1;
 }
 

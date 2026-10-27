@@ -38,7 +38,6 @@ import type { Cell, Uct } from './cell.js';
 import type { ChatChannel, ChatMessage } from './chat.js';
 import type { Player, ValueField } from './player.js';
 import type { Team, TeamInvite, TeamMemberView } from './team.js';
-import type { LeaderboardSnapshot } from './leaderboard.js';
 import type { AchievementSnapshot } from './achievement.js';
 
 /**
@@ -133,7 +132,7 @@ export interface ClientToServerEvents {
   /** 登录/加入游戏 */
   'client.login': (
     payload: { username: string; guest?: boolean },
-    ack?: (result: AckResult<{ player: Player; serverTime: number; cycleStartTime: number; cycleMinutes: number; existingPlayers: Player[]; leaderboard?: LeaderboardSnapshot; leaderboardEnabled?: boolean; achievements?: AchievementSnapshot }>) => void,
+    ack?: (result: AckResult<{ player: Player; serverTime: number; cycleStartTime: number; cycleMinutes: number; existingPlayers: Player[]; achievements?: AchievementSnapshot }>) => void,
   ) => void;
 
   /** 掷骰子 */
@@ -269,14 +268,7 @@ export interface ServerToClientEvents {
     regionValues?: Record<string, Record<string, number>>;
     /** 当前玩家团队的 UCT 汇总表（服务端权威均值；无团队/单人时为自身各字段值） */
     teamValues?: Record<string, number>;
-    /** 当前排行榜快照 */
-    leaderboard?: LeaderboardSnapshot;
-    /** 是否启用排行榜 */
-    leaderboardEnabled?: boolean;
   }) => void;
-
-  /** 榜单完整快照更新 */
-  'server.leaderboardUpdated': (payload: LeaderboardSnapshot) => void;
 
   'server.achievementUnlocked': (payload: import('./achievement.js').AchievementUnlockedPayload) => void;
 

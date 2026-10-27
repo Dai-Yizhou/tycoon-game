@@ -158,30 +158,17 @@ body {
 
 /* 区域状态块（右上，常驻） */
 .region-status {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
   text-align: right; max-width: 52%;
   padding: 4px 8px;
   border: var(--region-border-w) solid var(--gp-border);
   border-radius: var(--region-radius);
   background: var(--gp-card);
 }
-.region-status__row { display: flex; align-items: center; gap: 8px; }
-.region-status__name { white-space: nowrap; font-weight: 800; font-size: 12px; color: var(--gp-fg); }
-.cycle-indicator { display: flex; align-items: center; gap: 6px; padding-left: 7px; border-left: 1px solid var(--gp-border); }
+.region-status__name { white-space: nowrap; font-weight: 600; font-size: 11px; letter-spacing: 0.08em; color: var(--gp-muted); }
+.cycle-indicator { display: flex; align-items: center; gap: 6px; }
 .cycle-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--gp-border); background: var(--gp-cycle-day); }
-.cycle-text { font-size: 10px; color: var(--gp-muted); font-family: var(--font-num); }
-.leaderboard-panel {
-  display: flex; flex-direction: column; gap: 2px;
-  width: 100%; margin-top: 4px; padding-top: 4px;
-  border-top: 1px solid var(--gp-border);
-  color: var(--gp-muted); font-family: var(--font-num); font-size: 11px;
-}
-.leaderboard-row { display: flex; align-items: baseline; gap: 6px; justify-content: flex-end; }
-.leaderboard-row__rank { min-width: 14px; text-align: right; color: var(--gp-accent); font-weight: 700; }
-.leaderboard-row__name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.leaderboard-row__score { color: var(--gp-fg); font-weight: 700; }
-.leaderboard-row--self .leaderboard-row__name,
-.leaderboard-row--self .leaderboard-row__score { color: var(--gp-accent); }
+.region-status .cycle-text { font-size: 18px; font-weight: 800; letter-spacing: 0.04em; color: var(--gp-fg); font-family: var(--font-num); }
 
 /* 底栏控件（占位） */
 .dice-zone { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; }
@@ -432,17 +419,11 @@ body[data-plan="E"] [data-plan-block="E"] { display: flex; }
 
       <!-- ========== 常驻：区域状态块 ========== -->
       <section class="region-status">
-        <div class="region-status__row">
-          <div class="region-status__name">东北区域</div>
-          <div class="cycle-indicator">
-            <div class="cycle-dot"></div>
-            <span class="cycle-text">昼 12:00</span>
-          </div>
+        <div class="region-status__name">东北区域</div>
+        <div class="cycle-indicator">
+          <div class="cycle-dot"></div>
+          <span class="cycle-text">昼 12:00</span>
         </div>
-        <section class="leaderboard-panel">
-          <div class="leaderboard-row"><span class="leaderboard-row__rank">1</span><span class="leaderboard-row__name">陌生人</span><span class="leaderboard-row__score">4200</span></div>
-          <div class="leaderboard-row leaderboard-row--self"><span class="leaderboard-row__rank">3</span><span class="leaderboard-row__name">张三</span><span class="leaderboard-row__score">2000</span></div>
-        </section>
       </section>
     </header>
 

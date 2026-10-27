@@ -112,10 +112,6 @@ export function createLoadingPage(controller: GameController): HTMLElement {
         if (!active || attempt !== connectionAttempt || controller.getSocket() !== socket) return;
         controller.setConnected(socketId);
       },
-      onStatus: (status) => {
-        if (!active || attempt !== connectionAttempt) return;
-        if (status === 'offline') controller.setLeaderboardOffline();
-      },
       onError: (error) => {
         if (!active || attempt !== connectionAttempt) return;
         if (error === 'authentication_failed' || error === 'authentication_required') {
@@ -142,7 +138,7 @@ export function createLoadingPage(controller: GameController): HTMLElement {
         if (!active || attempt !== connectionAttempt) return;
         if (result.ok && result.data) {
           // 只落地登录数据，不切页；切页由本页在停留结束后统一执行（含 bankruptcy）
-          controller.setLoginResult(result.data.player, result.data.cycleStartTime, result.data.cycleMinutes, result.data.existingPlayers || [], result.data.leaderboard || null);
+          controller.setLoginResult(result.data.player, result.data.cycleStartTime, result.data.cycleMinutes, result.data.existingPlayers || []);
 
           const targetState = result.data.player.status === 'bankrupt' ? 'bankruptcy' : 'game';
           // 停留期保持加载动画，读满一条 tips 后再切页（进度条已移除，不再有填充进度）

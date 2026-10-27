@@ -1,15 +1,14 @@
 import type { LocalizedText } from './cell.js';
 
 export type AchievementScope = 'map' | 'global';
-export type AchievementCategory = 'movement' | 'economy' | 'social' | 'event' | 'ranking';
+export type AchievementCategory = 'movement' | 'economy' | 'social' | 'event';
 
 export type AchievementTrigger =
   | { type: 'visitCells'; cellIds: number[] }
   | { type: 'completeEvents'; cellIds: number[]; eventIds: string[] }
   | { type: 'uctThreshold'; fieldId: string; target: number }
   | { type: 'ownedCells'; target: number }
-  | { type: 'purchasedCells'; target: number }
-  | { type: 'ranking'; targetRank: number };
+  | { type: 'purchasedCells'; target: number };
 
 export interface AchievementDefinition {
   id: string;
@@ -62,7 +61,7 @@ export function validateAchievementDefinitions(definitions: AchievementDefinitio
     ids.add(definition.id);
     if (!isLocalizedText(definition.name) || !isLocalizedText(definition.description)) throw new Error(`成就文案必须包含双语: ${definition.id}`);
     if (!['map', 'global'].includes(definition.scope)) throw new Error(`成就 scope 非法: ${definition.id}`);
-    if (!['movement', 'economy', 'social', 'event', 'ranking'].includes(definition.category)) throw new Error(`成就 category 非法: ${definition.id}`);
+    if (!['movement', 'economy', 'social', 'event'].includes(definition.category)) throw new Error(`成就 category 非法: ${definition.id}`);
     validateTrigger(definition);
     if (definition.progress && (!Number.isInteger(definition.progress.target) || definition.progress.target < 1)) throw new Error(`成就 progress.target 必须是正整数: ${definition.id}`);
   }
@@ -93,7 +92,6 @@ function validateTrigger(definition: AchievementDefinition): void {
   }
   if (trigger.type === 'ownedCells' && definition.scope !== 'map') throw new Error(`ownedCells 成就必须是 map scope: ${definition.id}`);
   if ((trigger.type === 'ownedCells' || trigger.type === 'purchasedCells') && (!Number.isInteger(trigger.target) || trigger.target < 1)) throw new Error(`成就 target 必须是正整数: ${definition.id}`);
-  if (trigger.type === 'ranking' && (!Number.isInteger(trigger.targetRank) || trigger.targetRank < 1)) throw new Error(`targetRank 必须是正整数: ${definition.id}`);
 }
 
 function validateCellIds(cellIds: number[], id: string): void {

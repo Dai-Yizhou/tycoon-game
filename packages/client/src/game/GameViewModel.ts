@@ -140,10 +140,6 @@ export interface OtherPlayersSlice {
   players: OtherPlayerInfo[];
 }
 
-export interface LeaderboardSlice {
-  leaderboard: import('@game/shared').LeaderboardState;
-}
-
 export interface AchievementSlice {
   achievements: ClientGameSnapshot['achievements'];
 }
@@ -180,7 +176,7 @@ export type StateChangeKey =
   | 'player' | 'movement' | 'camera' | 'dice' | 'cooldown' | 'jail'
   | 'dayNight'
   | 'regions' | 'chat' | 'team' | 'tutorial' | 'otherPlayers' | 'behavior'
-  | 'pathChoice' | 'cellActions' | 'leaderboard' | 'achievements' | 'all';
+  | 'pathChoice' | 'cellActions' | 'achievements' | 'all';
 
 export interface StateChangeEvent {
   key: StateChangeKey;
@@ -207,7 +203,6 @@ export class GameViewModel {
       this.notify('player', 'store');
       this.notify('movement', 'store');
       this.notify('chat', 'store');
-      this.notify('leaderboard', 'store');
       this.notify('achievements', 'store');
       this.notify('all', 'store');
     });
@@ -293,10 +288,6 @@ export class GameViewModel {
   getRegions(): RegionSlice {
     const snapshot = this.projectedSnapshot();
     return { mapRegions: snapshot.mapRegions, valueFieldDefs: snapshot.valueFieldDefs, valueModifiers: snapshot.valueModifiers, regionValues: snapshot.regionValues };
-  }
-
-  getLeaderboard(): LeaderboardSlice {
-    return { leaderboard: this.projectedSnapshot().leaderboard };
   }
 
   getAchievements(): AchievementSlice {

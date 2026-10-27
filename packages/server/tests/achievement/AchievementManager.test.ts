@@ -9,10 +9,9 @@ const defs: AchievementDefinition[] = [
   { id: 'uct', scope: 'map', name: { 'zh-CN': '财富', 'en-US': 'Wealth' }, description: { 'zh-CN': '达到阈值', 'en-US': 'Reach threshold' }, category: 'economy', progress: { visible: true, target: 10 }, trigger: { type: 'uctThreshold', fieldId: 'score', target: 10 } },
   { id: 'owned', scope: 'map', name: { 'zh-CN': '持有', 'en-US': 'Owned' }, description: { 'zh-CN': '持有格子', 'en-US': 'Own cells' }, category: 'economy', progress: { visible: true, target: 2 }, trigger: { type: 'ownedCells', target: 2 } },
   { id: 'buy', scope: 'global', name: { 'zh-CN': '购买', 'en-US': 'Buy' }, description: { 'zh-CN': '购买格子', 'en-US': 'Buy cells' }, category: 'economy', progress: { visible: true, target: 2 }, trigger: { type: 'purchasedCells', target: 2 } },
-  { id: 'rank', scope: 'global', name: { 'zh-CN': '榜单', 'en-US': 'Rank' }, description: { 'zh-CN': '进入榜单', 'en-US': 'Reach rank' }, category: 'ranking', progress: { visible: true, target: 2 }, trigger: { type: 'ranking', targetRank: 2 } },
 ];
 
-test('六类触发均通过服务端入口推进且只解锁一次', async () => {
+test('五类触发均通过服务端入口推进且只解锁一次', async () => {
   const unlocked: string[] = [];
   const manager = new AchievementManager(defs, new InMemoryAchievementStore(), (payload) => unlocked.push(payload.achievement.id));
   const owner = { accountId: 'p1', guest: true };
@@ -28,8 +27,7 @@ test('六类触发均通过服务端入口推进且只解锁一次', async () =>
   await manager.refreshOwnedCells(owner, 'map-a', [1]);
   await manager.recordPurchase(owner, 'map-a', 1);
   await manager.recordPurchase(owner, 'map-a', 2);
-  await manager.recordRanking(owner, 2);
-  expect(unlocked.sort()).toEqual(['buy', 'event', 'owned', 'rank', 'uct', 'visit'].sort());
+  expect(unlocked.sort()).toEqual(['buy', 'event', 'owned', 'uct', 'visit'].sort());
   expect((await manager.getSnapshot(owner, 'map-a')).achievements.every((item) => item.record.unlocked)).toBe(true);
 });
 

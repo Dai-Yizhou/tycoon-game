@@ -10,7 +10,6 @@ export * from './player.js';
 export * from './economy-rules.js';
 export * from './team.js';
 export * from './map-meta.js';
-export * from './leaderboard.js';
 export * from './transport.js';
 export * from './event.js';
 export * from './era.js';

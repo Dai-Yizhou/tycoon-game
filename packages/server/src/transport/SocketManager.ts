@@ -33,7 +33,6 @@ import type { DayNightCycle } from '../world/DayNightCycle.js';
 import type { TeamManager } from '../team/TeamManager.js';
 import type { JWTService } from '../auth/JWTService.js';
 import type { Cell } from '@game/shared';
-import type { LeaderboardManager } from '../ranking/LeaderboardManager.js';
 import type { AchievementManager } from '../achievement/AchievementManager.js';
 import type { AchievementOwner } from '../achievement/AchievementStore.js';
 
@@ -87,7 +86,6 @@ export interface SocketManagerOptions {
   /** 昼夜循环实例（用于登录时同步时间给客户端） */
   dayNightCycle?: DayNightCycle;
   teamManager?: TeamManager;
-  leaderboardManager?: LeaderboardManager;
   achievementManager?: AchievementManager;
   achievementOwner?: (playerId: string, guest: boolean) => AchievementOwner;
 }
@@ -104,7 +102,6 @@ export class SocketManager {
   private readonly autoWireWorldEvents: boolean;
   private dayNightCycle?: DayNightCycle;
   private teamManager?: TeamManager;
-  private leaderboardManager?: LeaderboardManager;
   private achievementManager?: AchievementManager;
   private achievementOwner?: (playerId: string, guest: boolean) => AchievementOwner;
 
@@ -124,7 +121,6 @@ export class SocketManager {
     this.teamManager = options.teamManager;
     this.achievementManager = options.achievementManager;
     this.achievementOwner = options.achievementOwner;
-    this.setLeaderboardManager(options.leaderboardManager);
 
     if (!this.authenticate && !this.jwtService && process.env.NODE_ENV === 'production') {
       throw new Error('explicit socket authentication is required');
@@ -216,16 +212,6 @@ export class SocketManager {
     ...args: Parameters<ServerToClientEvents[K]>
   ): void {
     this.io.to(SocketManager.teamRoom(teamId)).emit(event, ...(args as Parameters<ServerToClientEvents[K]>));
-  }
-
-  /**
-   * 榜单快照按在线玩家分别推送
-   */
-  broadcastLeaderboard(snapshot: import('@game/shared').LeaderboardSnapshot): void {
-    for (const [playerId, sockets] of this.playerSockets) {
-      const personalized = this.leaderboardManager?.getCurrentSnapshot(playerId, snapshot.generatedAt) ?? snapshot;
-      for (const sid of sockets) this.io.sockets.sockets.get(sid)?.emit('server.leaderboardUpdated', personalized);
-    }
   }
 
   emitToPlayer<K extends keyof ServerToClientEvents>(
@@ -563,7 +549,6 @@ export class SocketManager {
           regionValues: this.buildRegionValuesSnapshot(),
           // 当前玩家的团队 UCT 汇总表：客户端据此以权威均值驱动 teamValue 展示（避免本地回退自身）
           teamValues: this.world.computeTeamValueTable(player.id),
-          leaderboard: this.leaderboardManager?.getCurrentSnapshot(player.id, now) ?? undefined,
         });
 
       } catch (err) {
@@ -590,10 +575,6 @@ export class SocketManager {
       if (Object.keys(row).length > 0) out[region.id] = row;
     }
     return out;
-  }
-
-  setLeaderboardManager(manager: LeaderboardManager | undefined): void {
-    this.leaderboardManager = manager;
   }
 
   setAchievementManager(manager: AchievementManager | undefined, owner?: (playerId: string, guest: boolean) => AchievementOwner): void {

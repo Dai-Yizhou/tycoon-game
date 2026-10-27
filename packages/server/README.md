@@ -17,7 +17,6 @@ Node.js + Express + Socket.IO 服务端。`src/index.ts:bootstrap()` 调用 `src
 | `src/storage/` | WorldStore / UserStore 及 Mongo / 文件 / 内存实现（玩家状态统一经世界快照持久化） |
 | `src/team/`、`src/chat/` | 队伍、聊天模块 |
 | `src/achievement/` | 成就配置加载、管理器与存储（Mongo/文件/内存） |
-| `src/ranking/` | LeaderboardManager 榜单脏标记与正式刷新广播 |
 | `map.json`、`map-meta.json`、`behaviors/` | 棋盘、地图元数据与行为配置 |
 
 Socket 注册点是 `app.ts` 的 `io.on('connection')`：先注册 SocketManager 核心连接处理，再调用 HandlerRegistry 注册业务 handler。协议定义在 `@game/shared`。

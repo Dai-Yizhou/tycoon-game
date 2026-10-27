@@ -247,7 +247,6 @@ export function createGamePage(controller: GameController): HTMLElement {
   page.appendChild(gameHudShell.getElement());
 
   gameSocket = controller.getSocket();
-  if (context.leaderboard) gameStore.setLeaderboard(context.leaderboard);
   // Init: load map data, then start game
   if (context.player && context.player.id) {
     gameStore?.applyEvent({ sequence: gameStore.nextSequence(), type: 'player', player: context.player });

@@ -20,7 +20,6 @@ test('接受合法成就定义并拒绝重复 ID', () => {
 
 test('拒绝与触发规则冲突的 scope 和非法引用', () => {
   expect(() => validateAchievementDefinitions([definition({ scope: 'global' })])).toThrow('scope');
-  expect(() => validateAchievementDefinitions([definition({ trigger: { type: 'ranking', targetRank: 0 }, scope: 'global' })])).toThrow('targetRank');
 });
 
 test('校验所有阈值触发器的正整数边界', () => {

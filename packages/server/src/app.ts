@@ -35,7 +35,6 @@ import { JWTService } from './auth/JWTService.js';
 import { AuthService, type UserStore } from './auth/AuthService.js';
 import { FileUserStore } from './storage/FileUserStore.js';
 import { createAuthRouter } from './auth/authRoutes.js';
-import { LeaderboardManager } from './ranking/index.js';
 import { AchievementManager, FileAchievementStore, loadAchievementDefinitions, MongoAchievementStore, type AchievementStore } from './achievement/index.js';
 
 /**
@@ -136,7 +135,6 @@ export interface CreatedApp {
   userStore?: UserStore;
   worldStore?: WorldStore;
   achievementStore?: AchievementStore;
-  leaderboardManager?: LeaderboardManager;
   handlerRegistry?: HandlerRegistry;
 }
 
@@ -360,43 +358,16 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
     // 玩家数值变更即团队均值随之变化：随时下推其团队 UCT 汇总表，保证客户端 teamValue 展示权威
     socketManager?.emitToPlayer(currentPlayer.id, 'server.teamValueTable', { playerId: currentPlayer.id, teamValues: world.computeTeamValueTable(currentPlayer.id) });
   });
-  const leaderboardManager = new LeaderboardManager({
-    worldId: world.getWorldIdentity()?.worldId ?? mapMeta.id,
-    mapMeta,
-    getPlayers: () => world.getAllPlayers(),
-    getRegionId: (cellId) => world.getRegionId(cellId),
-    getRegionValue: (regionId, fieldId) => world.getRegionValue(regionId, fieldId),
-    broadcast: (snapshot) => {
-      if (socketManager) {
-        socketManager.broadcastLeaderboard(snapshot);
-      }
-    },
-  });
   if (deps.socketManagerOptions) {
     socketManager = new SocketManager(io, {
       ...deps.socketManagerOptions,
       world,
       jwtService: deps.socketManagerOptions.jwtService ?? authJwt,
       teamManager: handlerRegistry.getTeamManager(),
-      leaderboardManager,
       achievementManager,
       achievementOwner: (playerId, guest) => ({ accountId: playerId, guest }),
     });
   }
-  world.on('playerAdded', () => leaderboardManager.markDirty());
-  world.on('playerRemoved', () => leaderboardManager.markDirty());
-  world.on('playerUpdated', () => leaderboardManager.markDirty());
-  world.on('playerPositionChanged', () => leaderboardManager.markDirty());
-  world.on('playerStatusChanged', () => leaderboardManager.markDirty());
-  world.on('regionValueChanged', () => leaderboardManager.markDirty());
-  leaderboardManager.subscribe((snapshot) => {
-    for (const player of world.getAllPlayers()) {
-      const personalized = leaderboardManager.getCurrentSnapshot(player.id, snapshot.generatedAt);
-      const rank = personalized?.currentPlayer?.rank ?? null;
-      void achievementManager.recordRanking({ accountId: player.id, guest: isGuestPlayer(player.username) }, rank).catch((error) => logger.error('achievement ranking update failed', error));
-    }
-  });
-  leaderboardManager.markDirty();
 
   // 初始化昼夜循环（从服务器启动时开始计时），周期时长与白昼占比均以 map-meta 为准
   const cycleMinutes = mapMeta.dayNightCycle > 0 ? mapMeta.dayNightCycle : DEFAULT_DAY_NIGHT_CONFIG.cycleMinutes;
@@ -482,7 +453,6 @@ export async function createApp(config: ServerConfig, deps: AppDependencies = {}
     handlerRegistry,
     userStore,
     achievementStore,
-    leaderboardManager,
   };
 }
 

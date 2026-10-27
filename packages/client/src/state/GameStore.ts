@@ -1,4 +1,4 @@
-import type { AchievementSnapshot, Cell, LeaderboardSnapshot, LeaderboardState, LocalizedText, Player, ChatMessage as ServerChatMessage, ValueModifierRule } from '@game/shared';
+import type { AchievementSnapshot, Cell, LocalizedText, Player, ChatMessage as ServerChatMessage, ValueModifierRule } from '@game/shared';
 
 // ===== 类型定义 =====
 
@@ -103,7 +103,6 @@ export interface ClientGameSnapshot {
   otherPlayerMoves: Map<string, OtherPlayerMoveState>;
   /** 当前玩家团队的 UCT 汇总表（服务端权威均值）；用于 teamValue 展示，避免本地回退自身 */
   teamValueTable: Record<string, number>;
-  leaderboard: LeaderboardState;
   achievements: { status: 'loading' | 'ready' | 'empty' | 'error' | 'offline' | 'disabled'; snapshot: AchievementSnapshot | null; error: string | null };
 }
 
@@ -147,7 +146,7 @@ export class GameStore {
     isBankrupt: false,
     isInJail: false, jailEndTime: 0, jailDurationMs: 0, canRoll: true, diceAnimating: false, actionUsedThisTurn: false, teamMembers: [], ownedProperties: new Set(), propertyLevels: new Map(), ownedInvestments: new Set(), investmentShares: new Map(), chatHistory: [], cells: new Map(), isMoving: false, remainingSteps: 0, cameraTargetX: 0, cameraTargetY: 0, diceValue: 0, diceAnimStart: 0, rollCooldownEnd: 0, rollCooldownMs: 0, dayNightStartTime: Date.now(), serverTimeOffset: 0, cycleMinutes: 15, dayNightRatio: 0.5, pathChoice: { active: false, options: [] }, previousCellId: -1, playerDisplayX: 600, playerDisplayY: 500, moveFromX: 0, moveFromY: 0, moveToX: 0, moveToY: 0, moveStartTime: 0, moveDwellUntil: 0, serverPath: [], serverPathIndex: 0, isWaitingForChoice: false, isServerAnimating: false, cellActions: [], regionValues: new Map(),
       boughtPrices: new Map(),
-      mapRegions: [], mapTimezones: [], valueFieldDefs: [], valueModifiers: [], cellRuntimeStates: new Map(), otherPlayerMoves: new Map(), teamValueTable: {}, leaderboard: { status: 'loading', snapshot: null, error: null }, achievements: { status: 'loading', snapshot: null, error: null },
+      mapRegions: [], mapTimezones: [], valueFieldDefs: [], valueModifiers: [], cellRuntimeStates: new Map(), otherPlayerMoves: new Map(), teamValueTable: {}, achievements: { status: 'loading', snapshot: null, error: null },
   };
   private readonly listeners = new Set<(snapshot: ClientGameSnapshot) => void>();
 
@@ -200,22 +199,6 @@ export class GameStore {
 
   setAchievementsOffline(): void {
     this.snapshot = { ...this.snapshot, achievements: { ...this.snapshot.achievements, status: 'offline' } };
-    this.publish();
-  }
-
-  setLeaderboard(snapshot: LeaderboardSnapshot | null): void {
-    const status = snapshot ? ((snapshot.top?.length ?? 0) > 0 ? 'ready' : 'empty') : 'disabled';
-    this.snapshot = { ...this.snapshot, leaderboard: { status, snapshot, error: null } };
-    this.publish();
-  }
-
-  setLeaderboardError(error: string): void {
-    this.snapshot = { ...this.snapshot, leaderboard: { ...this.snapshot.leaderboard, status: 'error', error } };
-    this.publish();
-  }
-
-  setLeaderboardOffline(): void {
-    this.snapshot = { ...this.snapshot, leaderboard: { ...this.snapshot.leaderboard, status: 'offline' } };
     this.publish();
   }
 
@@ -492,7 +475,6 @@ export class GameStore {
       cellRuntimeStates: new Map(),
       otherPlayerMoves: new Map(),
       teamValueTable: {},
-      leaderboard: { status: 'loading', snapshot: null, error: null },
       achievements: { status: 'loading', snapshot: null, error: null },
     };
     this.publish();

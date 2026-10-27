@@ -22,7 +22,7 @@ map.json / map-meta.json / achievements.json / behaviors/*.json
 | 文件 | 作用 |
 |---|---|
 | `packages/server/map.json` | 棋盘格子与有向边、按类型的数值字段、行为引用、区域/时区归属 |
-| `packages/server/map-meta.json` | 数值字段定义、UCT 声明、初始值、区域、昼夜、骰子、榜单、税收、可选 valueModifiers |
+| `packages/server/map-meta.json` | 数值字段定义、UCT 声明、初始值、区域、昼夜、骰子、税收、可选 valueModifiers |
 | `packages/server/behaviors/*.json` | 行为引擎脚本；由格子 `behaviorPass` / `behaviorLand` 与 `investmentTriggers` 引用 |
 | `packages/server/achievements.json` | 成就定义 |
 
@@ -70,7 +70,6 @@ map.json / map-meta.json / achievements.json / behaviors/*.json
 | `dayNightCycle` / `dayNightRatio` | 昼夜周期（小时）与白昼占比 |
 | `dayNight` | 昼夜区域数值变化：`{ day: { region: {...} }, night: { region: {...} } }` |
 | `dice` | `{ cooldownMs, min, max }` |
-| `ranking` | `{ enabled, topN, refreshMs, score: { constant, player: {字段:权重}, region: {字段:权重} } }` |
 | `tax` | 计税配置，见下 |
 | `valueModifiers[]` | 可选；数值调节规则，见下 |
 | `inactivityCleanup` | 可选；长期离线清理：`{ thresholdMs, sweepIntervalMs? }`。离线超过 `thresholdMs` 的玩家被释放全部股份并置破产态（不删号）；未配置则关闭 |
@@ -159,7 +158,7 @@ map.json / map-meta.json / achievements.json / behaviors/*.json
 
 顶层是数组，每项：
 
-- `id`、双语 `name`/`description`、`scope`（`map`/`global`）、`category`（movement/economy/social/event/ranking）
+- `id`、双语 `name`/`description`、`scope`（`map`/`global`）、`category`（movement/economy/social/event）
 - `progress`（可选）：`{ visible, target }`（`target` 为正整数）
 - `trigger`：见下表
 
@@ -170,7 +169,6 @@ map.json / map-meta.json / achievements.json / behaviors/*.json
 | `uctThreshold` | `fieldId`、`target` | 任意 |
 | `ownedCells` | `target` | 必须 `map` |
 | `purchasedCells` | `target` | 任意 |
-| `ranking` | `targetRank` | 任意 |
 
 加载期校验：ID 非空且唯一、双语文案齐全、scope/category 合法、cellIds/target 合法。
 

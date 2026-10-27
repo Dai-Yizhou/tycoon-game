@@ -1,5 +1,4 @@
 import type { ValueField } from './player';
-import type { RankingConfig } from './leaderboard';
 import type { LocalizedText, Uct } from './cell';
 import type { ValueModifierRule } from '../value-modifiers/types';
 
@@ -85,7 +84,6 @@ export interface MapMeta {
   dayNightRatio?: number;
   dice: DiceConfig;
   tax: TaxConfig;
-  ranking?: RankingConfig;
   /** 昼夜 UCT 数值变化配置（可选，未配置则日夜切换不调整数值） */
   dayNight?: DayNightValueChangeConfig;
   /** 全局数值调节规则（可选，D8）；命中 cellType+base 时覆盖/联动目标字段 */
