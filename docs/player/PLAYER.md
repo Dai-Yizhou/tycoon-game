@@ -84,6 +84,12 @@ UCT 声明（`uct`）：player = `[money, credit]`；region = `[pros]`。
 - 升级取 `upgradeCost[level]`，等级 +1，超过 `maxLevel` 被拒；仅地产可升级，投资项目不可升级。
 - 租金取 `rent[level]`；默认地图 1 号 level=0 时为 8、3 号为 12。
 
+### 释放股份
+
+- `client.releaseProperty` / `client.releaseInvestment` 释放整份持股，按释放时 `price` 的 `player` 字段绝对值返还（凭空增发，不由其他股东补付）。
+- 释放与其他行动共享同一次停靠互斥；非股东释放被拒（`not_owner`）。
+- 释放后剩余股东自动重分持股；无人持股时格子等级与累计值归零，广播 `server.propertyReleased` / `server.investmentReleased`。
+
 ### 合租（持股）
 
 - 后续购买者支付自己的价格；全员持股**平均化**：持股比例为 `1 / 参与人数`，不再按买入价配比。

@@ -42,6 +42,7 @@
     "rentOwnerShare": "{{owner}} 收 {{amount}}",
     "rentSelfOwned": "{{payer}} 停靠「{{cell}}」，因其本人持股，本次不收租",
     "rentNoCollectableOwner": "「{{cell}}」的股东均不可收租（在押/破产），本次不收租",
+    "shareReleased": "{{player}} 释放了「{{cell}}」的股份，返还 {{refund}}",
     "rentLevelConfigMissing": "「{{cell}}」缺少等级 {{level}} 的租金配置，本次不收租",
     "rentZero": "「{{cell}}」当前租金为 0，本次不收租",
     "rentFieldMissing": "{{payer}} 缺少字段「{{field}}」，本次不收租",
@@ -131,6 +132,14 @@
     "jailCost": "出狱费用",
     "secondsFormat": "{{value}} 秒"
   },
+  "onboarding": {
+    "roll": "点这里开始",
+    "hover": "看看这块地",
+    "action": "选一个",
+    "chat": "和邻居打个招呼",
+    "skip": "跳过",
+    "replay": "重看新手引导"
+  },
   "uct": {
     "player": "玩家",
     "region": "区域"
@@ -158,6 +167,7 @@
     "nextRentFormat": "下一级租金 {{rent}}",
     "nextRentLabel": "下一级租金",
     "upgradeTitle": "升级地产",
+    "releaseTitle": "释放地产股份",
     "price": "价格",
     "rent": "租金",
     "level": "等级",
@@ -168,6 +178,7 @@
   "investment": {
     "title": "投资项目",
     "invest": "投资",
+    "releaseTitle": "释放投资股份",
     "price": "投资价格: {{price}} 元"
   },
   "transport": {

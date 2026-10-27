@@ -195,4 +195,80 @@ describe('PropertyHandler v2', () => {
     expect(payer.values.money.current).toBe(-70);
     expect(owner.values.money.current).toBe(100);
   });
+
+  function createReleaseWorld(ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>) {
+    const world = new GameWorld();
+    world.loadMap([property], meta);
+    const socket = { data: { playerId: 'p1' }, emit: jest.fn(), on: jest.fn() } as any;
+    const player = {
+      id: 'p1',
+      username: 'p1',
+      teamId: null,
+      position: { cellId: 1 },
+      values: { money: { id: 'money', name: 'money', current: 1000, min: 0 } },
+      status: 'normal',
+      createdAt: 1,
+      lastActiveAt: 1,
+    } as any;
+    world.addPlayer(player);
+    world.getRuntimeState().replaceOwnerships(1, ownerships);
+    const handler = new PropertyHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
+    return { world, socket, player, handler };
+  }
+
+  it('释放地产股份返还完整 price，并清空所有权与累计值', () => {
+    const { world, socket, player, handler } = createReleaseWorld([
+      { playerId: 'p1', share: 1, purchasePrice: 100 },
+    ]);
+
+    const ack = jest.fn();
+    (handler as any).handleReleaseProperty(socket, { cellId: 1 }, ack);
+
+    expect(ack).toHaveBeenCalledWith(expect.objectContaining({
+      ok: true,
+      data: expect.objectContaining({ refund: { player: { money: 100 } }, share: 1 }),
+    }));
+    expect(player.values.money.current).toBe(1100);
+    const state = world.getRuntimeState().getCellState(1);
+    expect(state.ownerships).toEqual([]);
+    expect(state.level).toBe(0);
+    expect(state.accumulatedValue).toBe(0);
+  });
+
+  it('多人合持时释放者按完整 price 返还，剩余股东重分为 1', () => {
+    const { world, socket, player, handler } = createReleaseWorld([
+      { playerId: 'p1', share: 0.5, purchasePrice: 100 },
+      { playerId: 'p2', share: 0.5, purchasePrice: 100 },
+    ]);
+
+    const ack = jest.fn();
+    (handler as any).handleReleaseProperty(socket, { cellId: 1 }, ack);
+
+    expect(ack).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+    expect(player.values.money.current).toBe(1100);
+    const state = world.getRuntimeState().getCellState(1);
+    expect(state.ownerships).toHaveLength(1);
+    expect(state.ownerships[0]).toMatchObject({ playerId: 'p2', share: 1 });
+  });
+
+  it('非股东释放被拒绝', () => {
+    const { socket, handler } = createReleaseWorld([]);
+
+    const ack = jest.fn();
+    (handler as any).handleReleaseProperty(socket, { cellId: 1 }, ack);
+
+    expect(ack).toHaveBeenCalledWith({ ok: false, error: 'not_owner' });
+  });
+
+  it('同一次停留内购买后再释放被拒绝', () => {
+    const { socket, handler } = createReleaseWorld([]);
+
+    const buyAck = jest.fn();
+    (handler as any).handleBuyProperty(socket, { cellId: 1 }, buyAck);
+    expect(buyAck).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+
+    const releaseAck = jest.fn();
+    (handler as any).handleReleaseProperty(socket, { cellId: 1 }, releaseAck);
+    expect(releaseAck).toHaveBeenCalledWith({ ok: false, error: 'action_used_this_stop' });
+  });
 });

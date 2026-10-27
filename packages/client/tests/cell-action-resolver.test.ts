@@ -93,16 +93,19 @@ describe('act-bar 动作解析器', () => {
     });
     const actions = resolveCellActions({ cell, state: makeState({ owned: true, ownerCount: 1, level: 0 }), currentPlayer: makePlayer(200), valueFieldDefs: definitions });
 
-    expect(actions).toHaveLength(1);
+    expect(actions).toHaveLength(2);
     expect(actions[0]).toMatchObject({ id: 'upgrade-property', enabled: true });
     // 下一级租金已移入悬浮卡，act-bar 只保留升级费用
     expect(actions[0].detail).toBe('财产 -40');
+    expect(actions[1]).toMatchObject({ id: 'release-property', enabled: true });
+    expect(actions[1].detail).toBe('财产 -100');
   });
 
-  it('property 已达最高等级时不提供升级动作', () => {
+  it('property 已达最高等级时只保留释放动作', () => {
     const cell = makeCell('property', { maxOwnerCount: 5, price, rent: [{ player: { money: -10 } }], upgradeCost: [{ player: { money: -40 } }] });
     const actions = resolveCellActions({ cell, state: makeState({ owned: true, ownerCount: 1, level: 1 }), currentPlayer: makePlayer(200), valueFieldDefs: definitions });
-    expect(actions).toHaveLength(0);
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatchObject({ id: 'release-property', enabled: true });
   });
 
   it('investment 未持有：动作 ID 为 buy-investment（不是 invest），并按持股上限隐藏', () => {
@@ -117,7 +120,8 @@ describe('act-bar 动作解析器', () => {
     expect(full).toHaveLength(0);
 
     const owned = resolveCellActions({ cell, state: makeState({ ownedInvestment: true, ownerCount: 1 }), currentPlayer: makePlayer(200), valueFieldDefs: definitions });
-    expect(owned).toHaveLength(0);
+    expect(owned).toHaveLength(1);
+    expect(owned[0]).toMatchObject({ id: 'release-investment', enabled: true });
   });
 
   it('transport 提供传送动作，破产或本回合已操作时禁用', () => {

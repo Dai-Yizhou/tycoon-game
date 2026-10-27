@@ -45,7 +45,7 @@ const SOCKET_EVENTS = [
   'server.teamInviteReceived', 'server.teamMemberJoined', 'server.teamMemberLeft',
   'server.teamUpdated', 'server.teamDisbanded', 'server.teamInviteRejected', 'server.regionValueChanged', 'server.teamValueTable', 'server.gameState',
   'server.valueFieldDefinitions', 'server.diceRolled', 'server.notification', 'server.achievementUnlocked', 'server.playerBankrupt', 'server.playerRestarted',
-  'server.propertyBought', 'server.propertyUpgraded', 'server.investmentBought', 'server.investmentEventTriggered',
+  'server.propertyBought', 'server.propertyUpgraded', 'server.propertyReleased', 'server.investmentBought', 'server.investmentReleased', 'server.investmentEventTriggered',
 ] as const;
 
 /**
@@ -210,12 +210,26 @@ export function registerSocketHandlers(socket: TypedClientSocket, options: Socke
     refresh();
   });
 
+  socket.on('server.propertyReleased', (payload) => {
+    store.setCell(payload.cell);
+    store.setCellRuntimeState(payload.cell.id, payload.runtime);
+    store.applyEvent({ sequence: store.nextSequence(), type: 'propertyRelease', playerId: payload.playerId, cellId: payload.cell.id });
+    refresh();
+  });
+
   socket.on('server.investmentBought', (payload) => {
     store.setCell(payload.cell);
     store.setCellRuntimeState(payload.cell.id, payload.runtime);
     const ownerships = payload.runtime.ownerships;
     const ownership = ownerships.find((item) => item.playerId === payload.playerId);
     if (ownership) store.applyEvent({ sequence: store.nextSequence(), type: 'investment', playerId: payload.playerId, cellId: payload.cell.id, share: ownership.share });
+    refresh();
+  });
+
+  socket.on('server.investmentReleased', (payload) => {
+    store.setCell(payload.cell);
+    store.setCellRuntimeState(payload.cell.id, payload.runtime);
+    store.applyEvent({ sequence: store.nextSequence(), type: 'investmentRelease', playerId: payload.playerId, cellId: payload.cell.id });
     refresh();
   });
 

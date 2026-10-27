@@ -118,6 +118,8 @@ export type ClientGameEvent =
   | { sequence: number; type: 'otherPlayerMove'; playerId: string; cellId: number }
   | { sequence: number; type: 'property'; playerId: string; cellId: number; level: number }
   | { sequence: number; type: 'investment'; playerId: string; cellId: number; share: number }
+  | { sequence: number; type: 'propertyRelease'; playerId: string; cellId: number }
+  | { sequence: number; type: 'investmentRelease'; playerId: string; cellId: number }
   | { sequence: number; type: 'move'; playerId: string; cellId: number };
 
 export interface ServerGameSnapshot {
@@ -382,6 +384,22 @@ export class GameStore {
       if (event.playerId === this.snapshot.currentPlayer?.id) {
         ownedInvestments.add(event.cellId);
         investmentShares.set(event.cellId, event.share);
+      }
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, ownedInvestments, investmentShares, actionUsedThisTurn: event.playerId === this.snapshot.currentPlayer?.id ? true : this.snapshot.actionUsedThisTurn };
+    } else if (event.type === 'propertyRelease') {
+      const ownedProperties = new Set(this.snapshot.ownedProperties);
+      const propertyLevels = new Map(this.snapshot.propertyLevels);
+      if (event.playerId === this.snapshot.currentPlayer?.id) {
+        ownedProperties.delete(event.cellId);
+        propertyLevels.delete(event.cellId);
+      }
+      this.snapshot = { ...this.snapshot, sequence: event.sequence, ownedProperties, propertyLevels, actionUsedThisTurn: event.playerId === this.snapshot.currentPlayer?.id ? true : this.snapshot.actionUsedThisTurn };
+    } else if (event.type === 'investmentRelease') {
+      const ownedInvestments = new Set(this.snapshot.ownedInvestments);
+      const investmentShares = new Map(this.snapshot.investmentShares);
+      if (event.playerId === this.snapshot.currentPlayer?.id) {
+        ownedInvestments.delete(event.cellId);
+        investmentShares.delete(event.cellId);
       }
       this.snapshot = { ...this.snapshot, sequence: event.sequence, ownedInvestments, investmentShares, actionUsedThisTurn: event.playerId === this.snapshot.currentPlayer?.id ? true : this.snapshot.actionUsedThisTurn };
     } else if (event.type === 'value' && this.snapshot.currentPlayer?.id === event.playerId) {

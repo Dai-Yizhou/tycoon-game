@@ -42,6 +42,7 @@
     "rentOwnerShare": "{{owner}} received {{amount}}",
     "rentSelfOwned": "{{payer}} landed on \"{{cell}}\" but owns it, so no rent is charged",
     "rentNoCollectableOwner": "No owner of \"{{cell}}\" can collect rent (jailed/bankrupt), so no rent is charged",
+    "shareReleased": "{{player}} released shares of \"{{cell}}\", refunded {{refund}}",
     "rentLevelConfigMissing": "\"{{cell}}\" has no rent configured for level {{level}}, so no rent is charged",
     "rentZero": "Current rent of \"{{cell}}\" is 0, so no rent is charged",
     "rentFieldMissing": "{{payer}} has no field \"{{field}}\", so no rent is charged",
@@ -131,6 +132,14 @@
     "jailCost": "Jail cost",
     "secondsFormat": "{{value}}s"
   },
+  "onboarding": {
+    "roll": "Start here",
+    "hover": "Check this tile",
+    "action": "Choose one",
+    "chat": "Say hi",
+    "skip": "Skip",
+    "replay": "Replay guide"
+  },
   "uct": {
     "player": "Player",
     "region": "Region"
@@ -158,6 +167,7 @@
     "nextRentFormat": "Next-level rent {{rent}}",
     "nextRentLabel": "Next-level rent",
     "upgradeTitle": "Upgrade Property",
+    "releaseTitle": "Release Property Shares",
     "price": "Price",
     "rent": "Rent",
     "level": "Level",
@@ -168,6 +178,7 @@
   "investment": {
     "title": "Investment",
     "invest": "Invest",
+    "releaseTitle": "Release Investment Shares",
     "price": "Price: {{price}}"
   },
   "transport": {

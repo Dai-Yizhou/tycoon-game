@@ -157,6 +157,12 @@ export interface ClientToServerEvents {
     ack?: (result: AckResult<{ cell: Cell; price: import('./cell.js').Uct }>) => void,
   ) => void;
 
+  /** 释放地产股份（整份释放，按释放时的 price 返还） */
+  'client.releaseProperty': (
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
+    ack?: (result: AckResult<{ cell: Cell; refund: import('./cell.js').Uct; share: number }>) => void,
+  ) => void;
+
   /** 升级地产 */
   'client.upgradeProperty': (
     payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number; confirm?: boolean },
@@ -217,6 +223,12 @@ export interface ClientToServerEvents {
   'client.buyInvestment': (
     payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number; confirm?: boolean },
     ack?: (result: AckResult<{ cell: Cell }>) => void,
+  ) => void;
+
+  /** 释放投资项目股份（整份释放，按释放时的 price 返还） */
+  'client.releaseInvestment': (
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
+    ack?: (result: AckResult<{ cell: Cell; refund: import('./cell.js').Uct; share: number }>) => void,
   ) => void;
 
   /** 修缮纪念碑 */
@@ -306,6 +318,15 @@ export interface ServerToClientEvents {
     playerId: string;
     newLevel: number;
     cost: import('./cell.js').Uct;
+    runtime: { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number };
+  }) => void;
+
+  /** 地产股份被释放 */
+  'server.propertyReleased': (payload: {
+    cell: Cell;
+    playerId: string;
+    refund: import('./cell.js').Uct;
+    share: number;
     runtime: { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number };
   }) => void;
 
@@ -479,6 +500,15 @@ export interface ServerToClientEvents {
 
   /** 投资项目被购买 */
   'server.investmentBought': (payload: { cell: Cell; playerId: string; runtime: { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number } }) => void;
+
+  /** 投资项目股份被释放 */
+  'server.investmentReleased': (payload: {
+    cell: Cell;
+    playerId: string;
+    refund: import('./cell.js').Uct;
+    share: number;
+    runtime: { ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>; level: number; accumulatedValue: number };
+  }) => void;
 
   /** 投资项目事件被触发 */
   'server.investmentEventTriggered': (payload: {

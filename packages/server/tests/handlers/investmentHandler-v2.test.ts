@@ -103,7 +103,7 @@ describe('InvestmentHandler v2', () => {
       on: ((event: string) => registeredEvents.push(event)) as TypedServer['on'],
     } as unknown as TypedServer);
 
-    expect(registeredEvents).toEqual(['client.buyInvestment']);
+    expect(registeredEvents).toEqual(['client.buyInvestment', 'client.releaseInvestment']);
   });
 
   it('dispatches a domain event to every matching investment subscription', () => {
@@ -112,5 +112,54 @@ describe('InvestmentHandler v2', () => {
     const handler = new InvestmentHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
 
     expect((handler as any).dispatchDomainEvent(DomainEvents.AnyPlayerLandsEvent)).toEqual([]);
+  });
+
+  function createReleaseWorld(ownerships: Array<{ playerId: string; share: number; purchasePrice: number }>) {
+    const world = new GameWorld();
+    world.loadMap([investment], meta);
+    const socket = { data: { playerId: 'p1' }, emit: jest.fn(), on: jest.fn() } as any;
+    const player = {
+      id: 'p1',
+      username: 'p1',
+      teamId: null,
+      position: { cellId: 1 },
+      values: {
+        money: { id: 'money', name: 'money', current: 1000, min: 0 },
+        credit: { id: 'credit', name: 'credit', current: 10, min: 0 },
+      },
+      status: 'normal',
+      createdAt: 1,
+      lastActiveAt: 1,
+    } as any;
+    world.addPlayer(player);
+    world.getRuntimeState().replaceOwnerships(1, ownerships);
+    const handler = new InvestmentHandler({ emit: jest.fn(), on: jest.fn() } as unknown as TypedServer, world);
+    return { world, socket, player, handler };
+  }
+
+  it('释放投资股份按完整 price 返还所有 player 字段，并清空所有权', () => {
+    const { world, socket, player, handler } = createReleaseWorld([
+      { playerId: 'p1', share: 1, purchasePrice: 100 },
+    ]);
+
+    const ack = jest.fn();
+    (handler as any).handleReleaseInvestment(socket, { cellId: 1 }, ack);
+
+    expect(ack).toHaveBeenCalledWith(expect.objectContaining({
+      ok: true,
+      data: expect.objectContaining({ refund: { player: { money: 100, credit: 2 } }, share: 1 }),
+    }));
+    expect(player.values.money.current).toBe(1100);
+    expect(player.values.credit.current).toBe(12);
+    expect(world.getRuntimeState().getCellState(1).ownerships).toEqual([]);
+  });
+
+  it('非股东释放投资股份被拒绝', () => {
+    const { socket, handler } = createReleaseWorld([]);
+
+    const ack = jest.fn();
+    (handler as any).handleReleaseInvestment(socket, { cellId: 1 }, ack);
+
+    expect(ack).toHaveBeenCalledWith({ ok: false, error: 'not_owner' });
   });
 });

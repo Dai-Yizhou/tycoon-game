@@ -35,7 +35,7 @@ import {
 
 import {
   handleRollDice,
-  handleBuyProperty, handleUpgradeProperty, handleBuyInvestment, handleCoInvest,
+  handleBuyProperty, handleUpgradeProperty, handleReleaseProperty, handleBuyInvestment, handleReleaseInvestment, handleCoInvest,
   handleTransport, handleUseTransport, handleRestoreMonument, onPlayerArrived, ensureCooldownRevealTicker, type GameRuntime,
 } from '../game/systems/GameLogic.js';
 
@@ -232,7 +232,9 @@ export function createGamePage(controller: GameController): HTMLElement {
       const actions: Record<string, (d?: Record<string, unknown>) => void> = {
         'buy-property': () => invokeGameAction(handleBuyProperty),
         'upgrade-property': () => invokeGameAction(handleUpgradeProperty),
+        'release-property': () => invokeGameAction(handleReleaseProperty),
         'buy-investment': () => invokeGameAction(handleBuyInvestment),
+        'release-investment': () => invokeGameAction(handleReleaseInvestment),
         'co-invest': () => invokeGameAction(handleCoInvest),
         transport: (d) => {
           const target = typeof d?.targetCellId === 'number' ? d.targetCellId : undefined;

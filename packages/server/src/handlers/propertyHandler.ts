@@ -25,6 +25,7 @@ import type { BehaviorEngine, BehaviorExecuteResult } from '../behavior/Behavior
 import {
   addOwnership,
   getOwnerships,
+  releaseOwnership,
   distributeByShareFloor,
   type Ownership,
 } from '../economy/index.js';
@@ -93,7 +94,7 @@ export class PropertyHandler {
   private behaviorEngine: BehaviorEngine | null = null;
   /** 每位玩家本次停靠是否已执行购买或升级（到达时重置，停一次只允许一次操作） */
   private readonly actedThisVisit = new Map<string, boolean>();
-  private readonly operationGuard = new EconomicOperationGuard<AckResult<{ cell: Cell; price: Uct }>>();
+  private readonly operationGuard = new EconomicOperationGuard<AckResult<unknown>>();
 
   constructor(io: TypedServer, world: GameWorld, economy: EconomyService = new EconomyService(world)) {
     this.io = io;
@@ -162,6 +163,10 @@ export class PropertyHandler {
     socket.on('client.upgradeProperty', (payload, ack) => {
       this.handleUpgradeProperty(socket, payload, ack);
     });
+
+    socket.on('client.releaseProperty', (payload, ack) => {
+      this.handleReleaseProperty(socket, payload, ack);
+    });
   }
 
   /**
@@ -176,7 +181,7 @@ export class PropertyHandler {
       const requestId = payload.requestId;
       if (requestId) {
         const previous = this.operationGuard.getResult(requestId);
-        if (previous) { ack?.(previous); return; }
+        if (previous) { ack?.(previous as AckResult<{ cell: Cell; price: Uct }>); return; }
       }
       const lockKey = `property:${payload.cellId}`;
       if (!this.operationGuard.tryLock(lockKey)) { ack?.({ ok: false, error: 'operation_in_progress' }); return; }
@@ -484,6 +489,120 @@ export class PropertyHandler {
     } catch (err) {
       logger.error('升级地产处理错误', err);
       emitError(socket, ErrorCodes.InternalError, err instanceof Error ? err.message : String(err));
+      ack?.({ ok: false, error: 'internal_error' });
+    }
+  }
+
+  /**
+   * 处理释放地产股份请求
+   *
+   * 口径：按释放时的完整 price 返还（price.player 各字段取绝对值），整份释放；
+   * 不校验玩家当前位置，与购买/升级一致；与其他行动共享停靠互斥标记。
+   */
+  private handleReleaseProperty(
+    socket: TypedSocket,
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
+    ack?: (result: AckResult<{ cell: Cell; refund: Uct; share: number }>) => void,
+  ): void {
+    try {
+      const requestId = payload.requestId;
+      if (requestId) {
+        const previous = this.operationGuard.getResult(requestId);
+        if (previous) { ack?.(previous as AckResult<{ cell: Cell; refund: Uct; share: number }>); return; }
+      }
+      const lockKey = `property:${payload.cellId}`;
+      if (!this.operationGuard.tryLock(lockKey)) {
+        ack?.({ ok: false, error: 'operation_in_progress' });
+        return;
+      }
+      try {
+        const playerId = socket.data.playerId;
+        if (!playerId) { ack?.({ ok: false, error: 'unauthenticated' }); return; }
+        const player = this.world.getPlayer(playerId);
+        if (!player) { ack?.({ ok: false, error: 'player_not_found' }); return; }
+        if (player.status === PlayerStatus.Bankrupt || player.status === PlayerStatus.Frozen) {
+          ack?.({ ok: false, error: 'invalid_status' });
+          return;
+        }
+        const cell = this.world.getMapIndex()?.getById(payload.cellId);
+        if (!cell) { ack?.({ ok: false, error: 'cell_not_found' }); return; }
+        if (normalizeCellType(cell) !== CellTypes.Property) {
+          ack?.({ ok: false, error: 'not_releasable' });
+          return;
+        }
+        const own = getOwnerships(cell, this.world.getRuntimeState()).find(
+          (entry) => entry.playerId === playerId && entry.share > 0,
+        );
+        if (!own) { ack?.({ ok: false, error: 'not_owner' }); return; }
+        if (this.hasActedThisVisit(playerId, cell.id)) {
+          ack?.({ ok: false, error: 'action_used_this_stop' });
+          return;
+        }
+        if (!this.world.compareAndSwapEconomicVersions(
+          payload.cellId,
+          payload.expectedResourceVersion,
+          payload.expectedCellVersion,
+        )) {
+          ack?.({ ok: false, error: payload.expectedCellVersion !== undefined ? 'cell_version_conflict' : 'resource_version_conflict' });
+          return;
+        }
+
+        const priceUct = this.resolvePurchasePrice(cell, player);
+        const refundPlayer: Record<string, number> = {};
+        for (const [fieldId, amount] of Object.entries(priceUct?.player ?? {})) {
+          refundPlayer[fieldId] = Math.abs(amount);
+        }
+        if (Object.keys(refundPlayer).length === 0) { ack?.({ ok: false, error: 'no_price' }); return; }
+        if (Object.keys(refundPlayer).some((fieldId) => !player.values[fieldId])) {
+          ack?.({ ok: false, error: 'no_price' });
+          return;
+        }
+
+        const refund: Uct = { player: refundPlayer };
+        const changes = this.applyUct(player, refund, 'property_release_refund');
+        if (changes.length !== Object.keys(refundPlayer).length) {
+          ack?.({ ok: false, error: 'refund_failed' });
+          return;
+        }
+
+        releaseOwnership(cell, playerId, this.world.getRuntimeState());
+        this.updateCell(cell);
+
+        const runtime = this.world.getRuntimeState().getCellState(cell.id);
+        this.io.emit('server.propertyReleased', {
+          cell,
+          playerId,
+          refund,
+          share: own.share,
+          runtime: {
+            ownerships: [...runtime.ownerships],
+            level: runtime.level,
+            accumulatedValue: runtime.accumulatedValue,
+          },
+        });
+
+        const fieldDefinitions = this.world.getMapMeta()?.valueFieldDefinitions ?? [];
+        broadcastSystemMessage(
+          this.io,
+          t('server.shareReleased', {
+            player: player.username,
+            cell: this.cellLabel(cell),
+            refund: formatFieldAmounts(refundPlayer, fieldDefinitions),
+          }),
+        );
+
+        const response: AckResult<{ cell: Cell; refund: Uct; share: number }> = {
+          ok: true,
+          data: { cell, refund, share: own.share },
+        };
+        if (requestId) this.operationGuard.complete(requestId, response as unknown as AckResult<unknown>);
+        this.markActedThisVisit(playerId, cell.id);
+        ack?.(response);
+      } finally {
+        this.operationGuard.unlock(lockKey);
+      }
+    } catch (error) {
+      logger.error('处理地产股份释放失败', error);
       ack?.({ ok: false, error: 'internal_error' });
     }
   }

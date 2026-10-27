@@ -7,8 +7,8 @@
  * - 持股满员（ownerCount >= maxOwnerCount）不再提供购买动作。
  * - 已达最高等级（无 upgradeCost[level]）不再提供升级动作。
  * - 破产（isBankrupt）或本回合已操作（actionUsedThisTurn）时动作禁用。
- * - 动作 ID 与已注册处理器一一对应：buy-property / upgrade-property /
- *   buy-investment / transport / restore-monument。
+ * - 动作 ID 与已注册处理器一一对应：buy-property / upgrade-property / release-property /
+ *   buy-investment / release-investment / transport / restore-monument。
  * - 客户端 enabled 仅为投影，服务端校验才是权威。
  * - 负债式破产下 min 只是破产阈值，不再作为可点性下限：买不起也应保持可点，
  *   由服务端返回 wouldBankrupt 预览、客户端二次确认后放行（详见
@@ -82,14 +82,20 @@ export function resolveCellActions(input: CellActionInput): CellActionModel[] {
   if (cell.type === 'property') {
     const maxLevel = cell.upgradeCost?.length ?? 0;
     if (state.owned) {
+      const release: CellActionModel = {
+        id: 'release-property',
+        label: t('property.releaseTitle'),
+        detail: modDetail('price', cell.price, 0),
+        enabled: actionAvailable,
+      };
       const cost = cell.upgradeCost?.[state.level];
-      if (!cost || state.level >= maxLevel) return [];
+      if (!cost || state.level >= maxLevel) return [release];
       return [{
         id: 'upgrade-property',
         label: t('property.upgradeTitle'),
         detail: modDetail('upgradeCost', cost, state.level),
         enabled: actionAvailable && canApplyUct(currentPlayer, cost),
-      }];
+      }, release];
     }
     if (cell.maxOwnerCount !== undefined && state.ownerCount >= cell.maxOwnerCount) return [];
     return [{
@@ -101,7 +107,14 @@ export function resolveCellActions(input: CellActionInput): CellActionModel[] {
   }
 
   if (cell.type === 'investment') {
-    if (state.ownedInvestment) return [];
+    if (state.ownedInvestment) {
+      return [{
+        id: 'release-investment',
+        label: t('investment.releaseTitle'),
+        detail: modDetail('price', cell.price, state.level),
+        enabled: actionAvailable,
+      }];
+    }
     if (cell.maxOwnerCount !== undefined && state.ownerCount >= cell.maxOwnerCount) return [];
     return [{
       id: 'buy-investment',

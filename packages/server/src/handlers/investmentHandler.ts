@@ -20,7 +20,7 @@ import { logger } from '../utils/logger.js';
 import type { TypedServer, TypedSocket } from '../transport/SocketManager.js';
 import type { GameWorld } from '../world/GameWorld.js';
 import { ErrorCodes, emitError } from '../transport/handlers.js';
-import { addOwnership, getOwnerships, distributeByShareFloor } from '../economy/index.js';
+import { addOwnership, getOwnerships, releaseOwnership, distributeByShareFloor } from '../economy/index.js';
 import { publishValueChanged } from '../net/valuePublisher.js';
 import { broadcastSystemMessage, formatFieldAmounts } from '../net/systemChat.js';
 import type { PropertyOwnership } from './propertyHandler.js';
@@ -67,7 +67,7 @@ export class InvestmentHandler {
   private readonly economy: EconomyService;
   private achievementPurchase?: (playerId: string, cellId: number, guest: boolean) => void;
   private achievementOwnershipChanged?: (playerId: string, guest: boolean) => void;
-  private readonly operationGuard = new EconomicOperationGuard<AckResult<{ cell: Cell }>>();
+  private readonly operationGuard = new EconomicOperationGuard<AckResult<unknown>>();
   /** 每位玩家本次停靠是否已购买（到达时重置，停一次只允许一次操作） */
   private readonly actedThisVisit = new Map<string, boolean>();
 
@@ -117,6 +117,10 @@ export class InvestmentHandler {
       this.handleBuyInvestment(socket, payload, ack);
     });
 
+    socket.on('client.releaseInvestment', (payload, ack) => {
+      this.handleReleaseInvestment(socket, payload, ack);
+    });
+
   }
 
   /**
@@ -133,7 +137,7 @@ export class InvestmentHandler {
       const requestId = payload.requestId;
       if (requestId) {
         const previous = this.operationGuard.getResult(requestId);
-        if (previous) { ack?.(previous); return; }
+        if (previous) { ack?.(previous as AckResult<{ cell: Cell }>); return; }
       }
       const lockKey = `investment:${payload.cellId}`;
       if (!this.operationGuard.tryLock(lockKey)) { ack?.({ ok: false, error: 'operation_in_progress' }); return; }
@@ -276,6 +280,125 @@ export class InvestmentHandler {
       } finally { this.operationGuard.unlock(lockKey); }
     } catch (err) {
       logger.error('购买投资项目处理错误', err);
+      emitError(socket, ErrorCodes.InternalError, err instanceof Error ? err.message : String(err));
+      ack?.({ ok: false, error: 'internal_error' });
+    }
+  }
+
+  /**
+   * 处理释放投资项目股份请求
+   *
+   * 口径：按释放时的完整 price 返还（price.player 各字段取绝对值），整份释放；
+   * 不校验玩家当前位置，与购买一致；与购买共享停靠互斥标记。
+   */
+  private handleReleaseInvestment(
+    socket: TypedSocket,
+    payload: { cellId: number; requestId?: string; expectedResourceVersion?: number; expectedCellVersion?: number },
+    ack?: (result: AckResult<{ cell: Cell; refund: Uct; share: number }>) => void,
+  ): void {
+    try {
+      const requestId = payload.requestId;
+      if (requestId) {
+        const previous = this.operationGuard.getResult(requestId);
+        if (previous) { ack?.(previous as AckResult<{ cell: Cell; refund: Uct; share: number }>); return; }
+      }
+      const lockKey = `investment:${payload.cellId}`;
+      if (!this.operationGuard.tryLock(lockKey)) { ack?.({ ok: false, error: 'operation_in_progress' }); return; }
+      try {
+        const playerId = socket.data.playerId;
+        if (!playerId) { emitError(socket, ErrorCodes.NotAuthenticated, '请先登录'); ack?.({ ok: false, error: 'not_authenticated' }); return; }
+        const player = this.world.getPlayer(playerId);
+        if (!player) { emitError(socket, ErrorCodes.PlayerNotFound, '玩家不存在'); ack?.({ ok: false, error: 'player_not_found' }); return; }
+        if (!participatesInEconomy(player.status)) {
+          emitError(socket, ErrorCodes.InvalidOperation, '当前状态不可操作投资');
+          ack?.({ ok: false, error: 'invalid_status' });
+          return;
+        }
+        const mapIndex = this.world.getMapIndex();
+        if (!mapIndex) { emitError(socket, ErrorCodes.InternalError, '地图未加载'); ack?.({ ok: false, error: 'map_not_loaded' }); return; }
+        const cell = mapIndex.getById(payload.cellId);
+        if (!cell) { emitError(socket, ErrorCodes.InvalidPayload, `格子 ${payload.cellId} 不存在`); ack?.({ ok: false, error: 'cell_not_found' }); return; }
+        if (normalizeCellType(cell) !== CellTypes.Investment) {
+          emitError(socket, ErrorCodes.InvalidPayload, '该格子不是投资项目');
+          ack?.({ ok: false, error: 'not_investment' });
+          return;
+        }
+        const own = getOwnerships(cell, this.world.getRuntimeState()).find(
+          (entry) => entry.playerId === playerId && entry.share > 0,
+        );
+        if (!own) { emitError(socket, ErrorCodes.InvalidPayload, '你未持有该投资项目'); ack?.({ ok: false, error: 'not_owner' }); return; }
+        if (this.actedThisVisit.get(`${playerId}:${cell.id}`) === true) {
+          emitError(socket, ErrorCodes.InvalidPayload, '本次停靠已执行过操作');
+          ack?.({ ok: false, error: 'action_used_this_stop' });
+          return;
+        }
+        if (!this.world.compareAndSwapEconomicVersions(payload.cellId, payload.expectedResourceVersion, payload.expectedCellVersion)) {
+          ack?.({ ok: false, error: payload.expectedCellVersion !== undefined ? 'cell_version_conflict' : 'resource_version_conflict' });
+          return;
+        }
+
+        const priceUct = this.resolvePurchasePrice(cell, player);
+        const refundPlayer: Record<string, number> = {};
+        for (const [fieldId, amount] of Object.entries(priceUct?.player ?? {})) {
+          refundPlayer[fieldId] = Math.abs(amount);
+        }
+        if (Object.keys(refundPlayer).length === 0) {
+          emitError(socket, ErrorCodes.InvalidPayload, '该投资项目无价格信息');
+          ack?.({ ok: false, error: 'no_price' });
+          return;
+        }
+        if (Object.keys(refundPlayer).some((fieldId) => !player.values[fieldId])) {
+          emitError(socket, ErrorCodes.InvalidPayload, '返还字段缺失');
+          ack?.({ ok: false, error: 'no_price' });
+          return;
+        }
+
+        const refund: Uct = { player: refundPlayer };
+        const changes = this.applyUct(player, refund, 'investment_release_refund');
+        if (changes.length !== Object.keys(refundPlayer).length) {
+          emitError(socket, ErrorCodes.InternalError, '返还失败');
+          ack?.({ ok: false, error: 'refund_failed' });
+          return;
+        }
+
+        releaseOwnership(cell, playerId, this.world.getRuntimeState());
+        this.updateCell(cell);
+
+        const runtime = this.world.getRuntimeState().getCellState(cell.id);
+        this.io.emit('server.investmentReleased', {
+          cell,
+          playerId,
+          refund,
+          share: own.share,
+          runtime: {
+            ownerships: [...runtime.ownerships],
+            level: runtime.level,
+            accumulatedValue: runtime.accumulatedValue,
+          },
+        });
+
+        const locale = getLocale();
+        const cellLabel = cell.name?.[locale] ?? cell.name?.['zh-CN'] ?? cell.name?.['en-US'] ?? String(cell.id);
+        const fieldDefinitions = this.world.getMapMeta()?.valueFieldDefinitions ?? [];
+        broadcastSystemMessage(
+          this.io,
+          t('server.shareReleased', {
+            player: player.username,
+            cell: cellLabel,
+            refund: formatFieldAmounts(refundPlayer, fieldDefinitions),
+          }),
+        );
+
+        const response: AckResult<{ cell: Cell; refund: Uct; share: number }> = {
+          ok: true,
+          data: { cell, refund, share: own.share },
+        };
+        if (requestId) this.operationGuard.complete(requestId, response as unknown as AckResult<unknown>);
+        this.actedThisVisit.set(`${playerId}:${cell.id}`, true);
+        ack?.(response);
+      } finally { this.operationGuard.unlock(lockKey); }
+    } catch (err) {
+      logger.error('释放投资项目处理错误', err);
       emitError(socket, ErrorCodes.InternalError, err instanceof Error ? err.message : String(err));
       ack?.({ ok: false, error: 'internal_error' });
     }

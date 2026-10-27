@@ -109,7 +109,7 @@ function showBankruptcyConfirm(preview: BankruptcyPreview, onConfirm: () => void
 
 function emitAction(
   runtime: GameRuntime,
-  event: 'client.buyProperty' | 'client.upgradeProperty' | 'client.buyInvestment' | 'client.repairMonument',
+  event: 'client.buyProperty' | 'client.upgradeProperty' | 'client.releaseProperty' | 'client.buyInvestment' | 'client.releaseInvestment' | 'client.repairMonument',
   payload: Record<string, number>,
   confirm = false,
 ): void {
@@ -145,6 +145,12 @@ export function handleUpgradeProperty(runtime: GameRuntime): void {
   if (cell && cellType(cell) === 'property' && !snapshot.actionUsedThisTurn) emitAction(runtime, 'client.upgradeProperty', { cellId: cell.id });
 }
 
+export function handleReleaseProperty(runtime: GameRuntime): void {
+  const snapshot = runtime.store.getSnapshot();
+  const cell = runtime.mapIndex.getById(snapshot.currentPlayerPosition);
+  if (cell && cellType(cell) === 'property' && !snapshot.actionUsedThisTurn) emitAction(runtime, 'client.releaseProperty', { cellId: cell.id });
+}
+
 export function handleBuyInvestment(runtime: GameRuntime): void {
   const snapshot = runtime.store.getSnapshot();
   const cell = runtime.mapIndex.getById(snapshot.currentPlayerPosition);
@@ -152,6 +158,12 @@ export function handleBuyInvestment(runtime: GameRuntime): void {
 }
 
 export function handleCoInvest(runtime: GameRuntime): void { handleBuyInvestment(runtime); }
+
+export function handleReleaseInvestment(runtime: GameRuntime): void {
+  const snapshot = runtime.store.getSnapshot();
+  const cell = runtime.mapIndex.getById(snapshot.currentPlayerPosition);
+  if (cell && cellType(cell) === 'investment' && !snapshot.actionUsedThisTurn) emitAction(runtime, 'client.releaseInvestment', { cellId: cell.id });
+}
 
 export function handleTransport(runtime: GameRuntime): void {
   // 传送入口：点击后把 act-bar 更新为该枢纽可用的多个目的地动作

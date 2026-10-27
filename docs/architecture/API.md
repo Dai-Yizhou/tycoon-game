@@ -23,6 +23,7 @@
 | `client.choosePath` | `MovementHandler` | 多岔路选择合法下一格 |
 | `client.buyProperty` / `upgradeProperty` | `PropertyHandler` | 买地与升级；可携带 `requestId` 和 `expectedResourceVersion`，版本冲突返回 `resource_version_conflict` |
 | `client.buyInvestment` | `InvestmentHandler` | 投资购买；可携带 `requestId`、`expectedResourceVersion` 与 `expectedCellVersion`；投资事件由服务端域事件和地图 `investmentTriggers` 配置驱动，不提供客户端主动触发入口 |
+| `client.releaseProperty` / `releaseInvestment` | `PropertyHandler` / `InvestmentHandler` | 释放整份持股，按释放时 `price` 的 `player` 字段绝对值返还；与其他行动共享停靠互斥，可携带 `requestId` 与版本校验字段 |
 | `client.useTransport` / `getTransportDestinations` | `TransportHandler` | 查询目的地与付费传送 |
 | `client.repairMonument` / `getMonumentStatus` | `MonumentHandler` | 纪念碑状态查询与修缮 |
 | `client.inviteToTeam` / `respondToTeamInvite` / `leaveTeam` / `kickTeamMember` / `getTeamState` | `TeamHandler` | 队伍邀请、成员变更和状态查询 |
@@ -44,6 +45,7 @@
 | `server.valueChanged` | 玩家或区域数值增量/新值 |
 | `server.playerStatusChanged` | Frozen、Jail、Bankrupt 等玩家状态变化 |
 | `server.investmentBought` / `server.investmentEventTriggered` | 投资状态和事件变化；投资事件载荷包含服务端按股权与参与状态计算后的 `affectedPlayers`，客户端只展示当前玩家自己的明细 |
+| `server.propertyReleased` / `server.investmentReleased` | 股份释放结果：格子、释放者、返还 UCT、释放份额与释放后的 `ownerships/level/accumulatedValue` |
 | `server.transportDestinationsChanged` | 交通目的地变化 |
 | `server.prosperityChanged` | 区域/纪念碑繁荣度变化 |
 | `server.teamUpdated` / `teamDisbanded` / `teamInviteReceived` 等 | 队伍视图与邀请变化 |
