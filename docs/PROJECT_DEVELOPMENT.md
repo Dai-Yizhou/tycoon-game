@@ -1,4 +1,4 @@
-# 大富翁.io · 项目开发报告
+# rentfree.io · 项目开发报告
 
 > 生成日期：2026-09-25 · 主线依据：dev-Dai（266 提交）+ git churn 实测 + 工作区外历史原型目录。
 > 本报告合并自原 `DEVELOPMENT_TRAJECTORY.md` 与 `ENGINEERING_MATURITY.md`。

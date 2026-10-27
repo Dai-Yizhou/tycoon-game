@@ -1,4 +1,4 @@
-# 大富翁.io
+# rentfree.io
 
 > 当前运行时由 `packages/shared`、`packages/server`、`packages/client` 三包组成。服务端持有游戏世界和经济权威，客户端通过单一 Socket.IO 连接发送 `client.*` 请求并消费 `server.*` 状态事件。
 

@@ -1,4 +1,4 @@
-# 大富翁.io 项目开发与维护教程
+# 项目开发与维护教程
 
 > 适用读者：已掌握 **C++ 基本语法**（变量、函数、类、流程控制），但刚接触 **TypeScript / Node.js / Web 前端** 的开发者。
 > 本教程针对本仓库（`tycoon-game`）当前运行时（`fix/complete-authority-hardening` 分支）编写，所有路径和说法均以**实际源码**为准。

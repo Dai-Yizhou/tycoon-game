@@ -65,11 +65,11 @@
     "subtitle": "（还没想好的副标题）",
     "startButton": "开始游戏",
     "guestButton": "游客模式",
-    "welcome": "欢迎来到大富翁.io！点击\"掷骰子\"开始游戏",
+    "welcome": "欢迎来到rentfree.io！点击\"掷骰子\"开始游戏",
     "version": "游戏版本: v1.0.0",
     "unknownRegion": "未知区域",
     "defaultPlayerName": "玩家",
-    "welcomeMessage": "欢迎来到大富翁.io！点击\"掷骰子\"开始游戏"
+    "welcomeMessage": "欢迎来到rentfree.io！点击\"掷骰子\"开始游戏"
   },
   "login": {
     "title": "登录",
